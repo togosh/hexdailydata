@@ -2,7 +2,7 @@
 
 Migration 2 preserves migration 1 and adds `source_history` (one verified acquisition
 start, source pair and finality policy per chain) and `recovery_pins` (at most four named
-cutoffs per chain). These tables travel in seed format 1/schema 2. The manifest JSON
+cutoffs per chain). These tables travel in seed format 2/schema 2. The manifest JSON
 Schema is generated from the runtime Zod manifest; calculation version is `hex-native-1`.
 Database identity, migration credentials and session locks never travel.
 
@@ -11,14 +11,43 @@ the deployment receipt and pinned contract fields; it is not a missing-input def
 The inspected HEX constructor sets share rate and claim/ledger initialization without
 minting an ERC-20 balance. The older positive-supply fixture remains a synthetic case.
 
-Acquisition retains the accepted contiguous-header interface (2048 maximum; the engine
-plans at most128). It stops checkpoints at observed UTC boundaries, gets up to1024
-pending daily words at an explicit block hash, and uses the existing daily reducers.
-Source receipts enumerate each header's transaction identities; their complete filtered
-sets must match the full getLogs responses. All repeated, header, receipt, corroboration,
-day-close and reconciliation calls consume the sync lane. This conservative profile
-increases work; no real source capability or speed is claimed. The default profile has
-no multicall transport: there is no uncharged inner work hidden in a logical call.
+Acquisition compares two complete filtered HEX event sets, including Transfer, over an
+explicit numeric from/to interval following the prior cursor. It checks raw ABI values,
+canonical order/duplicates, bidirectional transaction identities, actual event header
+number/hash/time and transaction-list membership. Known shared upstreams are rejected;
+unknown correlation remains null. Equal omissions that evade supplied state checks are
+outside this provider-corroborated policy's proof. No union, digest-only assertion or
+single-source fallback is accepted. Only constructor verification requests receipts.
+
+Each accepted interval is within one observed UTC day. Its headers are sparse actual
+observations: the first/last and event blocks. Both sources also supply the prior cursor
+header and, when a search clips the requested interval, the actual adjacent first block
+of the next day. Checked binary brackets locate that pair; all lookups consume the sync
+lane. The next commit closes the previous day using its real last block, pinned supply
+and deterministic address samples. Activations, empty days, inherited fork ownership
+and delayed payouts still use the existing reducers. A real timestamp jump can close
+at most32 days at one boundary; a larger unresolved single-block jump pauses.
+
+Range spans start at128 and can double to1,048,576 blocks, independent of the bounds on
+2000 raw events,2048 verified observations,32 day transitions,1024 daily words and16MiB
+RPC responses. Search takes at most20 midpoint calls per source/attempt. No array or
+loop is allocated for skipped block numbers. Event-header RPC batches contain at most30
+items. Transaction lists are checked then discarded; the2049-entry cache retains only
+plain headers. Conflicting observations and changing range/previous/day boundaries
+reject the attempt. Parent hashes are checked only for numerically adjacent observed
+headers; agreement across gaps relies on corroborated canonical-range/finality evidence,
+not invented parent links. Recovery promises retained checkpoint rewinds, not arbitrary
+skipped block rewinds; a confirmed reorg without a retained checkpoint inside its
+configured block window pauses. Decoding remains outside the writer transaction.
+
+The durable acceptance policy is `filtered-range-sparse-v2`, with explicit range endpoints.
+Seed format2 rejects format1 and unsupported old acceptance metadata instead of treating
+old contiguous-header claims as sparse coverage. Schema2 and both existing migrations
+are unchanged. Import checks monotonic sparse observations, adjacent parent links,
+retained event/day-close/payout headers and every retained checkpoint restore. Ordinary
+reads do not repeat that audit. All metadata, fences, search, retries, constructor and
+reconciliation calls remain charged; fixed lane limits are unchanged. No real source
+capability, throughput or full-history feasibility is qualified by this correction.
 
 Pruning holds the canonical session lock and exclusive maintenance lock, deletes at
 most32 accepted checkpoint batches older than seven replay days and below every pin,

@@ -267,7 +267,7 @@ export function fixture({ last = 364, holdersPerBlock = 0 } = {}) {
     const source = new Source(new RpcClient(id, id, chain, CONTRACT, transport, budget), {
       codeHash: CODE_HASH,
       finality: { mode: 'confirmed', confirmations: 1, rollbackBlocks: 128 },
-      completeness: 'receipts',
+      completeness: 'filtered-ranges',
     });
     observedSources.push(source);
     return source;

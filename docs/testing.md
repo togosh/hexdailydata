@@ -180,3 +180,23 @@ example `git archive --format=zip`) and the small task report separately. Exclud
 node_modules, credentials, databases, seeds and live response bodies. This is an
 owner review artifact, never a runtime prerequisite. Do not add a packaging framework
 that snapshots the entire workspace after every edit.
+
+## Task03 acquisition follow-through witnesses
+
+`tests/unit/acquisition.test.mjs` uses lazy monotone-timestamp raw fixtures to hold events
+and day outcomes fixed as skipped distance and unrelated transaction density grow. It
+records logical/physical method counts, bytes, observations and virtual quota time
+separately from wall time. The old2B-header/2T-receipt floor is arithmetic, not a live
+measurement. `tests/sync/acquisition.mjs` runs in the same combined2CPU/4GiB envelope:
+raw policy/identity rejection with unchanged SQL/undo, exact sparse day closes and
+activation/maturity/payout results, a separately provisioned sparse seed destination,
+checkpoint rewind/replay, and a busy event range requiring bounded splitting. The
+original raw rebuild/fork/seed/precision/pruning/recovery tests remain in the final suite.
+Source physicalMethods counts HTTP attempts containing that method; mixed-method batches
+can contribute to more than one method, so those counts must not be summed as total HTTP.
+
+Use a separate `HDD_V2_SYNC_EVIDENCE` and `HDD_V2_SQL_EVIDENCE` directory below artifacts.
+The original Task03 evidence and Task01 policy-blocked temporary folder remain untouched.
+Task01 browser evidence at98ebf8c and Task02 million-row evidence at237aba7 remain reused;
+no schema, index, ranking query or amount reducer changed. This is not full-history,
+full seed-scale or real provider performance evidence.

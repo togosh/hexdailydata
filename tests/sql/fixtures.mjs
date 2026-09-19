@@ -98,10 +98,29 @@ export async function batch(client, values = [], day, chainId = 1) {
       locked: state.locked_hearts,
       balances: d === state.contract_day ? balances : [],
     });
-  const content = { headers: [h], events, closes, payouts: [] };
+  const {
+    rows: [previous],
+  } = await client.query(
+    'SELECT number,hash,parent_hash,timestamp FROM hdd.blocks_recent WHERE chain_id=$1 AND number=$2',
+    [chainId, s.block_number],
+  );
+  const content = {
+    next: null,
+    previous: {
+      number: previous.number,
+      hash: '0x' + previous.hash.toString('hex'),
+      parentHash: '0x' + previous.parent_hash.toString('hex'),
+      timestamp: previous.timestamp,
+    },
+    headers: [h],
+    events,
+    closes,
+    payouts: [],
+  };
   return {
     chainId,
     contract: CONTRACT,
+    range: { fromBlock: h.number, toBlock: h.number },
     expected: {
       blockNumber: s.block_number,
       blockHash: '0x' + s.block_hash.toString('hex'),

@@ -113,7 +113,11 @@ if (command === 'status') {
                 transports.get(s.endpointEnv)!,
                 budget,
               ),
-              { codeHash: profile.codeHash, finality: profile.policy, completeness: 'receipts' },
+              {
+                codeHash: profile.codeHash,
+                finality: profile.policy,
+                completeness: 'filtered-ranges',
+              },
             ),
         ) as [Source, Source];
         return new SyncEngine(writer, reader!, sources, resolve(process.env.HDD_V2_STORAGE_PATH!));

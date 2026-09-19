@@ -183,13 +183,16 @@ mode serves them as real data. Read the concrete checkpoint/seed mapping in
 
 ## Acquisition, sync and portable seeds (Task03)
 
-`npm run test:sync` provisions three sequential, private, disposable PostgreSQL targets.
+`npm run test:sync` provisions seven sequential, private, disposable PostgreSQL targets.
 It exercises raw transport -> rebuild -> streamed seed -> fresh import -> forward sync,
 then compares an otherwise identical rebuild with retention pinned by a lagging consumer.
 The Node runner and PostgreSQL share the same 2 CPU/4 GiB allocation described above.
 Evidence and synthetic seeds go to ignored `artifacts/task-03/`; generated seeds are not
-release artifacts. `HDD_V2_SYNC_TEST_PHASE=build|import|unpruned` selects a focused phase;
+release artifacts. `HDD_V2_SYNC_TEST_PHASE=build|early-import|import|unpruned|sparse-build|sparse-import|busy` selects a focused phase;
 import/unpruned require the matching build fixture artifacts, never a production seed.
+`sparse-import` requires `sparse-build`. `HDD_V2_SYNC_EVIDENCE` selects a new directory
+under repository artifacts; the acquisition follow-through uses `artifacts/task03-acquisition/`.
+The sparse fixture generates skipped headers lazily; the busy fixture forces bounded splits.
 
 Worker entry: `node src/worker/main.ts help` (or compiled `dist/worker/main.js`). Commands
 are `rebuild`, `once`, `watch`, `repair-range <retained-block>`, `seed-export <file>` and
@@ -208,21 +211,21 @@ and frozen rebuild target. There are no default real endpoints, constructor/fork
 or synthetic runtime values. All supplied boundary identities are checked through the
 provider path. Filling these values is not authorization to run the early canary.
 
-The initial acquisition implementation verifies contiguous headers, full filtered log
-sets and each header's complete receipt enumeration from both sources. It batches up to
-30 RPC items and adapts checkpoint ranges; unresolved single-block ambiguity pauses.
-This conservative receipt profile has substantial mandatory work. Its real capability,
-cost and 14-day feasibility remain unqualified; the approval brief counts that work.
-Sources can still be correlated. Unknown operators are disclosed as null, never proved
-independent. A profile exceeding the mandatory-work lower bound must be rejected.
-
+Acquisition compares complete filtered log sets from both sources over explicit bounded
+numeric ranges, retaining actual event and boundary headers. Checked searches locate
+exact UTC closes without fetching every irrelevant block; range spans grow independently
+of event/header/byte limits. Only constructor verification reads transaction receipts.
+Sources can still share omissions. Known shared operators are rejected; unknown
+correlation is disclosed as null. Real capability, cost and14-day feasibility remain
+unqualified. See [the acquisition contract](docs/sync.md) for sparse coverage, recovery
+and the work accounting limits.
 One process-role session lock owns the worker quota files. Keep the quota directory
 persistent and shared with the eventual API process: fixed disjoint dispatch slots and
 non-borrowing lanes enforce the combined ceiling; retries and aliases do not add quota.
 Every process starts with a 60-second quiet period and honors both roles' persisted
 cooldowns. Extra replicas are unsupported. Task04 owns actual live API callers.
 
-Seed export is a consistent, streamed logical snapshot in a strict `seed.tar.gz` format.
+Seed export is a consistent, streamed logical snapshot in a strict format2 `seed.tar.gz` archive. Format1 and unsupported old acceptance metadata are refused.
 Import requires an empty migrated target, its instance UUID, trusted archive SHA-256,
 contract/code identity and checkpoint hash in the expectation file. It preserves the
 destination instance and roles. Entire imports commit atomically after hashes, exact

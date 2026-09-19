@@ -127,3 +127,8 @@ Node 24 LTS, Fastify 5 support and Vite requirements were checked against the of
 [Vite guide](https://vite.dev/guide/). Exact installed versions are in package-lock.json
 and the task report. Dependency notices stay with their installed packages; source ZIPs
 exclude node_modules. No licensing review or production source qualification is claimed.
+
+Task03 acquisition follow-through uses the existing v2 ABI definitions and synthetic raw
+transport fixtures only. No additional v1 files, runtime, credentials or data were read.
+Filtered-range corroboration replaces mandatory historical receipts; constructor identity
+verification remains. The sparse range/seed contract is documented in sync.md.

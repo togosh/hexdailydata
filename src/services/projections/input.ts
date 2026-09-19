@@ -95,6 +95,8 @@ export const closeSchema = z.strictObject({
 const sourceSchema = z.strictObject({
   id: z.string().min(1).max(80),
   operator: z.string().min(1).max(80).nullable(),
+  previous: headerSchema,
+  next: headerSchema.nullable(),
   headers: z.array(headerSchema).min(1).max(2048),
   events: z.array(eventSchema).max(2000),
   closes: z.array(closeSchema).max(32),
@@ -104,6 +106,7 @@ const batchSchema = z.strictObject({
   chainId: chain,
   contract: address,
   expected: z.strictObject({ blockNumber: integer, blockHash: hash, revision: integer }),
+  range: z.strictObject({ fromBlock: integer, toBlock: integer }),
   sources: z.tuple([sourceSchema, sourceSchema]),
 });
 export type Header = z.infer<typeof headerSchema>;
@@ -171,6 +174,8 @@ function normalizeSource(source: Batch['sources'][number], chainId: number, cont
     payoutDays.add(payout.day);
   }
   return {
+    previous: source.previous,
+    next: source.next,
     headers: source.headers,
     events: unique,
     closes: source.closes,
@@ -189,22 +194,40 @@ export function validateBatch(input: unknown) {
     second = normalizeSource(b, batch.chainId, batch.contract);
   if (JSON.stringify(first) !== JSON.stringify(second))
     throw new Error('Native source disagreement.');
-  let prior = batch.expected.blockNumber,
-    priorHash = batch.expected.blockHash,
-    priorTime: bigint | undefined;
+  if (
+    BigInt(batch.range.fromBlock) !== BigInt(batch.expected.blockNumber) + 1n ||
+    BigInt(batch.range.toBlock) < BigInt(batch.range.fromBlock) ||
+    BigInt(batch.range.toBlock) - BigInt(batch.range.fromBlock) >= 1048576n ||
+    first.headers[0]!.number !== batch.range.fromBlock ||
+    first.headers.at(-1)!.number !== batch.range.toBlock ||
+    first.previous.number !== batch.expected.blockNumber ||
+    first.previous.hash !== batch.expected.blockHash
+  )
+    throw new Error('Invalid explicit range coverage.');
+  let prior = first.previous.number,
+    priorHash = first.previous.hash,
+    priorTime = BigInt(first.previous.timestamp);
+  const rangeDay = contractDayAt(BigInt(first.headers[0]!.timestamp));
   for (const h of first.headers) {
     if (
-      BigInt(h.number) !== BigInt(prior) + 1n ||
-      h.parentHash !== priorHash ||
-      (priorTime !== undefined && BigInt(h.timestamp) <= priorTime)
+      BigInt(h.number) <= BigInt(prior) ||
+      (BigInt(h.number) === BigInt(prior) + 1n && h.parentHash !== priorHash) ||
+      BigInt(h.timestamp) <= priorTime ||
+      contractDayAt(BigInt(h.timestamp)) !== rangeDay
     )
-      throw new Error('Noncontiguous header range.');
-    contractDayAt(BigInt(h.timestamp));
+      throw new Error('Noncontiguous or contradictory observed header range.');
     prior = h.number;
     priorHash = h.hash;
     priorTime = BigInt(h.timestamp);
   }
   const last = first.headers.at(-1)!;
+  if (
+    first.next &&
+    (BigInt(first.next.number) !== BigInt(last.number) + 1n ||
+      first.next.parentHash !== last.hash ||
+      contractDayAt(BigInt(first.next.timestamp)) <= rangeDay)
+  )
+    throw new Error('Invalid corroborated day boundary.');
   return {
     batch,
     ...first,
@@ -225,7 +248,8 @@ export function validateBatch(input: unknown) {
       eventDigest: digest(first.events),
       headerDigest: digest(first.headers),
       payoutDigest: digest(first.payouts),
-      policy: 'full-range-corroboration-v1',
+      policy: 'filtered-range-sparse-v2',
+      range: batch.range,
     },
   };
 }

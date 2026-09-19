@@ -97,6 +97,7 @@ export class RpcClient {
     transportMs: 0,
     guardsMs: 0,
     methods: {} as Record<string, number>,
+    physicalMethods: {} as Record<string, number>,
     selectors: {} as Record<string, number>,
   };
   readonly id: string;
@@ -147,6 +148,9 @@ export class RpcClient {
           const start = performance.now();
           this.counters.requests++;
           this.counters.logical += calls.length;
+          for (const method of new Set(calls.map((call) => call.method)))
+            this.counters.physicalMethods[method] =
+              (this.counters.physicalMethods[method] ?? 0) + 1;
           for (const call of calls)
             this.counters.methods[call.method] = (this.counters.methods[call.method] ?? 0) + 1;
           for (const call of calls)

@@ -17,7 +17,6 @@ import {
 } from '../../services/projections/input.ts';
 import { reconcile } from '../../services/projections/initialize.ts';
 import { totalColumns } from '../../services/projections/reduce.ts';
-import { contractDayAt } from '../../domain/day.ts';
 import limits from '../../../config/limits.json' with { type: 'json' };
 
 export async function diskReserve(path: string) {
@@ -95,6 +94,7 @@ export class SyncEngine {
     const values = [];
     for (const source of this.sources) {
       await source.verify(checkpoint, signal);
+      source.counters.receiptCalls++;
       const receipt = z
         .object({
           transactionHash: hash,
@@ -331,7 +331,6 @@ export class SyncEngine {
       while (BigInt(s.block_number) < BigInt(target.number)) {
         signal.throwIfAborted();
         await diskReserve(this.storagePath);
-        const previous = plainHeader(await this.sources[0].header(s.block_number, signal));
         const expected = {
           blockNumber: s.block_number,
           blockHash: hex(s.block_hash),
@@ -352,40 +351,25 @@ export class SyncEngine {
         const acquisitionStart = performance.now();
         let accepted: ReturnType<typeof validateBatch>;
         for (;;) {
+          range = Number(
+            BigInt(range) < BigInt(target.number) - BigInt(s.block_number)
+              ? BigInt(range)
+              : BigInt(target.number) - BigInt(s.block_number),
+          );
           try {
-            const all: [Header[], Header[]] = [[], []];
-            let rangeDay: number | undefined;
-            const count = Number(
-              BigInt(target.number) - BigInt(s.block_number) > BigInt(range)
-                ? BigInt(range)
-                : BigInt(target.number) - BigInt(s.block_number),
-            );
-            const acquired = await Promise.all(
-              this.sources.map((source) =>
-                source.rangeHeaders(BigInt(s.block_number) + 1n, count, signal),
-              ),
-            );
-            for (let i = 0; i < count; i++) {
-              const pair = [acquired[0]![i]!, acquired[1]![i]!];
-              const day = contractDayAt(BigInt(pair[0]!.timestamp));
-              if (rangeDay !== undefined && day !== rangeDay) break;
-              rangeDay = day;
-              all[0].push(plainHeader(pair[0]!));
-              all[1].push(plainHeader(pair[1]!));
-            }
+            const end = BigInt(s.block_number) + BigInt(range);
+            const to = (end < BigInt(target.number) ? end : BigInt(target.number)).toString();
             const first = await this.sources[0].acquire(
               expected,
-              all[0],
+              to,
               state.sampled_addresses.map(hex),
-              previous,
               pending.day,
               signal,
             );
             const second = await this.sources[1].acquire(
               expected,
-              all[1],
+              to,
               state.sampled_addresses.map(hex),
-              previous,
               pending.day,
               signal,
             );
@@ -393,6 +377,10 @@ export class SyncEngine {
               chainId: this.writer.chainId,
               contract: this.sources[0].rpc.contract,
               expected,
+              range: {
+                fromBlock: (BigInt(s.block_number) + 1n).toString(),
+                toBlock: first.headers.at(-1)!.number,
+              },
               sources: [first, second],
             };
             accepted = validateBatch(batch);
@@ -408,6 +396,7 @@ export class SyncEngine {
               range === 1
             )
               throw error;
+            for (const source of this.sources) source.invalidateAfter(s.block_number);
             range = Math.max(1, Math.floor(range / 2));
             this.progress.splits++;
           }
@@ -428,7 +417,7 @@ export class SyncEngine {
         const pruneStart = performance.now();
         await this.writer.prune();
         this.progress.pruneMs += performance.now() - pruneStart;
-        range = Math.min(128, range * 2);
+        range = Math.min(1048576, range * 2);
         this.progress.phase = 'acquiring';
       }
       this.progress.phase = 'idle';

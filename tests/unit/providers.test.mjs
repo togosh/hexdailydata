@@ -72,7 +72,7 @@ test('read-only contract/method/pinned call allowlist rejects writes and unbound
     CONTRACT,
   );
 });
-test('raw acquisition matches IDs and rejects false empty, truncated, malformed and wrong-code responses', async () => {
+test('raw acquisition distinguishes empty arrays from malformed responses; paired acceptance owns omission detection', async () => {
   const chain = fixture({ last: 130 });
   const good = chain.source(1, 'one');
   await good.verify(chain.plain(100), signal);
@@ -80,7 +80,7 @@ test('raw acquisition matches IDs and rejects false empty, truncated, malformed 
   const empty = chain.source(1, 'empty', new FakeClock(), (rows, requests) =>
     rows.map((r, i) => (requests[i].method === 'eth_getLogs' ? { ...r, result: [] } : r)),
   );
-  await assert.rejects(() => empty.events([chain.plain(101)], signal), /Incomplete/);
+  assert.deepEqual(await empty.events([chain.plain(101)], signal), []); // Not accepted until paired comparison.
   const truncated = chain.source(1, 'partial', new FakeClock(), (rows) => rows.slice(1));
   await assert.rejects(() => truncated.verify(chain.plain(100), signal));
   const wrong = chain.source(1, 'code', new FakeClock(), (rows, requests) =>
@@ -238,30 +238,23 @@ test('real abort timeout and byte-bound rejection retain physical charges', asyn
   assert.equal(budget.counters.attempts, 2);
 });
 
-test('complete receipts allow unrelated anonymous and large logs while binding all log identities', async () => {
+test('filtered logs reject wrong identities and oversized payloads without historical receipts', async () => {
   const chain = fixture({ last: 130 });
-  const clean = await chain.source(1, 'clean').events([chain.plain(101)], signal);
-  for (const variant of ['anonymous', 'large', 'wrong-identity', 'oversized-hex']) {
+  for (const variant of ['wrong-identity', 'oversized-hex', 'removed', 'bad-header']) {
     const source = chain.source(1, variant, new FakeClock(), (rows, calls) =>
       rows.map((row, i) => {
-        if (calls[i].method !== 'eth_getTransactionReceipt') return row;
-        const copy = structuredClone(row);
-        copy.result.logs.push({
-          ...copy.result.logs[0],
-          address: variant === 'oversized-hex' ? CONTRACT : A,
-          logIndex: '0x2',
-          topics: variant === 'anonymous' ? [] : copy.result.logs[0].topics,
-          data:
-            variant === 'large' || variant === 'oversized-hex' ? '0x' + '00'.repeat(4097) : '0x',
-          transactionHash:
-            variant === 'wrong-identity' ? hash(999999) : copy.result.transactionHash,
-        });
+        if (calls[i].method !== 'eth_getLogs') return row;
+        const copy = structuredClone(row),
+          log = copy.result[0];
+        if (variant === 'wrong-identity') log.transactionHash = hash(999999);
+        if (variant === 'oversized-hex') log.data = '0x' + '00'.repeat(4097);
+        if (variant === 'removed') log.removed = true;
+        if (variant === 'bad-header') log.blockHash = hash(99999);
         return copy;
       }),
     );
-    if (variant === 'wrong-identity' || variant === 'oversized-hex')
-      await assert.rejects(() => source.events([chain.plain(101)], signal));
-    else assert.deepEqual(await source.events([chain.plain(101)], signal), clean);
+    await assert.rejects(() => source.events([chain.plain(101)], signal));
+    assert.equal(source.rpc.counters.methods.eth_getTransactionReceipt ?? 0, 0);
   }
 });
 test('metrics arriving during asynchronous cooldown read precede undispatched sync', async () => {

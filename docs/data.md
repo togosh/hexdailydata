@@ -295,14 +295,14 @@ through JavaScript Number. Addresses/hashes use 20/32-byte BYTEA domains. Day sa
 addresses are a bounded BYTEA array populated from the same validated address inputs.
 
 The accepted-input boundary compares two complete **supplied** normalized event sets,
-including raw topics/data and decoded values, plus contiguous headers, day-close supply
+including raw topics/data and decoded values, plus explicit contiguous numeric coverage with sparse actual headers, day-close supply
 and deterministic balance samples. Known shared operators are rejected; unknown source
 correlation is recorded as null. Matching sources can share an omission: agreement is
 not an independence or completeness proof. Task03 must provide complete acquisition,
-correct ABI decoding, receipt/code identity, finality qualification and corroborated
+correct ABI decoding, targeted constructor receipt/code identity, finality qualification and corroborated
 pinned calls. Task02 has no provider transport and makes no live acceptance claim.
 
-A commit contains at most2048 contiguous headers,2000 supplied logs per source,32 day
+A commit contains at most2048 verified headers across an explicit interval of at most1,048,576 blocks,2000 supplied logs per source,32 day
 boundaries and1024 materialized daily words. More work must be split into checkpoints.
 DailyDataUpdate protocol logs are retained independently from pinned materialized words;
 a delayed read may fill multiple earlier days without inventing a new protocol log.
@@ -313,7 +313,7 @@ capped at principal+payout and recorded once, at GA or first End. Transfers alon
 circulating supply. Claim logs have no extra mint effects beyond their Transfer and
 StakeStart logs. No claim/BPD payout estimator is implemented here.
 
-| Durable state | Owning transaction / position | Rewind | Seed v1 representation |
+| Durable state | Owning transaction / position | Rewind | Seed format2 representation |
 |---|---|---|---|
 | Chain identity, constructor state, fork boundary | Explicit empty-chain initialization; two supplied states must agree; constructor sum and fork full SQL aggregate/owner/schedule audit | Initialization is the floor; cannot rewind behind it | chains plus referenced parent/entry identities in manifest |
 | Current accounts and stake lifecycle | Native writer commit at sync block/hash | Exact changed-row before-images; newly inserted rows deleted | accounts, stakes |
@@ -392,3 +392,10 @@ boundaries. The entry may be on a later day. A daily close whose last block is s
 common history retains origin1. Once a serving fork exists, new parent commits/rewinds
 are refused so they cannot invalidate inherited state/common event references. A future
 independent Ethereum suffix needs an explicit task-owned extension; it is not enabled here.
+
+Task03 acquisition follow-through: sparse headers are observations, not synthetic empty
+blocks or evidence of parent linkage across skipped numbers. Each accepted range follows
+the cursor exactly; both sources corroborate its actual endpoints and event sets. The
+writer receives one observed UTC day per range; checked last-before/first-after searches
+preserve exact close identities. See sync.md for bounds and seed format2 rejection rules.
+No migration or canonical amount/reducer definition changed.

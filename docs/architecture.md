@@ -84,6 +84,12 @@ is disclosed in the source profile; never advertise it as proved independence.
   hash, transaction hash/index, log index, topics and data. Reject removed logs at the
   accepted target, conflicting duplicates, out-of-range records and missing responses.
   Reuse verified headers; do not repeat a whole historical scan at every checkpoint.
+  Explicit accepted numeric coverage follows the prior cursor even when observations
+  are sparse. Retain real event/range/checkpoint headers; compare adjacent parent links
+  where present, never pretend nonadjacent headers are directly linked. Checked bounded
+  searches locate exact UTC last-before/first-after pairs. Grow block spans independently
+  of event/header/byte/day/transaction limits; neither all-block header enumeration nor
+  all-transaction receipts are mandatory under this policy.
 - Compare range boundary hashes at the pinned accepted target. On a mismatch, provider
   limit, truncation hint or ambiguous result, bisect the range and compare again under
   the same finite job budget. Below a single block there is no smaller range: bounded

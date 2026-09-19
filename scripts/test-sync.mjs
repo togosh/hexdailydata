@@ -1,13 +1,31 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { resolve, relative, isAbsolute } from 'node:path';
 import { mkdirSync, appendFileSync, writeFileSync } from 'node:fs';
 
-mkdirSync('artifacts/task-03', { recursive: true });
+const evidence = resolve(process.env.HDD_V2_SYNC_EVIDENCE ?? 'artifacts/task-03');
+const relativeEvidence = relative(resolve('artifacts'), evidence);
+if (relativeEvidence.startsWith('..') || isAbsolute(relativeEvidence))
+  throw new Error('Sync evidence must remain in repository artifacts.');
+mkdirSync(evidence, { recursive: true });
 let failure;
 const phases = process.env.HDD_V2_SYNC_TEST_PHASE
   ? [process.env.HDD_V2_SYNC_TEST_PHASE]
-  : ['build', 'early-import', 'import', 'unpruned'];
-if (phases.some((p) => !['build', 'early-import', 'import', 'unpruned'].includes(p)))
+  : ['build', 'early-import', 'import', 'unpruned', 'sparse-build', 'sparse-import', 'busy'];
+if (
+  phases.some(
+    (p) =>
+      ![
+        'build',
+        'early-import',
+        'import',
+        'unpruned',
+        'sparse-build',
+        'sparse-import',
+        'busy',
+      ].includes(p),
+  )
+)
   throw new Error('Unknown test phase.');
 for (const phase of phases) {
   if (failure) break;
@@ -15,6 +33,7 @@ for (const phase of phases) {
   const env = {
     ...process.env,
     HDD_V2_PROJECT: project,
+    HDD_V2_SYNC_EVIDENCE: evidence,
     HDD_V2_DB_INSTANCE: randomUUID(),
     HDD_V2_SYNC_PHASE: phase,
   };
@@ -50,8 +69,21 @@ for (const phase of phases) {
       ]),
     );
     console.log(docker([...compose, 'exec', '-T', 'db', 'df', '-Pk', '/var/lib/postgresql/data']));
-    const output = docker([...compose, 'run', '--rm', '-T', 'runner'], 900000);
-    writeFileSync(`artifacts/task-03/${phase}-integration.log`, output + '\n');
+    const output = docker(
+      [
+        ...compose,
+        'run',
+        '--rm',
+        '-T',
+        'runner',
+        'node',
+        phase.startsWith('sparse-') || phase === 'busy'
+          ? 'tests/sync/acquisition.mjs'
+          : 'tests/sync/run.mjs',
+      ],
+      900000,
+    );
+    writeFileSync(`${evidence}/${phase}-integration.log`, output + '\n');
     console.log(output);
     console.log(
       'DB sampled resources:',
@@ -71,7 +103,7 @@ for (const phase of phases) {
       process.exitCode = 1;
     }
     appendFileSync(
-      'artifacts/task-03/runs.txt',
+      `${evidence}/runs.txt`,
       `${new Date().toISOString()} ${phase} ${project} exit=${process.exitCode ?? 0}\n`,
     );
   }

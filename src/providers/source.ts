@@ -2,20 +2,12 @@ import { createHash } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import { z } from 'zod';
 import { contractDayAt } from '../domain/day.ts';
-import {
-  hash,
-  headerSchema,
-  type Header,
-  type Batch,
-  type Event,
-} from '../services/projections/input.ts';
+import { hash, type Header, type Batch, type Event } from '../services/projections/input.ts';
 import {
   decodeHeader,
   plainHeader,
   decodeLog,
   rawLogSchema,
-  receiptLogSchema,
-  quantity,
   q,
   word,
   words,
@@ -24,7 +16,7 @@ import {
   globalInfo,
   dailyWords,
 } from './abi.ts';
-import { RpcClient, RangeError, type RpcCall } from './rpc.ts';
+import { RpcClient, RangeError } from './rpc.ts';
 
 export const policySchema = z.strictObject({
   codeHash: hash,
@@ -36,15 +28,21 @@ export const policySchema = z.strictObject({
       rollbackBlocks: z.number().int().min(1).max(100000),
     }),
   ]),
-  // Complete receipt enumeration binds log membership to each header's transaction list.
-  // This conservative acquisition profile must pass the workload/capability canary.
-  completeness: z.literal('receipts'),
+  // Complete filtered sets are corroborated, not a proof against shared omissions.
+  completeness: z.literal('filtered-ranges'),
 });
 export type SourcePolicy = z.infer<typeof policySchema>;
 export class Source {
   readonly policy: SourcePolicy;
-  private headers = new Map<string, ReturnType<typeof decodeHeader>>();
-  readonly counters = { decodeMs: 0, headersPeak: 0, eventsPeak: 0, receiptCalls: 0 };
+  private headers = new Map<string, Header>();
+  readonly counters = {
+    decodeMs: 0,
+    headersPeak: 0,
+    eventsPeak: 0,
+    receiptCalls: 0,
+    searchCalls: 0,
+    observationsPeak: 0,
+  };
   readonly rpc: RpcClient;
   constructor(rpc: RpcClient, policy: unknown) {
     this.rpc = rpc;
@@ -57,36 +55,54 @@ export class Source {
     if (!refresh && this.headers.has(number)) return this.headers.get(number)!;
     const h = decodeHeader(await this.rpc.call('eth_getBlockByNumber', [q(number), false], signal));
     if (h.number !== number) throw new Error('Header number mismatch.');
-    this.headers.set(number, h);
+    this.headers.set(number, plainHeader(h));
     while (this.headers.size > 2049) this.headers.delete(this.headers.keys().next().value!);
     this.counters.headersPeak = Math.max(this.counters.headersPeak, this.headers.size);
     return h;
   }
-  async rangeHeaders(start: bigint, count: number, signal: AbortSignal) {
-    if (!Number.isInteger(count) || count < 1 || count > 2048)
-      throw new Error('Header range exceeds checkpoint bound.');
-    const result: Header[] = [];
-    for (let offset = 0; offset < count; offset += 30) {
-      const numbers = Array.from({ length: Math.min(30, count - offset) }, (_, i) =>
-        (start + BigInt(offset + i)).toString(),
-      );
-      const missing = numbers.filter((n) => !this.headers.has(n));
-      if (missing.length) {
-        const values = await this.rpc.calls(
-          missing.map((n) => ({ method: 'eth_getBlockByNumber', params: [q(n), false] })),
-          signal,
-        );
-        for (let i = 0; i < values.length; i++) {
-          const h = decodeHeader(values[i]);
-          if (h.number !== missing[i]) throw new Error('Header batch identity mismatch.');
-          this.headers.set(h.number, h);
-        }
+  /** Select actual observations without allocating an entry per skipped block. */
+  private async plan(expected: Batch['expected'], to: string, signal: AbortSignal) {
+    const observations = new Map<string, Header>();
+    const observe = async (number: string) => {
+      if (observations.has(number)) return observations.get(number)!;
+      if (observations.size >= 2048) throw new RangeError('Verified header bound exceeded.');
+      const h = plainHeader(await this.header(number, signal, true));
+      observations.set(number, h);
+      this.counters.observationsPeak = Math.max(this.counters.observationsPeak, observations.size);
+      return h;
+    };
+    const previous = await observe(expected.blockNumber);
+    if (previous.hash !== expected.blockHash) throw new RangeError('Previous boundary changed.');
+    const from = (BigInt(expected.blockNumber) + 1n).toString();
+    if (BigInt(to) < BigInt(from) || BigInt(to) - BigInt(from) >= 1048576n)
+      throw new Error('Requested block span exceeds bound.');
+    const first = await observe(from);
+    let last = await observe(to);
+    let next: Header | null = null;
+    const day = contractDayAt(BigInt(first.timestamp));
+    if (day - contractDayAt(BigInt(previous.timestamp)) > 32)
+      throw new RangeError('Too many day transitions.');
+    // Checked binary brackets find the real last-before / first-after pair.
+    // No timestamp interpolation or claim of parent linkage across an observed gap.
+    if (contractDayAt(BigInt(last.timestamp)) > day) {
+      let low = first,
+        high = last;
+      while (BigInt(high.number) - BigInt(low.number) > 1n) {
+        this.counters.searchCalls++;
+        const mid = await observe(((BigInt(low.number) + BigInt(high.number)) / 2n).toString());
+        if (
+          BigInt(mid.timestamp) <= BigInt(low.timestamp) ||
+          BigInt(mid.timestamp) >= BigInt(high.timestamp)
+        )
+          throw new RangeError('Contradictory day-search bracket.');
+        if (contractDayAt(BigInt(mid.timestamp)) === day) low = mid;
+        else high = mid;
       }
-      result.push(...numbers.map((n) => plainHeader(this.headers.get(n)!)));
-      while (this.headers.size > 2049) this.headers.delete(this.headers.keys().next().value!);
-      this.counters.headersPeak = Math.max(this.counters.headersPeak, this.headers.size);
+      if (high.parentHash !== low.hash) throw new RangeError('Day boundary parent disagreement.');
+      last = low;
+      next = high;
     }
-    return result;
+    return { previous, first, last, next, observations };
   }
   async verify(at: Header, signal: AbortSignal) {
     const [chain, code] = await this.rpc.calls(
@@ -179,62 +195,53 @@ export class Source {
     );
     if (!Array.isArray(response) || response.length > 2000)
       throw new RangeError('Log range too large or malformed.');
-    const map = new Map(headers.map((h) => [h.number, h]));
-    const start = performance.now();
-    const logs = response.map((raw) => {
-      const input = rawLogSchema.parse(raw),
-        h = map.get(BigInt(input.blockNumber).toString());
-      if (!h) throw new Error('Out-of-range log.');
-      return decodeLog(input, this.rpc.chain, this.rpc.contract, h);
-    });
-    this.counters.decodeMs += performance.now() - start;
-    // A short getLogs array is not completeness evidence. Enumerate every transaction's
-    // receipt by identity and compare its entire filtered set, including Transfer.
-    const receipts: Event[] = [];
-    for (const h of headers) {
-      const full = await this.header(h.number, signal);
-      for (let i = 0; i < full.transactions.length; i += 30) {
-        const txs = full.transactions.slice(i, i + 30);
-        this.counters.receiptCalls += txs.length;
-        const calls: RpcCall[] = txs.map((tx) => ({
-          method: 'eth_getTransactionReceipt',
-          params: [tx],
-        }));
-        const values = await this.rpc.calls(calls, signal);
-        for (let j = 0; j < values.length; j++) {
-          const r = z
-            .object({
-              transactionHash: hash,
-              transactionIndex: quantity,
-              blockHash: hash,
-              blockNumber: quantity,
-              logs: z.array(receiptLogSchema).max(10000),
-            })
-            .passthrough()
-            .parse(values[j]);
-          if (
-            r.transactionHash !== txs[j] ||
-            BigInt(r.transactionIndex) !== BigInt(i + j) ||
-            r.blockHash !== h.hash ||
-            BigInt(r.blockNumber).toString() !== h.number
-          )
-            throw new Error('Receipt identity mismatch.');
-          for (const raw of r.logs) {
-            if (
-              raw.transactionHash !== r.transactionHash ||
-              raw.transactionIndex !== r.transactionIndex ||
-              raw.blockHash !== r.blockHash ||
-              raw.blockNumber !== r.blockNumber
-            )
-              throw new Error('Receipt log identity mismatch.');
-            if (raw.address === this.rpc.contract && Object.values(topics).includes(raw.topics[0]!))
-              receipts.push(decodeLog(raw, this.rpc.chain, this.rpc.contract, h));
-            if (receipts.length > 2000)
-              throw new RangeError('Complete event range exceeds checkpoint bound.');
-          }
-        }
+    const raw = response.map((value) => rawLogSchema.parse(value));
+    const numbers = [...new Set(raw.map((log) => BigInt(log.blockNumber).toString()))];
+    if (numbers.some((n) => BigInt(n) < BigInt(first.number) || BigInt(n) > BigInt(last.number)))
+      throw new Error('Out-of-range log.');
+    const logs: Event[] = [];
+    const decoded = new Map<string, ReturnType<typeof decodeHeader>>();
+    // Only event blocks need transaction membership checks; discard transaction lists
+    // after decoding each bounded group, rather than retaining unrelated transactions.
+    for (let offset = 0; offset < numbers.length; offset += 30) {
+      const group = numbers.slice(offset, offset + 30);
+      const values = await this.rpc.calls(
+        group.map((n) => ({ method: 'eth_getBlockByNumber', params: [q(n), false] })),
+        signal,
+      );
+      for (let i = 0; i < group.length; i++) {
+        const h = decodeHeader(values[i]);
+        if (h.number !== group[i]) throw new Error('Event header number mismatch.');
+        const prior = headers.find((v) => v.number === h.number);
+        if (prior && JSON.stringify(prior) !== JSON.stringify(plainHeader(h)))
+          throw new RangeError('Event boundary header disagreement.');
+        if (!prior) headers.push(plainHeader(h));
+        decoded.set(h.number, h);
       }
+      const start = performance.now();
+      for (const input of raw) {
+        const h = decoded.get(BigInt(input.blockNumber).toString());
+        if (!h) continue;
+        if (h.transactions[Number(BigInt(input.transactionIndex))] !== input.transactionHash)
+          throw new Error('Event transaction/header identity mismatch.');
+        logs.push(decodeLog(input, this.rpc.chain, this.rpc.contract, h));
+      }
+      this.counters.decodeMs += performance.now() - start;
+      decoded.clear();
     }
+    // Check ordering in the raw response as well: grouping must never repair it.
+    for (let i = 1; i < raw.length; i++) {
+      const a = raw[i - 1]!,
+        b = raw[i]!;
+      if (
+        BigInt(b.blockNumber) < BigInt(a.blockNumber) ||
+        (b.blockNumber === a.blockNumber &&
+          (BigInt(b.logIndex) < BigInt(a.logIndex) ||
+            BigInt(b.transactionIndex) < BigInt(a.transactionIndex)))
+      )
+        throw new Error('Misordered source logs.');
+    }
+    headers.sort((a, b) => (BigInt(a.number) < BigInt(b.number) ? -1 : 1));
     const normalize = (events: Event[]) => {
       const result: Event[] = [];
       for (const e of events) {
@@ -253,8 +260,7 @@ export class Source {
       }
       return result;
     };
-    if (JSON.stringify(normalize(logs)) !== JSON.stringify(normalize(receipts)))
-      throw new RangeError('Incomplete/conflicting filtered log range.');
+    normalize(logs);
     this.counters.eventsPeak = Math.max(this.counters.eventsPeak, logs.length);
     // Fence reads that straddled a reorg, even when EIP-1898 calls are not needed.
     if ((await this.header(last.number, signal, true)).hash !== last.hash)
@@ -263,12 +269,13 @@ export class Source {
   }
   async acquire(
     expected: Batch['expected'],
-    headers: Header[],
+    to: string,
     sample: string[],
-    previous: Header,
     pendingDay: number | null,
     signal: AbortSignal,
   ): Promise<Batch['sources'][number]> {
+    const { previous, first, last, next, observations } = await this.plan(expected, to, signal);
+    const headers = first.number === last.number ? [first] : [first, last];
     const events = await this.events(headers, signal),
       closes: Batch['sources'][number]['closes'] = [],
       payouts: Batch['sources'][number]['payouts'] = [];
@@ -288,8 +295,7 @@ export class Source {
           balances: day === priorDay ? balances : [],
         });
     }
-    const last = headers.at(-1)!,
-      state = await this.state(last, signal);
+    const state = await this.state(last, signal);
     const begin = pendingDay ?? priorDay,
       end = Math.min(state.dailyCount, firstDay, begin + 1024);
     if (begin < end) {
@@ -306,6 +312,42 @@ export class Source {
         })),
       );
     }
-    return { id: this.rpc.id, operator: this.rpc.operator, headers, events, closes, payouts };
+    for (const h of headers) {
+      const known = observations.get(h.number);
+      if (known && JSON.stringify(known) !== JSON.stringify(h))
+        throw new RangeError('Contradictory verified observation.');
+      observations.set(h.number, h);
+    }
+    if (observations.size > 2048) throw new RangeError('Verified header bound exceeded.');
+    this.counters.observationsPeak = Math.max(this.counters.observationsPeak, observations.size);
+    const ordered = [...observations.values()].sort((a, b) =>
+      BigInt(a.number) < BigInt(b.number) ? -1 : 1,
+    );
+    for (let i = 1; i < ordered.length; i++) {
+      const a = ordered[i - 1]!,
+        b = ordered[i]!;
+      if (
+        BigInt(b.timestamp) <= BigInt(a.timestamp) ||
+        (BigInt(b.number) === BigInt(a.number) + 1n && b.parentHash !== a.hash)
+      )
+        throw new RangeError('Contradictory observed headers.');
+    }
+    // Fence boundary/state reads after all acquisition, including day search lookahead.
+    const fences = [previous, first, last, ...(next ? [next] : []), ordered.at(-1)!];
+    for (const h of new Map(fences.map((v) => [v.number, v])).values())
+      if (
+        JSON.stringify(plainHeader(await this.header(h.number, signal, true))) !== JSON.stringify(h)
+      )
+        throw new RangeError('Range boundary changed during acquisition.');
+    return {
+      id: this.rpc.id,
+      operator: this.rpc.operator,
+      previous,
+      next,
+      headers,
+      events,
+      closes,
+      payouts,
+    };
   }
 }

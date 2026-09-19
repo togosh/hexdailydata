@@ -182,9 +182,19 @@ export class CanonicalWriter {
         ]);
         if (
           hex(chain.contract_address) !== batch.contract ||
+          accepted.previous.timestamp !== sync.block_time ||
           BigInt(headers[0]!.timestamp) <= BigInt(sync.block_time)
         )
           throw new Error('Contract/time mismatch.');
+        const {
+          rows: [previousHeader],
+        } = await measuredQuery(
+          this.client,
+          'SELECT parent_hash FROM hdd.blocks_recent WHERE chain_id=$1 AND number=$2',
+          [this.chainId, sync.block_number],
+        );
+        if (!previousHeader || hex(previousHeader.parent_hash) !== accepted.previous.parentHash)
+          throw new Error('Previous checkpoint header contradiction.');
         if (
           chain.initialization === 'fork' &&
           sync.block_number === chain.parent_block &&

@@ -427,6 +427,24 @@ try {
         ],
         ['chains', (text) => text.replace('{', '{"unexpected_column": 1,'), /columns/],
         [
+          'sync_state',
+          (text) => text.replaceAll('filtered-range-sparse-v2', 'full-range-corroboration-v1'),
+          /Unsupported/,
+        ],
+        [
+          'blocks_recent',
+          (text) => {
+            const rows = text.trimEnd().split('\n');
+            const index = rows.findIndex(
+              (row) => row.includes('"chain_id": 369') && row.includes('"number": 295,'),
+            );
+            assert.ok(index >= 0);
+            rows.splice(index, 1);
+            return rows.join('\n') + '\n';
+          },
+          /range|bounds|header/,
+        ],
+        [
           'undo_recent',
           (text) => text.replace(/"row_key": \{/, '"row_key": {"unexpected_identity": 1,'),
           /undo identity/,

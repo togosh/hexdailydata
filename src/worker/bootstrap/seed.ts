@@ -7,7 +7,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { performance } from 'node:perf_hooks';
 import { manifestSchema, tables, tableNames, type Table, type Manifest } from './manifest.ts';
 import { packArchive, readArchive, lines, archiveLimits } from './archive.ts';
-import { hex } from '../../services/projections/input.ts';
+import { hex, integer } from '../../services/projections/input.ts';
 import { reconcile } from '../../services/projections/initialize.ts';
 import { restoreCheckpoint, restoreCursor } from '../../services/projections/recovery.ts';
 import { decodeLog } from '../../providers/abi.ts';
@@ -82,7 +82,7 @@ async function descriptor(client: pg.Client): Promise<Omit<Manifest, 'files' | '
     reason: 'Market acquisition belongs to later tasks.',
   });
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     schemaVersion: 2,
     calculationVersion: 'hex-native-1',
     chainId: last.chain_id,
@@ -408,6 +408,40 @@ async function validateState(
       (BigInt(check.start_block) > BigInt(check.block_number) && !inheritedBoundary)
     )
       throw new Error('Seed cursor/header/day/coverage inconsistency.');
+    // Format 2 admits only explicit sparse-range metadata (including at rewound
+    // boundaries). Old contiguous-range assertions must not silently change meaning.
+    const acceptance = check.acceptance;
+    if (acceptance.initialization) {
+      if (
+        acceptance.initialization !== chain.initialization ||
+        check.block_number !==
+          (chain.initialization === 'fork' ? chain.parent_block : check.start_block)
+      )
+        throw new Error('Seed initialization acceptance mismatch.');
+    } else {
+      if (
+        acceptance.policy !== 'filtered-range-sparse-v2' ||
+        !integer.safeParse(acceptance.range?.fromBlock).success ||
+        !integer.safeParse(acceptance.range?.toBlock).success ||
+        acceptance.range.toBlock !== check.block_number ||
+        BigInt(acceptance.range.fromBlock) > BigInt(acceptance.range.toBlock) ||
+        BigInt(acceptance.range.toBlock) - BigInt(acceptance.range.fromBlock) >= 1048576n
+      )
+        throw new Error('Unsupported or inconsistent seed range acceptance.');
+      const {
+        rows: [range],
+      } = await client.query(
+        `SELECT
+        EXISTS(SELECT 1 FROM hdd.blocks_recent WHERE chain_id=$1 AND number=$2) AS first,
+        (SELECT previous_sync->>'block_number' FROM hdd.checkpoints_recent WHERE chain_id=$1 AND block_number=$3) AS previous`,
+        [chain.chain_id, acceptance.range.fromBlock, check.block_number],
+      );
+      if (
+        range.previous !== null &&
+        (!range.first || BigInt(range.previous) + 1n !== BigInt(acceptance.range.fromBlock))
+      )
+        throw new Error('Seed range/checkpoint coverage mismatch.');
+    }
     const policy = policySchema.shape.finality.parse(check.finality_policy);
     if (
       policy.mode !== check.finality ||
@@ -442,10 +476,20 @@ async function validateState(
       `SELECT EXISTS(SELECT 1 FROM hdd.blocks_recent b WHERE b.chain_id=$1 AND (number<$2 OR number>$3)) OR
       ($5::boolean AND EXISTS(SELECT 1 FROM hdd.recovery_pins p WHERE p.chain_id=$1 AND (block_number<$2 OR block_number>$3))) OR
       EXISTS(SELECT 1 FROM hdd.daily_stats d WHERE d.chain_id=$1 AND (contract_day>=$4 OR close_block>$3 OR payout_block>$3)) OR
+      EXISTS(SELECT 1 FROM hdd.daily_stats d WHERE d.chain_id=$1 AND
+        ((d.close_block>=$2 AND NOT EXISTS(SELECT 1 FROM hdd.blocks_recent b JOIN hdd.blocks_recent n
+          ON n.chain_id=b.chain_id AND n.number=b.number+1 WHERE b.chain_id=$1 AND b.number=d.close_block
+          AND b.hash=d.close_hash AND b.timestamp<1575331200::bigint+(d.contract_day+1)::bigint*86400
+          AND n.timestamp>=1575331200::bigint+(d.contract_day+1)::bigint*86400)) OR
+         (d.payout_block>=$2 AND NOT EXISTS(SELECT 1 FROM hdd.blocks_recent b WHERE b.chain_id=$1
+          AND b.number=d.payout_block AND b.hash=d.payout_hash)))) OR
       EXISTS(SELECT 1 FROM hdd.accounts a WHERE a.chain_id=$1 AND last_block>$3) OR
       EXISTS(SELECT 1 FROM hdd.stakes t WHERE t.chain_id=$1 AND last_block>$3) OR
-      EXISTS(SELECT 1 FROM hdd.blocks_recent b LEFT JOIN hdd.blocks_recent p ON p.chain_id=b.chain_id AND p.number=b.number-1
-        WHERE b.chain_id=$1 AND b.number>$2 AND (p.number IS NULL OR b.parent_hash<>p.hash OR b.timestamp<=p.timestamp)) AS bad`,
+      EXISTS(SELECT 1 FROM (SELECT *,lag(number) OVER(ORDER BY number) AS prior_number,
+        lag(hash) OVER(ORDER BY number) AS prior_hash,lag(timestamp) OVER(ORDER BY number) AS prior_time
+        FROM hdd.blocks_recent WHERE chain_id=$1) b
+        WHERE b.prior_number IS NOT NULL AND (b.timestamp<=b.prior_time OR
+          (b.number=b.prior_number+1 AND b.parent_hash<>b.prior_hash))) AS bad`,
       [
         chain.chain_id,
         check.rewind_floor,
@@ -474,7 +518,7 @@ async function validateState(
   for (const table of ['events', 'transfers_recent'] as const) {
     await client.query(
       `DECLARE verify_events NO SCROLL CURSOR FOR SELECT t.*,c.contract_address,s.block_number AS cursor,
-        b.hash AS retained_hash,b.timestamp AS retained_time FROM hdd.${table} t
+        b.hash AS retained_hash,b.timestamp AS retained_time,s.rewind_floor FROM hdd.${table} t
         JOIN hdd.chains c ON c.chain_id=t.origin_chain_id JOIN hdd.sync_state s ON s.chain_id=c.chain_id
         LEFT JOIN hdd.blocks_recent b ON b.chain_id=t.origin_chain_id AND b.number=t.block_number
         WHERE $1::int IS NULL OR t.origin_chain_id=$1`,
@@ -486,6 +530,8 @@ async function validateState(
       for (const r of rows) {
         signal.throwIfAborted();
         if (BigInt(r.block_number) > BigInt(r.cursor)) throw new Error('Seed future event.');
+        if (BigInt(r.block_number) >= BigInt(r.rewind_floor) && !r.retained_hash)
+          throw new Error('Seed retained event header missing.');
         if (
           r.retained_hash &&
           (!r.retained_hash.equals(r.block_hash) || r.retained_time !== r.block_time)

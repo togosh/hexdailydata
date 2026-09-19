@@ -18,10 +18,18 @@ function input() {
       data: '0x',
       value: { kind: 'transfer', sender: A, recipient: B, hearts: '90071992547409931234567890' },
     };
-  const content = { headers: [h], events: [event], closes: [], payouts: [] };
+  const content = {
+    next: null,
+    previous: header(100, 10, 99, 9),
+    headers: [h],
+    events: [event],
+    closes: [],
+    payouts: [],
+  };
   return {
     chainId: 1,
     contract: CONTRACT,
+    range: { fromBlock: h.number, toBlock: h.number },
     expected: { blockNumber: '100', blockHash: hash(100), revision: '0' },
     sources: [
       { id: 'one', operator: 'one', ...content },
