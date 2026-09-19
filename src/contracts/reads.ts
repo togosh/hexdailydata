@@ -24,7 +24,7 @@ export const StakeIdSchema = z
   .string()
   .max(13)
   .regex(/^(0|[1-9][0-9]*)$/)
-  .refine((s) => BigInt(s) < 1n << 40n);
+  .pipe(z.string().refine((s) => BigInt(s) < 1n << 40n));
 export const CursorSchema = z
   .string()
   .min(1)

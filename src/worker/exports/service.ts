@@ -121,12 +121,14 @@ export class ExportService {
         if (this.attempts.get(r.id) === attempt) continue;
         this.verified.delete(r.id);
         this.manifests.delete(r.id);
-        this.attempts.set(r.id, attempt);
         await this.verify(bundle, signal);
+        // Only completed verification is reusable. Cancellation and transient I/O must retry.
+        this.attempts.set(r.id, attempt);
       } catch {
-        signal.throwIfAborted();
+        this.attempts.delete(r.id);
         this.verified.delete(r.id);
         this.manifests.delete(r.id);
+        signal.throwIfAborted();
       }
     }
   }

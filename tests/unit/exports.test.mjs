@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { csvLine, datasetRow } from '../../src/worker/exports/datasets.ts';
 import { marketObservationSchema } from '../../src/worker/daily/market.ts';
+test('pre-aborted and mid-read file verification reject without process crash or open handles', () => {
+  const result = spawnSync(process.execPath, ['tests/fixtures/export-abort.mjs'], {
+    encoding: 'utf8',
+    timeout: 10000,
+  });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
 test('CSV quotes, injection guard, null versus exact zero and independent large holder vector', () => {
   assert.equal(
     csvLine(['a,b', 'a"b', 'a\nb', '=1+1', null, '0', '900719925474099312345678']),

@@ -97,9 +97,13 @@ export async function member(root: string, id: string, name: Dataset | 'manifest
   return h;
 }
 export async function digestHandle(h: FileHandle, signal: AbortSignal) {
+  signal.throwIfAborted();
   const sha = createHash('sha256');
   let bytes = 0;
-  for await (const b of h.createReadStream({ autoClose: false, start: 0, signal })) {
+  const stream = h.createReadStream({ autoClose: false, start: 0, signal });
+  // Abort errors may arrive after iterator teardown; never leave an unhandled stream error.
+  stream.on('error', () => {});
+  for await (const b of stream) {
     signal.throwIfAborted();
     bytes += b.length;
     if (bytes > maxBundleBytes) throw new Error('Bundle member exceeds bound.');

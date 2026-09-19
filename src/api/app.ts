@@ -1,5 +1,6 @@
 ﻿import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import type { FastifyError, FastifyRequest, FastifyReply } from 'fastify';
 import { createHash } from 'node:crypto';
 import { ApiErrorSchema } from '../contracts/api.ts';
 import { routes, jsonRevalidation } from './routes.ts';
@@ -27,6 +28,21 @@ export function createApp(
     routerOptions: { maxParamLength: 2048 },
     trustProxy: false,
     forceCloseConnections: true,
+    frameworkErrors(error: FastifyError, request: FastifyRequest, reply: FastifyReply) {
+      const invalid = ['FST_ERR_BAD_URL', 'FST_ERR_MAX_PARAM_LENGTH'].includes(error.code);
+      reply
+        .code(invalid ? 400 : 503)
+        .header('Cache-Control', 'no-store')
+        .header('X-Content-Type-Options', 'nosniff')
+        .send(
+          errorBody(
+            request.id,
+            invalid ? 'invalid_request' : 'source_unavailable',
+            invalid ? 'Invalid request.' : 'Required data is unavailable.',
+            !invalid,
+          ),
+        );
+    },
   });
   const deps = options.dependencies ?? {},
     now = options.now ?? Date.now,

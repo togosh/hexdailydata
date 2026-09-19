@@ -3,12 +3,64 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { setTimeout as pause } from 'node:timers/promises';
+import http from 'node:http';
 import { PageCursors } from '../../src/services/queries/cursor.ts';
 import { RangeQuery } from '../../src/contracts/reads.ts';
+import { ApiErrorSchema } from '../../src/contracts/api.ts';
 import { routes } from '../../src/api/routes.ts';
 import { createApp } from '../../src/api/app.ts';
 import { AddressService } from '../../src/services/live/address.ts';
 import { fixture, ManualClock, CODE_HASH, A, emptyBaseline } from '../live/fixture.mjs';
+
+test('actual HTTP malformed paths and stake IDs are sanitized400 before dependency work', async () => {
+  let calls = 0;
+  const app = createApp({
+    dependencies: {
+      db: {
+        read() {
+          calls++;
+          throw new Error('must not query');
+        },
+      },
+    },
+  });
+  await app.listen({ host: '127.0.0.1', port: 0 });
+  try {
+    for (const path of [
+      '/api/v2/stakes/PRIVATE_MARKER%ZZ',
+      '/api/v2/addresses/PRIVATE_MARKER%C0%AF',
+      '/api/v2/stakes/' + 'a'.repeat(2050),
+      ...['nope', '1.5', '1e3', '-1', '0x10', '1099511627776'].map((id) => '/api/v2/stakes/' + id),
+    ]) {
+      const response = await new Promise((resolve, reject) => {
+        http
+          .get({ host: '127.0.0.1', port: app.server.address().port, path }, async (r) => {
+            try {
+              const chunks = [];
+              for await (const chunk of r) chunks.push(chunk);
+              resolve({
+                status: r.statusCode,
+                headers: r.headers,
+                text: Buffer.concat(chunks).toString(),
+              });
+            } catch (error) {
+              reject(error);
+            }
+          })
+          .on('error', reject);
+      });
+      assert.equal(response.status, 400, path);
+      const body = ApiErrorSchema.parse(JSON.parse(response.text));
+      assert.equal(body.error.code, 'invalid_request');
+      assert.equal(body.error.retryable, false);
+      assert.equal(response.headers['cache-control'], 'no-store');
+      assert.ok(!response.text.includes(path) && !response.text.includes('PRIVATE_MARKER'));
+    }
+    assert.equal(calls, 0);
+  } finally {
+    await app.close();
+  }
+});
 
 test('page cursors reject tampering, filter/chain binding, expiry and another process', () => {
   const c = new PageCursors(),

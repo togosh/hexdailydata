@@ -529,6 +529,34 @@ try {
     assert.equal(verifications, 1);
     assert.equal(reader.readers, 0);
     assert.equal(reader.attempts.size, 1);
+    if (!large) {
+      for (const failure of ['abort', 'transient']) {
+        const retry = new ExportService(() => reads.connection(), '/exports');
+        const originalVerify = retry.verify.bind(retry);
+        const cancelled = new AbortController();
+        let attempts = 0;
+        retry.verify = async (...args) => {
+          attempts++;
+          if (attempts === 1) {
+            if (failure === 'abort') cancelled.abort();
+            else throw new Error('Injected transient verification I/O failure');
+          }
+          return originalVerify(...args);
+        };
+        if (failure === 'abort') await assert.rejects(retry.refresh(cancelled.signal));
+        else await retry.refresh(signal);
+        assert.equal((await retry.catalog(369)).status, 'rebuilding');
+        await retry.refresh(signal);
+        assert.equal((await retry.catalog(369)).status, 'available');
+        await retry.refresh(signal);
+        assert.equal(attempts, 2);
+      }
+      evidence.verificationRecovery = {
+        cancelledAndTransientRetried: true,
+        fileChangesOrRestart: false,
+        unchangedSuccessRehashed: false,
+      };
+    }
     const target = '/exports/' + bundle.id + '/daily.csv',
       original = await readFile(target);
     await writeFile(target, Buffer.from('corrupt'));
