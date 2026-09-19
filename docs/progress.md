@@ -120,3 +120,29 @@ are preserved. Reports, commands, review and archive checksums are in ignored
 `artifacts/task-03/early-canary/`. This status-only commit follows reviewed code.
 Next is owner input/approval for the bounded canary, or an explicit decision to proceed
 with Task07 despite unmeasured feasibility; Task09 waits for07. Neither was started.
+
+PulseChain HDS history integration PASS. Reviewed code `96e903c` adds one independent
+source-reported archive, compiled inspect/import/local CSV commands, an explicit daily
+API source variant, and schema5/seed4 recovery integration. Independent
+`/root/pulsechain_history_review` passed one full review and one narrow wording/test
+recheck. Final checks passed: 86 units, format/type/build/OpenAPI, focused real SQL/API/
+operator/portable tests and the existing API regression. Unchanged SQL/recovery evidence
+is tied to `71718e5`; the final correction changes no runtime logic.
+
+One authorized bounded HDS download (4,829,074 bytes) imported only into new isolated
+v2 test resources: 1,227 selected records and 1,218 admitted prices. First admitted
+source-record observation: 2023-05-17, USD0.01958399; exact market period and first-ever
+trade remain unproved. Conflicting records/prices stay excluded, missing prices stay
+missing, and all 19 mapped statistics retain source attribution. A local 10,000-row
+shape used 11,165,696 SQL relation bytes; import took 806.85ms and CSV took 5,027.94ms.
+Native fixture state remained exact across seed, backup, forward sync and rewind.
+Archive-only readiness stays uninitialized. Existing native history semantics,
+migrations1-4 and the five public datasets remain preserved.
+
+Reports, field/date/price assessment, receipt, actual commands, reviewer evidence and
+source ZIP are in ignored `artifacts/task-pulsechain-history/`. Test containers/volumes
+were removed; raw input and original evidence remain local. This entry is a status-only
+commit after reviewed code. Live source feasibility and native completeness remain
+unproved; RPC/subgraph probes, canary, Tasks07/09, v1/production import, signup, purchases,
+push and deployment were not run. Next remains separately authorized source feasibility
+qualification or an explicit owner decision on Task07; Task09 waits for07.
