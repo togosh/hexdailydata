@@ -17,12 +17,17 @@ export const tables = {
   checkpoints_recent: ['chain_id', 'revision'],
   undo_recent: ['sequence'],
   recovery_pins: ['chain_id', 'purpose'],
+  rank_state: ['chain_id'],
+  account_ranks: ['chain_id', 'address'],
+  market_sources: ['chain_id', 'source'],
+  market_samples: ['chain_id', 'source', 'identity'],
+  market_daily: ['chain_id', 'source', 'contract_day'],
 } as const;
 export type Table = keyof typeof tables;
 export const tableNames = Object.keys(tables) as Table[];
 export const manifestSchema = z.strictObject({
-  formatVersion: z.literal(2),
-  schemaVersion: z.literal(3),
+  formatVersion: z.literal(3),
+  schemaVersion: z.literal(4),
   calculationVersion: z.literal('hex-native-1'),
   createdAt: z.iso.datetime(),
   chainId: z.union([z.literal(1), z.literal(369)]),

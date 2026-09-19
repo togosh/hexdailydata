@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { connect, databaseConfig } from '../db/connect.ts';
@@ -14,6 +14,8 @@ import { PriceReader, priceTargets } from '../services/live/price.ts';
 import { MetricsService } from './metrics/service.ts';
 import { SqlMetricStore } from './metrics/store.ts';
 import { MetricsJob, runWorkerLifecycle } from './lifecycle.ts';
+import { DailyService, capturePrice } from './daily/service.ts';
+import { configureMarket, importMarketBars } from './daily/market.ts';
 
 const command = process.argv[2] ?? 'help';
 const controller = new AbortController();
@@ -31,7 +33,7 @@ if (command === 'status') {
   );
 } else if (command === 'help' || command === '--help') {
   console.log(
-    'Worker: rebuild | once | watch | repair-range <block> | seed-export <file> | seed-import <file> <expectation.json> | status. Explicit v2 database required. Provider commands require HDD_V2_SOURCE_PROFILE and HDD_V2_ALLOW_LIVE_RPC=true; none are enabled by default.',
+    'Worker: rebuild | once | watch | repair-range <block> | daily | export | market-import <file> | seed-export <file> | seed-import <file> <expectation.json> | status. Daily/export need HDD_V2_EXPORT_PATH; no live opt-in. Market import needs HDD_V2_MARKET_PROFILE. Explicit v2 database required. Provider commands require HDD_V2_SOURCE_PROFILE and HDD_V2_ALLOW_LIVE_RPC=true; none are enabled by default.',
   );
 } else {
   let writer: CanonicalWriter | undefined,
@@ -43,10 +45,55 @@ if (command === 'status') {
     timer: NodeJS.Timeout | undefined;
   try {
     if (
-      !['rebuild', 'once', 'watch', 'repair-range', 'seed-export', 'seed-import'].includes(command)
+      ![
+        'rebuild',
+        'once',
+        'watch',
+        'repair-range',
+        'seed-export',
+        'seed-import',
+        'daily',
+        'export',
+        'market-import',
+      ].includes(command)
     )
       throw new Error('Unknown worker command.');
-    if (command.startsWith('seed-')) {
+    if (command === 'daily' || command === 'export') {
+      if (!process.env.HDD_V2_EXPORT_PATH) throw new Error('Explicit owned export root required.');
+      const daily = new DailyService(
+        () => connect(databaseConfig('worker')),
+        resolve(process.env.HDD_V2_EXPORT_PATH),
+      );
+      await daily.exports.startup(signal);
+      await daily.tick(signal, Date.now(), command === 'export');
+      console.log(JSON.stringify(daily.status));
+      if (daily.status.marketError || daily.status.exportError) process.exitCode = 1;
+    } else if (command === 'market-import') {
+      const path = process.argv[3],
+        profilePath = process.env.HDD_V2_MARKET_PROFILE;
+      if (
+        !path ||
+        !profilePath ||
+        (await stat(path)).size > 2 * 1024 * 1024 ||
+        (await stat(profilePath)).size > 4096
+      )
+        throw new Error('Bounded input and explicit market profile required.');
+      const profile = z
+        .strictObject({
+          chain: z.union([z.literal(1), z.literal(369)]),
+          source: z.string().regex(/^[a-z][a-z0-9_-]{0,63}$/),
+          fromDay: z.number().int().min(0).max(65535),
+          method: z.literal('source-reported'),
+        })
+        .parse(JSON.parse(await readFile(profilePath, 'utf8')));
+      const raw = JSON.parse(await readFile(path, 'utf8'));
+      if (raw.chain !== profile.chain || raw.source !== profile.source)
+        throw new Error('Market profile mismatch.');
+      client = await connect(databaseConfig('worker'));
+      await configureMarket(client, profile.chain, profile.source, profile.method, profile.fromDay);
+      await importMarketBars(client, raw, Math.floor(Date.now() / 1000), signal);
+      console.log('Market intervals imported; aggregate with daily.');
+    } else if (command.startsWith('seed-')) {
       const path = process.argv[3];
       if (!path) throw new Error('Explicit seed path required.');
       client = await connect(databaseConfig('worker'));
@@ -109,6 +156,16 @@ if (command === 'status') {
           )
         : null;
       metricClient = await connect(databaseConfig('worker'));
+      const exportPath = resolve(
+        process.env.HDD_V2_EXPORT_PATH ?? resolve(process.env.HDD_V2_STORAGE_PATH, 'exports'),
+      );
+      await mkdir(exportPath, { recursive: true });
+      const daily = new DailyService(() => connect(databaseConfig('worker')), exportPath);
+      try {
+        await daily.exports.startup(signal);
+      } catch (error) {
+        daily.status.exportError = (error as Error).message;
+      }
       const metricSources = profile.pulsechain.map(
         (s) =>
           new RpcClient(
@@ -126,6 +183,7 @@ if (command === 'status') {
         profile.codeHash,
         price,
         new SqlMetricStore(metricClient),
+        (source, sample) => capturePrice(metricClient!, 369, source, sample),
       );
       reader = await connect(databaseConfig('api'));
       async function engine(chain: 1 | 369) {
@@ -191,10 +249,14 @@ if (command === 'status') {
             if (command === 'rebuild') await sync.audit(signal);
           }
           console.log(JSON.stringify({ progress: sync.progress, budget: budget.counters }));
+          if (command !== 'watch') await daily.tick(signal);
         },
         new MetricsJob(budget.clock, (s) => metrics.tick(s)),
         signal,
         command === 'watch',
+        command === 'watch'
+          ? [new MetricsJob(budget.clock, (s) => daily.tick(s, budget.clock.now()))]
+          : [],
       );
     }
   } catch (error) {

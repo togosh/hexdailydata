@@ -124,3 +124,13 @@ materialized ledger, corroborating price), within the existing6/180 lane. Metada
 refresh increases logical work, not that request count for this small allowlist.
 No live latency, route authenticity, actual historical-state, full mixed product scale
 or14-day rebuild/cost feasibility is established by virtual-clock synthetic tests.
+
+
+## Task05 capture integration
+
+A successful qualified price read now offers its exact rational route value and
+source block/update times to compact SQL sampling, after healthy metric persistence.
+No stale cached value is offered as a new sample. Same source/block retries deduplicate;
+minute coverage follows source time, not collection time. A sample failure does not
+replace the healthy price/share-rate/payout observations. Peg-assumed qualification
+is retained in daily manifests. No historical venue endpoint or BTC/ETH feed was added.

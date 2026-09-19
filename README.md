@@ -7,6 +7,7 @@ serving chain; required shared Ethereum-era HEX history retains its original ide
 and the built React shell. Exact domain rules and runtime DTO validation are tested.
 Task02 adds isolated PostgreSQL migrations and incremental projection primitives.
 Task03 adds offline-tested acquisition, continuous sync, retention and portable seeds.
+Task05 adds daily ranks, compact market observations and five immutable CSV downloads.
 Task04 adds exact current metrics, a bounded reserve-price route, scheduled worker
 observations and callable live address services. See [the live contract](docs/live.md).
 No real data, live provider qualification or deployment is supplied.
@@ -206,7 +207,7 @@ authority. The API remains read-only and the public shell remains uninitialized.
 Migration3 adds only disposable latest observations, independent of native bootstrap.
 `npm run test:live` creates a fresh Task04 SQL project and uses raw synthetic providers;
 `npm test` includes offline live-service and scheduler checks. The source-only seed
-contract is format2/schemaVersion3; current overlays are excluded and start unavailable
+contract is format3/schemaVersion4; current overlays are excluded and start unavailable
 after a fresh import. No pre-existing schema/seed compatibility layer is supplied.
 
 Provider commands fail closed unless `HDD_V2_ALLOW_LIVE_RPC=true`, `HDD_V2_SOURCE_PROFILE`,
@@ -260,3 +261,26 @@ See [progress](docs/progress.md) for reviewed commits and local report locations
 [architecture](docs/architecture.md), [API interfaces](docs/interfaces.md),
 [testing](docs/testing.md), and [operations](docs/operations.md) for later-task contracts.
 `VALIDATION.md` is the historical starter report, not evidence of the current build.
+
+## Daily jobs and immutable exports (Task05)
+
+Run `npm run test:daily` for fresh, private SQL/file targets: schema3 upgrade, raw
+market intervals, ranking, streamed publication, process-kill recovery, seed import,
+DB-only restore and the million-stake/500,000-account export. Set
+`HDD_V2_DAILY_EVIDENCE` to a new directory under artifacts; phase selection is
+`HDD_V2_DAILY_TEST_PHASE=functional|import|restore|scale`. Import/restore use the
+matching functional artifacts. The harness removes only its own projects/volumes.
+
+Offline commands use the existing explicit v2 worker database configuration:
+`node src/worker/main.ts daily` coalesces due work; `node src/worker/main.ts export`
+forces a new bundle. Both require an existing empty/owned `HDD_V2_EXPORT_PATH` and
+need no live-provider flag. Normal watch runs the same jobs alongside metrics; bulk
+rebuild publishes at its accepted endpoint. Filesystem durability failures leave
+exports unavailable. Linux directory fsync is required for publication; Windows
+limitations are reported by the actual filesystem test, not silently waived.
+
+The narrow offline venue input is `market-import <file>`, with a bounded
+`HDD_V2_MARKET_PROFILE` JSON containing `chain, source, fromDay, method`
+(method `source-reported`). See data.md for the minute-bar wire format and limits.
+No real market history endpoint or canary was enabled. Public download routes,
+Home integration and UI remain Task06/07.

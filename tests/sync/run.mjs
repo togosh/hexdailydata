@@ -132,7 +132,7 @@ try {
       (await migrator.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows.map(
         (r) => r.version,
       ),
-      [1, 2, 3],
+      [1, 2, 3, 4],
     );
   });
   api = await db('api');

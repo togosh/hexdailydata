@@ -1,7 +1,8 @@
 # Data model and retention
 
-Task03's implemented acquisition/seed/pruning mapping extends the Task02 mapping below;
-see [sync and recovery contract](sync.md). Planned later-product tables remain unimplemented.
+Task05 adds the compact overlays documented below. The Task02 mapping describes the
+unchanged native row/undo contract; Task03's acquisition/seed/pruning mapping remains
+in [sync and recovery contract](sync.md).
 
 ## Storage principle
 
@@ -399,3 +400,76 @@ the cursor exactly; both sources corroborate its actual endpoints and event sets
 writer receives one observed UTC day per range; checked last-before/first-after searches
 preserve exact close identities. See sync.md for bounds and seed format2 rejection rules.
 No migration or canonical amount/reducer definition changed.
+
+
+## Task05 daily overlays and portable format3/schema4
+
+Migrations1?3 remain byte-for-byte unchanged. Migration4 adds account_ranks and
+rank_state, market_sources/samples/daily and export_bundles. No canonical account,
+stake, daily or before-image row changes shape. The export manifest is the compact
+file catalog in one JSON value; there is no separate export_files or job_runs table.
+
+Liquid and staker ranks are consecutive ordinals, amount descending then address
+bytes ascending. Only positive liquid/accounted principal qualifies for that rank;
+zero on the other side has a null rank. Holders include the union of those sets.
+Accounted principal/count excludes GA, ended and cancelled and includes queued,
+open and mature-open. Maturities use scheduledMaturity: queued/open only, strictly
+future maturity day; mature-open and GA are excluded. Rank values and the shared
+ranking_day commit together. ranking_day names the last completed protocol day;
+rank_state records the actual accepted block/time, which may be later than midnight.
+Current balances retain their separate current-index as-of. Identical ranks are not
+rewritten merely to advance the shared cutoff. No historical rank copies are kept.
+
+Daily CSV reads closeDay/applyPayout facts. Payout per T-share truncates to12dp,
+weighted days and staked percentage to8dp. Undefined ratios are empty; a materialized
+zero-share ledger remains materialized with an empty ratio. The post-claim current
+estimator never supplies historical claim/BPD rows. Lifecycle timestamps join permanent
+start/end events using the event origin and fork boundary, including inherited ended
+and cancelled stakes; recent headers are not an export dependency.
+
+Market source IDs are fixed public slugs, at most four per chain. A route ID hashes
+its declared route/provider identity and carries peg_assumed; two providers at one
+block corroborate reserves, not independently priced USD. Prices retain rational
+numerator/denominator; CSV display truncates to24dp. Route samples reuse a successful
+Task04 read and add no HTTP allowance. Source block time defines UTC minute/day;
+pool reserve-update and collection time remain distinct. Same source/block is one
+identity, including repeated polls. Equal prices at different block identities count
+only the actually observed minute buckets. Sampled OHLC includes all accepted marks
+in those buckets, not all trades. Volume/liquidity is empty for reserve samples.
+
+The supported source-reported adapter accepts raw JSON {chain,source,bars:[...]},
+at most1440 bars/2MiB per offline file. Each bar is {time,revision,open,high,low,close,
+volume,liquidity}; time is an integer Unix UTC minute start, revision an integer
+string, prices/optional USD fields decimal strings with at most24dp. Only closed
+intervals are accepted. Its source profile fixes chain/source/fromDay/method; no
+provider endpoint or supported live history window is configured. Volume sums only
+source-reported nonoverlapping minute volumes; liquidity is the last observed estimate.
+
+Daily observations are per(source,day), including explicit missing days. Complete
+means all1440 minute intervals under that method, never all venues/trades. Partial
+means fewer; outages/pretrading minutes are not forward-filled. Distinct sources
+never silently merge. Late retained-interval revisions dirty only their affected day;
+aggregation increments a source version only when the daily observation changes,
+which makes the scheduler publish a NEW immutable bundle. A correction requiring
+already retired minute inputs is explicitly refused; those inputs must be reacquired
+under a separately implemented/qualified historical source contract, not invented.
+Local samples lost after restore remain gaps. Offline fixture coverage is not live
+market qualification. Missing source profiles are NOT_CONFIGURED.
+
+market_sources records through_day, earliest dirty_day, source definition, logical
+sample bytes and capture status. Each invocation processes at most31 days per source.
+Pruning removes samples at least seven days behind the aggregated cutoff only when
+no dirty day still needs them and the shared snapshot/prune lock is available. Pending
+unaggregated observations survive nominal age. A64MiB logical sample limit per source
+pauses capture with byte_pressure; it never deletes required input. Physical bytes,
+indexes and WAL are separate measurements. This is a finite maximum256MiB logical
+sample allocation per supported chain, not a claim about total physical disk.
+
+A native rewind atomically clears ranks/cutoff, invalidates export availability and
+removes the dependent native sample/daily suffix. Independent venue history survives.
+Native daily facts still use exact original undo. Seed format3/schema4 includes ranks,
+market daily facts, consumer progress and remaining required samples using the existing
+exact SQL row codec. It excludes live_metrics and export_bundles; imports cannot
+advertise nonexistent files or fresh old live observations. Older logical formats
+are rejected. A seed semantic audit checks rank cutoff/range/density and market
+metadata/coverage/bytes; these are ingestion checks, not ordinary serving queries.

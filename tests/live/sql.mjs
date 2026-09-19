@@ -58,7 +58,7 @@ try {
       (await migrator.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows.map(
         (x) => x.version,
       ),
-      [1, 2, 3],
+      [1, 2, 3, 4],
     );
   });
   const api = await db('api'),

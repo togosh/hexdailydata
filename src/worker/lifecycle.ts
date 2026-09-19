@@ -55,14 +55,17 @@ export async function runWorkerLifecycle<T>(
   metrics: MetricsJob,
   signal: AbortSignal,
   keepMetricsOnNativeFailure = false,
+  background: MetricsJob[] = [],
 ): Promise<T> {
   const controller = new AbortController();
   const combined = AbortSignal.any([signal, controller.signal]);
   let jobFailure: unknown;
-  const recurring = metrics.run(combined).catch((error) => {
-    jobFailure = error;
-    controller.abort(error);
-  });
+  const recurring = Promise.all([metrics, ...background].map((job) => job.run(combined))).catch(
+    (error) => {
+      jobFailure = error;
+      controller.abort(error);
+    },
+  );
   try {
     let value: T;
     try {

@@ -213,8 +213,13 @@ export const IndexedAddressSchema = z.strictObject({
   accountedHearts: UIntStringSchema.nullable(),
   stakeCount: UIntStringSchema.nullable(),
   rankingDay: ContractDaySchema.nullable(),
-  // Task05 owns ranks. A live observation cannot fabricate one from this baseline.
-  rank: z.null(),
+  rank: z
+    .strictObject({
+      liquid: UIntStringSchema.nullable(),
+      staker: UIntStringSchema.nullable(),
+      asOf: BlockRefSchema,
+    })
+    .nullable(),
 });
 export const AddressResultSchema = z.strictObject({
   outcome: z.enum(['available', 'partial', 'unavailable', 'expired', 'quota']),

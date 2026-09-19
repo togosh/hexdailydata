@@ -188,3 +188,32 @@ Use short-lived IP-based rate-limit state only where needed, with a documented e
 No analytics/advertising tracker is required for launch. Seed, backup and diagnostics
 must exclude visitor request caches. Future reminders require separate explicit consent;
 the basic app must not silently become an address-to-contact database.
+
+
+## Task05 local publication and recovery limits
+
+Use an explicitly owned export root with its .hdd-exports marker. The worker owns one
+global builder advisory lock. A repeatable-read SQL cursor snapshot shares the existing
+snapshot/prune protection; it does not hold the canonical writer through file I/O.
+Statements are bounded to120s; a build to30min/4GiB. Files stream in bounded buffers,
+are independently hashed, synced, and renamed on the same filesystem. Both directory
+sync acknowledgements are mandatory. Only then does the DB transaction switch slots.
+Lost commit acknowledgement is resolved against that same UUID. Unadvertised orphans
+are cleaned before another build; cleanup only enumerates fixed member names inside
+ordinary owned UUID/work directories and refuses symlinks, hardlinks and unknown files.
+
+Retention is current + prior + at most one build. Prior receives60s grace and a shared
+reader advisory lease. New publication pauses when an active prior reader prevents
+retirement. Each API service permits32 active readers, each at most120s; the deployment
+contract remains one API process. Retired IDs admit no new readers. Prior remains
+published until its replacement is durable; its exclusive retirement lease prevents
+new readers during that build. After commit, retired files are removed. Cleanup failure
+leaves bounded orphan work and blocks further publication until safe cleanup succeeds.
+
+At startup verify hashes for the bounded current/prior bundles before downloads become
+available. A worker marks missing/corrupt bundles unavailable; a read-only API excludes
+them. DB-only restore rebuilds from the actual restored checkpoint under NEW UUIDs.
+Exact old files may retain IDs only after digest verification. Other healthy SQL/API
+reads remain independent. Real directory fsync is tested on Linux; unsupported Windows
+acknowledgement is an explicit publication failure, not a successful durability claim.
+This is Task05's service recovery boundary, not Task08's production backup tooling.

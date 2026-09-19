@@ -26,7 +26,8 @@
     "db:migrate": "node src/db/main.ts migrate",
     "test:sql": "node scripts/test-sql.mjs",
     "test:sync": "node scripts/test-sync.mjs",
-    "test:live": "node scripts/test-live.mjs"
+    "test:live": "node scripts/test-live.mjs",
+    "test:daily": "node scripts/test-daily.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",

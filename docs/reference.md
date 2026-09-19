@@ -149,3 +149,11 @@ its bytes still match the previously recorded SHA256. Function/line references,
 literal independently derived synthetic vectors and remaining proof limits are in
 [live observations](live.md). Actual pinned historic-state verification and deployed
 identity remain unperformed. The existing source/license cautions remain unchanged.
+
+
+## Task05 reuse
+
+Task05 reused v2 closeDay/applyPayout, canonical event timestamps, domain unit/ratio
+helpers, source replay fixtures, shared quota scheduling and portable row codec. No v1
+source file, application module, credentials or data was accessed for this task. Earlier
+reference receipts and acquisition-correction evidence remain unchanged.

@@ -4,11 +4,11 @@
   "properties": {
     "formatVersion": {
       "type": "number",
-      "const": 2
+      "const": 3
     },
     "schemaVersion": {
       "type": "number",
-      "const": 3
+      "const": 4
     },
     "calculationVersion": {
       "type": "string",
@@ -188,8 +188,8 @@
       }
     },
     "files": {
-      "minItems": 14,
-      "maxItems": 14,
+      "minItems": 19,
+      "maxItems": 19,
       "type": "array",
       "items": {
         "type": "object",
@@ -210,7 +210,12 @@
               "transfers_recent",
               "checkpoints_recent",
               "undo_recent",
-              "recovery_pins"
+              "recovery_pins",
+              "rank_state",
+              "account_ranks",
+              "market_sources",
+              "market_samples",
+              "market_daily"
             ]
           },
           "path": {

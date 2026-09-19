@@ -200,3 +200,19 @@ The original Task03 evidence and Task01 policy-blocked temporary folder remain u
 Task01 browser evidence at98ebf8c and Task02 million-row evidence at237aba7 remain reused;
 no schema, index, ranking query or amount reducer changed. This is not full-history,
 full seed-scale or real provider performance evidence.
+
+
+## Task05 offline suite
+
+npm run test:daily uses fresh private projects and actual PostgreSQL/files. Functional
+cases cover populated schema3 migration, actual raw native replay, exact CSV decode,
+rank interruption, raw market bars/samples, concurrent snapshots, publication hook
+failures, SIGKILL at rename/commit boundaries, leases, symlinks, corruption, lag-aware
+pruning,30 accepted daily cycles, portable daily state and new empty seed import.
+A separate pg_dump data-only restore into a fresh target retains the catalog while
+files are absent. Scale uses1,000,000 lifecycle rows/500,000 accounts, exact wide
+amounts, actual ranking/query plans and five-file streaming with metric work and
+reader overlap. Direct SQL scale construction is labeled synthetic, not acquisition.
+All test commands/exits, failed probes/corrections and sampling limits remain in ignored
+artifacts/task-05. Windows filesystem probing is separate; Linux PASS is not a Windows
+or production durability claim. Canary/provider/history capability remains NOT_RUN.

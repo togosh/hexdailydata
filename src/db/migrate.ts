@@ -60,5 +60,6 @@ export async function migrateCurrent(client: pg.Client) {
   return migrate(client, await initialMigration(), [
     await readFile(new URL('../../migrations/0002_recovery.sql', import.meta.url), 'utf8'),
     await readFile(new URL('../../migrations/0003_live.sql', import.meta.url), 'utf8'),
+    await readFile(new URL('../../migrations/0004_daily.sql', import.meta.url), 'utf8'),
   ]);
 }

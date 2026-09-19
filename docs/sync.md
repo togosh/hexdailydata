@@ -95,3 +95,15 @@ implements interface facts and derives topics/selectors with pinned `@noble/hash
 Literal topic/packed-integer vectors and raw transport + SQL fixtures exercise decoding.
 No full Solidity source is included. A new web fetch of the Etherscan source returned403;
 no live RPC, deployed-bytecode or fork qualification was performed.
+
+
+## Task05 storage version
+
+The supported logical seed is now format3/schema4; format2 is rejected. Native tables,
+source-range validation, sparse/fork-parent rules and migrations1?3 are unchanged.
+The fixed allowlist additionally contains rank_state/account_ranks and
+market_sources/market_samples/market_daily. The strict empty target also requires
+export_bundles empty. Disposable live metrics and file publication status are excluded.
+The Task05 data mapping describes rank/market invalidation; rewind never rewrites
+independently sourced venue history. Export and seed snapshots share the existing
+prune lock. No provider method, canary allowance or deployment permission changed.

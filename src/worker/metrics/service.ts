@@ -16,18 +16,22 @@ import type { RpcClient } from '../../providers/rpc.ts';
 import { blockRef, observed, unavailable } from '../../services/live/observations.ts';
 import { PriceReader, pinnedCall, verifyCode } from '../../services/live/price.ts';
 import { readMetrics, type MetricStore, type Metrics } from './store.ts';
+import { priceSample, type MarketSample } from '../daily/market.ts';
+import { createHash } from 'node:crypto';
 
 export class MetricsService {
   readonly sources: readonly [RpcClient, RpcClient];
   readonly codeHash: string;
   readonly price: PriceReader | null;
   readonly store: MetricStore;
+  readonly capture: ((source: string, sample: MarketSample) => Promise<void>) | undefined;
   readonly counters = { ticks: 0, updates: 0, failures: 0 };
   constructor(
     sources: readonly [RpcClient, RpcClient],
     codeHash: string,
     price: PriceReader | null,
     store: MetricStore,
+    capture?: (source: string, sample: MarketSample) => Promise<void>,
   ) {
     if (
       sources[0].budget !== sources[1].budget ||
@@ -41,6 +45,7 @@ export class MetricsService {
     this.codeHash = codeHash;
     this.price = price;
     this.store = store;
+    this.capture = capture;
   }
   async tick(signal: AbortSignal) {
     this.counters.ticks++;
@@ -50,6 +55,7 @@ export class MetricsService {
     const previous = await readMetrics(this.store, a.chain, clock.now());
     const next: Metrics = { ...previous };
     const inputs: Record<string, unknown> = {};
+    let pendingSample: { source: string; sample: MarketSample } | undefined;
     try {
       const [chain, raw] = await a.calls(
         [
@@ -204,6 +210,27 @@ export class MetricsService {
             `Provider correlation: ${a.operator && b.operator ? 'distinct_declared_operators' : 'unknown'}.`,
             ...ra.map((r, i) => `Pool ${i} reserve update seconds: ${r.updated}.`),
           ]);
+          if (this.capture) {
+            // Source profile identity includes the route and declared corroborating sources.
+            const source =
+              'route-' +
+              createHash('sha256')
+                .update(JSON.stringify([this.price.profile, a.id, b.id]))
+                .digest('hex')
+                .slice(0, 32);
+            pendingSample = {
+              source,
+              sample: priceSample({
+                identity: h.hash.slice(2),
+                sourceTime: h.timestamp,
+                observedTime: String(Math.floor(clock.now() / 1000)),
+                blockNumber: h.number,
+                blockHash: h.hash,
+                poolTime: ra.reduce((v, r) => (r.updated > v ? r.updated : v), 0n).toString(),
+                price: this.price.ratio(ra, reserves),
+              }),
+            };
+          }
         } catch {
           this.counters.failures++;
         }
@@ -233,6 +260,12 @@ export class MetricsService {
         this.counters.failures++;
       }
     }
+    if (pendingSample && this.capture)
+      try {
+        await this.capture(pendingSample.source, pendingSample.sample);
+      } catch {
+        this.counters.failures++;
+      }
     return readMetrics(this.store, a.chain, clock.now());
   }
 }

@@ -166,3 +166,22 @@ cannot precede the source block. Each component is aged independently when serve
 `mode: development` replaces the unused scaffold `demo` option; there is no fake-data
 mode. Weighted duration is nullable when its accounted set is empty. All derived
 payout displays use the exact-ratio/truncate-8 policy in data.md.
+
+
+## Task05 implemented download service boundary
+
+ExportService provides startup verification, catalog, openStream and worker build.
+Catalog returns available/rebuilding with only validated public manifests; a UUID not
+retained by the DB returns retired (the future HTTP410), an unverified or changed file
+returns unavailable. Open streams expose immutable SHA-256 ETag/bytes and release
+completion; callers own cancellation. API callers use the read-only SQL connection.
+Task06 owns HTTP status mapping/routes and catalog refresh after new publication.
+
+Manifests carry format/calculation version, accepted current-index identity/finality,
+actual rank identity plus completed-day label, native daily/payout cutoffs, per-source
+market cutoffs/versions/method/qualification and interval contract, origins, exact
+column units/order, rows/bytes/digests. Markets can have multiple source rows per day.
+No endpoint, storage path or credential is exposed. Normal download/catalog reads
+check protected file identity/stat metadata, not full content hashes. The address
+baseline now includes nullable liquid/staker ranks with a separate rank asOf block.
+The Home shell remains uninitialized and no Task06 route inventory was added.

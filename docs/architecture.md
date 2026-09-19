@@ -350,3 +350,18 @@ serving states, because the owner explicitly does not require them.
 New chain adapters implement the same ingestion interface. Auth/entitlements can wrap
 API services later. Leagues/query builders consume selected read models. Notifications
 consume a separate optional subscription module. None needs a generic plugin bus now.
+
+
+## Task05 job wiring
+
+Watch runs the existing coalescing MetricsJob for current metrics and an independent
+coalescing daily job. The daily job derives due work from durable rank/daily/market
+cutoffs and the current bundle manifest, aggregates at most31 market days per source,
+prunes safe samples, ranks once for the useful completed cutoff and publishes when
+those cutoffs change. Rebuild performs one endpoint daily publication after native
+replay/audit. Offline daily/export commands use the same implementation. Failed exports
+do not hold the native writer or prevent metric writes. Sample capture follows healthy
+metric persistence; a failed market write records its own failure. No additional
+provider polling loop or quota allowance was introduced. A future configured historical
+transport must use the existing sync lane; Task05's raw minute-bar file input performs
+no provider I/O. No real historical transport profile is currently qualified.

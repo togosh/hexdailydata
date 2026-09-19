@@ -147,10 +147,7 @@ export class PriceReader {
       },
     };
   }
-  value(
-    a: ReturnType<typeof decodeReserves>[],
-    b: ReturnType<typeof decodeReserves>[],
-  ): PriceValue {
+  ratio(a: ReturnType<typeof decodeReserves>[], b: ReturnType<typeof decodeReserves>[]): Rational {
     if (
       JSON.stringify(a, (_, v) => (typeof v === 'bigint' ? String(v) : v)) !==
       JSON.stringify(b, (_, v) => (typeof v === 'bigint' ? String(v) : v))
@@ -189,7 +186,13 @@ export class PriceReader {
         suffix.denominator * leg.price.denominator,
       );
     }
-    const usdPerHex = displayRatio(price, 24);
+    return price;
+  }
+  value(
+    a: ReturnType<typeof decodeReserves>[],
+    b: ReturnType<typeof decodeReserves>[],
+  ): PriceValue {
+    const usdPerHex = displayRatio(this.ratio(a, b), 24);
     if (usdPerHex === '0') throw new Error('Price display underflow.');
     return { usdPerHex, valuation: 'peg_assumed', kind: 'spot_estimate' };
   }

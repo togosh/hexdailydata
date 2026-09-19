@@ -80,7 +80,7 @@ export async function scale({ admin, api, db }) {
   // Direct SQL fixture construction is test data, NOT an accepted acquisition or seed import.
   await phase('replace small fixture with deterministic scale state', async () => {
     await admin.query(
-      `TRUNCATE hdd.undo_recent,hdd.checkpoints_recent,hdd.blocks_recent,hdd.events,hdd.transfers_recent,hdd.daily_stats,hdd.share_schedule,hdd.stakes,hdd.accounts,hdd.current_state,hdd.sync_state,hdd.chains RESTART IDENTITY`,
+      `TRUNCATE hdd.undo_recent,hdd.checkpoints_recent,hdd.blocks_recent,hdd.events,hdd.transfers_recent,hdd.daily_stats,hdd.share_schedule,hdd.stakes,hdd.accounts,hdd.current_state,hdd.sync_state,hdd.chains RESTART IDENTITY CASCADE`,
     );
     await worker.query(
       `INSERT INTO hdd.chains(chain_id,contract_address,code_hash,initialization,origin_chain_id) VALUES(1,decode($1,'hex'),decode(repeat('cd',32),'hex'),'constructor',1)`,
