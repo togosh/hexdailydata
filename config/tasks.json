@@ -76,7 +76,7 @@
         "src/api/",
         "src/services/queries/"
       ],
-      "status": "pending"
+      "status": "passed"
     },
     {
       "id": "07",

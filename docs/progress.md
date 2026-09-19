@@ -7,7 +7,8 @@
 | 03 | passed (offline) | Reviewed code `73d461b`; 43 unit tests and 21 isolated sync/seed/pruning groups. Same independent `/root/task03_review`: PASS after one full review and two corrections. SQL/container evidence reused at `64bc9d7`; see ignored `artifacts/task-03/report.md` and reviewer report. Canary prepared / NOT_RUN; live/full-scale qualification remains open. |
 | 04 | passed (offline) | Reviewed code `7787ac16331c52d18437e05e731b486e58752ef3`; 68 tests, 12 SQL groups, 28 sync groups and 5 live-service SQL groups. Independent `/root/task04_review`: PASS after one full review and one correction/recheck. Reports, commands and measurements in ignored `artifacts/task-04/`. |
 | 05 | passed (offline) | Reviewed code `a9bf7bec00c9da468b8759ab68fa06506f9f48e2`; 70 units, 11 daily groups, fresh seed/DB-restore continuation, 3 scale groups, 28 sync and 5 live-service SQL groups. Independent `/root/task05_review`: PASS after one full review and one correction/recheck. Actual reports/commands in ignored `artifacts/task-05/`. |
-| 06–11 | pending | Not implemented |
+| 06 | passed (offline) | Reviewed code `c7ae880c2455239a511a1136dccb3e60f9ace44e`; 76 units, actual API/SQL/Linux/compiled-image/restore and affected export checks. Independent `/root/task06_review`: PASS after one full review and one correction/recheck. 1M-stake/500k-account Home query p95 0.840ms, HTTP p95 2.079ms, 2,429 bytes; scale evidence reused from `751353c`. Report and exact provenance in ignored `artifacts/task-06/REPORT.md`. |
+| 07–11 | pending | Not implemented |
 
 The development shell has no live data/indexer. Task02 qualifies schema/projections on
 isolated disposable PostgreSQL17; the public shell remains uninitialized. Task01 source
@@ -76,3 +77,14 @@ sampled OHLC/peg_assumed limitations remain explicit. Tasks01–04, acquisition 
 migrations1–3 and original evidence are preserved. Task-owned disposable resources were
 removed. Canary NOT_RUN; no live/v1 access, push or deployment. This final status-only
 commit follows independent PASS. Task06 is next eligible and has not started.
+
+Task06 implements all14 read routes, independent Home freshness, exact bounded
+history/keyset/calculator reads, shared address limits and read-only immutable-download
+refresh. Independent probes found and closed verification cancellation/crash/retry and
+malformed-input errors. Final affected checks passed on `c7ae880`; unchanged scale
+success paths reuse `751353c` under combined2CPU/4GiB. Mixed native reads stayed useful
+through injected price failures, quota-denied overlays and new-bundle verification.
+Provider time is synthetic; the512MiB runner reached its memory ceiling. Tasks01–05,
+acquisition correction and original evidence are preserved. No canary/live/v1 runtime
+or data/push/deployment. This status-only commit follows independent PASS. Tasks07/08
+are next eligible but unstarted; source feasibility still precedes major Task07 work.
