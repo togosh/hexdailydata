@@ -81,8 +81,8 @@ export const DailyHeadlineSchema = z
     dateUtc: z.iso.date(),
     contractDay: ContractDaySchema,
     displayDay: z.number().int().min(1).max(65_536),
-    asOf: BlockRefSchema,
-    stakedPercent: DecimalStringSchema,
+    asOf: BlockRefSchema.extend({ blockTimestamp: TimestampSchema.nullable() }),
+    stakedPercent: DecimalStringSchema.nullable(),
     weightedStakeLengthDays: DecimalStringSchema.nullable(),
     circulatingHex: DecimalStringSchema,
     stakedHex: DecimalStringSchema,
@@ -118,7 +118,7 @@ export const HomeResponseSchema = z
   .refine((home) => {
     const expected = home.chain === 'pulsechain' ? 369 : 1;
     // A serving PulseChain history may refer to its common Ethereum-era source.
-    const allowed = (block: BlockRef | null) =>
+    const allowed = (block: { chainId: number; blockNumber: string } | null) =>
       !block ||
       block.chainId === expected ||
       (expected === 369 && block.chainId === 1 && BigInt(block.blockNumber) <= 17_232_999n);
@@ -160,16 +160,60 @@ export const LiveStakePageSchema = z
     'Inconsistent stake page',
   );
 export const ApiErrorSchema = z.strictObject({
-  error: z.strictObject({ code: z.string(), message: z.string(), retryable: z.boolean() }),
-  requestId: z.string(),
+  error: z.strictObject({
+    code: z.string().max(64),
+    message: z.string().max(200),
+    retryable: z.boolean(),
+  }),
+  requestId: z.string().max(128),
 });
 export const StatusResponseSchema = z.strictObject({
   mode: z.literal('development'),
-  chain: z.literal('pulsechain'),
-  state: z.literal('uninitialized'),
+  chain: ChainKeySchema,
+  state: z.enum(['uninitialized', 'syncing', 'current', 'degraded']),
   productionReady: z.literal(false),
-  chainSyncImplemented: z.literal(false),
-  liveProvidersEnabled: z.literal(false),
+  chainSyncImplemented: z.literal(true),
+  liveProvidersEnabled: z.boolean(),
+  database: z.enum(['ready', 'unavailable', 'unconfigured']),
+  qualification: z.literal('offline_only_live_not_qualified'),
+  streams: z
+    .array(
+      z.strictObject({
+        chain: ChainKeySchema,
+        asOf: BlockRefSchema,
+        revision: UIntStringSchema,
+        finality: FinalitySchema,
+        freshness: z.enum(['fresh', 'stale', 'unavailable']),
+        fromBlock: UIntStringSchema.nullable(),
+        rewindFloor: UIntStringSchema,
+        rankingDay: ContractDaySchema.nullable(),
+        dailyThroughDay: ContractDaySchema.nullable(),
+      }),
+    )
+    .max(2),
+  observations: z
+    .array(
+      z.strictObject({
+        chain: ChainKeySchema,
+        metric: z.enum(['price', 'shareRate', 'todayPayoutEstimate', 'latestCompletedPayout']),
+        status: z.enum(['fresh', 'stale', 'unavailable']),
+        asOf: BlockRefSchema.nullable(),
+        observedAt: TimestampSchema.nullable(),
+      }),
+    )
+    .max(8),
+  markets: z
+    .array(
+      z.strictObject({
+        chain: ChainKeySchema,
+        source: z.string().max(64),
+        fromDay: ContractDaySchema,
+        throughDay: ContractDaySchema.nullable(),
+        dirtyDay: ContractDaySchema.nullable(),
+        state: z.enum(['ready', 'byte_pressure', 'capture_error']),
+      }),
+    )
+    .max(8),
 });
 
 export type UIntString = z.infer<typeof UIntStringSchema>;

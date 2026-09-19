@@ -30,7 +30,7 @@ export async function directory(path: string) {
   )
     throw new Error('Export directory is not an owned ordinary directory.');
 }
-export async function exportRoot(path: string) {
+export async function exportRoot(path: string, allowCreate = true) {
   const root = resolve(path);
   await directory(root);
   const marker = join(root, '.hdd-exports');
@@ -47,6 +47,7 @@ export async function exportRoot(path: string) {
     }
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    if (!allowCreate) throw e;
     if ((await readdir(root)).length) throw new Error('New export root must be empty.');
     const h = await open(marker, 'wx', 0o600);
     try {
@@ -98,7 +99,7 @@ export async function member(root: string, id: string, name: Dataset | 'manifest
 export async function digestHandle(h: FileHandle, signal: AbortSignal) {
   const sha = createHash('sha256');
   let bytes = 0;
-  for await (const b of h.createReadStream({ autoClose: false, start: 0 })) {
+  for await (const b of h.createReadStream({ autoClose: false, start: 0, signal })) {
     signal.throwIfAborted();
     bytes += b.length;
     if (bytes > maxBundleBytes) throw new Error('Bundle member exceeds bound.');

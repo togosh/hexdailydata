@@ -216,3 +216,33 @@ reader overlap. Direct SQL scale construction is labeled synthetic, not acquisit
 All test commands/exits, failed probes/corrections and sampling limits remain in ignored
 artifacts/task-05. Windows filesystem probing is separate; Linux PASS is not a Windows
 or production durability claim. Canary/provider/history capability remains NOT_RUN.
+
+## Task06 offline API evidence
+
+`npm run test:api` uses `compose.sql.yaml` plus `compose.api-test.yaml` with a fresh
+run-scoped project, PostgreSQL/API credentials and Linux volume. `HDD_V2_API_SCALE=1`
+selects the representative million-stake/500000-account shape. No preexisting dataset
+or v1 process is mounted. Source factory HTTP tests inject raw synthetic RPC into the
+actual AddressService and SQL baseline. A separate actual compiled API container gets
+only the read credential and a read-only export mount. Image restart is tested.
+
+The measured runtime allocation is PostgreSQL1.5CPU/3GiB, test driver+synthetic worker+
+source HTTP0.25CPU/512MiB, compiled API0.25CPU/512MiB. The compiled service is stopped
+during the source mixed-load phase. Docker orchestration and image builds are host
+control overhead outside those measurements. The driver performs no product ranking,
+query, conversion or CSV work outside the declared container. Setup is synthetic SQL,
+not an acquisition or live throughput qualification.
+
+Raw101-sample Home data-query/HTTP/revalidation distributions, first request, EXPLAIN
+ANALYZE BUFFERS, payload size, mixed HTTP/metric/export responses and resource milestones
+are written to the selected ignored evidence directory. Warm database samples are not
+cold-disk results; source factory connection setup is reported separately. Milestones
+are not continuous peak disk measurements. Existing unchanged Task05 replay/seed/rank
+and publication crash evidence is reused by reviewed commit, with affected live/export
+paths rerun as recorded in the Task06 report. Windows publication fsync remains unsupported;
+Linux publication and Windows read-only API behavior are distinct.
+
+Cheap final checks: `npm run format:check`, `npm run typecheck`, `npm test`,
+`npm run openapi:check`, `npm run build`, plus the affected API and export/live tests.
+The existing browser-shell smoke has no Task07 visual-fidelity claim; Task06 evidence
+uses its own output directory so original Task01 screenshots are preserved.

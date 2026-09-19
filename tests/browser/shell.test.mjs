@@ -57,7 +57,10 @@ test('built React shell renders honest unavailable states on desktop and mobile'
         ? route.continue()
         : route.abort(),
     );
-    await mkdir('artifacts/task-01', { recursive: true });
+    const evidence = process.env.HDD_V2_BROWSER_EVIDENCE ?? 'artifacts/task-01';
+    if (!/^artifacts\/task-\d{2}(\/[a-z0-9_-]+)*$/.test(evidence))
+      throw new Error('Task-owned browser evidence required.');
+    await mkdir(evidence, { recursive: true });
     for (const [name, width, height] of [
       ['desktop', 1280, 800],
       ['mobile', 390, 844],
@@ -80,7 +83,7 @@ test('built React shell renders honest unavailable states on desktop and mobile'
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
         true,
       );
-      await page.screenshot({ path: `artifacts/task-01/shell-${name}.png`, fullPage: true });
+      await page.screenshot({ path: `${evidence}/shell-${name}.png`, fullPage: true });
     }
     await page.route('**/api/v2/status', (route) => route.fulfill({ status: 503, body: '{}' }));
     await page.reload();

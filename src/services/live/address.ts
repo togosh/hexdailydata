@@ -93,9 +93,20 @@ export class AddressService {
     signal.throwIfAborted();
     const started = this.rpc.budget.clock.now();
     const deadline = Math.min(jobDeadline, started + 10000);
+    let continuation: Cursor | undefined;
+    try {
+      continuation = cursor ? this.decode(cursor, address) : undefined;
+    } catch {
+      return {
+        outcome: 'expired',
+        reason: 'cursor_expired_or_incompatible',
+        indexed: null,
+        live: null,
+      };
+    }
     // Baseline is independent, bounded SQL, never merged into live exact totals.
     const indexedPromise = within(
-      this.baseline.address(this.rpc.chain, address),
+      this.baseline.address(this.rpc.chain, address, signal),
       signal,
       deadline - started,
     ).catch(() => null);
@@ -104,7 +115,6 @@ export class AddressService {
       reason: string | null = null;
     try {
       if (started >= deadline) throw new Error('Address deadline expired.');
-      const continuation = cursor ? this.decode(cursor, address) : undefined;
       const key = `${this.rpc.chain}/${address}/${pageSize}/${cursor ?? 'latest'}`;
       const cached = this.cache.get(key, started);
       if (cached) {
@@ -309,9 +319,11 @@ export class AddressService {
     if (address !== undefined) addressSchema.parse(address);
     signal.throwIfAborted();
     const deadline = this.rpc.budget.clock.now() + 10000;
-    const indexed = await within(this.baseline.stake(this.rpc.chain, id), signal, 10000).catch(
-      () => null,
-    );
+    const indexed = await within(
+      this.baseline.stake(this.rpc.chain, id, signal),
+      signal,
+      10000,
+    ).catch(() => null);
     signal.throwIfAborted();
     if (indexed && address !== undefined && address !== indexed.address)
       return { outcome: 'incompatible_owner' as const, indexed, live: null };
@@ -324,10 +336,16 @@ export class AddressService {
         ? ('observed' as const)
         : indexed && result.live?.page.enumerationComplete
           ? ('not_current_at_block' as const)
-          : ('indexing' as const),
+          : result.outcome === 'quota'
+            ? ('quota' as const)
+            : result.outcome === 'unavailable'
+              ? ('unavailable' as const)
+              : ('indexing' as const),
       indexed,
       live: item,
       observation: result.live?.page.asOf ?? null,
+      observedAt: result.live?.page.observedAt ?? null,
+      expiresAt: result.live?.expiresAt ?? null,
     };
   }
 }

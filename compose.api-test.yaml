@@ -1,0 +1,37 @@
+services:
+  runner:
+    cpus: 0.25
+    mem_limit: 512m
+    memswap_limit: 512m
+    environment:
+      HDD_V2_API_SCALE: ${HDD_V2_API_SCALE:-0}
+    volumes:
+      - ${HDD_V2_API_EVIDENCE:?Task-owned evidence}:/evidence
+      - exports:/exports
+    command: ['node', 'tests/api/run.mjs']
+  api:
+    image: ${HDD_V2_API_IMAGE:?Run-specific image}
+    user: node
+    read_only: true
+    cpus: 0.25
+    mem_limit: 512m
+    memswap_limit: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      HDD_V2_DB_HOST: db
+      HDD_V2_DB_NAME: hexdailydata_v2
+      HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE}
+      HDD_V2_API_PASSWORD: ${HDD_V2_API_PASSWORD}
+      HDD_V2_EXPORT_PATH: /exports
+    volumes:
+      - exports:/exports:ro
+    networks: [sql]
+  storage-init:
+    image: node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+    network_mode: none
+    volumes:
+      - exports:/exports
+    command: ['chown', '1000:1000', '/exports']
+volumes:
+  exports:

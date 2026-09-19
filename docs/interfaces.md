@@ -147,11 +147,10 @@ start-date selector or unnecessary slider. Historical arbitrary-start calculator
 not required at launch. Good-accounted/ended values in explorer are not silently reused
 as an ordinary new stake quote.
 
-## Task01 foundation boundary
+## Runtime DTO boundary
 
-The runnable development API serves health and validated status; Home data explicitly
-returns 503 until its owning tasks are built. Source/compiled entry points refuse live
-mode. `src/contracts/api.ts` is the runtime Zod schema and inferred-type source for
+The runnable API serves health/status and configured read models. An unconfigured Home
+returns503 without invented values. `src/contracts/api.ts` is the runtime Zod schema and inferred-type source for
 block references, observations, Home, live stake pages and errors. JSON example:
 `tests/fixtures/home.json` (synthetic, test-only; not imported into the application).
 No source/explorer fixture is served as current data.
@@ -172,10 +171,10 @@ payout displays use the exact-ratio/truncate-8 policy in data.md.
 
 ExportService provides startup verification, catalog, openStream and worker build.
 Catalog returns available/rebuilding with only validated public manifests; a UUID not
-retained by the DB returns retired (the future HTTP410), an unverified or changed file
+retained by the DB returns retired (HTTP410), an unverified or changed file
 returns unavailable. Open streams expose immutable SHA-256 ETag/bytes and release
 completion; callers own cancellation. API callers use the read-only SQL connection.
-Task06 owns HTTP status mapping/routes and catalog refresh after new publication.
+Task06 wires HTTP routes and read-only refresh after new publication.
 
 Manifests carry format/calculation version, accepted current-index identity/finality,
 actual rank identity plus completed-day label, native daily/payout cutoffs, per-source
@@ -184,4 +183,85 @@ column units/order, rows/bytes/digests. Markets can have multiple source rows pe
 No endpoint, storage path or credential is exposed. Normal download/catalog reads
 check protected file identity/stat metadata, not full content hashes. The address
 baseline now includes nullable liquid/staker ranks with a separate rank asOf block.
-The Home shell remains uninitialized and no Task06 route inventory was added.
+Catalog bundles carry their explicit current/prior slot, ordered current first. The
+unchanged Task07 shell still displays unavailable placeholders; API reads are implemented.
+
+## Task06 implemented read behavior
+
+The route table above is implemented in `src/api/routes.ts`; its schemas generate
+`docs/openapi.json` through `npm run openapi` (`openapi:check` checks reproducibility).
+All routes support GET and HEAD. Runtime cross-field invariants (day identity, positive
+ratios, chain attribution, real ordered dates, authenticated cursor/cutoff compatibility)
+remain stricter than JSON Schema can express; generation does not remove those checks.
+Unknown query keys are rejected. Lower/uppercase hexadecimal address input is normalized.
+
+| Query | Default / bounds / order |
+|---|---|
+| `chain` | `pulsechain`; only `pulsechain` and `ethereum` |
+| Daily and markets `from`, `to` | Both required, inclusive real UTC dates; launch through day65535; ordered and at most366 days |
+| Markets `source` | Optional declared source identifier; at most4 separate sources, source then day order |
+| Stakes `address` | Optional exact address; stake ID ascending, no OFFSET |
+| Stakes/holders/address `limit` | Default50, range1–100; live totals and returned page size stay separate |
+| Holders `order` | `liquid` (default) or `staker`; stored unique ordinal rank then address; ties were resolved by the daily ranking worker |
+| Indexed `cursor` | Signed version1, chain/filter/order/page-size/cutoff binding, 60s expiry from first page; changed sync revision/hash/rank identity returns409 |
+| Live address `cursor` | Existing signed pinned block/address/offset/count observation; at most60s; restart invalidates it |
+| Stake detail `address` | Optional owner hint for bounded recent discovery; a conflicting indexed owner returns409 |
+
+Examples: `/api/v2/daily?from=2021-01-04&to=2021-01-05`,
+`/api/v2/holders?order=staker&limit=50`, `/api/v2/stakes?address=0x…&limit=50`.
+The ellipsis is explanatory, not a valid address. Invalid date/chain/query returns400
+`invalid_request`. A changed cursor returns409 `cursor_incompatible`. HTTP admission or
+provider refusal without useful fallback returns429 `http_quota`/`provider_quota` and
+`Retry-After: 60`. Required source failure returns503 `source_unavailable`. Unconfigured
+or fully unusable Home returns503 `not_initialized`. Retired download IDs return410
+`bundle_retired`; unverified or changed files return503. Errors always use the shared
+sanitized envelope, e.g. `{"error":{"code":"cursor_incompatible","message":"Observation changed or expired; restart pagination.","retryable":false},"requestId":"req-1"}`.
+
+A missing indexed stake is inconclusive: bounded recent discovery can return a useful
+observed new stake, otherwise503 `not_indexed` or source/quota unavailable. An empty
+owner hint does not establish global absence, so this implementation does not issue404
+for an unknown stake merely from SQL or a user-supplied owner. Known indexed lifecycle
+remains available with a separately unavailable recent overlay. No whale enumeration
+or second provider allowance is used. Current balance and daily rank block cutoffs are
+separate. No historical holder snapshots are implied.
+
+Home performs one compact data statement after connection setup; current/daily/sync
+and four metric records are bounded. Home does no provider work, file verification,
+ranking, chart fetch or large-table count/sum. Source time, collection time and protocol
+day are distinct. Every response ages live components again, including before304.
+Estimates also expire on protocol-day change. An invalid price does not suppress a
+qualified share rate. Daily historical rows retain their source chain/block/hash and
+may have `blockTimestamp:null` after headers are pruned; a day boundary is never
+invented as the exact block time. Retained lifecycle events supply stake timestamps.
+A completed *live observation* can expire; `/daily` retains the exact completed ledger
+fact and its original payout block. This is historical data, not today's estimate.
+
+Daily responses report missing days explicitly and pending payout stays null. Market
+sources are never summed: each has its method, qualification, accepted through-day and
+dirty suffix. Previously aggregated rows within a dirty suffix are `pending_correction`
+and excluded from accepted coverage. Market rationals remain exact strings. Calculator
+presets are mean-of-daily-ratios for complete1/30/365 windows at the latest materialized
+past-day cutoff, with actual range/count. Gaps, pending days and zero shares are unavailable.
+API ratios truncate to8 decimals; CSV payout/share-rate precision remains12 and market
+precision24. Raw integers and returned calculator rationals remain exact.
+
+Small JSON responses use a hash of the bounded representation and `no-cache,
+must-revalidate`; there is no server JSON cache extending a fresh label. Address/stake
+responses use `no-store`; their service cache still preserves the original observation
+and expiry. A304 is computed only after current aging/availability checks. CSVs use
+strong `"sha256-…"` ETags, exact byte length, attachment disposition and `public,
+max-age=31536000, immutable`. Conditional reads first open the protected available
+identity. HEAD/304 destroy the unopened stream and await its lease release. Range is
+ignored: the full200 representation is served and `Accept-Ranges: none` is declared.
+Retired URLs never redirect to a current bundle.
+
+Read requests have no body product. URL4096/header8192/cursor2048-character guards run
+before data access. JSON is capped at2MiB (Home target25KiB). There are8 exclusive SQL
+leases with no admission queue,5s connection setup,2s statement and3s lease bounds;
+download advisory sessions are separate. General handlers have8s, address/stake paths
+10s and downloads120s cancellation deadlines. Provider10s includes SQL/queue time and
+still has4HTTP/128logical maximum; routes share one API budget/cache/cooldown owner.
+The anonymous HTTP layer uses one transient global1200/min token bucket and64 active
+requests, plus the existing32pending+active download slots. Forwarded IP headers have
+no quota authority and no visitor/IP/address history is stored. Logs contain startup
+state only, never request URLs, query text, provider/SQL errors, paths or credentials.

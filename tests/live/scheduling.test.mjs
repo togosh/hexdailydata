@@ -234,7 +234,7 @@ test('public deadline includes delayed ID lookup; baseline timeout and dispatche
     },
   };
   const service = new AddressService(rpc, CODE_HASH, baseline);
-  assert.equal((await service.stake('1', signal)).outcome, 'indexing');
+  assert.equal((await service.stake('1', signal)).outcome, 'quota');
   assert.equal(rpc.counters.requests, 0);
   const hanging = new AddressService(rpc, CODE_HASH, {
     ...baseline,

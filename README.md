@@ -3,8 +3,8 @@
 A read-only HEX data product, built in this new repository. PulseChain is the initial
 serving chain; required shared Ethereum-era HEX history retains its original identity.
 
-**Task 01 provides a runnable development foundation.** Fastify serves health/status
-and the built React shell. Exact domain rules and runtime DTO validation are tested.
+**Task06 provides the versioned read API.** Fastify serves real bounded read models,
+health/status and the existing React shell. Exact domain rules and runtime DTOs are tested.
 Task02 adds isolated PostgreSQL migrations and incremental projection primitives.
 Task03 adds offline-tested acquisition, continuous sync, retention and portable seeds.
 Task05 adds daily ranks, compact market observations and five immutable CSV downloads.
@@ -54,13 +54,15 @@ port. Host defaults to loopback. No `.env` file is loaded automatically; supply
 variables in your shell or Compose environment. `.env.example` lists development options.
 
 - `/health/live`: 200 while the API process can serve requests.
-- `/health/ready`: 503 until data dependencies/schema are implemented and usable.
-- `/api/v2/status`: validated development/uninitialized status; no fabricated metrics.
-- `/api/v2/home`: 503 `not_implemented` (400 for invalid query parameters).
-- Other unimplemented routes: 404; write methods: 405. Errors use the shared envelope.
+- `/health/ready`: 200 when the configured private DB and schema4 are usable, including an empty schema; otherwise 503.
+- `/api/v2/status`: native stream cutoffs, coverage, independently aged metrics and market progress; production qualification remains false.
+- `/api/v2/home`: compact daily facts and four independently aged observations; useful partial data returns 200, fully uninitialized data 503.
+- All routes in [interfaces.md](docs/interfaces.md) are implemented. Unknown routes return 404; write methods return 405.
 
-`HDD_V2_MODE` defaults to `development`. Live mode or `HDD_V2_ALLOW_LIVE_RPC=true`
-fails before listening. Provider work is confined to explicitly configured worker commands. `doctor` checks
+`HDD_V2_MODE` defaults to `development`. Live access defaults OFF. An explicit address-service
+opt-in requires the existing source profile, persistent shared cooldown directory and private
+API database configuration; no provider URL comes from a request. Do not enable it as part
+of offline acceptance. `doctor` checks
 local tooling/configuration only; capability and cost results remain unmeasured.
 
 ## Isolated containers
@@ -131,7 +133,7 @@ input, never runtime data. The five CSV schemas remain in `src/contracts/dataset
 
 One npm package, one API/worker image, one PostgreSQL database. API and worker
 are separate process entry points. The SQL projection library has no RPC transport and
-is not wired to the uninitialized public shell.
+serves the API when explicitly configured; the Task07 browser presentation remains pending.
 Worker commands fail explicitly until their owning tasks are built.
 
 ## Isolated SQL projections (Task02)
@@ -203,7 +205,7 @@ are `rebuild`, `once`, `watch`, `repair-range <retained-block>`, `seed-export <f
 Every DB command requires the explicit v2 target/role/instance configuration above.
 Run `db:migrate` with the migrator to apply/check ordered migrations 1–3. Migration 1
 is unchanged; migration 2 adds only acquisition coverage, recovery pins and seed sequence
-authority. The API remains read-only and the public shell remains uninitialized.
+authority. The API remains read-only; Task06 wires stored reads while the Task07 shell remains pending.
 Migration3 adds only disposable latest observations, independent of native bootstrap.
 `npm run test:live` creates a fresh Task04 SQL project and uses raw synthetic providers;
 `npm test` includes offline live-service and scheduler checks. The source-only seed
@@ -284,3 +286,39 @@ The narrow offline venue input is `market-import <file>`, with a bounded
 (method `source-reported`). See data.md for the minute-bar wire format and limits.
 No real market history endpoint or canary was enabled. Public download routes,
 Home integration and UI remain Task06/07.
+
+## Task06 API configuration and offline acceptance
+
+An unconfigured API is a useful liveness/status shell and reports unavailable data. To
+serve stored data, supply `HDD_V2_DB_HOST=db`, `HDD_V2_DB_NAME=hexdailydata_v2`, the
+existing v2 `HDD_V2_DB_INSTANCE`, and `HDD_V2_API_PASSWORD` in the private container
+network. Only the API credential is supplied to the API. The worker/migrator owns schema
+and data preparation. Schema4 and the instance/role are checked when opening a SQL
+connection. No new migration or seed format is introduced by Task06.
+
+`HDD_V2_EXPORT_PATH` optionally identifies the existing worker-owned export directory.
+Mount it read-only. A single coalesced refresh checks current/prior publication metadata
+every five seconds and hashes only new or changed file identities, outside request
+handlers. Missing files, unsupported Windows publication durability, or verification in
+progress do not prevent native API readiness. An unchanged failed verification is retried
+when file/publication metadata changes. Windows read access needs no directory fsync;
+Task05 durable publication remains a Linux-volume operation.
+
+```powershell
+npm run openapi
+npm run openapi:check
+npm run test:api
+$env:HDD_V2_API_SCALE = '1'
+npm run test:api
+Remove-Item Env:HDD_V2_API_SCALE
+```
+
+The API suite provisions a fresh private PostgreSQL target, real Linux export files,
+source HTTP services and the compiled nonroot image. Its unique image/network/volumes
+are removed afterward. API, synthetic worker and SQL workloads fit a combined 2 CPU /
+4 GiB allocation; host Docker control/builds are outside measured runtime. Evidence
+is written under ignored `artifacts/task-06/`. Tests never contact live providers.
+Generated OpenAPI comes from the same route inventory and runtime schemas. Read the
+query defaults, errors, cache semantics and limits in [interfaces.md](docs/interfaces.md).
+No Task07 redesign, Task08 operations stack, canary, production or live qualification
+is supplied by this API implementation.

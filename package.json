@@ -27,7 +27,10 @@
     "test:sql": "node scripts/test-sql.mjs",
     "test:sync": "node scripts/test-sync.mjs",
     "test:live": "node scripts/test-live.mjs",
-    "test:daily": "node scripts/test-daily.mjs"
+    "test:daily": "node scripts/test-daily.mjs",
+    "test:api": "node scripts/test-api.mjs",
+    "openapi": "node scripts/openapi.mjs",
+    "openapi:check": "node scripts/openapi.mjs --check"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",

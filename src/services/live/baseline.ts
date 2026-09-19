@@ -3,10 +3,11 @@ import { IndexedAddressSchema, type IndexedAddress } from '../../contracts/api.t
 import { address as addressSchema, hex } from '../projections/input.ts';
 
 export interface AddressBaseline {
-  address(chain: 1 | 369, address: string): Promise<IndexedAddress | null>;
+  address(chain: 1 | 369, address: string, signal?: AbortSignal): Promise<IndexedAddress | null>;
   stake(
     chain: 1 | 369,
     id: string,
+    signal?: AbortSignal,
   ): Promise<{ address: string; lifecycle: string; asOfBlock: string } | null>;
 }
 export class SqlAddressBaseline implements AddressBaseline {

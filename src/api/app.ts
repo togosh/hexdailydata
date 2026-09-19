@@ -1,76 +1,279 @@
-import Fastify from 'fastify';
+﻿import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
-import { z } from 'zod';
-import { ApiErrorSchema, ChainKeySchema, StatusResponseSchema } from '../contracts/api.ts';
+import { createHash } from 'node:crypto';
+import { ApiErrorSchema } from '../contracts/api.ts';
+import { routes, jsonRevalidation } from './routes.ts';
+import { ApiFailure, unavailable } from './errors.ts';
+import { type ApiDependencies, sqlBaseline } from './dependencies.ts';
+import { PageCursors } from '../services/queries/cursor.ts';
+import { home, status, chainId } from '../services/queries/home.ts';
+import { daily, markets, calculator } from '../services/queries/history.ts';
+import { stakes, holders, indexedStake } from '../services/queries/lists.ts';
 
-export function createApp(options: { webRoot?: string } = {}) {
-  const app = Fastify({ logger: false, requestTimeout: 5_000, bodyLimit: 16_384 });
-  const errorBody = (requestId: string, code: string, message: string, retryable = false) =>
-    ApiErrorSchema.parse({ error: { code, message, retryable }, requestId });
-
+export function createApp(
+  options: {
+    webRoot?: string;
+    dependencies?: ApiDependencies;
+    now?: () => number;
+    admission?: { capacity: number; concurrent: number };
+  } = {},
+) {
+  const app = Fastify({
+    logger: false,
+    requestTimeout: 15000,
+    connectionTimeout: 15000,
+    keepAliveTimeout: 5000,
+    bodyLimit: 16384,
+    routerOptions: { maxParamLength: 2048 },
+    trustProxy: false,
+    forceCloseConnections: true,
+  });
+  const deps = options.dependencies ?? {},
+    now = options.now ?? Date.now,
+    cursors = new PageCursors();
+  const contexts = new Map<
+    string,
+    { controller: AbortController; timer: NodeJS.Timeout; cleanup: () => void }
+  >();
+  const capacity = options.admission?.capacity ?? 1200,
+    concurrent = options.admission?.concurrent ?? 64;
+  let tokens = capacity,
+    last = Date.now();
+  const errorBody = (id: string, code: string, message: string, retryable = false) =>
+    ApiErrorSchema.parse({ error: { code, message, retryable }, requestId: id });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Cache-Control', 'no-store').header('X-Content-Type-Options', 'nosniff');
-    if (!['GET', 'HEAD'].includes(request.method)) {
+    if (!['GET', 'HEAD'].includes(request.method))
       return reply
         .code(405)
         .header('Allow', 'GET, HEAD')
         .send(errorBody(request.id, 'read_only', 'Only read requests are supported.'));
+    if (
+      request.url.length > 4096 ||
+      request.url
+        .split('?')[0]!
+        .split('/')
+        .some((s) => s.length > 2048) ||
+      Buffer.byteLength(JSON.stringify(request.headers)) > 8192
+    )
+      throw new ApiFailure(400, 'invalid_request', 'Request exceeds input bounds.');
+    const time = Date.now();
+    tokens = Math.min(capacity, tokens + ((time - last) * capacity) / 60000);
+    last = time;
+    if (tokens < 1 || contexts.size >= concurrent)
+      throw new ApiFailure(429, 'http_quota', 'HTTP admission limit reached.');
+    tokens--;
+    const controller = new AbortController();
+    const download = request.routeOptions.url === '/api/v2/downloads/:bundle/:dataset';
+    const live =
+      request.routeOptions.url?.includes('/addresses/') ||
+      request.routeOptions.url === '/api/v2/stakes/:id';
+    const timer = setTimeout(
+      () => controller.abort(),
+      download ? 120000 : live ? 10000 : 8000,
+    ).unref();
+    const aborted = () => controller.abort();
+    const close = () => {
+      if (!reply.raw.writableFinished) controller.abort();
+    };
+    request.raw.once('aborted', aborted);
+    reply.raw.once('close', close);
+    const cleanup = () => {
+      clearTimeout(timer);
+      request.raw.removeListener('aborted', aborted);
+      reply.raw.removeListener('close', close);
+      contexts.delete(request.id);
+    };
+    reply.raw.once('close', cleanup);
+    contexts.set(request.id, { controller, timer, cleanup });
+  });
+  app.addHook('onResponse', async (request) => contexts.get(request.id)?.cleanup());
+  app.addHook('onClose', async () => {
+    for (const c of contexts.values()) {
+      c.controller.abort();
+      c.cleanup();
     }
+    await deps.close?.();
   });
   app.setErrorHandler((error, request, reply) => {
-    const errorStatus =
-      error instanceof Error && 'statusCode' in error ? error.statusCode : undefined;
-    const status =
-      typeof errorStatus === 'number' && errorStatus >= 400 && errorStatus < 500
-        ? errorStatus
-        : 500;
+    const e = error instanceof ApiFailure ? error : unavailable();
+    if (reply.raw.headersSent) {
+      reply.raw.destroy();
+      return;
+    }
+    if (e.status === 429) reply.header('Retry-After', '60');
     reply
-      .code(status)
-      .send(
-        errorBody(
-          request.id,
-          status === 500 ? 'internal_error' : 'invalid_request',
-          status === 500 ? 'Request could not be completed.' : 'Invalid request.',
-        ),
-      );
+      .code(e.status)
+      .send(errorBody(request.id, e.code, e.message, e.status === 429 || e.status === 503));
   });
-  app.setNotFoundHandler((request, reply) => {
-    reply.code(404).send(errorBody(request.id, 'not_found', 'Route not found.'));
-  });
-  app.get('/health/live', async () => ({ status: 'live', mode: 'development' }));
-  app.get('/health/ready', async (request, reply) =>
-    reply
-      .code(503)
-      .send(
-        errorBody(
-          request.id,
-          'not_initialized',
-          'Data dependencies and schema are not initialized.',
-        ),
-      ),
+  app.setNotFoundHandler((request, reply) =>
+    reply.code(404).send(errorBody(request.id, 'not_found', 'Route not found.')),
   );
-  app.get('/api/v2/status', async () =>
-    StatusResponseSchema.parse({
-      mode: 'development',
-      chain: 'pulsechain',
-      state: 'uninitialized',
-      productionReady: false,
-      chainSyncImplemented: false,
-      liveProvidersEnabled: false,
-    }),
-  );
-  app.get('/api/v2/home', async (request, reply) => {
-    const query = z
-      .strictObject({ chain: ChainKeySchema.default('pulsechain') })
-      .safeParse(request.query);
-    if (!query.success)
-      return reply.code(400).send(errorBody(request.id, 'invalid_query', 'Invalid chain query.'));
-    return reply
-      .code(503)
-      .send(errorBody(request.id, 'not_implemented', 'Home data is not implemented yet.'));
-  });
-  if (options.webRoot) {
+  for (const route of routes)
+    app.get(route.path, async (request, reply) => {
+      const query = route.query.safeParse(request.query),
+        params = route.params.safeParse(request.params);
+      if (!query.success || !params.success)
+        throw new ApiFailure(400, 'invalid_request', 'Invalid request.');
+      const q: any = query.data,
+        p: any = params.data;
+      const signal = contexts.get(request.id)!.controller.signal;
+      const db = () => {
+        if (!deps.db)
+          throw new ApiFailure(503, 'not_initialized', 'Data dependencies are not configured.');
+        return deps.db;
+      };
+      let body: unknown;
+      switch (route.id) {
+        case 'live':
+          body = { status: 'live', mode: 'development' };
+          break;
+        case 'ready':
+          await db().read(signal, (c) => c.query('SELECT 1'));
+          body = { status: 'ready' };
+          break;
+        case 'status':
+          body = await status(deps.db, q.chain, signal, now(), Boolean(deps.addresses));
+          break;
+        case 'home': {
+          body = await home(db(), q.chain, signal, now());
+          const h = body as Awaited<ReturnType<typeof home>>;
+          if (!h.daily && Object.values(h.live).every((o) => o.value === null))
+            throw new ApiFailure(
+              503,
+              'not_initialized',
+              'No useful Home observations are available.',
+            );
+          break;
+        }
+        case 'daily':
+          body = await daily(db(), q, signal);
+          break;
+        case 'markets':
+          body = await markets(db(), q, signal);
+          break;
+        case 'stakes':
+          body = await stakes(db(), q, signal, cursors, now());
+          break;
+        case 'holders':
+          body = await holders(db(), q, signal, cursors, now());
+          break;
+        case 'calculator':
+          body = await calculator(db(), q.chain, signal, now());
+          break;
+        case 'address':
+        case 'addressStakes': {
+          if (q.cursor && (q.chain !== 'pulsechain' || !deps.addresses))
+            throw new ApiFailure(
+              409,
+              'cursor_incompatible',
+              'Observation changed or expired; restart pagination.',
+            );
+          const result =
+            q.chain === 'pulsechain' && deps.addresses
+              ? await deps.addresses.get(p.address, signal, q.limit, q.cursor)
+              : {
+                  outcome: 'unavailable',
+                  reason: 'live_not_configured',
+                  indexed: await sqlBaseline(db()).address(chainId(q.chain), p.address, signal),
+                  live: null,
+                };
+          if (result.outcome === 'expired')
+            throw new ApiFailure(
+              409,
+              'cursor_incompatible',
+              'Observation changed or expired; restart pagination.',
+            );
+          if (!result.indexed && !result.live)
+            throw result.outcome === 'quota'
+              ? new ApiFailure(429, 'provider_quota', 'Live observation quota is unavailable.')
+              : unavailable();
+          body = result;
+          break;
+        }
+        case 'stake': {
+          const known = await indexedStake(db(), q.chain, p.id, signal);
+          if (q.address && known.indexed && q.address !== known.indexed.address)
+            throw new ApiFailure(
+              409,
+              'incompatible_owner',
+              'Owner hint conflicts with indexed history.',
+            );
+          const recent =
+            q.chain === 'pulsechain' && deps.addresses
+              ? await deps.addresses.stake(p.id, signal, q.address)
+              : { outcome: 'unavailable', live: null, observation: null };
+          if (!known.indexed && recent.outcome === 'indexing')
+            throw new ApiFailure(
+              503,
+              'not_indexed',
+              'Stake is not indexed; recent bounded discovery is inconclusive.',
+            );
+          if (!known.indexed && ['unavailable', 'quota'].includes(recent.outcome))
+            throw recent.outcome === 'quota'
+              ? new ApiFailure(429, 'provider_quota', 'Live observation quota is unavailable.')
+              : unavailable();
+          body = {
+            chain: q.chain,
+            ...known,
+            recent: {
+              outcome: recent.outcome,
+              live: recent.live,
+              observation: 'observation' in recent ? recent.observation : null,
+              observedAt: 'observedAt' in recent ? recent.observedAt : null,
+              expiresAt: 'expiresAt' in recent ? recent.expiresAt : null,
+              finality: 'provisional',
+            },
+          };
+          break;
+        }
+        case 'downloads':
+          body = deps.downloads
+            ? await deps.downloads.catalog(chainId(q.chain))
+            : { status: 'rebuilding', bundles: [] };
+          break;
+        case 'download': {
+          if (!deps.downloads) throw unavailable();
+          const opened = await deps.downloads.openStream(p.bundle, p.dataset, signal);
+          if (opened.status !== 'available')
+            throw opened.status === 'retired'
+              ? new ApiFailure(410, 'bundle_retired', 'This immutable bundle is retired.')
+              : unavailable();
+          const { stream, released, etag, bytes } = opened;
+          stream.on('error', () => {});
+          reply
+            .header('Content-Type', 'text/csv; charset=utf-8')
+            .header('Content-Disposition', `attachment; filename="${p.dataset}-${p.bundle}.csv"`)
+            .header('ETag', etag)
+            .header('Cache-Control', 'public, max-age=31536000, immutable')
+            .header('Accept-Ranges', 'none');
+          if (matches(request.headers['if-none-match'], etag) || request.method === 'HEAD') {
+            stream.destroy();
+            await released;
+            if (matches(request.headers['if-none-match'], etag)) return reply.code(304).send();
+            return reply.header('Content-Length', bytes).send();
+          }
+          return reply.header('Content-Length', bytes).send(stream);
+        }
+      }
+      const parsed = route.response?.safeParse(body);
+      if (parsed && !parsed.success) throw unavailable();
+      const json = JSON.stringify(parsed?.data ?? body);
+      if (Buffer.byteLength(json) > 2 * 1024 * 1024) throw unavailable();
+      if (jsonRevalidation.has(route.id)) {
+        const etag = '"' + createHash('sha256').update(json).digest('hex') + '"';
+        reply.header('Cache-Control', 'no-cache, must-revalidate').header('ETag', etag);
+        if (matches(request.headers['if-none-match'], etag)) return reply.code(304).send();
+      }
+      return reply.type('application/json; charset=utf-8').send(json);
+    });
+  if (options.webRoot)
     app.register(fastifyStatic, { root: options.webRoot, index: ['index.html'], dotfiles: 'deny' });
-  }
   return app;
+}
+function matches(value: string | undefined, etag: string) {
+  return (
+    value?.split(',').some((s) => s.trim() === '*' || s.trim().replace(/^W\//, '') === etag) ??
+    false
+  );
 }

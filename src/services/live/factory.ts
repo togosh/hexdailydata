@@ -7,9 +7,10 @@ import { cooldownFiles } from '../../providers/cooldown.ts';
 import { RpcClient, httpTransport } from '../../providers/rpc.ts';
 import { AddressService } from './address.ts';
 import { SqlAddressBaseline } from './baseline.ts';
+import type { AddressBaseline } from './baseline.ts';
 
 /** Task06 can own this lifetime. No public route or default provider access is enabled. */
-export async function openAddressService(env = process.env) {
+export async function openAddressService(env = process.env, baseline?: AddressBaseline) {
   if (
     env.HDD_V2_ALLOW_LIVE_RPC !== 'true' ||
     !env.HDD_V2_SOURCE_PROFILE ||
@@ -37,7 +38,7 @@ export async function openAddressService(env = process.env) {
     const service = new AddressService(
       new RpcClient(source.id, source.operator, 369, profile.contract, transport, budget),
       profile.codeHash,
-      new SqlAddressBaseline(client),
+      baseline ?? new SqlAddressBaseline(client),
     );
     return {
       get: (address: string, signal: AbortSignal, pageSize?: number, cursor?: string) =>

@@ -46,7 +46,7 @@ export default function App() {
         </dl>
       </section>
       <p>Shared Ethereum-era HEX history will be identified separately from PulseChain activity.</p>
-      <footer>Development foundation · Data synchronization is not implemented yet.</footer>
+      <footer>Development shell · Live data qualification and final interface are pending.</footer>
     </main>
   );
 }

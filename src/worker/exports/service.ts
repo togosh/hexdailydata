@@ -30,6 +30,9 @@ export class ExportService {
   readonly connect: Connect;
   readonly root: string;
   private verified = new Map<string, Map<Dataset, string>>();
+  private manifests = new Map<string, string>();
+  private attempts = new Map<string, string>();
+  private refreshing: Promise<void> | undefined;
   private readers = 0;
   constructor(connect: Connect, root: string) {
     this.connect = connect;
@@ -69,15 +72,80 @@ export class ExportService {
       }
     }
     this.verified.set(bundle.id, prints);
+    this.manifests.set(bundle.id, JSON.stringify(bundle));
+  }
+  /** Read-only, coalesced refresh. No marker creation, publication, retirement or fsync. */
+  refresh(signal: AbortSignal): Promise<void> {
+    if (this.refreshing) return this.refreshing;
+    const work = this.refreshPublications(signal).finally(() => {
+      this.refreshing = undefined;
+    });
+    this.refreshing = work;
+    return work;
+  }
+  private async refreshPublications(signal: AbortSignal) {
+    await exportRoot(this.root, false);
+    const c = await this.connect();
+    let rows;
+    try {
+      ({ rows } = await c.query(
+        "SELECT id,manifest FROM hdd.export_bundles WHERE status='available' ORDER BY chain_id,slot LIMIT 4",
+      ));
+    } finally {
+      await c.end();
+    }
+    const retained = new Set(rows.map((r) => r.id));
+    for (const map of [this.verified, this.manifests, this.attempts])
+      for (const id of map.keys()) if (!retained.has(id)) map.delete(id);
+    for (const r of rows) {
+      signal.throwIfAborted();
+      try {
+        const bundle = bundleSchema.parse(r.manifest);
+        if (bundle.id !== r.id) throw new Error('Publication identity mismatch.');
+        const identity = JSON.stringify(bundle);
+        const stats: string[] = [];
+        for (const name of ['manifest', ...datasets] as const) {
+          let h;
+          try {
+            h = await member(this.root, r.id, name);
+            stats.push(fingerprint(await h.stat()));
+          } catch {
+            stats.push('missing');
+          } finally {
+            await h?.close();
+          }
+        }
+        const attempt = identity + stats.join('|');
+        if (this.attempts.get(r.id) === attempt) continue;
+        this.verified.delete(r.id);
+        this.manifests.delete(r.id);
+        this.attempts.set(r.id, attempt);
+        await this.verify(bundle, signal);
+      } catch {
+        signal.throwIfAborted();
+        this.verified.delete(r.id);
+        this.manifests.delete(r.id);
+      }
+    }
   }
   async startup(signal: AbortSignal) {
     this.verified.clear();
-    await exportRoot(this.root);
+    this.manifests.clear();
+    this.attempts.clear();
     const c = await this.connect();
     try {
       const {
         rows: [role],
       } = await c.query('SELECT current_user AS name');
+      if (role.name !== 'hdd_v2_worker') {
+        try {
+          await this.refresh(signal);
+        } catch {
+          signal.throwIfAborted();
+        }
+        return;
+      }
+      await exportRoot(this.root);
       const { rows } = await c.query(
         "SELECT id,manifest FROM hdd.export_bundles WHERE status='available'",
       );
@@ -99,13 +167,18 @@ export class ExportService {
     const c = await this.connect();
     try {
       const { rows } = await c.query(
-        'SELECT manifest,status FROM hdd.export_bundles WHERE chain_id=$1 ORDER BY slot',
+        'SELECT id,slot,manifest,status FROM hdd.export_bundles WHERE chain_id=$1 ORDER BY slot LIMIT 2',
         [chain],
       );
-      const bundles: Bundle[] = [];
+      const bundles: (Bundle & { slot: 'current' | 'prior' })[] = [];
       for (const row of rows) {
         const b = bundleSchema.parse(row.manifest);
-        if (row.status === 'available' && this.verified.has(b.id)) {
+        if (
+          row.status === 'available' &&
+          row.id === b.id &&
+          this.verified.has(b.id) &&
+          this.manifests.get(b.id) === JSON.stringify(b)
+        ) {
           let valid = true;
           for (const f of b.files) {
             let h;
@@ -119,7 +192,7 @@ export class ExportService {
               await h?.close();
             }
           }
-          if (valid) bundles.push(b);
+          if (valid) bundles.push({ ...b, slot: row.slot });
           else this.verified.delete(b.id);
         }
       }
@@ -154,6 +227,8 @@ export class ExportService {
       if (!this.verified.has(id)) return { status: 'unavailable' as const };
       const b = bundleSchema.parse(r.manifest),
         f = b.files.find((f) => f.dataset === dataset)!;
+      if (b.id !== id || this.manifests.get(id) !== JSON.stringify(b))
+        return { status: 'unavailable' as const };
       try {
         h = await member(this.root, id, dataset);
         if (fingerprint(await h.stat()) !== this.verified.get(id)!.get(dataset))
@@ -428,6 +503,8 @@ export class ExportService {
       committing = false;
       if (prior) {
         this.verified.delete(prior);
+        this.manifests.delete(prior);
+        this.attempts.delete(prior);
         await removeBundle(this.root, prior);
       }
       await this.verify(bundle, bounded, checked);
@@ -444,6 +521,8 @@ export class ExportService {
             const b = bundleSchema.parse(r.manifest);
             if (prior) {
               this.verified.delete(prior);
+              this.manifests.delete(prior);
+              this.attempts.delete(prior);
               await removeBundle(this.root, prior);
             }
             await this.verify(b, signal, checked);
