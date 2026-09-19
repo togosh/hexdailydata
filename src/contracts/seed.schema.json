@@ -4,11 +4,11 @@
   "properties": {
     "formatVersion": {
       "type": "number",
-      "const": 3
+      "const": 4
     },
     "schemaVersion": {
       "type": "number",
-      "const": 4
+      "const": 5
     },
     "calculationVersion": {
       "type": "string",
@@ -188,8 +188,8 @@
       }
     },
     "files": {
-      "minItems": 19,
-      "maxItems": 19,
+      "minItems": 21,
+      "maxItems": 21,
       "type": "array",
       "items": {
         "type": "object",
@@ -215,7 +215,9 @@
               "account_ranks",
               "market_sources",
               "market_samples",
-              "market_daily"
+              "market_daily",
+              "history_source",
+              "history_daily"
             ]
           },
           "path": {

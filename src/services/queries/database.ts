@@ -34,7 +34,7 @@ export class ReadDatabase {
       const { rows } = await c.query(
         'SELECT version FROM hdd.schema_migrations ORDER BY version LIMIT 6',
       );
-      if (rows.map((r) => r.version).join(',') !== '1,2,3,4') throw unavailable();
+      if (rows.map((r) => r.version).join(',') !== '1,2,3,4,5') throw unavailable();
       await c.query(
         "SET default_transaction_read_only=on; SET statement_timeout='2000ms'; SET idle_in_transaction_session_timeout='3000ms'",
       );

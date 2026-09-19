@@ -30,7 +30,7 @@ async function workerConnection() {
     if (
       (await c.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows
         .map((r) => r.version)
-        .join(',') !== '1,2,3,4'
+        .join(',') !== '1,2,3,4,5'
     )
       throw new Error('Unsupported worker schema.');
     return c;

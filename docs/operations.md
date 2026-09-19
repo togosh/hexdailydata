@@ -48,7 +48,7 @@ publication. Manual override cannot convert uncertain data to “verified”.
 The compiled `canary check|prepare|status|run|resume` command wraps the existing services.
 The schema is `src/operator/canary-plan.ts`; `config/canary.example.json` intentionally
 lacks live inputs. Check only parses local files: no SQL or transport construction.
-Prepare requires a new empty schema4 destination; it does not grant live permission.
+Prepare requires a new empty schema5 destination; it does not grant live permission.
 
 The immutable plan contains session UUID, reviewed source commit, release image SHA256,
 new host project/DB UUID, normalized storage/quota roots and `<storage>/canary.json`;
@@ -309,7 +309,7 @@ README is the fresh-install authority. One app image contains compiled API, work
 operator entrypoints, migrations, runtime dependencies/config, pg_dump17 and age.
 Images/lockfile remain pinned; pg-copy-streams is the small added dependency required
 to import bounded PostgreSQL COPY streams without executing archive SQL. No schema
-migration was needed: migrations1?4 and seed format3/schema4 are preserved.
+migration was needed for Task08. The later HDS overlay adds migration5 and seed format4/schema5, preserving migrations1-4 and native semantics.
 
 The application connects only to db/hexdailydata_v2 with its explicit instance UUID.
 Database roles remain separated. Initialization alone reads bootstrap credentials;

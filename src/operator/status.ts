@@ -20,7 +20,7 @@ export async function operatorStatus(env = process.env) {
       schemaState = present
         ? (await c.query('SELECT version FROM hdd.schema_migrations ORDER BY version LIMIT 6')).rows
             .map((r) => r.version)
-            .join(',') === '1,2,3,4'
+            .join(',') === '1,2,3,4,5'
           ? 'supported'
           : 'unsupported'
         : 'uninitialized';
@@ -116,7 +116,7 @@ export async function operatorStatus(env = process.env) {
           ? 'supported'
           : 'unsupported',
       release: env.HDD_V2_RELEASE ?? 'development',
-      schema: runtime.database === 'ready' ? 4 : null,
+      schema: runtime.database === 'ready' ? 5 : null,
       schemaState,
       ...runtime,
       paths,

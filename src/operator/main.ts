@@ -8,6 +8,7 @@ import { operatorError } from './errors.ts';
 import { runCanary, canaryHelp } from './canary.ts';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { runHistory, historyHelp } from './history.ts';
 
 export async function runOperator(
   argv = process.argv.slice(2),
@@ -18,7 +19,9 @@ export async function runOperator(
   const onSignal = () => controller.abort(new Error('Operator cancelled.'));
   for (const sig of ['SIGINT', 'SIGTERM'] as const) process.once(sig, onSignal);
   try {
-    if (command === 'canary') {
+    if (command === 'history')
+      console.log(JSON.stringify(await runHistory(args, controller.signal)));
+    else if (command === 'canary') {
       const result = await runCanary(args, controller.signal, canaryOptions);
       console.log(JSON.stringify(result));
       if ('status' in result && result.status === 'stopped') process.exitCode = 2;
@@ -26,7 +29,9 @@ export async function runOperator(
     } else if (command === 'help' || command === '--help') {
       console.log(
         'Operator: doctor | status | migrate | sync | rebuild | exports | backup | restore | ' +
-          canaryHelp,
+          canaryHelp +
+          ' | ' +
+          historyHelp,
       );
     } else if (command === 'doctor' || command === 'status') {
       const result = await operatorStatus();

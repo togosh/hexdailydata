@@ -2535,6 +2535,35 @@
               "format": "date",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
             }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "const": "hexdailystats"
+            }
+          },
+          {
+            "name": "afterSourceDay",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
           }
         ],
         "responses": {
@@ -2543,304 +2572,201 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "chain": {
-                      "type": "string",
-                      "enum": [
-                        "pulsechain",
-                        "ethereum"
-                      ]
-                    },
-                    "cutoff": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "asOf": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "chain": {
+                          "type": "string",
+                          "enum": [
+                            "pulsechain",
+                            "ethereum"
+                          ]
+                        },
+                        "cutoff": {
+                          "anyOf": [
+                            {
                               "type": "object",
                               "properties": {
-                                "chainId": {
-                                  "anyOf": [
-                                    {
-                                      "type": "number",
-                                      "const": 1
+                                "asOf": {
+                                  "type": "object",
+                                  "properties": {
+                                    "chainId": {
+                                      "anyOf": [
+                                        {
+                                          "type": "number",
+                                          "const": 1
+                                        },
+                                        {
+                                          "type": "number",
+                                          "const": 369
+                                        }
+                                      ]
                                     },
-                                    {
-                                      "type": "number",
-                                      "const": 369
+                                    "blockNumber": {
+                                      "type": "string",
+                                      "maxLength": 78,
+                                      "pattern": "^(0|[1-9][0-9]*)$"
+                                    },
+                                    "blockHash": {
+                                      "type": "string",
+                                      "pattern": "^0x[0-9a-f]{64}$"
+                                    },
+                                    "blockTimestamp": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                                     }
-                                  ]
+                                  },
+                                  "required": [
+                                    "chainId",
+                                    "blockNumber",
+                                    "blockHash",
+                                    "blockTimestamp"
+                                  ],
+                                  "additionalProperties": false
                                 },
-                                "blockNumber": {
+                                "revision": {
                                   "type": "string",
                                   "maxLength": 78,
                                   "pattern": "^(0|[1-9][0-9]*)$"
                                 },
-                                "blockHash": {
+                                "finality": {
                                   "type": "string",
-                                  "pattern": "^0x[0-9a-f]{64}$"
+                                  "enum": [
+                                    "finalized",
+                                    "confirmed",
+                                    "provisional"
+                                  ]
                                 },
-                                "blockTimestamp": {
-                                  "type": "string",
-                                  "format": "date-time",
-                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                "contractDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
                                 }
                               },
                               "required": [
-                                "chainId",
-                                "blockNumber",
-                                "blockHash",
-                                "blockTimestamp"
+                                "asOf",
+                                "revision",
+                                "finality",
+                                "contractDay"
                               ],
                               "additionalProperties": false
                             },
-                            "revision": {
-                              "type": "string",
-                              "maxLength": 78,
-                              "pattern": "^(0|[1-9][0-9]*)$"
-                            },
-                            "finality": {
-                              "type": "string",
-                              "enum": [
-                                "finalized",
-                                "confirmed",
-                                "provisional"
-                              ]
-                            },
-                            "contractDay": {
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "coverage": {
+                          "type": "object",
+                          "properties": {
+                            "fromDay": {
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 65535
+                            },
+                            "toDay": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "expected": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 366
+                            },
+                            "count": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 366
+                            },
+                            "missingDays": {
+                              "maxItems": 366,
+                              "type": "array",
+                              "items": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              }
                             }
                           },
                           "required": [
-                            "asOf",
-                            "revision",
-                            "finality",
-                            "contractDay"
+                            "fromDay",
+                            "toDay",
+                            "expected",
+                            "count",
+                            "missingDays"
                           ],
                           "additionalProperties": false
                         },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "coverage": {
-                      "type": "object",
-                      "properties": {
-                        "fromDay": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 65535
-                        },
-                        "toDay": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 65535
-                        },
-                        "expected": {
-                          "type": "integer",
-                          "minimum": 1,
-                          "maximum": 366
-                        },
-                        "count": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 366
-                        },
-                        "missingDays": {
+                        "items": {
                           "maxItems": 366,
                           "type": "array",
                           "items": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 65535
-                          }
-                        }
-                      },
-                      "required": [
-                        "fromDay",
-                        "toDay",
-                        "expected",
-                        "count",
-                        "missingDays"
-                      ],
-                      "additionalProperties": false
-                    },
-                    "items": {
-                      "maxItems": 366,
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "dateUtc": {
-                            "type": "string",
-                            "format": "date",
-                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
-                          },
-                          "contractDay": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 65535
-                          },
-                          "displayDay": {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 65536
-                          },
-                          "asOf": {
                             "type": "object",
                             "properties": {
-                              "chainId": {
-                                "anyOf": [
-                                  {
-                                    "type": "number",
-                                    "const": 1
+                              "dateUtc": {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              "contractDay": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "displayDay": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 65536
+                              },
+                              "asOf": {
+                                "type": "object",
+                                "properties": {
+                                  "chainId": {
+                                    "anyOf": [
+                                      {
+                                        "type": "number",
+                                        "const": 1
+                                      },
+                                      {
+                                        "type": "number",
+                                        "const": 369
+                                      }
+                                    ]
                                   },
-                                  {
-                                    "type": "number",
-                                    "const": 369
-                                  }
-                                ]
-                              },
-                              "blockNumber": {
-                                "type": "string",
-                                "maxLength": 78,
-                                "pattern": "^(0|[1-9][0-9]*)$"
-                              },
-                              "blockHash": {
-                                "type": "string",
-                                "pattern": "^0x[0-9a-f]{64}$"
-                              },
-                              "blockTimestamp": {
-                                "anyOf": [
-                                  {
-                                    "type": "string",
-                                    "format": "date-time",
-                                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
-                                  },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              }
-                            },
-                            "required": [
-                              "chainId",
-                              "blockNumber",
-                              "blockHash",
-                              "blockTimestamp"
-                            ],
-                            "additionalProperties": false
-                          },
-                          "stakedPercent": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 120,
-                                "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "weightedStakeLengthDays": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "maxLength": 120,
-                                "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
-                              },
-                              {
-                                "type": "null"
-                              }
-                            ]
-                          },
-                          "circulatingHex": {
-                            "type": "string",
-                            "maxLength": 120,
-                            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
-                          },
-                          "stakedHex": {
-                            "type": "string",
-                            "maxLength": 120,
-                            "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
-                          },
-                          "holderCount": {
-                            "type": "string",
-                            "maxLength": 78,
-                            "pattern": "^(0|[1-9][0-9]*)$"
-                          },
-                          "stakerCount": {
-                            "type": "string",
-                            "maxLength": 78,
-                            "pattern": "^(0|[1-9][0-9]*)$"
-                          },
-                          "originChainId": {
-                            "anyOf": [
-                              {
-                                "type": "number",
-                                "const": 1
-                              },
-                              {
-                                "type": "number",
-                                "const": 369
-                              }
-                            ]
-                          },
-                          "circulatingHearts": {
-                            "type": "string",
-                            "maxLength": 78,
-                            "pattern": "^(0|[1-9][0-9]*)$"
-                          },
-                          "lockedHearts": {
-                            "type": "string",
-                            "maxLength": 78,
-                            "pattern": "^(0|[1-9][0-9]*)$"
-                          },
-                          "rawShareRate": {
-                            "type": "string",
-                            "maxLength": 78,
-                            "pattern": "^(0|[1-9][0-9]*)$"
-                          },
-                          "payout": {
-                            "type": "object",
-                            "properties": {
-                              "status": {
-                                "type": "string",
-                                "enum": [
-                                  "pending",
-                                  "materialized"
-                                ]
-                              },
-                              "payoutHearts": {
-                                "anyOf": [
-                                  {
+                                  "blockNumber": {
                                     "type": "string",
                                     "maxLength": 78,
                                     "pattern": "^(0|[1-9][0-9]*)$"
                                   },
-                                  {
-                                    "type": "null"
-                                  }
-                                ]
-                              },
-                              "stakeShares": {
-                                "anyOf": [
-                                  {
+                                  "blockHash": {
                                     "type": "string",
-                                    "maxLength": 78,
-                                    "pattern": "^(0|[1-9][0-9]*)$"
+                                    "pattern": "^0x[0-9a-f]{64}$"
                                   },
-                                  {
-                                    "type": "null"
+                                  "blockTimestamp": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   }
-                                ]
+                                },
+                                "required": [
+                                  "chainId",
+                                  "blockNumber",
+                                  "blockHash",
+                                  "blockTimestamp"
+                                ],
+                                "additionalProperties": false
                               },
-                              "hexPerTShare": {
+                              "stakedPercent": {
                                 "anyOf": [
                                   {
                                     "type": "string",
@@ -2852,69 +2778,1711 @@
                                   }
                                 ]
                               },
-                              "blockNumber": {
+                              "weightedStakeLengthDays": {
                                 "anyOf": [
                                   {
                                     "type": "string",
-                                    "maxLength": 78,
-                                    "pattern": "^(0|[1-9][0-9]*)$"
+                                    "maxLength": 120,
+                                    "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
                                   },
                                   {
                                     "type": "null"
                                   }
                                 ]
                               },
-                              "blockHash": {
+                              "circulatingHex": {
+                                "type": "string",
+                                "maxLength": 120,
+                                "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
+                              },
+                              "stakedHex": {
+                                "type": "string",
+                                "maxLength": 120,
+                                "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
+                              },
+                              "holderCount": {
+                                "type": "string",
+                                "maxLength": 78,
+                                "pattern": "^(0|[1-9][0-9]*)$"
+                              },
+                              "stakerCount": {
+                                "type": "string",
+                                "maxLength": 78,
+                                "pattern": "^(0|[1-9][0-9]*)$"
+                              },
+                              "originChainId": {
                                 "anyOf": [
                                   {
-                                    "type": "string",
-                                    "pattern": "^0x[0-9a-f]{64}$"
+                                    "type": "number",
+                                    "const": 1
                                   },
                                   {
-                                    "type": "null"
+                                    "type": "number",
+                                    "const": 369
                                   }
                                 ]
+                              },
+                              "circulatingHearts": {
+                                "type": "string",
+                                "maxLength": 78,
+                                "pattern": "^(0|[1-9][0-9]*)$"
+                              },
+                              "lockedHearts": {
+                                "type": "string",
+                                "maxLength": 78,
+                                "pattern": "^(0|[1-9][0-9]*)$"
+                              },
+                              "rawShareRate": {
+                                "type": "string",
+                                "maxLength": 78,
+                                "pattern": "^(0|[1-9][0-9]*)$"
+                              },
+                              "payout": {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "pending",
+                                      "materialized"
+                                    ]
+                                  },
+                                  "payoutHearts": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "stakeShares": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "hexPerTShare": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 120,
+                                        "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "blockNumber": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "blockHash": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^0x[0-9a-f]{64}$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "payoutHearts",
+                                  "stakeShares",
+                                  "hexPerTShare",
+                                  "blockNumber",
+                                  "blockHash"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [
-                              "status",
-                              "payoutHearts",
-                              "stakeShares",
-                              "hexPerTShare",
-                              "blockNumber",
-                              "blockHash"
+                              "dateUtc",
+                              "contractDay",
+                              "displayDay",
+                              "asOf",
+                              "stakedPercent",
+                              "weightedStakeLengthDays",
+                              "circulatingHex",
+                              "stakedHex",
+                              "holderCount",
+                              "stakerCount",
+                              "originChainId",
+                              "circulatingHearts",
+                              "lockedHearts",
+                              "rawShareRate",
+                              "payout"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "chain",
+                        "cutoff",
+                        "coverage",
+                        "items"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "chain": {
+                          "type": "string",
+                          "const": "pulsechain"
+                        },
+                        "chainId": {
+                          "type": "number",
+                          "const": 369
+                        },
+                        "source": {
+                          "type": "string",
+                          "const": "hexdailystats"
+                        },
+                        "sourceReported": {
+                          "type": "boolean",
+                          "const": true
+                        },
+                        "revision": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "properties": {
+                            "selection": {
+                              "type": "object",
+                              "properties": {
+                                "source": {
+                                  "type": "string",
+                                  "const": "hexdailystats"
+                                },
+                                "chainId": {
+                                  "type": "number",
+                                  "const": 369
+                                },
+                                "mappingVersion": {
+                                  "type": "string",
+                                  "const": "hds-pulsechain-record-date-1"
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{64}$"
+                                },
+                                "fromSourceDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "toSourceDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "fromDate": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                },
+                                "toDate": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                },
+                                "excludeSourceDays": {
+                                  "maxItems": 100,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "sourceDay": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 65535
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "minLength": 5,
+                                        "maxLength": 160
+                                      }
+                                    },
+                                    "required": [
+                                      "sourceDay",
+                                      "reason"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "excludePriceSourceDays": {
+                                  "maxItems": 100,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "sourceDay": {
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "maximum": 65535
+                                      },
+                                      "reason": {
+                                        "type": "string",
+                                        "minLength": 5,
+                                        "maxLength": 160
+                                      }
+                                    },
+                                    "required": [
+                                      "sourceDay",
+                                      "reason"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "provenance": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "bounded-public-download",
+                                        "supplied-snapshot",
+                                        "synthetic-fixture"
+                                      ]
+                                    },
+                                    "chainId": {
+                                      "type": "number",
+                                      "const": 369
+                                    },
+                                    "acquiredAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                    },
+                                    "statement": {
+                                      "type": "string",
+                                      "minLength": 20,
+                                      "maxLength": 1024
+                                    },
+                                    "url": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "enum": [
+                                            "https://hexdailystats.com/fulldatapulsechain",
+                                            "https://hexstats.today/fulldatapulsechain"
+                                          ]
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "chainId",
+                                    "acquiredAt",
+                                    "statement",
+                                    "url"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "source",
+                                "chainId",
+                                "mappingVersion",
+                                "sha256",
+                                "fromSourceDay",
+                                "toSourceDay",
+                                "fromDate",
+                                "toDate",
+                                "excludeSourceDays",
+                                "excludePriceSourceDays",
+                                "provenance"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "summary": {
+                              "type": "object",
+                              "properties": {
+                                "records": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 10000
+                                },
+                                "prices": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 10000
+                                },
+                                "firstRecordDateUtc": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                },
+                                "lastRecordDateUtc": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                },
+                                "firstAvailablePrice": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "sourceDay": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 65535
+                                        },
+                                        "sourceRecordDateUtc": {
+                                          "type": "string",
+                                          "format": "date",
+                                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                        },
+                                        "sourceDate": {
+                                          "type": "string",
+                                          "format": "date-time",
+                                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                        }
+                                      },
+                                      "required": [
+                                        "sourceDay",
+                                        "sourceRecordDateUtc",
+                                        "sourceDate"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "records",
+                                "prices",
+                                "firstRecordDateUtc",
+                                "lastRecordDateUtc",
+                                "firstAvailablePrice"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "dateBasis": {
+                              "type": "string",
+                              "const": "sourceRecordDateUtc"
+                            },
+                            "priceKind": {
+                              "type": "string",
+                              "const": "source_reported_daily_reference"
+                            },
+                            "marketPeriod": {
+                              "type": "string",
+                              "const": "unproved"
+                            },
+                            "contentSha256": {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{64}$"
+                            }
+                          },
+                          "required": [
+                            "selection",
+                            "summary",
+                            "dateBasis",
+                            "priceKind",
+                            "marketPeriod",
+                            "contentSha256"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "fieldDefinitions": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "unit": {
+                                "type": "string"
+                              },
+                              "meaning": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "unit",
+                              "meaning"
                             ],
                             "additionalProperties": false
                           }
                         },
-                        "required": [
-                          "dateUtc",
-                          "contractDay",
-                          "displayDay",
-                          "asOf",
-                          "stakedPercent",
-                          "weightedStakeLengthDays",
-                          "circulatingHex",
-                          "stakedHex",
-                          "holderCount",
-                          "stakerCount",
-                          "originChainId",
-                          "circulatingHearts",
-                          "lockedHearts",
-                          "rawShareRate",
-                          "payout"
-                        ],
-                        "additionalProperties": false
-                      }
+                        "coverage": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "to": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "records": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "prices": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "missingRecordDates": {
+                              "maxItems": 366,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              }
+                            },
+                            "missingPriceDates": {
+                              "maxItems": 366,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              }
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to",
+                            "records",
+                            "prices",
+                            "missingRecordDates",
+                            "missingPriceDates"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "items": {
+                          "maxItems": 64,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sourceDay": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 65535
+                              },
+                              "sourceDayToken": {
+                                "type": "string",
+                                "maxLength": 160,
+                                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                              },
+                              "sourceDate": {
+                                "type": "string",
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                              },
+                              "sourceRecordDateUtc": {
+                                "type": "string",
+                                "format": "date",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                              },
+                              "marketPeriodUtc": {
+                                "type": "null"
+                              },
+                              "dateRelationship": {
+                                "type": "string",
+                                "enum": [
+                                  "same_nominal_day",
+                                  "previous_nominal_day",
+                                  "delayed",
+                                  "unproved"
+                                ]
+                              },
+                              "quality": {
+                                "type": "string",
+                                "enum": [
+                                  "reported",
+                                  "skeleton"
+                                ]
+                              },
+                              "metrics": {
+                                "type": "object",
+                                "properties": {
+                                  "circulatingHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "stakedHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "stakedHEXGA": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "totalHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "tshareRateHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "totalTshares": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "dailyPayoutHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "payoutPerTshareHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "penaltiesHEX": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "averageStakeLength": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "stakedHEXPercent": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "currentHolders": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "numberOfHolders": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "currentStakerCount": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "totalStakerCount": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "totalTsharesChange": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "currentHoldersChange": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "stakedSupplyChange": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "circulatingSupplyChange": {
+                                    "type": "object",
+                                    "properties": {
+                                      "published": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "value": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "maxLength": 160,
+                                            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      },
+                                      "availability": {
+                                        "type": "string",
+                                        "enum": [
+                                          "available",
+                                          "missing",
+                                          "null",
+                                          "sentinel",
+                                          "negative",
+                                          "zero_price",
+                                          "skeleton",
+                                          "era_unproved",
+                                          "date_mismatch",
+                                          "future_period",
+                                          "copied_price",
+                                          "selected_exclusion",
+                                          "invalid_value"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "published",
+                                      "value",
+                                      "availability"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "circulatingHEX",
+                                  "stakedHEX",
+                                  "stakedHEXGA",
+                                  "totalHEX",
+                                  "tshareRateHEX",
+                                  "totalTshares",
+                                  "dailyPayoutHEX",
+                                  "payoutPerTshareHEX",
+                                  "penaltiesHEX",
+                                  "averageStakeLength",
+                                  "stakedHEXPercent",
+                                  "currentHolders",
+                                  "numberOfHolders",
+                                  "currentStakerCount",
+                                  "totalStakerCount",
+                                  "totalTsharesChange",
+                                  "currentHoldersChange",
+                                  "stakedSupplyChange",
+                                  "circulatingSupplyChange"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "referencePriceUsd": {
+                                "type": "object",
+                                "properties": {
+                                  "published": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 160,
+                                        "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "value": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "maxLength": 160,
+                                        "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  },
+                                  "availability": {
+                                    "type": "string",
+                                    "enum": [
+                                      "available",
+                                      "missing",
+                                      "null",
+                                      "sentinel",
+                                      "negative",
+                                      "zero_price",
+                                      "skeleton",
+                                      "era_unproved",
+                                      "date_mismatch",
+                                      "future_period",
+                                      "copied_price",
+                                      "selected_exclusion",
+                                      "invalid_value"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "published",
+                                  "value",
+                                  "availability"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "sourceDay",
+                              "sourceDayToken",
+                              "sourceDate",
+                              "sourceRecordDateUtc",
+                              "marketPeriodUtc",
+                              "dateRelationship",
+                              "quality",
+                              "metrics",
+                              "referencePriceUsd"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "continuation": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "afterSourceDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "revision": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                }
+                              },
+                              "required": [
+                                "afterSourceDay",
+                                "revision"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "chain",
+                        "chainId",
+                        "source",
+                        "sourceReported",
+                        "revision",
+                        "metadata",
+                        "fieldDefinitions",
+                        "coverage",
+                        "items",
+                        "continuation"
+                      ],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": [
-                    "chain",
-                    "cutoff",
-                    "coverage",
-                    "items"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -2966,6 +4534,49 @@
             }
           },
           "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
             "description": "Sanitized error. See interfaces.md for route semantics.",
             "content": {
               "application/json": {
@@ -3131,6 +4742,35 @@
               "format": "date",
               "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
             }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "const": "hexdailystats"
+            }
+          },
+          {
+            "name": "afterSourceDay",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 65535
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
           }
         ],
         "responses": {
@@ -3144,6 +4784,9 @@
             "description": "Sanitized error. See interfaces.md for route semantics."
           },
           "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "409": {
             "description": "Sanitized error. See interfaces.md for route semantics."
           },
           "429": {

@@ -1,0 +1,33 @@
+{
+  "source": "hexdailystats",
+  "chainId": 369,
+  "mappingVersion": "hds-pulsechain-record-date-1",
+  "sha256": "cb314fca46c2beae121349a3b375c71874bb72b76caf3b32cf98724b9db18520",
+  "fromSourceDay": 1255,
+  "toSourceDay": 2482,
+  "fromDate": "2023-05-11",
+  "toDate": "2026-09-18",
+  "excludeSourceDays": [
+    {
+      "sourceDay": 1768,
+      "reason": "Conflicting duplicate published pricePulseX values; both records excluded."
+    }
+  ],
+  "provenance": {
+    "kind": "bounded-public-download",
+    "chainId": 369,
+    "acquiredAt": "2026-09-19T22:30:18.703Z",
+    "url": "https://hexdailystats.com/fulldatapulsechain",
+    "statement": "One authorized bounded public PulseChain file GET; receipt retained. Current producer interpretation only; historical market periods unproved."
+  },
+  "excludePriceSourceDays": [
+    {
+      "sourceDay": 1734,
+      "reason": "Two distinct source days share the exact recorded timestamp with conflicting prices; retain statistics only."
+    },
+    {
+      "sourceDay": 1735,
+      "reason": "Two distinct source days share the exact recorded timestamp with conflicting prices; retain statistics only."
+    }
+  ]
+}

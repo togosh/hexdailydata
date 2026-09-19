@@ -120,13 +120,18 @@ export function datasetRow(name: Dataset, r: Record<string, any>): (string | num
     }
   }
 }
-export function csvLine(values: readonly (string | number | null)[]) {
+export function csvLine(
+  values: readonly (string | number | null)[],
+  numericColumns: ReadonlySet<number> = new Set(),
+) {
   return (
     values
-      .map((v) => {
+      .map((v, index) => {
         if (v === null) return '';
         let s = String(v);
-        if (/^[=+@\-\t\r]/.test(s)) s = "'" + s;
+        const numeric =
+          numericColumns.has(index) && /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(s);
+        if (!numeric && /^[=+@\-\t\r]/.test(s)) s = "'" + s;
         return /[",\r\n]/.test(s) ? '"' + s.replaceAll('"', '""') + '"' : s;
       })
       .join(',') + '\n'

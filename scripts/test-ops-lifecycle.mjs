@@ -171,11 +171,11 @@ try {
     },
   );
   await pass('unsupported schema release refuses and leaves both processes stopped', async () => {
-    await sql("INSERT INTO hdd.schema_migrations VALUES(5,repeat('a',64))");
+    await sql("INSERT INTO hdd.schema_migrations VALUES(6,repeat('a',64))");
     await exec(process.execPath, ['scripts/operator/host.mjs', 'release', directory], [1]);
     assert.equal((await state('api')).Running, false);
     assert.equal((await state('worker')).Running, false);
-    await sql('DELETE FROM hdd.schema_migrations WHERE version=5');
+    await sql('DELETE FROM hdd.schema_migrations WHERE version=6');
     await host('release');
   });
   await pass(
@@ -205,7 +205,7 @@ try {
     async () => {
       writeFileSync(
         join(root, 'Dockerfile.compatible'),
-        `FROM ${config.image}\nENV HDD_V2_RELEASE=compatible-schema4-release\n`,
+        `FROM ${config.image}\nENV HDD_V2_RELEASE=compatible-schema5-release\n`,
       );
       const tag = config.project + ':compatible';
       await exec('docker', ['build', '-f', join(root, 'Dockerfile.compatible'), '-t', tag, root]);
@@ -297,7 +297,7 @@ try {
         checks,
         exit: process.exitCode ?? 0,
         compatibleImageScope:
-          'Two real images, same code/schema4, distinct release metadata. Not a Task06 worker rollback claim.',
+          'Two real images, same code/schema5, distinct release metadata. Not a Task06 worker rollback claim.',
         external: 'NOT_RUN',
       },
       null,

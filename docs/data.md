@@ -35,6 +35,7 @@ raw token/share magnitudes use NUMERIC(78,0), never float. API big integers are 
 | live_metrics | latest validated observation by chain/metric; bounded key set |
 | export_bundles / export_files | complete current and prior file manifests; bounded |
 | job_runs | short operational history; retention by age/count |
+| history_source / history_daily | one current attributed HDS PulseChain selection/revision and up to10,000 compact source-day rows; independent of native chains/cursors/undo |
 
 No table of arbitrary historical holder balances or holder ranks. An account's zero
 balance may remain if it is a stake owner or needed for uniqueness/first-seen metrics;
@@ -169,6 +170,32 @@ new registry/service. No measured provider coverage is supplied by this kit.
 Missing mandatory capability rejects the profile. Market gaps do not prevent native
 index progress, but native completeness is not evidence of complete market coverage.
 No BTC/ETH asset feeds, retrospective holder snapshots or legacy-format parity are added.
+For the HDS overlay, market scope is PulseChain HEX only; pre-fork Ethereum prices are
+excluded. Required inherited native protocol history and origin-chain1 remain intact.
+
+## Source-reported PulseChain history (schema5)
+
+Migration0005 adds `history_source` and `history_daily`; migrations0001–0004 are unchanged.
+These tables have no native-chain foreign key and never seed `daily_stats`, balances,
+stakes, events, market samples, current state, sync cursors or undo. One transaction
+publishes the selected rows plus metadata/revision. Exact repeats do no writes;
+replacement requires the current revision explicitly. Unchanged rows are not rewritten.
+Only the current compact selection is retained, not full historical revision copies.
+
+The input digest, mapping version, provenance, source-day/date bounds and exclusions
+are explicit. Exact published number tokens, including exponents, are preserved as
+strings; this preserves publication precision, not on-chain accuracy. Null, absent,
+sentinel, negative/invalid, suspicious skeleton and available values remain distinct.
+Only `pricePulseX` can supply the daily reference; UV/ETH/BTC/derived ROI fields are
+excluded. Record coverage and price coverage are separate. See [history.md](history.md)
+for the mapping, source limitations and first-supported-period interpretation.
+
+Current logical seeds use format4/schema5 and include both archive tables, even when
+empty, with separate normalization/selection validation. Older formats fail explicitly.
+A valid native checkpoint is still required for seed export; a raw HDS file or archive-only
+DB cannot become a native seed. A nonempty archive-only target rejects native seed import.
+Encrypted schema5 backup/restore supports both archive-only and native-plus-archive state.
+Archive values survive native forward sync/rewind independently of native undo.
 
 ## Portable seed v1 (product is v2)
 
@@ -402,7 +429,7 @@ preserve exact close identities. See sync.md for bounds and seed format2 rejecti
 No migration or canonical amount/reducer definition changed.
 
 
-## Task05 daily overlays and portable format3/schema4
+## Task05 daily overlays (original format3/schema4)
 
 Migrations1?3 remain byte-for-byte unchanged. Migration4 adds account_ranks and
 rank_state, market_sources/samples/daily and export_bundles. No canonical account,
@@ -467,7 +494,7 @@ sample allocation per supported chain, not a claim about total physical disk.
 
 A native rewind atomically clears ranks/cutoff, invalidates export availability and
 removes the dependent native sample/daily suffix. Independent venue history survives.
-Native daily facts still use exact original undo. Seed format3/schema4 includes ranks,
+Native daily facts still use exact original undo. Format4/schema5 retains the format3 ranks,
 market daily facts, consumer progress and remaining required samples using the existing
 exact SQL row codec. It excludes live_metrics and export_bundles; imports cannot
 advertise nonexistent files or fresh old live observations. Older logical formats

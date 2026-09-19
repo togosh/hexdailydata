@@ -62,6 +62,17 @@ export const MarketQuery = RangeQuery.safeExtend({
     .regex(/^[a-z][a-z0-9_-]*$/)
     .optional(),
 });
+export const DailyQuery = RangeQuery.safeExtend({
+  source: z.literal('hexdailystats').optional(),
+  afterSourceDay: z.coerce.number().int().min(0).max(65535).optional(),
+  revision: z.uuid().optional(),
+}).refine((q) =>
+  q.source
+    ? q.chain === 'pulsechain' &&
+      ((q.afterSourceDay === undefined && q.revision === undefined) ||
+        (q.afterSourceDay !== undefined && q.revision !== undefined))
+    : q.afterSourceDay === undefined && q.revision === undefined,
+);
 export const CutoffSchema = z.strictObject({
   asOf: BlockRefSchema,
   revision: UIntStringSchema,

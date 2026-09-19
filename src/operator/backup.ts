@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { connect, databaseConfig } from '../db/connect.ts';
 import { reconcile } from '../services/projections/initialize.ts';
 import { validateDailyState } from '../worker/daily/validate.ts';
+import { validateHistory } from '../worker/history/store.ts';
 import { tableNames } from '../worker/bootstrap/manifest.ts';
 import { emptyTarget, fileHash } from '../worker/bootstrap/seed.ts';
 import { packArchive, readArchive } from '../worker/bootstrap/archive.ts';
@@ -21,7 +22,7 @@ const tables = [...tableNames, 'live_metrics', 'export_bundles'];
 const hash = z.string().regex(/^[0-9a-f]{64}$/);
 const manifestSchema = z.strictObject({
   format: z.literal('hdd-pgdump-age-1'),
-  schema: z.literal(4),
+  schema: z.literal(5),
   calculation: z.literal('hex-native-1'),
   release: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,100}$/),
   sourceInstance: z.uuid(),
@@ -80,7 +81,7 @@ async function schema(c: pg.Client) {
   ).rows
     .map((r) => r.version)
     .join(',');
-  if (versions !== '1,2,3,4') throw new Error('Backup/restore requires supported schema 4.');
+  if (versions !== '1,2,3,4,5') throw new Error('Backup/restore requires supported schema 5.');
 }
 async function cutoff(c: pg.Client) {
   return (
@@ -285,7 +286,7 @@ export async function backup(
     );
     const manifest = manifestSchema.parse({
       format: 'hdd-pgdump-age-1',
-      schema: 4,
+      schema: 5,
       calculation: 'hex-native-1',
       release: work.release,
       sourceInstance: cfg.instance,
@@ -514,6 +515,7 @@ export async function restore(
     for (const r of (await c.query('SELECT chain_id FROM hdd.chains ORDER BY chain_id')).rows)
       await reconcile(c, r.chain_id);
     await validateDailyState(c, signal);
+    await validateHistory(c, signal);
     const recoveryCheckpoints = (
       await c.query('SELECT count(*)::text AS n FROM hdd.checkpoints_recent')
     ).rows[0].n;

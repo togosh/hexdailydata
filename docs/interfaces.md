@@ -7,6 +7,8 @@ camelCase; CSV fields use snake_case and unit suffixes. Integer magnitudes, bloc
 numbers and stake IDs are decimal strings; decimals are non-exponent strings. Day
 numbers are bounded integers and use explicit `contractDay`/`displayDay` names.
 Empty CSV cell means unavailable; zero means measured zero. UTC timestamps use ISO8601.
+Exception: the explicitly source-reported HDS variant preserves exact published numeric
+tokens as strings, including exponent notation; it does not claim canonical precision.
 
 Every independently fresh component has `asOf`, `observedAt`, `status`, and where
 appropriate `finality` and `method`. Do not duplicate a dataset-wide chain ID or
@@ -22,6 +24,7 @@ Error envelope: `{error:{code,message,retryable},requestId}`. Never SQL/stack/cr
 | GET /api/v2/status | per-stream sync/coverage/freshness, no credentials or host paths |
 | GET /api/v2/home?chain=pulsechain | compact daily headline + independent cached live metrics |
 | GET /api/v2/daily?chain=pulsechain&from=YYYY-MM-DD&to=YYYY-MM-DD | chart/table daily facts; bounded date range |
+| GET /api/v2/daily?chain=pulsechain&source=hexdailystats&from=YYYY-MM-DD&to=YYYY-MM-DD | separate source-reported variant, source-record-date axis;64 rows/page with explicit revision-bound continuation |
 | GET /api/v2/markets/daily?... | native market observation history with coverage/method |
 | GET /api/v2/stakes?chain=pulsechain&address=0x...&cursor=... | indexed lifecycle/search; keyset pagination |
 | GET /api/v2/stakes/:id?chain=pulsechain | known lifecycle and separately labeled recent-state observation |
@@ -64,6 +67,23 @@ on Home. Target Home JSON <=25KiB uncompressed and query p95<=250ms locally at s
 first useful mobile metrics <=2s under the documented network/CPU profile.
 
 ## Price methodology
+
+Historical market scope is PulseChain HEX after the supported post-fork observation
+boundary, with no Ethereum price splice or implied all-time coverage. HDS `pricePulseX`
+is a source-reported daily reference, not OHLC, a live mark, or a first-ever-trade claim.
+The source variant labels chain369, sourceReported, revision, mapping, date basis,
+original source day/date, published tokens and per-field availability. It rejects
+Ethereum/unknown sources and keeps the omitted-source canonical path unchanged.
+All ranges remain at most366 dates and all JSON at most2MiB. Follow `continuation`
+using `afterSourceDay` and `revision` with the same range; changed revisions return409.
+Coverage is for the requested whole range, not just the current page. ETags reflect the
+bounded response including revision/selection; there is no request-time source-file hash.
+
+The operator's local archive CSV is separate from the five public bundles and
+`datasets.json`. It includes source-specific units, availability, exact published tokens
+and empty unavailable cells. Numeric fields preserve validated negative values; text
+uses the existing CSV escaping/formula protection. No reported payout fills native
+calculator gaps, and archive success does not initialize native readiness.
 
 Use the tested v1 reserve-math knowledge selectively, not its acquisition machinery.
 Resolve/verify a small allowlisted pool/anchor set at startup and on scheduled metadata

@@ -1,5 +1,11 @@
 # Task03 acquisition and recovery contract
 
+Current follow-through: logical seed format4/schema5 adds optional source-reported
+PulseChain history tables and separate archive validation. A valid native checkpoint
+is still mandatory; raw daily JSON and archive-only state cannot seed balances/cursors.
+The prior format evolution below is retained as implementation history. Schema5
+encrypted backup/restore also supports archive-only state. See [data.md](data.md).
+
 Migration 2 preserves migration 1 and adds `source_history` (one verified acquisition
 start, source pair and finality policy per chain) and `recovery_pins` (at most four named
 cutoffs per chain). These native tables travel in seed format2; Task04 updates storage

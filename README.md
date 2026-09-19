@@ -3,8 +3,9 @@
 Read-only HEX data API, exact TypeScript domain calculations, PostgreSQL projections,
 resumable acquisition, daily history and five immutable CSV downloads. Tasks01–06 are
 accepted offline. Task08 adds the compiled operations path below. Task07 UI and Task09
-integrated qualification remain pending. There is no supplied live dataset, qualified
-provider profile, deployed site or production-readiness claim.
+integrated qualification remain pending. The HDS PulseChain integration adds an attributed
+reported-history overlay; it is not a native seed or live source qualification. There is
+no qualified native provider profile, deployed site or production-readiness claim.
 
 ## Prerequisites
 
@@ -51,7 +52,7 @@ Open <http://127.0.0.1:4320>. Choose a different free port as `init`'s last argu
 `init` creates a unique project, instance UUID, four random role passwords and an input
 directory. `build` creates one local release image. `provision` generates a private age
 key, creates/checks owned volumes, initializes only their root ownership and applies
-migrations1–4. Repeating `provision` preserves existing state. Keep this environment's
+migrations1–5. Repeating `provision` preserves existing state. Keep this environment's
 configuration and secrets; never rerun `init` to replace them.
 
 `release` stops API+worker, runs the migration check and starts both from the same
@@ -79,7 +80,7 @@ node scripts/operator/host.mjs compose '.local/v2 environment' -f compose.dev.ya
 
 ## Readiness and normal maintenance
 
-- `/health/live`: process can respond. `/health/ready`: configured private schema4 is
+- `/health/live`: process can respond. `/health/ready`: configured private schema5 is
   usable, including an empty install. Home returns503 until useful observations exist.
 - `/api/v2/status`: independently aged native/metric/market progress. Production mode
   does **not** enable providers or change `productionReady:false`/live qualification.
@@ -128,6 +129,58 @@ Later authorized use needs an explicit reviewed Compose override for profile mou
 secrets/environment and worker egress; never add a public fallback or reuse old secrets.
 Ordinary source operation then uses durable progress across days without per-day grants.
 
+## PulseChain reported history — isolated local input
+
+`history` is a separate source-reported archive. It does not initialize native chains,
+Home, calculator presets or the five standard downloads. Market prices are PulseChain
+HEX only, post-fork, from admitted `pricePulseX` observations. Read [history.md](docs/history.md)
+for exact field meanings, date uncertainty, missing values and the inspected snapshot.
+
+Create/build/provision a **new** environment using the commands above, with a distinct
+directory such as `.local/v2 history` and a free port. Leave the worker stopped. Place
+the already acquired raw `hds-pulsechain.json` and its receipt in that environment's
+`input/`. The single authorized download for this task has already been spent; do not
+rerun it. For another explicitly authorized acquisition, the bounded downloader is
+`node scripts/history-download.mjs <new-output.json>`; it has no retries or fallback URL.
+
+Inspect first, then create `selection.json` from
+`config/history-selection.example.json` **only if the file digest matches that example**.
+For any other supplied snapshot, explicitly inspect and select its own digest, dates,
+source days, provenance and exclusions. A supplied snapshot without a download receipt
+uses `supplied-snapshot`, a truthful statement and its acquisition time. Synthetic fixtures
+must say `synthetic-fixture`. No HDS download occurs during these operator commands:
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 history' run --rm -T operator history inspect /input/hds-pulsechain.json
+node scripts/operator/host.mjs compose '.local/v2 history' run --rm -T operator history inspect /input/hds-pulsechain.json /input/selection.json /input/hds-pulsechain.json.receipt.json
+```
+
+Create `input/destination.json` with the actual new identities from this environment's
+`environment.json`: `{ "project": "COPY_PROJECT", "instance": "COPY_INSTANCE_UUID",
+"purpose": "new-isolated-history-test" }`. This is an explicit destination assertion,
+not an authorization to use an existing database. Then:
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 history' run --rm -T operator history import /input/hds-pulsechain.json /input/selection.json /input/destination.json /input/hds-pulsechain.json.receipt.json
+node scripts/operator/host.mjs compose '.local/v2 history' run --rm -T operator history export /state/pulsechain-history.csv
+node scripts/operator/host.mjs compose '.local/v2 history' up -d --wait api
+```
+
+Query `/api/v2/daily?chain=pulsechain&source=hexdailystats&from=2023-05-11&to=2023-05-20`
+on the chosen loopback port. Dates are source-record dates, not asserted market close.
+Follow the explicit revision-bound continuation for ranges exceeding64 source records.
+An exact import repeat returns `changed:false`; export requires a new filename. A
+correction requires an inspected replacement selection and `--replace <current revision>`
+at the end of the import command. It atomically replaces the entire selected view,
+including removing rows outside the new range; there is no silent merge or replacement.
+For supplied/synthetic provenance omit the receipt argument from inspect/import.
+
+`npm run test:history` runs synthetic SQL/API/operator/seed/backup/forward/rewind acceptance
+in newly named isolated resources. The task-only `-- --real` option also consumes the
+already saved ignored task input (no download); it is not runnable from a source ZIP
+without that separately retained snapshot. All outputs remain local. No live source,
+Task07/09, canary, v1 or deployment qualification is implied.
+
 ## Bounded offline canary preparation
 
 For bounded qualification use the separate compiled `operator canary` path described
@@ -154,7 +207,7 @@ node scripts/operator/host.mjs compose '.local/v2 canary' run --rm -T operator c
 node scripts/operator/host.mjs compose '.local/v2 canary' run --rm -T operator canary status /input/plan.json
 ```
 
-Preparation requires an empty schema4 DB, matching project/UUID/image and Linux storage.
+Preparation requires an empty schema5 DB, matching project/UUID/image and Linux storage.
 Only after separate owner approval may a reviewed Compose override supply endpoints,
 operator egress, `HDD_V2_ALLOW_LIVE_RPC=true` and `HDD_V2_CANARY_OPT_IN=<session UUID>`,
 then invoke `canary run /input/plan.json /input/owner-approval.json` or `canary resume`

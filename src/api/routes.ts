@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { HomeResponseSchema, StatusResponseSchema } from '../contracts/api.ts';
 import {
   ChainQuery,
-  RangeQuery,
+  DailyQuery,
   MarketQuery,
   StakesQuery,
   StakeQuery,
@@ -19,6 +19,7 @@ import {
   AddressResultSchema,
   DownloadsResponseSchema,
 } from '../contracts/reads.ts';
+import { reportedHistoryResponseSchema } from '../contracts/history.ts';
 const none = z.strictObject({});
 const address = z.strictObject({ address: AddressSchema });
 export const jsonRevalidation = new Set([
@@ -65,9 +66,9 @@ export const routes = [
   {
     id: 'daily',
     path: '/api/v2/daily',
-    query: RangeQuery,
+    query: DailyQuery,
     params: none,
-    response: DailyResponseSchema,
+    response: z.union([DailyResponseSchema, reportedHistoryResponseSchema]),
   },
   {
     id: 'markets',

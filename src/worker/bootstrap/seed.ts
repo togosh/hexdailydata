@@ -14,6 +14,7 @@ import { decodeLog } from '../../providers/abi.ts';
 import { policySchema } from '../../providers/source.ts';
 import { diskReserve } from '../sync/engine.ts';
 import { validateDailyState } from '../daily/validate.ts';
+import { validateHistory } from '../history/store.ts';
 
 export async function fileHash(path: string, signal: AbortSignal) {
   const digest = createHash('sha256');
@@ -25,8 +26,8 @@ export async function fileHash(path: string, signal: AbortSignal) {
 }
 async function schema(client: pg.Client) {
   const { rows } = await client.query('SELECT version FROM hdd.schema_migrations ORDER BY version');
-  if (JSON.stringify(rows.map((r) => r.version)) !== '[1,2,3,4]')
-    throw new Error('Seed requires schema version 4.');
+  if (JSON.stringify(rows.map((r) => r.version)) !== '[1,2,3,4,5]')
+    throw new Error('Seed requires schema version 5.');
 }
 async function role(client: pg.Client) {
   const {
@@ -90,8 +91,8 @@ async function descriptor(client: pg.Client): Promise<Omit<Manifest, 'files' | '
       'No claim of complete live market history; per-source intervals and gaps are in market_daily.',
   });
   return {
-    formatVersion: 3,
-    schemaVersion: 4,
+    formatVersion: 4,
+    schemaVersion: 5,
     calculationVersion: 'hex-native-1',
     chainId: last.chain_id,
     contractAddress: hex(last.contract_address),
@@ -377,7 +378,10 @@ export async function validateState(
   signal: AbortSignal,
   recoveryChain: number | null = null,
 ) {
-  if (recoveryChain === null) await validateDailyState(client, signal);
+  if (recoveryChain === null) {
+    await validateDailyState(client, signal);
+    await validateHistory(client, signal);
+  }
   const { rows: chains } = await client.query(
     'SELECT * FROM hdd.chains WHERE $1::int IS NULL OR chain_id=$1 ORDER BY chain_id',
     [recoveryChain],

@@ -13,6 +13,8 @@ import { displayRatio } from '../../domain/units.ts';
 import type { ReadDatabase } from './database.ts';
 import { unavailable } from '../../api/errors.ts';
 import { chainId, dailyRow, date, metrics, readCutoff } from './home.ts';
+import { reportedHistory } from '../../worker/history/store.ts';
+import { DailyQuery } from '../../contracts/reads.ts';
 
 export function range(q: { from: string; to: string }) {
   return [
@@ -30,7 +32,8 @@ export function coverage(fromDay: number, toDay: number, days: number[]) {
 export const dailySql = `SELECT d.*,h.timestamp AS close_time FROM hdd.daily_stats d
  LEFT JOIN hdd.blocks_recent h ON h.chain_id=d.origin_chain_id AND h.number=d.close_block
  WHERE d.chain_id=$1 AND d.contract_day BETWEEN $2 AND $3 ORDER BY d.contract_day LIMIT 366`;
-export async function daily(db: ReadDatabase, q: z.infer<typeof RangeQuery>, signal: AbortSignal) {
+export async function daily(db: ReadDatabase, q: z.infer<typeof DailyQuery>, signal: AbortSignal) {
+  if (q.source === 'hexdailystats') return reportedHistory(db, q, signal);
   return db.read(
     signal,
     async (c) => {

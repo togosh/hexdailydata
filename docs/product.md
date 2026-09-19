@@ -19,9 +19,11 @@ payout and current-day payout estimate; ordinary-new-stake calculator; address/s
 lookup with live observations; holder/staker summaries and daily rankings; standard
 CSV downloads; a compact methodology/glossary and public freshness/status page.
 
-PulseChain is the actively indexed chain. Ethereum-era common history is included and
-labeled. Independently updated post-fork Ethereum is later, not an accidental omission
-or an unlabeled merge. Deep pool inventories, complete per-pool history, generalized
+PulseChain is the actively indexed chain. Required Ethereum-era common native history
+is included and labeled: inherited stake timing, shares, accounting and lifecycle remain
+intact. Price/market history is PulseChain HEX only, beginning at the earliest supported
+post-fork observation, with explicit gaps. There is no planned post-fork eHEX product
+and no pre-fork Ethereum price seam. Deep pool inventories, complete per-pool history, generalized
 portfolio tracking and every legacy endpoint are outside the initial release.
 
 ## Explicit nonrequirements
@@ -30,10 +32,17 @@ No arbitrary historical liquid-holder snapshots/rankings; no exact reproduction 
 old generated CSV bytes; no support for legacy URL/JSON/CSV formats; no immutable
 copy of every published full dataset. No copying the old schema to achieve “parity”.
 No login, paid API, custom query sandbox, leagues or email reminders at launch.
-Bitcoin (BTC) and Ethereum (ETH) asset-price feeds/tickers are separate future work.
-Do not add their providers, credentials, UI placeholders or extra bootstrap requirements.
+ETH/USD and Ethereum/PulseChain gas comparisons are approved directions for separate
+work; neither is implemented by the HDS archive. BTC feeds remain outside this task.
+Do not add providers, credentials, UI placeholders or extra bootstrap requirements.
 This exclusion does not remove required common Ethereum-era HEX history.
 No fake demo values in a production response. No wallet/signing/trading functionality.
+
+The HDS PulseChain overlay provides explicitly source-reported daily statistics and
+daily reference prices through an opt-in daily API variant and local operator CSV.
+Its source-record dates are not proven market-close times. It does not initialize native
+state, satisfy native history completeness, make Home/calculator/live inputs ready,
+or establish live source feasibility. Task07/09 and the feasibility condition remain open.
 
 ## Freshness is per component
 

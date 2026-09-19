@@ -40,7 +40,7 @@ for (const route of routes) {
       JSON.parse(readFileSync('tests/fixtures/home.json', 'utf8')),
     );
   const errors = [400, 405, 429, 503];
-  if (['stakes', 'stake', 'holders', 'address', 'addressStakes'].includes(route.id))
+  if (['daily', 'stakes', 'stake', 'holders', 'address', 'addressStakes'].includes(route.id))
     errors.push(409);
   if (route.id === 'download') errors.push(410);
   for (const code of errors.sort((a, b) => a - b))

@@ -141,11 +141,11 @@ try {
     ])
       await assert.rejects(api.query(sql), /permission denied/);
     await api.query('SET default_transaction_read_only=on');
-    await admin.query('UPDATE hdd.schema_migrations SET version=5 WHERE version=4');
+    await admin.query('UPDATE hdd.schema_migrations SET version=6 WHERE version=5');
     const incompatible = new ReadDatabase(databaseConfig('api'));
     await assert.rejects(incompatible.read(signal, (c) => c.query('SELECT 1')));
     await incompatible.close();
-    await admin.query('UPDATE hdd.schema_migrations SET version=4 WHERE version=5');
+    await admin.query('UPDATE hdd.schema_migrations SET version=5 WHERE version=6');
     for (const config of [
       { ...databaseConfig('api'), instance: '00000000-0000-0000-0000-000000000000' },
       { ...databaseConfig('api'), user: 'hdd_v2_worker' },
