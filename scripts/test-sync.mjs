@@ -6,8 +6,8 @@ mkdirSync('artifacts/task-03', { recursive: true });
 let failure;
 const phases = process.env.HDD_V2_SYNC_TEST_PHASE
   ? [process.env.HDD_V2_SYNC_TEST_PHASE]
-  : ['build', 'import', 'unpruned'];
-if (phases.some((p) => !['build', 'import', 'unpruned'].includes(p)))
+  : ['build', 'early-import', 'import', 'unpruned'];
+if (phases.some((p) => !['build', 'early-import', 'import', 'unpruned'].includes(p)))
   throw new Error('Unknown test phase.');
 for (const phase of phases) {
   if (failure) break;

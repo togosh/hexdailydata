@@ -384,18 +384,28 @@ async function validateState(
     const {
       rows: [check],
     } = await client.query(
-      `SELECT s.*,c.contract_day,h.start_block,h.sources,h.finality_policy,
+      `SELECT s.*,c.contract_day,h.start_block,h.start_hash,h.sources,h.finality_policy,
       EXISTS(SELECT 1 FROM hdd.blocks_recent b WHERE b.chain_id=s.chain_id AND b.number=s.block_number AND b.hash=s.block_hash AND b.timestamp=s.block_time) AS header,
       EXISTS(SELECT 1 FROM hdd.blocks_recent b WHERE b.chain_id=s.chain_id AND b.number=s.rewind_floor) AS floor
       FROM hdd.sync_state s JOIN hdd.current_state c USING(chain_id) JOIN hdd.source_history h USING(chain_id) WHERE s.chain_id=$1`,
       [chain.chain_id],
     );
+    // Native acquisition starts at the entry block, but its first undo checkpoint
+    // restores the verified inherited parent. This exception is audit-only and exact.
+    const inheritedBoundary =
+      recoveryChain === 369 &&
+      check &&
+      chain.initialization === 'fork' &&
+      check.block_number === chain.parent_block &&
+      check.block_hash.equals(chain.parent_hash) &&
+      check.start_block === chain.entry_block &&
+      check.start_hash.equals(chain.entry_hash);
     if (
       !check ||
       !check.header ||
       !check.floor ||
       Number((BigInt(check.block_time) - 1575331200n) / 86400n) !== check.contract_day ||
-      BigInt(check.start_block) > BigInt(check.block_number)
+      (BigInt(check.start_block) > BigInt(check.block_number) && !inheritedBoundary)
     )
       throw new Error('Seed cursor/header/day/coverage inconsistency.');
     const policy = policySchema.shape.finality.parse(check.finality_policy);

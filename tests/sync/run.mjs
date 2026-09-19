@@ -49,10 +49,10 @@ const pair = (id) => [
   chain.source(id, 'fixture-two', clock, undefined, budget),
 ];
 const seed = '/evidence/fixture.seed.tar.gz';
-async function corruptSeed(table, edit) {
+async function corruptSeed(table, edit, sourcePath = seed) {
   const members = [];
   await readArchive(
-    seed,
+    sourcePath,
     ['seed.json', ...tableNames.map((t) => `tables/${t}.ndjson`)],
     async (name, size, chunks) => {
       const parts = [];
@@ -189,6 +189,8 @@ try {
         ).rows[0].count,
         '0',
       );
+      const exporter = await db('worker');
+      await exportSeed(exporter, '/evidence/early.seed.tar.gz', signal);
     });
     await test('multi-day once, automatic replay-age pruning and independent exact totals', async () => {
       await sync.once(signal, chain.plain(296));
@@ -258,6 +260,65 @@ try {
         '/evidence/expected-checkpoint.json',
         JSON.stringify({ exact: await snapshot(), semantic: await snapshot({ semantic: true }) }),
       );
+    });
+  } else if (phase === 'early-import') {
+    worker = await db('worker');
+    await test('fresh first-native seed validates exact inherited boundary, then commits, rewinds and replays', async () => {
+      const path = '/evidence/early.seed.tar.gz';
+      const expected = {
+        instance: databaseConfig('worker').instance,
+        sha256: await fileHash(path, signal),
+        contract: CONTRACT,
+        codeHash: CODE_HASH,
+        checkpointHash: chain.plain(181).hash,
+      };
+      const corrupt = await corruptSeed(
+        'source_history',
+        (text) =>
+          text
+            .split('\n')
+            .map((row) =>
+              row.includes('"chain_id": 369')
+                ? row.replace(
+                    /"start_hash": "[^"]+"/,
+                    '"start_hash": "' + '\\\\x' + 'ff'.repeat(32) + '"',
+                  )
+                : row,
+            )
+            .join('\n'),
+        path,
+      );
+      const corruptHash = await fileHash(corrupt, signal);
+      await assert.rejects(
+        () =>
+          importSeed(
+            worker,
+            corrupt,
+            {
+              ...expected,
+              sha256: corruptHash,
+            },
+            signal,
+          ),
+        /cursor\/header/,
+      );
+      assert.equal((await api.query('SELECT count(*) FROM hdd.chains')).rows[0].count, '0');
+      const imported = await importSeed(worker, path, expected, signal);
+      assert.ok(imported.recoveryCheckpoints > 0);
+      sync = await engine(369);
+      await sync.audit(signal);
+      const s = await sync.cursor();
+      assert.equal(s.block_number, '181');
+      await writer.rewind('180', {
+        blockNumber: s.block_number,
+        blockHash: '0x' + s.block_hash.toString('hex'),
+        revision: s.revision,
+      });
+      assert.equal((await sync.cursor()).block_number, '180');
+      await sync.once(signal, chain.plain(181));
+      await sync.audit(signal);
+      assert.equal((await sync.cursor()).block_number, '181');
+      assert.ok(BigInt((await sync.cursor()).revision) > BigInt(s.revision));
     });
   } else if (phase === 'unpruned') {
     sync = await engine(1);
