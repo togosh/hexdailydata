@@ -271,6 +271,13 @@ A subsequent backup may replace that already verified ciphertext. Failed candida
 are overwritten on the next attempt under the lock; no archive-per-date retention.
 Key loss is unrecoverable; keep recovery keys separately and test them in a new target.
 
+Recheck working space against actual dump/packed sizes before packing and transfer.
+Restore reserves four times the logical dump plus64MiB for measured index/WAL/temp
+growth, then checks the reserve every16MiB of streamed input. The supported DB/state/
+maintenance named volumes share Docker's data filesystem; independently mounted DB
+storage requires separate free-space qualification. These checks retain the8GiB AND20%
+floor and abort heavy work without replacing the verified backup.
+
 A real mounted off-host destination can replace only the backup volume with a separately
 provisioned POSIX mount owned by UID1001/group1000. Set a Compose override's backup volume driver
 options to type=none, o=bind, device=the explicit mount path. Do not have volume-init

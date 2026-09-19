@@ -291,6 +291,9 @@ export async function backup(
     await c.query('SELECT pg_advisory_unlock_shared(4243,0)');
     phase = 'encrypt-transfer';
     const metadata = Buffer.from(JSON.stringify(manifest));
+    // Logical COPY text can be much larger than compressed/toasted SQL storage.
+    // Recheck against the actual dump before holding both dump and packed bytes.
+    await reserve(work.stage, bytes + 64 * 1024 ** 2);
     await packArchive(
       packed,
       [
@@ -300,6 +303,7 @@ export async function backup(
       signal,
     );
     await sample('dump-and-packed');
+    await reserve(work.destination, (await stat(packed)).size + 1024 ** 2);
     await toolFile('age', ['-e', '-i', work.identity, packed], candidate, signal);
     await syncPath(candidate);
     await syncPath(work.destination);
@@ -350,7 +354,12 @@ export async function backup(
 
 /** Only COPY data enters trusted current-schema tables. No dump SQL, SET, role,
  * sequence command, function, trigger or psql backslash command is ever executed. */
-async function importCopy(c: pg.Client, chunks: AsyncIterable<Buffer>, signal: AbortSignal) {
+async function importCopy(
+  c: pg.Client,
+  chunks: AsyncIterable<Buffer>,
+  signal: AbortSignal,
+  stage: string,
+) {
   const allowed = new Map<string, string>();
   for (const table of tables) {
     const columns = (
@@ -362,6 +371,7 @@ async function importCopy(c: pg.Client, chunks: AsyncIterable<Buffer>, signal: A
     allowed.set(`COPY hdd.${table} (${columns.join(', ')}) FROM stdin;`, table);
   }
   let pending = Buffer.alloc(0),
+    sinceReserve = 0,
     current: ReturnType<typeof copyFrom> | undefined,
     completion: Promise<void> | undefined;
   const seen = new Set<string>();
@@ -400,6 +410,13 @@ async function importCopy(c: pg.Client, chunks: AsyncIterable<Buffer>, signal: A
   }
   try {
     for await (const chunk of chunks) {
+      sinceReserve += chunk.length;
+      if (sinceReserve >= 16 * 1024 ** 2) {
+        // Supported named volumes share the Docker data filesystem. Keep a margin
+        // before more COPY/index/WAL growth; failure aborts the import transaction.
+        await reserve(stage, 64 * 1024 ** 2);
+        sinceReserve = 0;
+      }
       pending = Buffer.concat([pending, chunk]);
       let end;
       while ((end = pending.indexOf(10)) !== -1) {
@@ -460,7 +477,8 @@ export async function restore(
     const manifest = await inspectArchive(packed, signal);
     if (manifest.sourceInstance !== expected.sourceInstance)
       throw new Error('Restore source instance mismatch.');
-    await reserve(work.stage, manifest.dumpBytes * 3);
+    // The measured large restore includes indexes, WAL and temporary SQL work.
+    await reserve(work.stage, manifest.dumpBytes * 4 + 64 * 1024 ** 2);
     await c.query(
       "SET statement_timeout='1h'; SET idle_in_transaction_session_timeout='1h'; BEGIN",
     );
@@ -477,7 +495,7 @@ export async function restore(
     await c.query(`LOCK TABLE ${tables.map((t) => 'hdd.' + t).join(',')} IN EXCLUSIVE MODE`);
     await emptyTarget(c);
     phase = 'import';
-    await inspectArchive(packed, signal, (chunks) => importCopy(c, chunks, signal));
+    await inspectArchive(packed, signal, (chunks) => importCopy(c, chunks, signal, work!.stage));
     if (JSON.stringify(await cutoff(c)) !== JSON.stringify(manifest.cutoffs))
       throw new Error('Restored cutoff differs from snapshot.');
     phase = 'audit';
