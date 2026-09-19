@@ -12,6 +12,7 @@ import {
   rm,
 } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
+import { setTimeout as pause } from 'node:timers/promises';
 import { connect, databaseConfig } from '../../dist/db/connect.js';
 import { backup, restore, backupStatus } from '../../dist/operator/backup.js';
 import { reserve } from '../../dist/operator/files.js';
@@ -19,11 +20,27 @@ import { tables } from '../../dist/worker/bootstrap/manifest.js';
 import { validateState, validateRecovery, fileHash } from '../../dist/worker/bootstrap/seed.js';
 import { packArchive, readArchive } from '../../dist/worker/bootstrap/archive.js';
 import { toolFile } from '../../dist/operator/process.js';
+import { maintenanceLease } from '../../dist/operator/lease.js';
 import { configureMarket, importMarketBars } from '../../dist/worker/daily/market.js';
 const signal = new AbortController().signal;
 const action = process.argv[2],
   c = await connect(databaseConfig('worker'));
 c.on('error', () => {});
+async function loseMaintenanceConnection() {
+  const owners = (
+    await c.query(
+      "SELECT pid FROM pg_locks WHERE locktype='advisory' AND classid=4250 AND objid=0 AND granted",
+    )
+  ).rows;
+  assert.equal(owners.length, 1);
+  assert.equal(
+    (await c.query('SELECT pg_terminate_backend($1) AS stopped', [owners[0].pid])).rows[0].stopped,
+    true,
+  );
+  await pause(50);
+  // The DB lock is gone, but the first process still owns these Linux files.
+  await assert.rejects(backup(signal), /Maintenance filesystem already active/);
+}
 try {
   if (action === 'resources') {
     const admin = new pg.Client({
@@ -147,6 +164,18 @@ try {
       digest = createHash('sha256').update(before).digest('hex');
     // This is the SMALL fault fixture only, never the scale archive/driver.
     const accepted = await readFile('/backup/verified.json', 'utf8');
+    for (const hook of ['afterTransfer', 'beforePromote'])
+      await assert.rejects(
+        backup(signal, process.env, { [hook]: loseMaintenanceConnection }),
+        /Maintenance database connection lost/,
+      );
+    // Destination authority also excludes jobs with a separate staging mount.
+    const releaseDestination = await maintenanceLease(['/backup'], signal);
+    try {
+      await assert.rejects(backup(signal), /Maintenance filesystem already active/);
+    } finally {
+      await releaseDestination();
+    }
     for (let i = 0; i < 2; i++)
       await assert.rejects(
         backup(signal, process.env, {
@@ -199,10 +228,10 @@ try {
     assert.equal(await readFile('/backup/verified.json', 'utf8'), accepted);
     assert.ok(
       (await readdir('/backup')).every((n) =>
-        ['current.age', 'candidate.age', 'verified.json'].includes(n),
+        ['current.age', 'candidate.age', 'verified.json', '.maintenance.lock'].includes(n),
       ),
     );
-    assert.deepEqual(await readdir('/maintenance'), []);
+    assert.deepEqual(await readdir('/maintenance'), ['.maintenance.lock']);
     await assert.rejects(reserve('/maintenance', Number.MAX_SAFE_INTEGER), /reserve/);
     await symlink('/backup', '/maintenance/link');
     await assert.rejects(
@@ -211,7 +240,7 @@ try {
     );
     await unlink('/maintenance/link');
     console.log(
-      'PASS failed replacement retains last good + unchanged age; bounded candidate/staging; actual path low-space and symlink refusal.',
+      'PASS lost DB connection refuses successor until filesystem cleanup; destination lock; failed replacement retains last good + unchanged age; bounded candidate/staging; actual path low-space and symlink refusal.',
     );
   } else if (action === 'restore-failure') {
     const expected = JSON.parse(await readFile('/input/expectation.json', 'utf8'));
@@ -289,6 +318,12 @@ try {
     );
     await assert.rejects(
       restore('/input/recovery.age', expected, signal, process.env, {
+        beforeCommit: loseMaintenanceConnection,
+      }),
+      /Maintenance database connection lost/,
+    );
+    await assert.rejects(
+      restore('/input/recovery.age', expected, signal, process.env, {
         beforeCommit: () => {
           throw Error('injected restore failure');
         },
@@ -297,7 +332,7 @@ try {
     );
     assert.equal((await c.query('SELECT count(*)::text AS n FROM hdd.chains')).rows[0].n, '0');
     console.log(
-      'PASS wrong identity refusal and failed restore transaction rollback; target remains empty.',
+      'PASS wrong identity refusal, lost restore connection excludes successor, failed restore transaction rollback; target remains empty.',
     );
   } else if (action === 'health') console.log(JSON.stringify(await backupStatus()));
   else if (action === 'hold-backup')

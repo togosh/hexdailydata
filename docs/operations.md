@@ -240,8 +240,13 @@ old-secret discovery or source credential defaults. Status does not echo their v
 
 PostgreSQL snapshot export plus pg_dump --snapshot makes the metadata and dump coherent.
 The existing shared4243 snapshot lock prevents pruning during the dump; ordinary writers
-and API reads remain available. A separate4250 maintenance session lock bounds staging
-and releases on connection/process loss. A dump includes all hdd data except the installed
+and API reads remain available. A separate4250 maintenance session lock coordinates jobs.
+[Linux flock locks](https://man7.org/linux/man-pages/man2/flock.2.html) on persistent files in staging and destination remain held by the
+maintenance process through cleanup, even if its DB connection dies. Connection loss
+aborts the job; another process cannot reuse fixed paths before their owner finishes.
+Never delete the small .maintenance.lock files: they keep stable lock inodes. Local
+Linux flock semantics are required; unqualified network filesystems are unsupported.
+A dump includes all hdd data except the installed
 migration registry, which remains owned by the destination release. It excludes identity
 schema/roles/passwords, generated CSVs, source, provider endpoints and all filesystem caches.
 The manifest allowlists source UUID, release, schema/calculation, capture time, cutoffs,

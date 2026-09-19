@@ -125,6 +125,7 @@ function docker(argv, { allowFailure = false, timeout = 120000, quiet = false } 
     `${new Date().toISOString()} docker ${argv.join(' ')} exit=${r.status}\n`,
   );
   if (!quiet && r.stdout) process.stdout.write(r.stdout);
+  if (!quiet && r.stderr) process.stderr.write(r.stderr);
   if (r.status !== 0 && !allowFailure)
     throw new Error(`docker ${argv[0]} failed: exit=${r.status}; ${r.stderr.slice(-4000)}`);
   return r;

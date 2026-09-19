@@ -169,6 +169,22 @@ try {
     );
     assert.equal(network[0].Internal, true);
     await compose(source, ['stop', 'worker']);
+    const diagnostic = await execute(
+      process.execPath,
+      [
+        'scripts/operator/host.mjs',
+        'compose',
+        source,
+        'run',
+        '--rm',
+        '-T',
+        'operator',
+        'sync',
+        '--once',
+      ],
+      { expected: [1], label: 'disabled-provider-diagnostic' },
+    );
+    assert.match(diagnostic, /Provider work disabled: explicit source profile/);
   });
   if (!smoke) {
     if (scale)

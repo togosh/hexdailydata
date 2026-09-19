@@ -15,6 +15,7 @@ import { emptyTarget, fileHash } from '../worker/bootstrap/seed.ts';
 import { packArchive, readArchive } from '../worker/bootstrap/archive.ts';
 import { safePath, reserve, syncPath, atomicJson, maxBackupBytes } from './files.ts';
 import { toolFile } from './process.ts';
+import { maintenanceLease } from './lease.ts';
 
 const tables = [...tableNames, 'live_metrics', 'export_bundles'];
 const hash = z.string().regex(/^[0-9a-f]{64}$/);
@@ -117,23 +118,31 @@ export async function backupStatus(env = process.env, now = Date.now()) {
     return { state: 'unavailable', ageMs: null };
   }
 }
-/** One fixed private staging directory, protected by a session lock released on process death. */
-async function workspace(c: pg.Client, env: NodeJS.ProcessEnv) {
+/** SQL coordinates maintenance with DB work; file locks protect fixed paths even
+ * after a DB connection dies, and remain held until filesystem cleanup finishes. */
+async function workspace(c: pg.Client, env: NodeJS.ProcessEnv, signal: AbortSignal) {
   const cfg = backupConfig(env);
   await safePath(cfg.stage);
   await safePath(cfg.destination);
   await safePath(cfg.identity, false);
   if (!(await c.query('SELECT pg_try_advisory_lock(4250,0) AS held')).rows[0].held)
     throw new Error('Maintenance already active.');
+  const closeLease = await maintenanceLease([cfg.stage, cfg.destination], signal);
   const dir = join(cfg.stage, 'backup');
   try {
-    await safePath(dir);
-    await rm(dir, { recursive: true });
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    try {
+      await safePath(dir);
+      await rm(dir, { recursive: true });
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+    }
+    signal.throwIfAborted();
+    await mkdir(dir, { mode: 0o700 });
+    return { ...cfg, dir, closeLease };
+  } catch (error) {
+    await closeLease().catch(() => {});
+    throw error;
   }
-  await mkdir(dir, { mode: 0o700 });
-  return { ...cfg, dir };
 }
 async function inspectArchive(
   path: string,
@@ -183,9 +192,10 @@ export async function backup(
     beforePromote?: () => Promise<void>;
   } = {},
 ) {
-  signal = AbortSignal.any([signal, AbortSignal.timeout(2 * 3600000)]);
+  const connectionLost = new AbortController();
+  signal = AbortSignal.any([signal, connectionLost.signal, AbortSignal.timeout(2 * 3600000)]);
   const c = await connect(databaseConfig('worker', env));
-  c.on('error', () => {});
+  c.on('error', () => connectionLost.abort(new Error('Maintenance database connection lost.')));
   let work: Awaited<ReturnType<typeof workspace>> | undefined,
     phase = 'prepare';
   const started = Date.now();
@@ -215,7 +225,7 @@ export async function backup(
   );
   try {
     await schema(c);
-    work = await workspace(c, env);
+    work = await workspace(c, env, signal);
     const prior = await receipt(work.destination);
     if (
       prior &&
@@ -344,11 +354,12 @@ export async function backup(
   } finally {
     clearInterval(timer);
     await c.query('ROLLBACK').catch(() => {});
-    await c.end().catch(() => {});
     if (work)
       await rm(work.dir, { recursive: true, force: true }).catch(() =>
         console.error('Backup staging cleanup failed.'),
       );
+    await c.end().catch(() => {});
+    await work?.closeLease().catch(() => console.error('Backup filesystem lock release failed.'));
   }
 }
 
@@ -447,7 +458,8 @@ export async function restore(
   env = process.env,
   hooks: { beforeCommit?: () => Promise<void> } = {},
 ) {
-  signal = AbortSignal.any([signal, AbortSignal.timeout(2 * 3600000)]);
+  const connectionLost = new AbortController();
+  signal = AbortSignal.any([signal, connectionLost.signal, AbortSignal.timeout(2 * 3600000)]);
   const expected = restoreExpectation.parse(expectation),
     cfg = databaseConfig('worker', env);
   if (
@@ -460,7 +472,7 @@ export async function restore(
   if ((await fileHash(path, signal)) !== expected.sha256)
     throw new Error('Backup source integrity mismatch.');
   const c = await connect(cfg);
-  c.on('error', () => {});
+  c.on('error', () => connectionLost.abort(new Error('Maintenance database connection lost.')));
   let work: Awaited<ReturnType<typeof workspace>> | undefined,
     phase = 'verify';
   const started = Date.now();
@@ -470,7 +482,7 @@ export async function restore(
   );
   try {
     await schema(c);
-    work = await workspace(c, env);
+    work = await workspace(c, env, signal);
     await reserve(work.stage, 2 * (await stat(path)).size);
     const packed = join(work.dir, 'archive.tar.gz');
     await toolFile('age', ['-d', '-i', work.identity, path], packed, signal);
@@ -554,11 +566,12 @@ export async function restore(
   } finally {
     clearInterval(timer);
     await c.query('ROLLBACK').catch(() => {});
-    await c.end().catch(() => {});
     if (work)
       await rm(work.dir, { recursive: true, force: true }).catch(() =>
         console.error('Restore staging cleanup failed.'),
       );
+    await c.end().catch(() => {});
+    await work?.closeLease().catch(() => console.error('Restore filesystem lock release failed.'));
   }
 }
 
