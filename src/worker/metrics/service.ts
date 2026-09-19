@@ -65,7 +65,14 @@ export class MetricsService {
         asOf = blockRef(a.chain, h);
       if (BigInt(h.timestamp) > BigInt(Math.floor(clock.now() / 1000)))
         throw new Error('Future metric source.');
-      const planA = this.price?.plan(a, h, clock.now());
+      let planA: ReturnType<PriceReader['plan']> | undefined;
+      try {
+        planA = this.price?.plan(a, h, clock.now());
+      } catch {
+        this.counters.failures++;
+        if (!previous.price.value)
+          next.price = unavailable('allowlisted-reserve-ratio', 'price_profile_invalid');
+      }
       const results = await a.calls(
         [
           { method: 'eth_getBlockByNumber', params: [q(h.number), false] },
@@ -200,7 +207,8 @@ export class MetricsService {
         } catch {
           this.counters.failures++;
         }
-      } else next.price = unavailable('allowlisted-reserve-ratio', 'price_profile_unqualified');
+      } else if (!this.price)
+        next.price = unavailable('allowlisted-reserve-ratio', 'price_profile_unqualified');
     } catch {
       signal.throwIfAborted();
       this.counters.failures++;

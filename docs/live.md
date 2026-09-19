@@ -59,8 +59,10 @@ unknown correlation stays unknown. This is not a guarantee against shared bad da
 
 Each reserve ratio uses integer units; composed depth is the minimum output-side
 depth converted into anchor units across the route. Zero/low depth, malformed state
-and identity conflicts fail independently of contract metrics. This implementation
-supports only an explicitly peg-assumed $1 anchor. It cannot award an independent USD
+and identity conflicts fail independently of contract metrics. Price-profile planning
+failures, including a mismatched chain, are isolated too: native
+metrics continue, while price retains its aged last good value or reports an invalid profile.
+Only an explicitly peg-assumed $1 anchor is supported. It cannot award an independent USD
 anchor label from pool agreement. Real route identities remain unqualified; tests use
 synthetic metadata. Poll timestamp, pinned block timestamp and each pool's reserve
 update seconds are distinct. Successful stalled-block polls do not renew source age.
@@ -79,8 +81,11 @@ If discovery races a change, a smaller pinned count discards speculative indices
 proved outside the authoritative count; failures within the count reject the page.
 A larger count yields an honest partial page and continuation. No array index is an
 identity. Index records, dated rank cutoff and live pages remain separate. Stake ID
-lookup uses an indexed owner or caller-supplied address and one bounded page; unknown
-or out-of-page IDs return indexing, never a definitive404. Optional event discovery
+lookup uses an indexed owner or caller-supplied address and one bounded page. A hint
+conflicting with the indexed owner returns `incompatible_owner` before provider work.
+Only an indexed owner's complete list supports `not_current_at_block`; an unindexed
+ID absent from a supplied address remains `indexing`. Unknown or out-of-page IDs never
+produce a definitive404. Optional event discovery
 is not implemented. No all-address scan, arbitrary calldata or visitor history exists.
 
 Cursors are authenticated opaque process-local tokens binding chain, address, header,

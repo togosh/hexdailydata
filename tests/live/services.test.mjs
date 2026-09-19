@@ -220,6 +220,61 @@ test('cold zero/small/100 pages return actual pinned values inside two HTTP and 
   }
   console.log('ADDRESS_WORKLOAD ' + JSON.stringify(measurements));
 });
+test('stake lookup rejects conflicting owner hints and requires indexed ownership for negative conclusions', async () => {
+  const indexed = { address: A, lifecycle: 'unsettled', asOfBlock: '1' };
+  for (const c of [
+    { indexed, hint: B, count: 1, outcome: 'incompatible_owner', requests: 0 },
+    { indexed, hint: A, count: 1, outcome: 'observed', requests: 2 },
+    { indexed, count: 0, outcome: 'not_current_at_block', requests: 2 },
+    { indexed: null, hint: B, count: 0, outcome: 'indexing', requests: 2 },
+    { indexed: null, hint: A, count: 1, outcome: 'observed', requests: 2 },
+  ]) {
+    const { f, rpc } = addressSetup();
+    f.state.byAddress.set(A, c.count);
+    f.state.byAddress.set(B, 0);
+    const service = new AddressService(rpc, CODE_HASH, {
+      ...emptyBaseline,
+      async stake() {
+        return c.indexed;
+      },
+    });
+    const result = await service.stake('1', signal, c.hint);
+    assert.equal(result.outcome, c.outcome);
+    assert.deepEqual(result.indexed, c.indexed);
+    assert.equal(result.live?.stakeId ?? null, c.outcome === 'observed' ? '1' : null);
+    assert.equal(rpc.counters.requests, c.requests);
+  }
+});
+test('wrong-chain price planning leaves native metrics fresh and ages any prior good price', async () => {
+  for (const hadPrice of [false, true]) {
+    const { f, service, rpc, other, store } = setup();
+    const previous = hadPrice ? await service.tick(signal) : null;
+    f.clock.time += 120001;
+    const before = f.attempts.length;
+    const wrongChain = new MetricsService(
+      [rpc, other],
+      CODE_HASH,
+      new PriceReader({ ...f.price, chain: 1 }, HEX),
+      store,
+    );
+    const result = await wrongChain.tick(signal);
+    assert.equal(result.shareRate.status, 'fresh');
+    assert.equal(result.shareRate.value.rawShareRate, '123456');
+    assert.equal(result.todayPayoutEstimate.value.payoutHearts, '100000077');
+    assert.equal(result.latestCompletedPayout.value.payoutHearts, '42');
+    assert.equal(f.attempts.length - before, 3);
+    assert.equal(wrongChain.counters.failures, 1);
+    if (hadPrice) {
+      assert.deepEqual(result.price.asOf, previous.price.asOf);
+      assert.equal(result.price.observedAt, previous.price.observedAt);
+      assert.equal(result.price.value.usdPerHex, '25');
+      assert.equal(result.price.status, 'stale');
+    } else {
+      assert.equal(result.price.status, 'unavailable');
+      assert.equal(result.price.reason, 'price_profile_invalid');
+    }
+  }
+});
 test('continuations stay pinned, terminal page alone incomplete; address/tamper/expiry/restart/reorg cursor rejection', async () => {
   const { f, service } = addressSetup();
   f.state.count = 101;

@@ -313,14 +313,16 @@ export class AddressService {
       () => null,
     );
     signal.throwIfAborted();
-    const owner = address ?? indexed?.address;
+    if (indexed && address !== undefined && address !== indexed.address)
+      return { outcome: 'incompatible_owner' as const, indexed, live: null };
+    const owner = indexed?.address ?? address;
     if (!owner) return { outcome: 'indexing' as const, indexed, live: null };
     const result = await this.get(owner, signal, 100, undefined, deadline);
     const item = result.live?.page.items.find((x) => x.stakeId === id) ?? null;
     return {
       outcome: item
         ? ('observed' as const)
-        : result.live?.page.enumerationComplete
+        : indexed && result.live?.page.enumerationComplete
           ? ('not_current_at_block' as const)
           : ('indexing' as const),
       indexed,
