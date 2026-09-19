@@ -24,7 +24,7 @@
         "src/db/",
         "src/services/projections/"
       ],
-      "status": "pending"
+      "status": "passed"
     },
     {
       "id": "03",
