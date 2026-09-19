@@ -5,7 +5,8 @@
 | 01 | passed | Reviewed code `98ebf8c00200b5b6c2c0f889e05f559e5ebda1ba`; 29/29 tests, clean install/build, real non-root API/PostgreSQL and Chrome desktop/mobile smoke. Independent `/root/task01_review`: PASS, one full review plus one fixture delta recheck. See ignored `artifacts/task-01/report.md` and `reviewer-report.md`. |
 | 02 | passed | Reviewed code `237aba7`; isolated SQL, recovery, roles and million-row evidence accepted. |
 | 03 | passed (offline) | Reviewed code `73d461b`; 43 unit tests and 21 isolated sync/seed/pruning groups. Same independent `/root/task03_review`: PASS after one full review and two corrections. SQL/container evidence reused at `64bc9d7`; see ignored `artifacts/task-03/report.md` and reviewer report. Canary prepared / NOT_RUN; live/full-scale qualification remains open. |
-| 04–11 | pending | Not implemented |
+| 04 | passed (offline) | Reviewed code `7787ac16331c52d18437e05e731b486e58752ef3`; 68 tests, 12 SQL groups, 28 sync groups and 5 live-service SQL groups. Independent `/root/task04_review`: PASS after one full review and one correction/recheck. Reports, commands and measurements in ignored `artifacts/task-04/`. |
+| 05–11 | pending | Not implemented |
 
 The development shell has no live data/indexer. Task02 qualifies schema/projections on
 isolated disposable PostgreSQL17; the public shell remains uninitialized. Task01 source
@@ -47,3 +48,14 @@ feasibility claim. Reports/evidence and updated PREPARED/NOT_RUN brief are in ig
 `artifacts/task03-acquisition/`; original Task03 evidence is preserved. Task04/05 remain
 unstarted; next is the planner decision on this delta/cost ledger. No live/v1/canary,
 push or deployment occurred. This final status entry is separate from reviewed source.
+
+Task04 adds bounded current metrics and address services, cooperative worker scheduling,
+and migration3/seed integration. Final affected checks passed on `7787ac1`; unchanged
+SQL/sync regression evidence is reused from initial candidate `6f4ef60`. A cold 100-stake
+page used 2 HTTP / 107 logical calls / 49,714 bytes; ten requested cold pages delivered
+three and returned seven quota outcomes within fixed allowances. Four latest metric
+keys used 32,768 SQL relation bytes. These are offline synthetic measurements, not live
+latency/capacity proof. All Task04 disposable Docker resources were removed. Tasks01–03,
+the acquisition correction and original evidence remain preserved. Canary PREPARED /
+NOT_RUN, launcher NOT_CONFIGURED; no live/v1 access, push or deployment. This status-only
+commit is separate from reviewed code. Task05 is next sequential task and remains unstarted.

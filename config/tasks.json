@@ -50,7 +50,7 @@
         "src/worker/metrics/",
         "tests/live/"
       ],
-      "status": "pending"
+      "status": "passed"
     },
     {
       "id": "05",
