@@ -3,7 +3,8 @@
 This is an attributed daily archive, not canonical reconstruction or evidence of complete
 native history. Mapping `hds-pulsechain-record-date-1` keeps exact published numeric tokens
 (including exponent spelling and precision beyond24 decimal places) in text-valued JSON.
-The bounded `lossless-json` parser rejects duplicate keys before conversion. Input is at
+The bounded `lossless-json` parser rejects conflicting duplicate-key values before
+conversion; repeated identical values are accepted without changing their tokens. Input is at
 most16MiB/10,000 rows,128 scalar fields/row, bounded strings/nesting, and16KiB normalized
 SQL rows with separately bounded shared metadata. It never evaluates input as code.
 

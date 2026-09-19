@@ -17,8 +17,8 @@ import {
 } from '../../contracts/history.ts';
 
 export const sha256 = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
-// Admission scan only: no rewriting JSON/numeric tokens. Parsing and duplicate-key
-// rejection are delegated to lossless-json after these cheap memory/stack bounds.
+// Admission scan only: no rewriting JSON/numeric tokens. After these memory/stack
+// bounds, lossless-json rejects conflicting duplicate values; identical repeats are safe.
 function admit(text: string) {
   let depth = 0,
     quoted = false,

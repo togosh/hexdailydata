@@ -73,9 +73,28 @@ test('day/date relationship, delayed collection, incomplete periods and chain or
   delete r.pricePulseX;
   assert.throws(() => parseInput(Buffer.from(JSON.stringify([r]))), /PulseChain/);
 });
-test('bounded lossless parser rejects ambiguous keys, malformed data and conflicting selected identities', () => {
+test('lossless duplicate keys retain identical tokens and reject conflicting values', () => {
+  const input = (first, second) =>
+    Buffer.from(`[
+    {"currentDay":1261,"date":"2023-05-17T00:00:15.000Z",
+     "circulatingHEX":100,"pricePulseX":0.02,
+     "stakedHEX":${first},"stakedHEX":${second}}
+  ]`);
+  for (const token of ['9007199254740993', '1.2300e-40', '"9007199254740993"']) {
+    assert.equal(parseInput(input(token, token))[0].stakedHEX, token.replaceAll('"', ''));
+  }
+  for (const [first, second] of [
+    ['9007199254740993', '9007199254740994'],
+    ['55', '55.0'],
+    ['1.2300e-40', '1.23e-40'],
+    ['55', '"55"'],
+    ['"55"', '"56"'],
+  ]) {
+    assert.throws(() => parseInput(input(first, second)), /Duplicate JSON key/);
+  }
+});
+test('bounded lossless parser rejects malformed data and conflicting selected identities', () => {
   for (const bad of [
-    '[{"a":1,"a":1}]',
     '<html>error</html>',
     '{"error":"no"}',
     JSON.stringify([rawRow(1261, { date: '2023-02-30T00:00:00.000Z' })]),
