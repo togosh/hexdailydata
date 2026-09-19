@@ -35,7 +35,7 @@ export class ExportService {
     this.connect = connect;
     this.root = root;
   }
-  private async verify(bundle: Bundle, signal: AbortSignal) {
+  private async verify(bundle: Bundle, signal: AbortSignal, checked?: Map<Dataset, string>) {
     const manifest = await member(this.root, bundle.id, 'manifest');
     try {
       if (
@@ -50,8 +50,13 @@ export class ExportService {
     for (const f of bundle.files) {
       const h = await member(this.root, bundle.id, f.dataset);
       try {
-        const before = fingerprint(await h.stat()),
-          actual = await digestHandle(h, signal);
+        const before = fingerprint(await h.stat());
+        if (checked) {
+          if (checked.get(f.dataset) !== before) throw new Error('Verified bundle file replaced.');
+          prints.set(f.dataset, before);
+          continue;
+        }
+        const actual = await digestHandle(h, signal);
         if (
           actual.sha256 !== f.sha256 ||
           actual.bytes !== f.bytes ||
@@ -232,6 +237,7 @@ export class ExportService {
       committing = false;
     const id = randomUUID(),
       work = '.work-' + id;
+    const checked = new Map<Dataset, string>();
     let prior: string | undefined;
     const onLost = () => controller.abort(new Error('Export connection/lock lost.'));
     c.on('error', onLost);
@@ -339,9 +345,15 @@ export class ExportService {
       for (const f of files) {
         const h = await open(join(this.root, work, f.dataset + '.csv'), 'r');
         try {
+          const before = fingerprint(await h.stat());
           const d = await digestHandle(h, bounded);
-          if (d.sha256 !== f.sha256 || d.bytes !== f.bytes)
+          if (
+            d.sha256 !== f.sha256 ||
+            d.bytes !== f.bytes ||
+            before !== fingerprint(await h.stat())
+          )
             throw new Error('Stream verification mismatch.');
+          checked.set(f.dataset, before);
         } finally {
           await h.close();
         }
@@ -409,7 +421,7 @@ export class ExportService {
         this.verified.delete(prior);
         await removeBundle(this.root, prior);
       }
-      await this.verify(bundle, bounded);
+      await this.verify(bundle, bounded, checked);
       return bundle;
     } catch (error) {
       if (snapshot) await c.query('ROLLBACK').catch(() => {});
@@ -425,7 +437,7 @@ export class ExportService {
               this.verified.delete(prior);
               await removeBundle(this.root, prior);
             }
-            await this.verify(b, signal);
+            await this.verify(b, signal, checked);
             return b;
           }
         } finally {
