@@ -1,0 +1,27 @@
+{
+  "formatVersion": 1,
+  "note": "Reference constants only. Task03/10 must verify deployed code/fork hashes/capabilities. No credentials or active provider defaults.",
+  "chains": [
+    {
+      "key": "ethereum",
+      "chainId": 1,
+      "mode": "common-history-only",
+      "hexAddress": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+      "deploymentBlock": null,
+      "lastCommonBlock": "17232999",
+      "lastCommonBlockHash": null
+    },
+    {
+      "key": "pulsechain",
+      "chainId": 369,
+      "mode": "primary",
+      "hexAddress": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+      "inheritedFromChainId": 1,
+      "inheritedThroughBlock": "17232999",
+      "firstNativeBlock": null,
+      "firstNativeBlockHash": null,
+      "expectedCodeSha256": "331e6384b4acbab47e393ee5f85290cbdd8783be817b52643441c02bc0164511",
+      "finalityPolicy": "probe-finalized-before-live"
+    }
+  ]
+}

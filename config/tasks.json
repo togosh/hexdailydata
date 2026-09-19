@@ -1,0 +1,147 @@
+{
+  "formatVersion": 1,
+  "tasks": [
+    {
+      "id": "01",
+      "title": "Foundation and domain contract",
+      "dependsOn": [],
+      "owns": [
+        "src/contracts/",
+        "src/domain/",
+        "package.json",
+        "config/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "02",
+      "title": "Database and incremental projections",
+      "dependsOn": [
+        "01"
+      ],
+      "owns": [
+        "migrations/",
+        "src/db/",
+        "src/services/projections/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "03",
+      "title": "Bootstrap and continuous sync",
+      "dependsOn": [
+        "02"
+      ],
+      "owns": [
+        "src/providers/",
+        "src/worker/sync/",
+        "src/worker/bootstrap/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "04",
+      "title": "Current metrics and live address observations",
+      "dependsOn": [
+        "03"
+      ],
+      "owns": [
+        "src/services/live/",
+        "src/worker/metrics/",
+        "tests/live/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "05",
+      "title": "Daily history and clean downloads",
+      "dependsOn": [
+        "03"
+      ],
+      "owns": [
+        "src/worker/daily/",
+        "src/worker/exports/",
+        "tests/exports/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "06",
+      "title": "Public API and fast Home summary",
+      "dependsOn": [
+        "04",
+        "05"
+      ],
+      "owns": [
+        "src/api/",
+        "src/services/queries/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "07",
+      "title": "Minimal complete website",
+      "dependsOn": [
+        "06"
+      ],
+      "owns": [
+        "src/web/",
+        "tests/browser/"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "08",
+      "title": "Operations and self-hosting",
+      "dependsOn": [
+        "06"
+      ],
+      "owns": [
+        "scripts/operator/",
+        "deploy/",
+        "docs/operations.md"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "09",
+      "title": "Integrated scale and release candidate",
+      "dependsOn": [
+        "07",
+        "08"
+      ],
+      "owns": [
+        "tests/integration/",
+        "tests/scale/",
+        "docs/progress.md"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "10",
+      "title": "Bounded live validation and real bootstrap",
+      "dependsOn": [
+        "09"
+      ],
+      "owns": [
+        "tests/live/",
+        "config/chains.json",
+        "docs/reference.md"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "11",
+      "title": "Owner handoff and approved cutover",
+      "dependsOn": [
+        "10"
+      ],
+      "owns": [
+        "deploy/",
+        "docs/operations.md",
+        "docs/progress.md"
+      ],
+      "status": "pending"
+    }
+  ]
+}

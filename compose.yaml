@@ -1,0 +1,23 @@
+# Development scaffold only. Live sync is NOT implemented or automatically enabled.
+# Task01 pins digests and task08 supplies a tested separate production profile.
+name: hexdailydata-v2
+services:
+  api:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "127.0.0.1:4320:4320"
+    environment:
+      HDD_V2_MODE: scaffold
+      HDD_V2_HTTP_HOST: 0.0.0.0
+      HDD_V2_HTTP_PORT: "4320"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4320/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

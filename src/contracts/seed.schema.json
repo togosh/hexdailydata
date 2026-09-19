@@ -1,0 +1,214 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:hexdailydata:seed:1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "formatVersion",
+    "createdAt",
+    "chainId",
+    "contractAddress",
+    "codeSha256",
+    "checkpoint",
+    "coverage",
+    "schemaVersion",
+    "calculationVersion",
+    "files"
+  ],
+  "properties": {
+    "formatVersion": {
+      "const": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "chainId": {
+      "enum": [
+        1,
+        369
+      ]
+    },
+    "contractAddress": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{40}$"
+    },
+    "codeSha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "checkpoint": {
+      "type": "object",
+      "required": [
+        "blockNumber",
+        "blockHash",
+        "finality"
+      ],
+      "properties": {
+        "blockNumber": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "blockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "finality": {
+          "enum": [
+            "finalized",
+            "confirmed"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "lineage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parentChainId",
+        "parentBlockNumber",
+        "parentBlockHash",
+        "firstNativeBlockNumber",
+        "firstNativeBlockHash"
+      ],
+      "properties": {
+        "parentChainId": {
+          "const": 1
+        },
+        "parentBlockNumber": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "parentBlockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        },
+        "firstNativeBlockNumber": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "firstNativeBlockHash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-f]{64}$"
+        }
+      }
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "dataset",
+          "status"
+        ],
+        "properties": {
+          "dataset": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial",
+              "missing"
+            ]
+          },
+          "from": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "calculationVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "table",
+          "path",
+          "rows",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "table": {
+            "enum": [
+              "chains",
+              "sync_state",
+              "blocks_recent",
+              "events",
+              "transfers_recent",
+              "undo_recent",
+              "stakes",
+              "accounts",
+              "daily_stats",
+              "market_daily",
+              "market_samples"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^tables/[a-z_]+\\.ndjson$"
+          },
+          "rows": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "bytes": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "chainId": {
+            "const": 369
+          }
+        },
+        "required": [
+          "chainId"
+        ]
+      },
+      "then": {
+        "required": [
+          "lineage"
+        ]
+      }
+    }
+  ]
+}

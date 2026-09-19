@@ -1,0 +1,118 @@
+{
+  "referenceOnly": true,
+  "knownCommit": "e1a9cc417501479358494d4d9312ccaf2429f622",
+  "siblingDefault": "../HEXStakeExplorer-PulseChain",
+  "rule": "Hashes identify inspected reference, never runtime startup/reader compatibility requirements. Newer source is read deliberately, not reset. No old application code may be executed.",
+  "files": [
+    {
+      "path": "packages/core/src/constants.mjs",
+      "sha256": "fa0d2bdc68c05ca959e65b6789582b7be0c5b7b5697c1f76de60a680b076917a",
+      "purpose": "Protocol constants and known fork boundary; verify at live qualification."
+    },
+    {
+      "path": "packages/core/src/hex-day.mjs",
+      "sha256": "d9239430bc680574b3a8645c68ae9242ad1cb3a43a9755f969da18617ea3d07d",
+      "purpose": "Day/time units and boundary cases."
+    },
+    {
+      "path": "packages/core/src/exact-units.mjs",
+      "sha256": "5a992018d8fe3570c9053461c7a7ac251d5edb18053a023d2bf323f64e8acc41",
+      "purpose": "Exact amount formatting patterns."
+    },
+    {
+      "path": "packages/core/src/global-info.mjs",
+      "sha256": "3a45e33938f964e6277540a39cc14f461357d58da2ae9a6abd9df47e8557aa3c",
+      "purpose": "13-word globalInfo field order."
+    },
+    {
+      "path": "packages/core/src/daily-data-range.mjs",
+      "sha256": "c56dfe3817788e995ff78ad1f929d33adb322761fbad4fbe271a70d99fc6538b",
+      "purpose": "Packed daily ledger interface and bounds."
+    },
+    {
+      "path": "packages/core/src/hex-minimal-abi.mjs",
+      "sha256": "d06f801c58673eece16332610715d1a8b1711f669fb58dde6c0168f63b2f3d98",
+      "purpose": "Minimal lifecycle/daily event and contract interfaces."
+    },
+    {
+      "path": "packages/core/src/stake-event-decode.mjs",
+      "sha256": "89f3da099283b3b91e1d2fd4df08dcebe0f074923f84ae90e6c5d70a91a1839c",
+      "purpose": "Packed lifecycle event decoding."
+    },
+    {
+      "path": "packages/core/src/stake-list-decode.mjs",
+      "sha256": "bc23db1b83f130abcbbf6d6efb8846f51fc92e1b2ea02fda0f0b94f38d5dd89b",
+      "purpose": "At-block stake list observations."
+    },
+    {
+      "path": "packages/core/src/stake-semantics.mjs",
+      "sha256": "6edf69af87bfc14e86745958fda61aa5c34d2e7d0661d56eb199097a0bc481ae",
+      "purpose": "Timing/auto-stake/end modes; not a provider adapter."
+    },
+    {
+      "path": "packages/core/src/stake-status.mjs",
+      "sha256": "e9a0ae0cb524593ae58883384263dd335b850f216d4a84ef3cfef1ad134eafb1",
+      "purpose": "Queued/open/mature/GA/ended distinctions."
+    },
+    {
+      "path": "packages/core/src/state-copy-provenance.mjs",
+      "sha256": "fcc24566e8cd81f236e58c2b93e9eb2b965d4e25b60d74713ffd13c9411c7f71",
+      "purpose": "State-copy origin distinctions; do not copy old gate machinery."
+    },
+    {
+      "path": "packages/calculator/src/engine.mjs",
+      "sha256": "63d3a0b5407a4ac662c941d13757e8a0654ed27cb0fc31f026778417297fd909",
+      "purpose": "Ordinary new-stake exact quote and scenario cases."
+    },
+    {
+      "path": "packages/calculator/src/data-inputs/payout.mjs",
+      "sha256": "4a0cb4b8b95930fb0743c6c2976e1d9a27bfe4752ca0ca4390f051d9c0b96df8",
+      "purpose": "Payout presets and coverage semantics."
+    },
+    {
+      "path": "packages/calculator/src/THIRD_PARTY_NOTICES.md",
+      "sha256": "78fa04dba5e67d46d4db6c270a2639ef9e36ec5d2118eea13efa067cad864c8d",
+      "purpose": "License/verified-contract-reference limitations."
+    },
+    {
+      "path": "apps/api/src/current-price/onchain/math.mjs",
+      "sha256": "d04d5d2a1263b4a4c5ced2e5da325c3b008dac61b3cc8f33064497622894f90f",
+      "purpose": "Rational reserve ratios/depth comparisons."
+    },
+    {
+      "path": "apps/api/src/current-price/onchain/estimate.mjs",
+      "sha256": "df93b5ea13c5c277365f747f1a95903f1b7ad4c43ab70a7719157c5ae9c5a2e2",
+      "purpose": "Price source/anchor/conflict semantics."
+    },
+    {
+      "path": "apps/api/src/current-price/onchain/policy.mjs",
+      "sha256": "a435327e24b4ec0a03de2fb21d8c49c294aa6736737da734a1b0904768f4d8a6",
+      "purpose": "Old peg-assumed allowlist; endpoints/method must be requalified."
+    },
+    {
+      "path": "apps/api/src/current-price/policy.mjs",
+      "sha256": "db80d931feeb47fc9187f0a66e0a59405d085e761f7de3bb35fe4d44da572084",
+      "purpose": "Alternative independent anchor assumptions, not automatic authorization."
+    },
+    {
+      "path": "apps/indexer/src/gate45/semantics.mjs",
+      "sha256": "5ce06492d321ade984acd50fa3b9d109aa5ab0632c94bb69b245f5e09f1a6ea5",
+      "purpose": "Daily/partial-day metrics case discovery; read source only."
+    },
+    {
+      "path": "apps/indexer/src/gate45/analytics.mjs",
+      "sha256": "a8d9eb1148bc9e9adfde9ddc21860239c8ab206cb44f8a2d2ff6e88536c19a66",
+      "purpose": "Weighted numerator/denominator and aggregate case discovery."
+    },
+    {
+      "path": "apps/web/src/pages/CalculatorPage.jsx",
+      "sha256": "e90ad503bfc7483ef509e439f50dd86939526f44a64241432309d3bee45d5df4",
+      "purpose": "Existing owner-approved interaction references, not a copy mandate."
+    },
+    {
+      "path": "apps/web/src/current-price/PriceMetric.jsx",
+      "sha256": "fe569ca029fe8cfc62dbd4aadde22bf0554d4b21b828e853d9841be4947cadd9",
+      "purpose": "Existing stale/estimate wording references."
+    }
+  ]
+}

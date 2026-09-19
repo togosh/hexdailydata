@@ -1,0 +1,17 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.*
+!.env.example
+artifacts/
+.local/
+.cache/
+*.log
+*.dump
+*.sql.gz
+*.tar.gz
+*.zip
+.vscode/
+.DS_Store

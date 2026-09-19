@@ -1,0 +1,69 @@
+{
+  "formatVersion": 1,
+  "liveEnabledByDefault": false,
+  "currentMetrics": {
+    "refreshSeconds": 60,
+    "freshSeconds": 120,
+    "maximumStaleSeconds": 1800
+  },
+  "addressReads": {
+    "freshSeconds": 60,
+    "pageSize": 100,
+    "maximumPageSize": 100,
+    "maximumInflight": 2,
+    "cacheBytes": 67108864,
+    "requestTimeoutSeconds": 10,
+    "maximumHttpAttemptsPerRequest": 4,
+    "maximumLogicalRpcCallsPerRequest": 128
+  },
+  "provider": {
+    "maximumConcurrentHttp": 2,
+    "defaultMinimumDispatchMilliseconds": 2000,
+    "maximumResponseBytes": 16777216,
+    "requestTimeoutSeconds": 15,
+    "maximumRetriesPerRequest": 3,
+    "honorRetryAfter": true,
+    "requireConfiguredEndpoints": true,
+    "apiMaximumConcurrentHttp": 1,
+    "workerMaximumConcurrentHttp": 1,
+    "maximumQueuedHttpPerProcess": 8,
+    "aggregateBudget": {
+      "windowSeconds": 60,
+      "httpAttempts": 30,
+      "logicalRpcCalls": 900,
+      "lanes": {
+        "address": {
+          "httpAttempts": 12,
+          "logicalRpcCalls": 360
+        },
+        "metrics": {
+          "httpAttempts": 6,
+          "logicalRpcCalls": 180
+        },
+        "sync": {
+          "httpAttempts": 12,
+          "logicalRpcCalls": 360
+        }
+      }
+    }
+  },
+  "liveCanary": {
+    "maximumMinutes": 60,
+    "maximumHttpRequests": 2500,
+    "maximumLogicalRpcCalls": 20000,
+    "maximumResponseBytes": 536870912
+  },
+  "retention": {
+    "recentDays": 7,
+    "marketSampleDays": 7,
+    "jobLogDays": 14,
+    "exportBundles": 2,
+    "maximumPendingExportBundles": 1,
+    "verifiedOffsiteBackups": 1
+  },
+  "resources": {
+    "minimumFreeBytes": 8589934592,
+    "minimumFreeFraction": 0.2,
+    "monthlyBudgetCeilingUsd": 60
+  }
+}

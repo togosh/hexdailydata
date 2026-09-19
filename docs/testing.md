@@ -1,0 +1,182 @@
+# Acceptance and measurement
+
+Tests protect product behavior, not a growing bureaucracy of source seals. Unit tests
+are cheap and local; integration uses real PostgreSQL in fresh v2-only containers.
+No host legacy database, source module execution, old scheduler, or broad old verify.
+Mocked RPC failure tests, real SQL tests, actual Docker/host tests and live-provider
+checks are separately labeled. Do not promote one into another.
+
+## Required correctness cases
+
+- Exact integer/decimal parsing, uint limits, shares/T-shares/HEX units, no exponent or
+  lossy JSON numbers, denominator zero, input bounds, protocol rounding.
+- Day zero/one convention, UTC boundary±1s, queued/ordinary/auto stakes,5555days,
+  cancelled-before-lock, early/mature/late end, good accounting then end, no double
+  penalty/reward, matured-open distinction, zero-share cases.
+- DailyDataRange packed widths and globalInfo field order; unmaterialized prior day;
+  current-day estimate after transition with pending rounds; early claim/Big-Pay-Day
+  historical ledger, current-era estimator not misapplied to it.
+- Fork imported active/matured/good-accounted/ended stakes, original chain identity,
+  branch event overlaps, source-code identity, known boundary invariants.
+- Transfer constructor/mint/burn/self-transfer, duplicate payload conflict, all balance
+  changes applied once, negative balance/supply mismatch, huge integer correctness.
+- Provider429/Retry-After, disconnected requests, slow response, truncated/empty/range-
+  limited logs, wrong chain/block, two-provider disagreement and interrupted pagination.
+- Transaction crash before commit, commit acknowledgement lost, resume with same
+  cursor, concurrent worker exclusion, stale lease/cursor, cancel on lock connection
+  loss. No remote HTTP inside SQL write transactions.
+- Reorg inside supported window, beyond-window stop, bad checkpoint, clock movement,
+  downtime across multiple days, pending market data not blocking native progress.
+- Seed traversal/link/duplicate/size/decompression/schema/chain/version/hash failures;
+  supply and lifecycle corruption; fresh empty import vs accidental existing DB target.
+- Export crash at stream/hash/rename/pointer stages, an interrupted download and
+  grace-period retirement; correct ETag/410. Retain exactly current+prior when idle.
+- Live addresses with new unindexed stakes, end+swap index,0/1/100/10000stakes,
+  pinned pagination, incomplete live observation, provider outage and no false not-found.
+- No secrets in logs/public status/seed/browser; rate-limit amplification; path injection,
+  numeric bounds, request cancellation; no raw-SQL or arbitrary-RPC public endpoint.
+
+## Independent evidence
+
+Reuse specific old tests as case discovery, not their infrastructure or sole expected
+values. Use hand-computed literal vectors, deployed-interface facts and reviewed source
+rules. For state-derived output compare independently acquired consistent block data.
+Avoid both expected and actual values invoking the same helper. Document inherited
+reference limitations; an old PASS is not proof of a changed path.
+
+## Representative scale
+
+Synthetic test target: >=1,000,000 stake lifecycle rows, realistic numeric widths,
+>=500,000 address rows, representative source events and30simulated day cycles.
+Include many unchanged stakes, actual mutations, daily closing transitions, failed
+jobs,2-day market lag and catch-up, exports during reads, and restart recovery.
+Use2CPU/4GiB memory constraint for the acceptance profile; record actual version,
+hardware/runtime/cgroup limits. Repeat enough requests for p50/p95, not three reads.
+
+Report heap/TOAST/index bytes separately, current/prior/temp CSV bytes, latest/short
+cache sizes, WAL and temporary high-water, cumulative temp bytes labeled correctly,
+RSS, request count/units, old-directory leftovers and total filesystem change. A row
+count reduction alone is not storage success. Show baseline, zero-change cycles,
+normal-change cycles, and end-of-retention steady shape. Required asymptotic bound:
+no N_stakes×N_days archive/provenance table and no growing full SQL snapshots.
+
+Provisional targets, to be measured and revised transparently if incompatible with
+correct scope/budget: current-scale native DB+twoexports <=25GiB; no per-day GBs of
+unchanged copies; keep working peaks within available volume with20%/8GiB reserve.
+Daily updater normal case well below one day, and local projection part preferably
+<5min at representative changes; provider acquisition cost/latency measured separately.
+A target miss is a report/fix decision, never permission to remove required history.
+
+## Bootstrap timing contract
+
+Owner requirement: independent rebuilding from HEX day 1 should finish in days. Design
+for **2–7 days** and require **no more than 14 days** on a stated hardware/provider
+profile within the ongoing $50–60/month operating envelope. Identify any separately
+approved one-time bootstrap charge. Neither a seed import nor a fast recent-day test
+proves independent historical rebuild. Targets are not measurements.
+
+Task03 prepares the smallest useful capability/throughput canary once basic isolated
+sync works. Execute it only after the separate owner approval in operations.md; use
+busy historical and recent periods plus the fork boundary, not just easy/empty ranges.
+Report actual range coverage and unavailable capabilities. Before extensive UI work,
+produce a go/no-go estimate including event density, limits, decode/SQL/export work,
+reconciliation, required market coverage, and stated uncertainty/headroom. A prediction
+over 14 days fails feasibility for that profile; change the work plan or seek an
+explicit provider/budget decision, not a quiet weaker target or truncated history.
+
+Required measurements: bytes; events/blocks/addresses; physical HTTP versus logical
+RPC calls; per-method/host latency and failures; enforced cooldown; local guard/hash
+work; decoding/replay; SQL; current-state reconciliation; exports; RSS; database/index/
+WAL/scratch/export sizes and working peak; elapsed time and restart position. Report
+stage wall times and overlaps rather than double-counting concurrent time. Do not
+infer raw provider speed from a phase that includes local validation and persistence.
+
+Task09 proves bulk behavior in realistic offline fixtures: no complete per-day snapshot
+or historical-balance sweep, no request-count-proportional full-source hashing, bounded
+working state, and exact required summaries/state under busy/fork/crash/retry cases.
+These fixtures measure local capacity; they do not certify public source throughput.
+
+Task10's separately started end-to-end rebuild establishes timing at a frozen target.
+Start from an empty v2 target with declared warm caches/inputs, and distinguish truly
+independent acquisition from seed/indexed-source assisted modes. Include supported
+history, required summaries and current-state reconciliation, plus the first complete
+standard exports/validation. Record start/end, coverage, budgets, time spent paused,
+active time and total elapsed wall time. Do not omit rate-limit waiting or restart
+costs to improve the headline. Full acceptance needs actual completion within 14 days;
+extrapolation is only an early feasibility estimate. Missing historical market fields
+remain explicitly unavailable and cannot be hidden behind native-ledger completeness.
+Task11 discloses the resulting measured profile and limits. No scope reduction is
+authorized merely because performance is difficult.
+
+## Plan-review closure cases (implement in the owning tasks)
+
+These extend existing tests, not a new approval framework:
+
+- Tasks02–03: supply-preserving omitted A-to-B transfer; same corrupted response from
+  correlated sources (do not assert the policy proves independence); different event
+  sets with matching headers; wrong constructor/fork state; truncation/ambiguous single
+  block and finalized disagreement. Compare every range under the selected policy.
+- Tasks02–03/05: replay historical days with pruning enabled, a lagging daily consumer,
+  crash/lost ack and seed export/import. Dates years before wall clock must not erase
+  the replay tail. Pruned and unpruned runs give identical required daily/current data;
+  byte pressure pauses before any protected input is removed. Include cancelled-before-
+  lock lifecycle/CSV status; cancelled is distinct from ordinary ended.
+- Tasks03/04/06/09: simultaneous cold address traffic, metrics, backfill and exports;
+  assert combined physical/logical limits, queue bounds, per-request caps including
+  retries/discovery, disconnect behavior and restart accounting. Metrics keep their
+  reservation; address overload returns honest fallback/429/503, not hidden extra work.
+- Tasks05/08: crash before/after file rename and DB publication, lost commit ack,
+  missing files on clean restore, no reusing immutable IDs with different bytes, API
+  available while downloads rebuild, delayed file readers, and current/prior cleanup.
+  Verify backup age/RPO and explicit gaps for unrecoverable local market observations.
+
+The early canary names required native/fork/market coverage separately (data.md), uses
+this actual validation policy and combined quotas, and includes representative replay
+plus SQL work. Missing mandatory capability or a mandatory-work/quota lower bound above
+14 days rejects the profile. A sample-derived duration below 14 days remains uncertain;
+Task10's complete timed rebuild, exports and validation remain the acceptance evidence.
+No 100% reliability or provider-independence claim follows from a documentation patch.
+
+## Browser performance
+
+Use a clean390×844 Chromium profile, cache disabled, realistic>=1mrow API backing,
+150ms RTT/10Mbps down/1.5Mbps up and4×CPU slowdown as a declared test profile.
+At least11fresh documents for p50/p95. Measure **first useful headline data**, not just
+DOMContentLoaded, plus complete chart time separately. Targets: headlines p95<=2s,
+chart p95<=3.5s; warm repeat<=1s is useful but cannot replace first-visit acceptance.
+No baseline serving warm caches while candidate starts cold, or tiny fake SQL fixture
+presented as production timing. Also smoke-test currentSafari/Firefox behavior later.
+
+Show price, rate and payout observation update cadence with a virtual clock; current-day
+estimate has visible status; delayed charts/history/export catalogs do not gate Home.
+No flash of fictitious numbers. Test errors, stale/disconnected state, reduced motion,
+keyboard/screenreader basics,200%zoom, longaddresses and small viewport overflow.
+
+## Fresh-developer proof
+
+A reviewer uses ONLY a fresh clone, README, Docker/Node prerequisites and explicit v2
+config. The old folder is absent. Run the sample/offline path, qualified seed import,
+forward sync fixture, rebuild fixture, restart, backup restore, verify outputs. Actual
+live full bootstrap remains separate if provider/real seed is unavailable. The commands
+must say precisely which capabilities they tested. No implicit local cache, database,
+secret, host UID, mount or prior runbook is allowed.
+
+Test image build and actual nonroot container startup/healthchecks, network/service
+names, volume ownership, credential delivery, shutdown and retry. A simulated systemd
+call does not qualify these. Production actual DNS/TLS/reboot and provider budget are
+recorded only when exercised in the later approved environment.
+
+## Task result format
+
+One ignored `artifacts/task-NN/report.md`: goal, code commit, changed components,
+commands/exits, correctness/performance results, primary failures and fixes, resources
+removed, remaining limitations, next task. Keep a short pointer/state in progress.md.
+One focused independent reviewer where available; fix actual findings within the task.
+Do not serialize a new source archive and hundreds of tiny receipts for every edit.
+Package source+one small report for owner handoff only when needed; no databases/secrets.
+
+For a task handoff, include a source-only ZIP of the committed new repository (for
+example `git archive --format=zip`) and the small task report separately. Exclude
+node_modules, credentials, databases, seeds and live response bodies. This is an
+owner review artifact, never a runtime prerequisite. Do not add a packaging framework
+that snapshots the entire workspace after every edit.

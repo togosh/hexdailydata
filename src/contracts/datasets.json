@@ -1,0 +1,246 @@
+{
+  "formatVersion": 1,
+  "encoding": "UTF-8",
+  "newline": "LF",
+  "delimiter": ",",
+  "quoting": "RFC4180-compatible",
+  "nullEncoding": "empty cell",
+  "chainAndAsOf": "dataset-wide manifest; origin_chain_id retained where rows have mixed origins",
+  "ratioRounding": "truncate to declared decimal places; raw numerator and denominator retained in canonical API/domain",
+  "datasets": [
+    {
+      "name": "daily",
+      "fileName": "daily.csv",
+      "columns": [
+        {
+          "name": "date_utc",
+          "unit": "UTC date"
+        },
+        {
+          "name": "display_day",
+          "unit": "one-based day"
+        },
+        {
+          "name": "origin_chain_id",
+          "unit": "source chain"
+        },
+        {
+          "name": "payout_hex_per_tshare",
+          "unit": "rounded ratio,12dp"
+        },
+        {
+          "name": "payout_status",
+          "unit": "materialized/pending"
+        },
+        {
+          "name": "tshare_rate_hex",
+          "unit": "HEX per T-share before bonuses"
+        },
+        {
+          "name": "staked_percent",
+          "unit": "rounded ratio,8dp"
+        },
+        {
+          "name": "weighted_stake_length_days",
+          "unit": "rounded ratio,8dp"
+        },
+        {
+          "name": "circulating_hex",
+          "unit": "exact HEX,8dp max"
+        },
+        {
+          "name": "staked_hex",
+          "unit": "exact HEX,8dp max"
+        },
+        {
+          "name": "liquid_holders",
+          "unit": "count"
+        },
+        {
+          "name": "active_stakers",
+          "unit": "count"
+        },
+        {
+          "name": "stakes_started",
+          "unit": "count"
+        },
+        {
+          "name": "stakes_ended",
+          "unit": "count"
+        },
+        {
+          "name": "penalties_hex",
+          "unit": "exact HEX,8dp max"
+        }
+      ]
+    },
+    {
+      "name": "stakes",
+      "fileName": "stakes.csv",
+      "columns": [
+        {
+          "name": "stake_id",
+          "unit": "integer string"
+        },
+        {
+          "name": "address",
+          "unit": "0x address"
+        },
+        {
+          "name": "principal_hex",
+          "unit": "exact HEX,8dp max"
+        },
+        {
+          "name": "tshares",
+          "unit": "exact T-shares,12dp max"
+        },
+        {
+          "name": "locked_day",
+          "unit": "zero-based contract day"
+        },
+        {
+          "name": "staked_days",
+          "unit": "days"
+        },
+        {
+          "name": "maturity_utc",
+          "unit": "UTC timestamp"
+        },
+        {
+          "name": "status",
+          "unit": "queued/open/mature_open/good_accounted/ended/cancelled"
+        },
+        {
+          "name": "started_utc",
+          "unit": "UTC timestamp"
+        },
+        {
+          "name": "ended_utc",
+          "unit": "UTC timestamp or empty"
+        },
+        {
+          "name": "payout_hex",
+          "unit": "exact settled HEX or empty"
+        },
+        {
+          "name": "penalty_hex",
+          "unit": "exact settled HEX or empty"
+        },
+        {
+          "name": "origin_chain_id",
+          "unit": "source of start event"
+        }
+      ]
+    },
+    {
+      "name": "holders",
+      "fileName": "holders.csv",
+      "columns": [
+        {
+          "name": "address",
+          "unit": "0x address"
+        },
+        {
+          "name": "liquid_hex",
+          "unit": "exact HEX"
+        },
+        {
+          "name": "accounted_staked_hex",
+          "unit": "exact HEX under named accounted-set definition"
+        },
+        {
+          "name": "total_hex",
+          "unit": "liquid+accounted staked, not claimable yield"
+        },
+        {
+          "name": "stake_count",
+          "unit": "count under same set"
+        },
+        {
+          "name": "liquid_rank",
+          "unit": "integer or empty"
+        },
+        {
+          "name": "staker_rank",
+          "unit": "integer or empty"
+        },
+        {
+          "name": "rank_date_utc",
+          "unit": "UTC date or empty"
+        }
+      ]
+    },
+    {
+      "name": "maturities",
+      "fileName": "maturities.csv",
+      "columns": [
+        {
+          "name": "date_utc",
+          "unit": "UTC date"
+        },
+        {
+          "name": "display_day",
+          "unit": "one-based scheduled maturity day"
+        },
+        {
+          "name": "stake_count",
+          "unit": "count"
+        },
+        {
+          "name": "principal_hex",
+          "unit": "exact HEX"
+        },
+        {
+          "name": "tshares",
+          "unit": "exact T-shares"
+        }
+      ]
+    },
+    {
+      "name": "markets",
+      "fileName": "markets.csv",
+      "columns": [
+        {
+          "name": "date_utc",
+          "unit": "UTC date"
+        },
+        {
+          "name": "price_open_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "price_high_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "price_low_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "price_close_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "volume_usd",
+          "unit": "source-reported decimal or empty"
+        },
+        {
+          "name": "liquidity_usd",
+          "unit": "source-estimated decimal or empty"
+        },
+        {
+          "name": "source",
+          "unit": "named venue/source"
+        },
+        {
+          "name": "method",
+          "unit": "sampled-ohlc or source-reported"
+        },
+        {
+          "name": "coverage",
+          "unit": "complete/partial/missing under stated method"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# NOT active. Task08/11 qualify this against the final release; replace the hostname.
+example.invalid {
+  encode zstd gzip
+  reverse_proxy api:4320
+}
