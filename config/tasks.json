@@ -63,7 +63,7 @@
         "src/worker/exports/",
         "tests/exports/"
       ],
-      "status": "pending"
+      "status": "passed"
     },
     {
       "id": "06",

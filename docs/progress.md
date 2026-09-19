@@ -6,7 +6,8 @@
 | 02 | passed | Reviewed code `237aba7`; isolated SQL, recovery, roles and million-row evidence accepted. |
 | 03 | passed (offline) | Reviewed code `73d461b`; 43 unit tests and 21 isolated sync/seed/pruning groups. Same independent `/root/task03_review`: PASS after one full review and two corrections. SQL/container evidence reused at `64bc9d7`; see ignored `artifacts/task-03/report.md` and reviewer report. Canary prepared / NOT_RUN; live/full-scale qualification remains open. |
 | 04 | passed (offline) | Reviewed code `7787ac16331c52d18437e05e731b486e58752ef3`; 68 tests, 12 SQL groups, 28 sync groups and 5 live-service SQL groups. Independent `/root/task04_review`: PASS after one full review and one correction/recheck. Reports, commands and measurements in ignored `artifacts/task-04/`. |
-| 05–11 | pending | Not implemented |
+| 05 | passed (offline) | Reviewed code `a9bf7bec00c9da468b8759ab68fa06506f9f48e2`; 70 units, 11 daily groups, fresh seed/DB-restore continuation, 3 scale groups, 28 sync and 5 live-service SQL groups. Independent `/root/task05_review`: PASS after one full review and one correction/recheck. Actual reports/commands in ignored `artifacts/task-05/`. |
+| 06–11 | pending | Not implemented |
 
 The development shell has no live data/indexer. Task02 qualifies schema/projections on
 isolated disposable PostgreSQL17; the public shell remains uninitialized. Task01 source
@@ -59,3 +60,19 @@ latency/capacity proof. All Task04 disposable Docker resources were removed. Tas
 the acquisition correction and original evidence remain preserved. Canary PREPARED /
 NOT_RUN, launcher NOT_CONFIGURED; no live/v1 access, push or deployment. This status-only
 commit is separate from reviewed code. Task05 is next sequential task and remains unstarted.
+
+Task05 adds atomic daily ranks, compact qualified market history, five immutable CSVs,
+bounded publication/read/retirement services, migration4/seed3 and worker daily/export
+commands. All affected final checks passed on `a9bf7be`; unchanged 12-group SQL evidence
+is reused from the implementation tree committed as `86182c3`. Independent SQL/file
+probes closed concurrent reader admission, prior grace and portable consumer-marker
+findings; DB-only restore continues native sync540→548 and exports a new verified UUID.
+Under combined2CPU/4GiB, the1M-stake/500k-account fixture ranked in4.17s and exported
+207,050,547 CSV bytes in24.82s, with35 metric ticks/140 writes and a complete address
+request. Quota-clock time is simulated; disk records are milestones, not continuous
+peaks. Windows directory fsync returned EPERM and publication fails closed; Linux
+durability/crash recovery passed. Historical market endpoints remain NOT_CONFIGURED;
+sampled OHLC/peg_assumed limitations remain explicit. Tasks01–04, acquisition correction,
+migrations1–3 and original evidence are preserved. Task-owned disposable resources were
+removed. Canary NOT_RUN; no live/v1 access, push or deployment. This final status-only
+commit follows independent PASS. Task06 is next eligible and has not started.
