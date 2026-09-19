@@ -243,6 +243,45 @@ try {
     assert.throws(() => validateBatch(sameBackend), /upstreams/);
     // Correlated identical omissions are not detectable by set agreement. Never claim otherwise.
   });
+  await test('contradictory transaction indexes/blocks reject before projections, cursor, receipts or undo change', async () => {
+    const before = await snapshot();
+    const recovery = async () => {
+      const result = {};
+      for (const table of ['checkpoints_recent', 'undo_recent'])
+        result[table] = (
+          await api.query(
+            `SELECT to_jsonb(t)::text AS value FROM hdd.${table} t ORDER BY to_jsonb(t)::text`,
+          )
+        ).rows;
+      return result;
+    };
+    const beforeRecovery = await recovery();
+    const twoIndexes = await batch(api, [transfer(A, B, 1), transfer(A, B, 2)]);
+    twoIndexes.sources.forEach((s) => (s.events[1].transactionIndex = 1));
+    await assert.rejects(() => writer.commit(twoIndexes), /transaction identity/);
+    const twoBlocks = await batch(api, [transfer(A, B, 1), transfer(A, B, 2)]);
+    twoBlocks.sources.forEach((s) => {
+      const prior = s.headers[0],
+        h = header(BigInt(prior.number) + 1n, 10, BigInt(prior.number));
+      h.timestamp = String(BigInt(prior.timestamp) + 1n);
+      s.headers.push(h);
+      Object.assign(s.events[1], {
+        blockNumber: h.number,
+        blockHash: h.hash,
+        blockTime: h.timestamp,
+        logIndex: 0,
+      });
+    });
+    await assert.rejects(() => writer.commit(twoBlocks), /transaction identity/);
+    assert.deepEqual(await snapshot(), before);
+    assert.deepEqual(await recovery(), beforeRecovery);
+    const valid = await batch(api, [transfer(A, B, 0), transfer(A, B, 0)]);
+    valid.sources.forEach((s) => {
+      s.events[1].transactionHash = hash(9999);
+      s.events[1].transactionIndex = 1;
+    });
+    await writer.commit(valid);
+  });
   await test('failure before commit, concurrent writer exclusion, bounded reader and injected lost ack', async () => {
     const other = await db('worker');
     await assert.rejects(() => CanonicalWriter.acquire(other, 1), /already active/);

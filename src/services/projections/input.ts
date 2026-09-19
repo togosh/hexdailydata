@@ -109,6 +109,8 @@ export function digest(value: unknown) {
 }
 function normalizeSource(source: Batch['sources'][number], chainId: number, contract: string) {
   const headers = new Map(source.headers.map((h) => [h.number, h]));
+  const positionByHash = new Map<string, string>();
+  const hashByPosition = new Map<string, string>();
   let previous: Event | undefined;
   const unique: Event[] = [];
   for (const event of source.events) {
@@ -121,6 +123,16 @@ function normalizeSource(source: Batch['sources'][number], chainId: number, cont
       h.timestamp !== event.blockTime
     )
       throw new Error('Event chain/contract/header mismatch.');
+    const position = `${event.blockNumber}:${event.blockHash}:${event.transactionIndex}`;
+    const knownPosition = positionByHash.get(event.transactionHash);
+    const knownHash = hashByPosition.get(position);
+    if (
+      (knownPosition !== undefined && knownPosition !== position) ||
+      (knownHash !== undefined && knownHash !== event.transactionHash)
+    )
+      throw new Error('Conflicting transaction identity.');
+    positionByHash.set(event.transactionHash, position);
+    hashByPosition.set(position, event.transactionHash);
     if (previous) {
       const order = BigInt(event.blockNumber) - BigInt(previous.blockNumber);
       if (
@@ -135,12 +147,6 @@ function normalizeSource(source: Batch['sources'][number], chainId: number, cont
           throw new Error('Conflicting duplicate event payload.');
         continue;
       }
-      if (
-        order === 0n &&
-        event.transactionIndex === previous.transactionIndex &&
-        event.transactionHash !== previous.transactionHash
-      )
-        throw new Error('Conflicting transaction identity.');
     }
     unique.push(event);
     previous = event;

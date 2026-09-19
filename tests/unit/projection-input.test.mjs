@@ -66,3 +66,32 @@ test('correlated identical omission is a documented limit, not a false completen
   });
   assert.equal(validateBatch(omitted).acceptance.eventCount, 0);
 });
+test('transaction hash and block/index identity are one-to-one while multiple logs remain valid', () => {
+  const multi = input();
+  multi.sources.forEach((s) => s.events.push({ ...structuredClone(s.events[0]), logIndex: 1 }));
+  assert.equal(validateBatch(multi).events.length, 2);
+  const distinct = structuredClone(multi);
+  distinct.sources.forEach((s) => {
+    s.events[1].transactionHash = hash(501);
+    s.events[1].transactionIndex = 1;
+  });
+  assert.equal(validateBatch(distinct).events.length, 2);
+  const twoIndexes = structuredClone(multi);
+  twoIndexes.sources.forEach((s) => (s.events[1].transactionIndex = 1));
+  assert.throws(() => validateBatch(twoIndexes), /transaction identity/);
+  const twoHashes = structuredClone(multi);
+  twoHashes.sources.forEach((s) => (s.events[1].transactionHash = hash(501)));
+  assert.throws(() => validateBatch(twoHashes), /transaction identity/);
+  const twoBlocks = structuredClone(multi);
+  twoBlocks.sources.forEach((s) => {
+    const h = header(102, 10, 101, 11);
+    s.headers.push(h);
+    Object.assign(s.events[1], {
+      blockNumber: h.number,
+      blockHash: h.hash,
+      blockTime: h.timestamp,
+      logIndex: 0,
+    });
+  });
+  assert.throws(() => validateBatch(twoBlocks), /transaction identity/);
+});
