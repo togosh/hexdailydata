@@ -14,6 +14,7 @@ import {
   plainHeader,
   decodeLog,
   rawLogSchema,
+  receiptLogSchema,
   quantity,
   q,
   word,
@@ -48,6 +49,9 @@ export class Source {
   constructor(rpc: RpcClient, policy: unknown) {
     this.rpc = rpc;
     this.policy = policySchema.parse(policy);
+  }
+  invalidateAfter(number: string) {
+    for (const n of this.headers.keys()) if (BigInt(n) > BigInt(number)) this.headers.delete(n);
   }
   async header(number: string, signal: AbortSignal, refresh = false) {
     if (!refresh && this.headers.has(number)) return this.headers.get(number)!;
@@ -204,7 +208,7 @@ export class Source {
               transactionIndex: quantity,
               blockHash: hash,
               blockNumber: quantity,
-              logs: z.array(rawLogSchema).max(10000),
+              logs: z.array(receiptLogSchema).max(10000),
             })
             .passthrough()
             .parse(values[j]);

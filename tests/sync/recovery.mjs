@@ -90,8 +90,8 @@ export async function recoveryCases({
   }
   await test('automatic in-window reorg rewinds/replays; finalized and beyond-window disagreement pause', async () => {
     const before = await sync.cursor();
+    // Reuse the engine whose cache contains the old branch at 361/362.
     reorg(356, 10000);
-    sync = new SyncEngine(writer, reader, pair(369), '/evidence');
     await sync.once(signal, chain.plain(362));
     await sync.audit(signal);
     assert.ok(BigInt((await sync.cursor()).revision) > BigInt(before.revision));

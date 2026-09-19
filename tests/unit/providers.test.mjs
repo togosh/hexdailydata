@@ -237,3 +237,57 @@ test('real abort timeout and byte-bound rejection retain physical charges', asyn
   assert.equal(large.counters.requests, 1);
   assert.equal(budget.counters.attempts, 2);
 });
+
+test('complete receipts allow unrelated anonymous and large logs while binding all log identities', async () => {
+  const chain = fixture({ last: 130 });
+  const clean = await chain.source(1, 'clean').events([chain.plain(101)], signal);
+  for (const variant of ['anonymous', 'large', 'wrong-identity', 'oversized-hex']) {
+    const source = chain.source(1, variant, new FakeClock(), (rows, calls) =>
+      rows.map((row, i) => {
+        if (calls[i].method !== 'eth_getTransactionReceipt') return row;
+        const copy = structuredClone(row);
+        copy.result.logs.push({
+          ...copy.result.logs[0],
+          address: variant === 'oversized-hex' ? CONTRACT : A,
+          logIndex: '0x2',
+          topics: variant === 'anonymous' ? [] : copy.result.logs[0].topics,
+          data:
+            variant === 'large' || variant === 'oversized-hex' ? '0x' + '00'.repeat(4097) : '0x',
+          transactionHash:
+            variant === 'wrong-identity' ? hash(999999) : copy.result.transactionHash,
+        });
+        return copy;
+      }),
+    );
+    if (variant === 'wrong-identity' || variant === 'oversized-hex')
+      await assert.rejects(() => source.events([chain.plain(101)], signal));
+    else assert.deepEqual(await source.events([chain.plain(101)], signal), clean);
+  }
+});
+test('metrics arriving during asynchronous cooldown read precede undispatched sync', async () => {
+  const clock = new FakeClock(),
+    order = [];
+  let release,
+    entered,
+    first = true;
+  const reading = new Promise((resolve) => (entered = resolve));
+  const store = {
+    extend: async () => {},
+    read: async () => {
+      if (first) {
+        first = false;
+        entered();
+        await new Promise((resolve) => (release = resolve));
+      }
+      return 0;
+    },
+  };
+  const budget = new ProviderBudget('worker', store, clock);
+  clock.time = 65100;
+  const sync = budget.run('sync', 1, 200000, signal, async () => order.push('sync'));
+  await reading;
+  const metrics = budget.run('metrics', 1, 200000, signal, async () => order.push('metrics'));
+  release();
+  await Promise.all([sync, metrics]);
+  assert.deepEqual(order, ['metrics', 'sync']);
+});

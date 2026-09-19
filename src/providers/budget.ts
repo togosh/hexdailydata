@@ -104,10 +104,13 @@ export class ProviderBudget {
       while (this.queue.length) {
         // Re-evaluate priority after every wait; new metrics can precede undispatched sync.
         this.queue.sort((a, b) => Number(b.lane === 'metrics') - Number(a.lane === 'metrics'));
-        const job = this.queue[0]!;
+        let job = this.queue[0]!;
         try {
           job.signal.throwIfAborted();
           const cooldown = await this.cooldown.read();
+          this.queue.sort((a, b) => Number(b.lane === 'metrics') - Number(a.lane === 'metrics'));
+          job = this.queue[0]!;
+          job.signal.throwIfAborted();
           const now = this.clock.now();
           if (now >= job.deadline) throw new Error('Provider deadline expired in queue.');
           const used = (this.used[job.lane] = this.used[job.lane].filter(

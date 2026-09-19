@@ -5,17 +5,8 @@ import { contractDayAt } from '../../domain/day.ts';
 import { validateBatch, bytes, hex, digest, type Batch } from './input.ts';
 import { readCurrent, saveCurrent, closeDay, applyEvent, applyPayout } from './reduce.ts';
 import { initializeConstructor, initializeFork } from './initialize.ts';
+import { restoreCheckpoint, restoreCursor } from './recovery.ts';
 
-const rewindTables: Record<string, string[]> = {
-  accounts: ['chain_id', 'address'],
-  stakes: ['chain_id', 'stake_id'],
-  current_state: ['chain_id'],
-  share_schedule: ['chain_id', 'activation_day'],
-  daily_stats: ['chain_id', 'contract_day'],
-  events: ['origin_chain_id', 'block_number', 'log_index'],
-  transfers_recent: ['origin_chain_id', 'block_number', 'log_index'],
-  blocks_recent: ['chain_id', 'number'],
-};
 const ownedConnections = new WeakSet<pg.Client>();
 export interface FaultHooks {
   /** Test harness fault injection only; not a validation bypass or provider callback. */
@@ -380,39 +371,15 @@ export class CanonicalWriter {
         throw new Error('Target is not a retained checkpoint within seven replay days.');
       await measuredQuery(this.client, "SELECT set_config('hdd.rewinding','yes',true)");
       for (const checkpoint of checkpoints) {
-        const { rows } = await measuredQuery(
-          this.client,
-          'SELECT relation_name,row_key::text,previous_value::text FROM hdd.undo_recent WHERE chain_id=$1 AND revision=$2 ORDER BY sequence DESC',
-          [this.chainId, checkpoint.revision],
-        );
-        for (const row of rows) {
-          const keys = rewindTables[row.relation_name];
-          if (!keys) throw new Error('Unsupported undo relation.');
-          const table = `hdd.${row.relation_name}`;
-          await measuredQuery(
-            this.client,
-            `DELETE FROM ${table} WHERE ${keys.map((k) => `${k}=(jsonb_populate_record(NULL::${table},$1::jsonb)).${k}`).join(' AND ')}`,
-            [row.row_key],
-          );
-          if (row.previous_value !== null)
-            await measuredQuery(
-              this.client,
-              `INSERT INTO ${table} SELECT * FROM jsonb_populate_record(NULL::${table},$1::jsonb)`,
-              [row.previous_value],
-            );
-        }
-        await measuredQuery(
-          this.client,
-          'DELETE FROM hdd.checkpoints_recent WHERE chain_id=$1 AND revision=$2',
-          [this.chainId, checkpoint.revision],
-        );
+        await restoreCheckpoint(this.client, this.chainId, checkpoint.revision);
       }
       // Cursor revision is a fencing token: never reuse it after rewind (prevents ABA).
-      await measuredQuery(
+      await restoreCursor(
         this.client,
-        `UPDATE hdd.sync_state SET (block_number,block_hash,block_time,finality,rewind_floor,acceptance,ranking_day)=
-       (SELECT block_number,block_hash,block_time,finality,greatest(rewind_floor,$4::bigint),acceptance,ranking_day FROM jsonb_populate_record(NULL::hdd.sync_state,$2::jsonb)),revision=$3 WHERE chain_id=$1`,
-        [this.chainId, previous, (BigInt(sync.revision) + 1n).toString(), sync.rewind_floor],
+        this.chainId,
+        previous,
+        sync.rewind_floor,
+        (BigInt(sync.revision) + 1n).toString(),
       );
       return { block: targetBlock, revision: (BigInt(sync.revision) + 1n).toString() };
     });

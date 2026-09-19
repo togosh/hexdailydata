@@ -53,7 +53,9 @@ function topicAddress(v: string) {
   padding(BigInt(v), 160);
   return address.parse('0x' + v.slice(-40));
 }
-export const rawLogSchema = z.object({
+// Receipt enumeration includes other contracts and anonymous events. Only selected
+// HEX logs get the tighter ABI payload/topic limits below; RPC bytes remain bounded.
+export const receiptLogSchema = z.object({
   address,
   blockNumber: quantity,
   blockHash: hash,
@@ -61,6 +63,10 @@ export const rawLogSchema = z.object({
   transactionIndex: quantity,
   logIndex: quantity,
   removed: z.literal(false),
+  topics: z.array(hash).max(4),
+  data: dataHex.max(16 * 1024 * 1024),
+});
+export const rawLogSchema = receiptLogSchema.extend({
   topics: z.array(hash).min(1).max(4),
   data: dataHex.max(8194),
 });

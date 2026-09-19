@@ -32,7 +32,13 @@ snapshot. Files stream through128-row SQL cursors and strict tar/gzip framing. I
 has one empty-target transaction and fixed table/column lists, checks the exact compressed
 bytes actually consumed, per-file counts/hashes and independent SQL totals, owners,
 share schedules, raw/decoded events, cursor/day/lineage, receipt continuity and undo
-identities. Numeric before-images never pass through JavaScript Number. The sequence
+identities. Extra user schemas and relations are refused even if the worker cannot
+read them. Before publication, import restores every retained checkpoint inside a
+rollback-only savepoint using the writer's bounded restore path. It checks exact SQL
+totals, schedules, raw events, cursor/header/day and progress bounds at each boundary,
+then rolls the entire audit back. This adds SQL/IO work proportional to the retained
+checkpoints and state size; full-scale import time and WAL remain unqualified.
+Numeric before-images never pass through JavaScript Number. The sequence
 resumes beyond imported undo rows. Tuple-byte counters are physical metadata and are
 recalculated on the destination; instance UUID and advisory locks stay local. Limits:
 1MiB/row,8GiB/member,32GiB expanded,1000:1 compression and a64KiB manifest. Those are

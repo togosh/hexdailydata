@@ -284,6 +284,7 @@ export class SyncEngine {
           blockHash: hex(s.block_hash),
           revision: s.revision,
         });
+        for (const source of this.sources) source.invalidateAfter(row.number);
         return;
       }
     }

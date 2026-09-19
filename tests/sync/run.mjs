@@ -332,6 +332,27 @@ try {
       codeHash: CODE_HASH,
     };
     assert.notEqual(identity.sourceInstance, expected.instance);
+    await test('unrelated table, view, or user schema refuses import without any mutation', async () => {
+      for (const [create, drop] of [
+        [
+          "CREATE TABLE hdd.unrelated_import_witness(value text); INSERT INTO hdd.unrelated_import_witness VALUES('synthetic')",
+          'DROP TABLE hdd.unrelated_import_witness',
+        ],
+        ['CREATE VIEW hdd.unrelated_view AS SELECT 1 AS value', 'DROP VIEW hdd.unrelated_view'],
+        ['CREATE SCHEMA unrelated_import_witness', 'DROP SCHEMA unrelated_import_witness'],
+      ]) {
+        await migrator.query(create);
+        const before = await snapshot();
+        await assert.rejects(() => importSeed(worker, seed, expected, signal), /unrelated/);
+        assert.deepEqual(await snapshot(), before);
+        if (create.startsWith('CREATE TABLE'))
+          assert.deepEqual(
+            (await migrator.query('SELECT * FROM hdd.unrelated_import_witness')).rows,
+            [{ value: 'synthetic' }],
+          );
+        await migrator.query(drop);
+      }
+    });
     await test('rehashed malicious seed fails independent totals, column and undo identity checks without partial target', async () => {
       for (const [table, edit, pattern] of [
         [
@@ -359,6 +380,54 @@ try {
         assert.equal((await api.query('SELECT count(*) FROM hdd.chains')).rows[0].count, '0');
       }
     });
+    await test('rehashed historical before-image and previous cursor corruption are rejected atomically', async () => {
+      const corruptions = [
+        [
+          'undo_recent',
+          (text) => {
+            // Earliest effective account A before-image in the latest retained revision.
+            const rows = text.trimEnd().split('\n');
+            const latest = rows
+              .filter((r) => /"chain_id": 369/.test(r))
+              .reduce((n, r) => Math.max(n, Number(r.match(/"revision": (\d+)/)[1])), 0);
+            const index = rows.findIndex(
+              (r) =>
+                r.includes('"relation_name": "accounts"') &&
+                r.includes('"revision": ' + latest + ',') &&
+                r.includes('11'.repeat(20)) &&
+                /"liquid_hearts": 900719925474099/.test(r),
+            );
+            assert.ok(index >= 0);
+            rows[index] = rows[index].replace(
+              /"liquid_hearts": (\d+)/,
+              (_, n) => '"liquid_hearts": ' + (BigInt(n) + 1n),
+            );
+            return rows.join('\n') + '\n';
+          },
+          /reconciliation/,
+        ],
+        [
+          'checkpoints_recent',
+          (text) =>
+            text.replace(
+              /"previous_sync": \{([^\n]*?)"block_hash": "[^"]+"/,
+              (_, prefix) =>
+                '"previous_sync": {' + prefix + '"block_hash": "' + '\\\\x' + 'ff'.repeat(32) + '"',
+            ),
+          /cursor\/header/,
+        ],
+      ];
+      for (const [table, edit, pattern] of corruptions) {
+        const path = await corruptSeed(table, edit);
+        const sha256 = await fileHash(path, signal);
+        await assert.rejects(
+          () => importSeed(worker, path, { ...expected, sha256 }, signal),
+          pattern,
+        );
+        assert.equal((await api.query('SELECT count(*) FROM hdd.chains')).rows[0].count, '0');
+        assert.equal((await api.query('SELECT count(*) FROM hdd.undo_recent')).rows[0].count, '0');
+      }
+    });
     await test('interrupted import rolls back all rows, then fresh import keeps destination identity', async () => {
       await assert.rejects(
         () =>
@@ -370,7 +439,9 @@ try {
         /injected/,
       );
       assert.equal((await api.query('SELECT count(*) FROM hdd.chains')).rows[0].count, '0');
-      await importSeed(worker, seed, expected, signal);
+      const imported = await importSeed(worker, seed, expected, signal);
+      assert.ok(imported.recoveryCheckpoints > 1);
+      console.log('Seed import recovery audit:', imported);
       assert.equal(
         (await api.query('SELECT instance::text FROM hdd_identity.instance')).rows[0].instance,
         expected.instance,

@@ -9,6 +9,7 @@ import { manifestSchema, tables, tableNames, type Table, type Manifest } from '.
 import { packArchive, readArchive, lines, archiveLimits } from './archive.ts';
 import { hex } from '../../services/projections/input.ts';
 import { reconcile } from '../../services/projections/initialize.ts';
+import { restoreCheckpoint, restoreCursor } from '../../services/projections/recovery.ts';
 import { decodeLog } from '../../providers/abi.ts';
 import { policySchema } from '../../providers/source.ts';
 import { diskReserve } from '../sync/engine.ts';
@@ -31,6 +32,30 @@ async function role(client: pg.Client) {
     rows: [r],
   } = await client.query('SELECT current_user AS role');
   if (r.role !== 'hdd_v2_worker') throw new Error('Seed requires explicit worker authority.');
+}
+async function emptyTarget(client: pg.Client) {
+  // Catalogs reveal even objects the worker cannot read. Refuse extra user schemas
+  // and relations rather than assuming the known application tables are the target.
+  const { rows: schemas } = await client.query(`SELECT nspname FROM pg_namespace
+    WHERE nspname !~ '^pg_' AND nspname NOT IN ('information_schema','public','hdd','hdd_identity')`);
+  const { rows: relations } = await client.query(`SELECT n.nspname,c.relname,c.relkind
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname !~ '^pg_' AND n.nspname<>'information_schema' AND c.relkind NOT IN ('i','I')`);
+  const expected = new Map([
+    ...tableNames.map((t) => [`hdd.${t}`, 'r'] as const),
+    ['hdd.schema_migrations', 'r'],
+    ['hdd.undo_recent_sequence_seq', 'S'],
+    ['hdd_identity.instance', 'r'],
+  ]);
+  if (
+    schemas.length ||
+    relations.length !== expected.size ||
+    relations.some((r) => expected.get(`${r.nspname}.${r.relname}`) !== r.relkind)
+  )
+    throw new Error('Seed import refuses unrelated destination schema or relation.');
+  for (const table of tableNames)
+    if ((await client.query(`SELECT 1 FROM hdd.${table} LIMIT 1`)).rowCount)
+      throw new Error('Seed import requires empty v2 target.');
 }
 async function descriptor(client: pg.Client): Promise<Omit<Manifest, 'files' | 'createdAt'>> {
   const { rows } = await client.query(
@@ -238,9 +263,7 @@ export async function importSeed(
     await client.query(
       `LOCK TABLE ${tableNames.map((t) => 'hdd.' + t).join(',')} IN EXCLUSIVE MODE`,
     );
-    for (const table of tableNames)
-      if ((await client.query(`SELECT 1 FROM hdd.${table} LIMIT 1`)).rowCount)
-        throw new Error('Seed import requires empty v2 target.');
+    await emptyTarget(client);
     let manifest: Manifest | undefined;
     let tableIndex = 0;
     const transfer = await readArchive(
@@ -318,6 +341,7 @@ export async function importSeed(
     if (JSON.stringify(actual) !== JSON.stringify(declared))
       throw new Error('Seed semantic coverage/checkpoint/lineage mismatch.');
     await validateState(client, signal);
+    const recoveryCheckpoints = await validateRecovery(client, signal);
     // Heap/TOAST representation may differ after logical import. Recount physical
     // tuple accounting rather than trusting the publisher's retained-byte counters.
     await client.query(`UPDATE hdd.checkpoints_recent c SET
@@ -330,15 +354,29 @@ export async function importSeed(
     await hooks.beforeCommit?.();
     signal.throwIfAborted();
     await client.query('COMMIT');
-    return { ms: performance.now() - started, checkpoint: manifest.checkpoint };
+    return {
+      ms: performance.now() - started,
+      checkpoint: manifest.checkpoint,
+      recoveryCheckpoints,
+    };
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
   }
 }
-async function validateState(client: pg.Client, signal: AbortSignal) {
-  const { rows: chains } = await client.query('SELECT * FROM hdd.chains ORDER BY chain_id');
-  if (chains.length < 1 || chains[0].chain_id !== 1 || chains.length > 2)
+async function validateState(
+  client: pg.Client,
+  signal: AbortSignal,
+  recoveryChain: number | null = null,
+) {
+  const { rows: chains } = await client.query(
+    'SELECT * FROM hdd.chains WHERE $1::int IS NULL OR chain_id=$1 ORDER BY chain_id',
+    [recoveryChain],
+  );
+  if (
+    recoveryChain === null &&
+    (chains.length < 1 || chains[0].chain_id !== 1 || chains.length > 2)
+  )
     throw new Error('Invalid common/native lineage.');
   for (const chain of chains) {
     signal.throwIfAborted();
@@ -370,16 +408,19 @@ async function validateState(client: pg.Client, signal: AbortSignal) {
         check.sources[0].operator === check.sources[1].operator)
     )
       throw new Error('Seed source/finality inconsistency.');
+    const syncColumns = await columns(client, 'sync_state');
     const {
       rows: [tail],
     } = await client.query(
       `WITH ordered AS (SELECT *,lag(block_number,1,$2::bigint) OVER(ORDER BY block_number) AS prior FROM hdd.checkpoints_recent WHERE chain_id=$1)
-      SELECT count(*) FILTER(WHERE (previous_sync->>'block_number')::bigint<>prior OR revision<= (previous_sync->>'revision')::bigint OR (previous_sync->>'chain_id')::int<>$1 OR block_number>$3)::int AS errors,
-      max(block_number)::text AS last FROM ordered`,
-      [chain.chain_id, check.rewind_floor, check.block_number],
+      SELECT count(*) FILTER(WHERE (previous_sync->>'block_number')::bigint<>prior OR revision<= (previous_sync->>'revision')::bigint OR (previous_sync->>'chain_id')::int<>$1 OR block_number>$3 OR revision>$4
+        OR NOT previous_sync ?& $5::text[] OR (SELECT count(*) FROM jsonb_object_keys(previous_sync))<>cardinality($5::text[]))::int AS errors,
+      max(block_number)::text AS last, count(*)::int AS checkpoints FROM ordered`,
+      [chain.chain_id, check.rewind_floor, check.block_number, check.revision, syncColumns],
     );
     if (
       tail.errors ||
+      tail.checkpoints > 4096 ||
       (tail.last === null
         ? check.block_number !== check.rewind_floor
         : tail.last !== check.block_number)
@@ -389,12 +430,22 @@ async function validateState(client: pg.Client, signal: AbortSignal) {
       rows: [bad],
     } = await client.query(
       `SELECT EXISTS(SELECT 1 FROM hdd.blocks_recent b WHERE b.chain_id=$1 AND (number<$2 OR number>$3)) OR
-      EXISTS(SELECT 1 FROM hdd.recovery_pins p WHERE p.chain_id=$1 AND (block_number<$2 OR block_number>$3)) OR
-      EXISTS(SELECT 1 FROM hdd.daily_stats d WHERE d.chain_id=$1 AND (contract_day>=$4 OR close_block>$3 OR payout_block>$3)) AS bad`,
-      [chain.chain_id, check.rewind_floor, check.block_number, check.contract_day],
+      ($5::boolean AND EXISTS(SELECT 1 FROM hdd.recovery_pins p WHERE p.chain_id=$1 AND (block_number<$2 OR block_number>$3))) OR
+      EXISTS(SELECT 1 FROM hdd.daily_stats d WHERE d.chain_id=$1 AND (contract_day>=$4 OR close_block>$3 OR payout_block>$3)) OR
+      EXISTS(SELECT 1 FROM hdd.accounts a WHERE a.chain_id=$1 AND last_block>$3) OR
+      EXISTS(SELECT 1 FROM hdd.stakes t WHERE t.chain_id=$1 AND last_block>$3) OR
+      EXISTS(SELECT 1 FROM hdd.blocks_recent b LEFT JOIN hdd.blocks_recent p ON p.chain_id=b.chain_id AND p.number=b.number-1
+        WHERE b.chain_id=$1 AND b.number>$2 AND (p.number IS NULL OR b.parent_hash<>p.hash OR b.timestamp<=p.timestamp)) AS bad`,
+      [
+        chain.chain_id,
+        check.rewind_floor,
+        check.block_number,
+        check.contract_day,
+        recoveryChain === null,
+      ],
     );
     if (bad.bad) throw new Error('Seed progress/tail/day bounds inconsistent.');
-    if (chain.chain_id === 369) {
+    if (chain.chain_id === 369 && recoveryChain === null) {
       const {
         rows: [parent],
       } = await client.query(
@@ -412,7 +463,12 @@ async function validateState(client: pg.Client, signal: AbortSignal) {
   }
   for (const table of ['events', 'transfers_recent'] as const) {
     await client.query(
-      `DECLARE verify_events NO SCROLL CURSOR FOR SELECT t.*,c.contract_address,s.block_number AS cursor FROM hdd.${table} t JOIN hdd.chains c ON c.chain_id=t.origin_chain_id JOIN hdd.sync_state s ON s.chain_id=c.chain_id`,
+      `DECLARE verify_events NO SCROLL CURSOR FOR SELECT t.*,c.contract_address,s.block_number AS cursor,
+        b.hash AS retained_hash,b.timestamp AS retained_time FROM hdd.${table} t
+        JOIN hdd.chains c ON c.chain_id=t.origin_chain_id JOIN hdd.sync_state s ON s.chain_id=c.chain_id
+        LEFT JOIN hdd.blocks_recent b ON b.chain_id=t.origin_chain_id AND b.number=t.block_number
+        WHERE $1::int IS NULL OR t.origin_chain_id=$1`,
+      [recoveryChain],
     );
     for (;;) {
       const { rows } = await client.query('FETCH FORWARD 128 FROM verify_events');
@@ -420,6 +476,11 @@ async function validateState(client: pg.Client, signal: AbortSignal) {
       for (const r of rows) {
         signal.throwIfAborted();
         if (BigInt(r.block_number) > BigInt(r.cursor)) throw new Error('Seed future event.');
+        if (
+          r.retained_hash &&
+          (!r.retained_hash.equals(r.block_hash) || r.retained_time !== r.block_time)
+        )
+          throw new Error('Seed event/header inconsistency.');
         const e = decodeLog(
           {
             address: hex(r.contract_address),
@@ -447,6 +508,7 @@ async function validateState(client: pg.Client, signal: AbortSignal) {
     }
     await client.query('CLOSE verify_events');
   }
+  if (recoveryChain !== null) return;
   const {
     rows: [undo],
   } = await client.query(`SELECT EXISTS(SELECT 1 FROM hdd.undo_recent u WHERE
@@ -475,4 +537,37 @@ async function validateState(client: pg.Client, signal: AbortSignal) {
     );
     if (shape.bad) throw new Error('Seed undo identity/column shape mismatch.');
   }
+}
+
+/** Import-only audit: exercise every retained checkpoint without publishing any
+ * historical state. Full reconciliation costs SQL work per checkpoint, not JS heap
+ * proportional to account/undo count. Ordinary sync/API reads never do this audit.
+ */
+async function validateRecovery(client: pg.Client, signal: AbortSignal) {
+  const { rows: chains } = await client.query(
+    'SELECT chain_id,rewind_floor FROM hdd.sync_state ORDER BY chain_id',
+  );
+  let count = 0;
+  for (const chain of chains) {
+    await client.query('SAVEPOINT seed_recovery');
+    await client.query("SELECT set_config('hdd.rewinding','yes',true)");
+    for (;;) {
+      signal.throwIfAborted();
+      const {
+        rows: [checkpoint],
+      } = await client.query(
+        `SELECT revision,previous_sync::text
+        FROM hdd.checkpoints_recent WHERE chain_id=$1 ORDER BY block_number DESC LIMIT 1`,
+        [chain.chain_id],
+      );
+      if (!checkpoint) break;
+      await restoreCheckpoint(client, chain.chain_id, checkpoint.revision, signal);
+      await restoreCursor(client, chain.chain_id, checkpoint.previous_sync, chain.rewind_floor);
+      await validateState(client, signal, chain.chain_id);
+      count++;
+    }
+    await client.query('ROLLBACK TO SAVEPOINT seed_recovery');
+    await client.query('RELEASE SAVEPOINT seed_recovery');
+  }
+  return count;
 }
