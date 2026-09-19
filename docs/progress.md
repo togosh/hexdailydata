@@ -8,7 +8,8 @@
 | 04 | passed (offline) | Reviewed code `7787ac16331c52d18437e05e731b486e58752ef3`; 68 tests, 12 SQL groups, 28 sync groups and 5 live-service SQL groups. Independent `/root/task04_review`: PASS after one full review and one correction/recheck. Reports, commands and measurements in ignored `artifacts/task-04/`. |
 | 05 | passed (offline) | Reviewed code `a9bf7bec00c9da468b8759ab68fa06506f9f48e2`; 70 units, 11 daily groups, fresh seed/DB-restore continuation, 3 scale groups, 28 sync and 5 live-service SQL groups. Independent `/root/task05_review`: PASS after one full review and one correction/recheck. Actual reports/commands in ignored `artifacts/task-05/`. |
 | 06 | passed (offline) | Reviewed code `c7ae880c2455239a511a1136dccb3e60f9ace44e`; 76 units, actual API/SQL/Linux/compiled-image/restore and affected export checks. Independent `/root/task06_review`: PASS after one full review and one correction/recheck. 1M-stake/500k-account Home query p95 0.840ms, HTTP p95 2.079ms, 2,429 bytes; scale evidence reused from `751353c`. Report and exact provenance in ignored `artifacts/task-06/REPORT.md`. |
-| 07–11 | pending | Not implemented |
+| 08 | passed (offline) | Reviewed code `740b947`; 79 units, 12 recovery groups and 9 lifecycle groups. Independent review and source-bound scale evidence are detailed below and in ignored `artifacts/task-08/`. |
+| 07, 09–11 | pending | Not implemented |
 
 The development shell has no live data/indexer. Task02 qualifies schema/projections on
 isolated disposable PostgreSQL17; the public shell remains uninitialized. Task01 source
@@ -105,3 +106,17 @@ policy rejection. Off-host/live/TLS/reboot/production qualification and canary N
 no v1, schedules, purchase, push or deployment. This status-only commit follows the
 reviewed source. Task07 remains next eligible subject to source feasibility/owner decision;
 Task09 waits for07. Neither task was started.
+
+Early-canary preparation PASS (offline); canary NOT_RUN. Reviewed code
+`d3558d201745931d616872f4c59e473255e14266` adds the bounded compiled operator runner
+using existing source/sync/SQL/live services, durable aggregate limits and same-session
+resume. Final checks: 79 unit tests and 11 focused PostgreSQL/Linux groups; independent
+`/root/early_canary_review` PASS after one full review and one correction/recheck,
+including 25 additional shutdown probes. Exact SQL matches control across caps and
+SIGTERM/lost-COMMIT recovery. Real provider requests: 0. The single updated brief is
+NOT_CONFIGURED / NEEDS_OWNER_INPUT; no live identity, throughput or Task10 qualification.
+Task-owned Docker resources are cleaned; original evidence and blocked Temp folders
+are preserved. Reports, commands, review and archive checksums are in ignored
+`artifacts/task-03/early-canary/`. This status-only commit follows reviewed code.
+Next is owner input/approval for the bounded canary, or an explicit decision to proceed
+with Task07 despite unmeasured feasibility; Task09 waits for07. Neither was started.
