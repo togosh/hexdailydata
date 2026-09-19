@@ -84,7 +84,8 @@ The public API remains uninitialized until qualified data and later serving inte
 Measurements distinguish transport wall time, quota waiting/cooldown, input guards,
 decoding, awaited SQL and replay/coordination wall time (commit wall time minus guards
 and awaited SQL). The last is not a CPU profiler. Seed export/import is measured;
-standard dataset export is `NOT_IMPLEMENTED`. PostgreSQL tuple counters do not include
+the original Task03 standard-export measurement was `NOT_IMPLEMENTED`; Task05 now
+implements five CSV publications and daily/market aggregation. PostgreSQL tuple counters do not include
 all physical indexes/TOAST/WAL; the isolated harness records those separately.
 
 Task03 source-use: the mapped `hex-minimal-abi.mjs`, `stake-event-decode.mjs` and
@@ -107,3 +108,31 @@ export_bundles empty. Disposable live metrics and file publication status are ex
 The Task05 data mapping describes rank/market invalidation; rewind never rewrites
 independently sourced venue history. Export and seed snapshots share the existing
 prune lock. No provider method, canary allowance or deployment permission changed.
+
+## Current qualification work ledger
+
+The bounded canary operator in operations.md counts every provider attempt from these
+paths. Implemented subsystems are not zero-cost; a short acquisition probe is not an
+independent complete rebuild. Costs not measured in that probe remain NOT_MEASURED.
+
+| Work | Current implementation / cost to retain |
+|---|---|
+| Filtered events | Source.events: two complete log sets per attempted range, constructor block and every rejected/split/retried range; raw event-header membership and response bytes |
+| Sparse observations | Source.plan/acquire: previous/first/end, up to20 search midpoints/source, event headers batched30, real day-adjacent boundaries and repeated fences; no invented skipped headers |
+| Native state/ledger | Pinned globalInfo+totalSupply per source/range, day-close state and up to32 sampled balances/source/day; dailyDataRange windows up to1024 days; pending remains pending |
+| Identity/finality/fork | Both source chains, code/header/constructor receipt, finalized or declared confirmation target, reorg recovery and common/fork identity checks; all count before dispatch |
+| Canonical replay/audit | Actual writer/SQL/guards/pruning plus final full SQL reconciliation; every current address balance is read from both sources at final audit; inherited parent balances at fork |
+| Metrics and current price | Task04 MetricsService and PriceReader: native currentDay/globalInfo/supply, materialized ledger, corroborated reserves and declared factory/token/pool code/metadata; four HTTP/tick for a complete route, variable logical calls |
+| Address page | Task04/06 AddressService: cold100-stake page107 logical/two HTTP, bounded4HTTP/128logical/10s including retries; SQL baseline distinct from provisional page |
+| Market capture/history | Task05 sample capture uses already obtained price; SQL/storage/aggregation are additional costs. Explicit raw historical file import exists, qualified historical provider transport does not. Missing coverage is not zero-priced native coverage |
+| Daily/ranking/CSV | Task05 implements due-day aggregation/ranks and five streamed, fsynced immutable exports with SQL publication and verification; not recreated every canary range |
+| Seed/backup/operations | Task03 seed validation/recovery and Task08 encrypted backup/new-target restore exist. CPU/SQL/IO/WAL/staging are measured separately; no full backup/import merely to exercise a short canary |
+
+Native lifecycle, transfers/current ownership, daily totals and contract ledger are mandatory.
+Historical market OHLC/volume/price availability is source-specific; sampled OHLC is not
+trade history and the supported USD route is `peg_assumed`, not an independent USD feed.
+No BTC/ETH asset feed or arbitrary historical holder snapshot is added. Reuse source-bound
+Task05 export, Task06 API and Task08 recovery measurements only as local cost evidence;
+virtual provider waiting must not become real throughput. Full acquisition, reconciliation,
+first exports, storage and actual completion timing still require Task10 after09 and its
+separate approval. A below14-day lower bound is never a feasibility PASS.

@@ -128,6 +128,39 @@ Later authorized use needs an explicit reviewed Compose override for profile mou
 secrets/environment and worker egress; never add a public fallback or reuse old secrets.
 Ordinary source operation then uses durable progress across days without per-day grants.
 
+## Bounded offline canary preparation
+
+For bounded qualification use the separate compiled `operator canary` path described
+in [operations.md](docs/operations.md#bounded-canary-operator). It shares existing
+source/sync/live services and adds durable aggregate limits. It starts no worker jobs.
+The supplied example intentionally reports `NOT_CONFIGURED`; it contains no source
+identities or approval. These commands make no real provider requests:
+
+```sh
+npm run build
+node dist/operator/main.js canary help
+node dist/operator/main.js canary check config/canary.example.json
+npm run test:canary
+```
+
+`check` exits2 for missing inputs and needs no DB. The test creates and removes only a
+new internal Docker/PostgreSQL project, injecting raw fixture providers. For a later
+complete plan, `init`, `build` and `provision` a **new** environment as above, leave
+API/worker stopped, and put the plan in its `input/`:
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 canary' run --rm -T operator canary check /input/plan.json
+node scripts/operator/host.mjs compose '.local/v2 canary' run --rm -T operator canary prepare /input/plan.json
+node scripts/operator/host.mjs compose '.local/v2 canary' run --rm -T operator canary status /input/plan.json
+```
+
+Preparation requires an empty schema4 DB, matching project/UUID/image and Linux storage.
+Only after separate owner approval may a reviewed Compose override supply endpoints,
+operator egress, `HDD_V2_ALLOW_LIVE_RPC=true` and `HDD_V2_CANARY_OPT_IN=<session UUID>`,
+then invoke `canary run /input/plan.json /input/owner-approval.json` or `canary resume`
+with the same arguments. No override or approval is supplied. The default network is
+internal. This qualification does not grant production or full-bootstrap permission.
+
 ## Encrypted backup and new-target restore
 
 ```sh

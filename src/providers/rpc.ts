@@ -26,7 +26,12 @@ export interface RpcCall {
 export type Transport = (
   body: string,
   signal: AbortSignal,
-) => Promise<{ status: number; retryAfter: string | null; body: AsyncIterable<Uint8Array> }>;
+) => Promise<{
+  status: number;
+  retryAfter: string | null;
+  body: AsyncIterable<Uint8Array>;
+  close?: () => Promise<void>;
+}>;
 export function httpTransport(endpoint: string): Transport {
   const url = new URL(endpoint);
   if (url.protocol !== 'https:' || url.username || url.password || url.hash)
@@ -267,8 +272,9 @@ export class RpcClient {
                 const selector = (call.params[0] as { data: string }).data.slice(0, 10);
                 this.counters.selectors[selector] = (this.counters.selectors[selector] ?? 0) + 1;
               }
+            let response: Awaited<ReturnType<Transport>> | undefined;
             try {
-              const response = await this.transport(body, combined);
+              response = await this.transport(body, combined);
               combined.throwIfAborted();
               const buffers: Buffer[] = [];
               let size = 0;
@@ -342,6 +348,7 @@ export class RpcClient {
             } finally {
               clearTimeout(timeout);
               this.counters.transportMs += performance.now() - start;
+              await response?.close?.();
             }
           },
           options.request ? () => options.request!.charge(calls.length) : undefined,

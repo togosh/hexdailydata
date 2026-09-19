@@ -32,7 +32,8 @@
     "openapi": "node scripts/openapi.mjs",
     "openapi:check": "node scripts/openapi.mjs --check",
     "operator": "node dist/operator/main.js",
-    "test:ops": "node scripts/test-ops.mjs"
+    "test:ops": "node scripts/test-ops.mjs",
+    "test:canary": "node scripts/test-canary.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",

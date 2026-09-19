@@ -98,7 +98,7 @@ const env = {
   ...process.env,
   HDD_V2_PROJECT: config.project,
   HDD_V2_DB_INSTANCE: config.instance,
-  HDD_V2_IMAGE: config.current ?? config.image,
+  HDD_V2_IMAGE: config.current ?? config.built ?? config.image,
   HDD_V2_SECRET_DIR: join(root, 'secrets'),
   HDD_V2_OPERATOR_INPUT: join(root, 'input'),
   HDD_V2_HOST_PORT: config.port,

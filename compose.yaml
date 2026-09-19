@@ -103,6 +103,7 @@ services:
     environment:
       <<: *worker-env
       HDD_V2_API_PASSWORD_FILE: /run/secrets/api
+      HDD_V2_CANARY_RELEASE: ${HDD_V2_IMAGE}
     secrets: [worker, api, backup]
     entrypoint: [node, dist/operator/main.js]
     volumes:

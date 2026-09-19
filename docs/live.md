@@ -116,7 +116,8 @@ as fresh. Task04 introduces no minute sample history; Task05 owns market_samples
 its consumer-aware aggregation/retention as well as daily markets/CSV/ranks. No needed
 samples are pruned by this task. Current observations never advance native cursors.
 
-Canary remains PREPARED / NOT_RUN, launcher NOT_CONFIGURED. Future qualification must
+The bounded compiled canary tooling is described in operations.md. The actual live
+plan remains NOT_CONFIGURED / NOT_RUN until owner inputs and separate approval. Qualification must
 include EIP-1898, the enlarged bounded address batch, preliminary latest count,
 stakeCount/stakeLists/currentDay, selected reserve/metadata methods and code identities.
 Steady metrics use four HTTP requests per successful tick (discovery, primary state,

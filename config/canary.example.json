@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "session": null,
+  "reviewedCommit": null,
+  "release": null,
+  "project": null,
+  "instance": null,
+  "storagePath": "/state",
+  "quotaPath": "/provider",
+  "sessionPath": "/state/canary.json",
+  "profile": null,
+  "price": null,
+  "identityStatus": "declared-unverified",
+  "correlation": "unknown",
+  "ranges": [],
+  "methods": ["eth_chainId", "eth_getBlockByNumber", "eth_getCode", "eth_getLogs", "eth_getTransactionReceipt", "eth_call"],
+  "allowHeadObservation": false,
+  "phases": [],
+  "notConfigured": ["Owner source identities, ranges, destination and approval are missing; this is not an executable live plan."],
+  "cost": {"policy": "no-paid-overage", "maximumUsd": 0, "basis": "Only owner-confirmed existing no-overage provider allowances; no purchase authorized."},
+  "caps": {"milliseconds": 3600000, "http": 2500, "logical": 20000, "bytes": 536870912, "responseBytes": 16777216}
+}

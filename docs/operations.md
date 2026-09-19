@@ -43,6 +43,88 @@ Budget exhaustion records next retry and remains resumable; it does not require 
 new source-bound permission files to continue ordinary work. Correctness failures stop
 publication. Manual override cannot convert uncertain data to “verified”.
 
+## Bounded canary operator
+
+The compiled `canary check|prepare|status|run|resume` command wraps the existing services.
+The schema is `src/operator/canary-plan.ts`; `config/canary.example.json` intentionally
+lacks live inputs. Check only parses local files: no SQL or transport construction.
+Prepare requires a new empty schema4 destination; it does not grant live permission.
+
+The immutable plan contains session UUID, reviewed source commit, release image SHA256,
+new host project/DB UUID, normalized storage/quota roots and `<storage>/canary.json`;
+the existing source profile (contract/code/constructor transaction, checkpoint and
+explicit balances, fork parent/entry, finality and target); four chain-specific source
+IDs with operators or null, account groups and endpoint environment references; exact
+numeric ranges per chain; read-only methods; head-observation permission; phase purposes;
+optional existing price profile; missing phases; a no-paid-overage cost basis and finite
+aggregate/per-response limits. Declarations stay unverified until observed. Known same
+operators are rejected case-insensitively; unknown correlation remains unknown.
+
+The bounded ordered phase list supports:
+- `capabilities {chain,at}`: code/header and corroborated EIP-1898 state.
+- `probe {chain,previous,to}`: actual sparse acquisition without a SQL origin; records
+  the actual day-clipped end and whether the whole requested interval was measured.
+- One `replay {basis:"constructor-prefix"}`: actual SyncEngine from constructor through
+  common/fork/target checkpoints, with normal audits. No implicit years-long setup.
+- `metrics`: MetricsService and optional declared PriceReader; component failures remain
+  explicit. `address {address,pageSize}`: AddressService with its4HTTP/128logical/10s cap.
+
+Each entry also needs a nonempty `purpose`. An unavailable live replay prefix is omitted
+and listed NOT_CONFIGURED. This runner does not import a seed; qualifying a separately
+authorized compatible v2 seed would need separate scope. No v1 seed is supported.
+Results are narrow observations, not blanket source qualification. Market files and
+full exports/backups are not automatically rerun just to exercise every subsystem.
+
+After a human approves the exact scope, a local record must contain exactly
+`{session,planDigest,release,instance,decision:"owner-approved-bounded-canary"}`. Check
+returns the normalized plan digest. Software cannot authenticate the owner's consent;
+an example/generated file is not approval. Run/resume additionally require both the
+session-specific opt-in and independent live-RPC opt-in. The normal host supplies its
+built/current image ID as `HDD_V2_CANARY_RELEASE`. No runtime source-file hash gate exists.
+
+One process holds stable Linux flock inodes in both roots through all transport/SQL
+cleanup, existing API/worker role locks, canonical ownership and maintenance ownership.
+Both chain writers are reserved before transport. Before fork initialization, parent
+ownership passes to the child connection while the worker role and child lock fence
+other operators/seed import. SQL ownership loss cancels the session. Prepare rejects
+retained state and nonempty DBs; resume requires retained checksummed state, immutable
+plan identity and matching filesystem inode identities. Cloning/restoring onto a new
+volume does not create allowance or inherit permission. Deliberate privileged deletion
+or rewriting is outside this accidental-execution guard. No schema was added.
+
+The deadline starts at first authorized run and includes restart quarantine, queues,
+cooldown, retries and local work. Invalid/rolled-back time fails closed. Before every
+transport attempt, HTTP/logical charges and byte reservation are atomically replaced and
+file/directory-fsynced. State is bounded to64KiB and checksummed for accidental corruption.
+One transport slot covers both chains, aliases and roles; existing fixed lanes still
+apply. The persistent lock inode is never unlinked. Ordinary public reads gain no session
+logging or source scanning, and ordinary sync never needs per-day manual grants.
+
+Each attempt reserves twice the selected response limit (at most32MiB:16MiB response
+plus16MiB chunk headroom). Insufficient headroom stops early. HTTP/logical charges never
+refund. A fully consumed body settles to actual application-observed bytes, including
+429/5xx/invalid JSON; an interrupted or crash-uncertain body retains its full reservation.
+`observedBytes` counts settled observed chunks; `chargedBytes` additionally covers unknown
+spend. A crossing chunk is counted in full before abort, never trimmed to the ceiling or
+retained for JSON parsing. An unusually large chunk may exceed even the reservation and
+is reported honestly. Neither counter is an exact network/kernel bound: fetch/TLS/read-ahead
+may have received additional bytes. The headroom is conservative, not a network guarantee.
+
+Default upper ceilings remain60min/2500HTTP/20000logical/512MiB; reduce them when adequate.
+The30HTTP/900logical rolling-minute total and address12/360,metrics6/180,sync12/360 shares
+are unchanged. All code/header/constructor/fork/ledger/price/discovery/retry/split/final
+audit requests count. Alias/account-group labels never create more quota. A cap is terminal.
+Cancellation/failure can resume only the same session before its original deadline with
+remaining credit. Completed phases stay completed. Interrupted replay reads the actual SQL
+cursor; acquisition-only phases may repeat and all repeat attempts are charged. No automatic
+extension, rotation or replacement session occurs. Exit2 indicates a bounded stop or
+missing config; exit1 indicates rejected input/operation. The state retains the reason.
+
+`npm run test:canary` after build exercises raw synthetic providers, real Linux process
+crashes and new PostgreSQL. Virtual quota time is not provider throughput. All actual
+live identity/coverage/cost/full-history qualification remains NOT_RUN. Unchanged scale
+evidence may be reused by its reviewed source commit, with limits explicitly retained.
+
 ## Cost target (planning envelope, not a vendor quote)
 
 Owner maximum is **$50–60/month total** before monetization. Suggested allocation:

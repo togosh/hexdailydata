@@ -1,0 +1,11 @@
+# Offline canary witness only, merged with compose.sql.yaml in a NEW run-scoped project.
+services:
+  runner:
+    environment:
+      HDD_V2_PROJECT: ${HDD_V2_PROJECT}
+      HDD_V2_ALLOW_LIVE_RPC: 'false'
+    volumes:
+      - canary_state:/canary-test
+    command: ['node', 'tests/canary/run.mjs']
+volumes:
+  canary_state:
