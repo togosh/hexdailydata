@@ -188,7 +188,10 @@ export class CanarySession {
     );
   }
   async finish(status: 'stopped' | 'complete', reason: string) {
-    if (this.timer) clearTimeout(this.timer);
+    // A failed Promise.all can leave its sibling queued or settling. Cancel and
+    // drain the shared transport before publishing the final state; its last
+    // reservation/settlement must never race this atomic file replacement.
+    await this.close();
     this.state.status = status;
     this.state.reason = reason.slice(0, 160);
     await this.save();

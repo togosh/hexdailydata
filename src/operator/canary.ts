@@ -265,7 +265,7 @@ export async function runCanary(
     await session.finish('complete', 'Bounded phases complete; no full feasibility claim.');
     return session.state;
   } catch (error) {
-    if (session && session.state.start !== null) {
+    if (session && session.state.start !== null && session.state.status !== 'complete') {
       const detail = operatorError(error);
       const reason = session.controller.signal.aborted
         ? String(session.controller.signal.reason?.message)

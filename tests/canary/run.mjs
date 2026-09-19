@@ -722,6 +722,108 @@ try {
     });
     await reset();
   });
+  await test('paired source failure drains sibling writes before durable stop and safe resume', async () => {
+    const p = await fresh(),
+      clock = new FakeClock();
+    clock.time = Date.now();
+    const f = rawFixture(p, clock);
+    let injected = false,
+      dispatched = 0,
+      saves = 0,
+      maximumSaves = 0;
+    const originalSave = CanarySession.prototype.save;
+    CanarySession.prototype.save = async function () {
+      saves++;
+      maximumSaves = Math.max(maximumSaves, saves);
+      try {
+        return await originalSave.call(this);
+      } finally {
+        saves--;
+      }
+    };
+    const options = {
+      env: environment(p),
+      clock,
+      transport: (endpoint) => {
+        const raw = f.transport(endpoint);
+        return async (body, active) => {
+          dispatched++;
+          const calls = JSON.parse(body);
+          if (
+            !injected &&
+            endpoint.includes('fixture-1-1') &&
+            calls.some((c) => c.method === 'eth_getBlockByNumber' && c.params[0] === 'latest')
+          ) {
+            injected = true;
+            return {
+              status: 200,
+              retryAfter: null,
+              body: (async function* () {
+                yield Buffer.from('invalid');
+              })(),
+            };
+          }
+          return raw(body, active);
+        };
+      },
+    };
+    try {
+      await runCanary(['prepare', p.storagePath + '/plan.json'], signal, options);
+      const stopped = await runCanary(
+        ['run', p.storagePath + '/plan.json', p.storagePath + '/approval.json'],
+        signal,
+        options,
+      );
+      assert.equal(injected, true);
+      assert.equal(stopped.status, 'stopped');
+      assert.equal(maximumSaves, 1);
+      const { checksum, ...stored } = await state(p);
+      assert.deepEqual(stopped, stored);
+      assert.equal(stored.pending, false);
+      assert.equal(stored.terminal, false);
+      assert.ok(stored.http >= dispatched);
+      await CanarySession.load(p, clock);
+      const resumed = await runCanary(
+        ['resume', p.storagePath + '/plan.json', p.storagePath + '/approval.json'],
+        signal,
+        options,
+      );
+      assert.equal(resumed.status, 'complete');
+      assert.equal(resumed.start, stored.start);
+      assert.equal(resumed.deadline, stored.deadline);
+      assert.equal(maximumSaves, 1);
+      assert.deepEqual(await snapshot(), completeControl.snapshot);
+      const before = await readFile(p.sessionPath, 'utf8');
+      let constructed = 0;
+      await assert.rejects(
+        runCanary(
+          ['resume', p.storagePath + '/plan.json', p.storagePath + '/approval.json'],
+          signal,
+          {
+            ...options,
+            transport: () => {
+              constructed++;
+              throw Error('forbidden');
+            },
+          },
+        ),
+        /complete/,
+      );
+      assert.equal(constructed, 0);
+      assert.equal(await readFile(p.sessionPath, 'utf8'), before);
+      results.push({
+        name: 'paired failure shutdown',
+        maximumSaves,
+        durableReturnedStateEqual: true,
+        startPreserved: true,
+        remainingCreditOnly: true,
+        status: 'MEASURED_OFFLINE',
+      });
+    } finally {
+      CanarySession.prototype.save = originalSave;
+      await reset();
+    }
+  });
   console.log(
     JSON.stringify({
       groups: results.filter((r) => r.status === 'PASS').length,
