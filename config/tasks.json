@@ -101,7 +101,7 @@
         "deploy/",
         "docs/operations.md"
       ],
-      "status": "pending"
+      "status": "passed"
     },
     {
       "id": "09",

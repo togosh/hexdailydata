@@ -88,3 +88,20 @@ Provider time is synthetic; the512MiB runner reached its memory ceiling. Tasks01
 acquisition correction and original evidence are preserved. No canary/live/v1 runtime
 or data/push/deployment. This status-only commit follows independent PASS. Tasks07/08
 are next eligible but unstarted; source feasibility still precedes major Task07 work.
+
+Task08 implements README-driven compiled dev/prod startup, isolated roles/volumes,
+operator commands, worker recovery, coordinated release/rollback and streaming encrypted
+backup/transactional restore. Independent review passed `740b947` after closing lost-lock
+replacement and hidden-diagnostic findings; the same reviewer ran fresh source-only
+recovery and separate-process lock-loss/SIGKILL retries. Final affected checks passed:
+79 units,12 small recovery groups and9 lifecycle groups. Unchanged regression evidence
+is tied to `feaceaf6`; the1M-stake/500k-account shape at `2aa18c1` backed up in46.404s and
+restored in116.704s with198 Home reads/0 failures. Its helper reached512MiB; this is no
+production headroom claim. Small valid fixtures separately prove exact forward replay
+and unknown post-snapshot market loss. Tasks01–06, sparse acquisition and original
+evidence remain preserved. Task-owned Docker resources/images are cleaned; ignored
+test files remain locally, including reviewer Temp folders retained after a deletion
+policy rejection. Off-host/live/TLS/reboot/production qualification and canary NOT_RUN;
+no v1, schedules, purchase, push or deployment. This status-only commit follows the
+reviewed source. Task07 remains next eligible subject to source feasibility/owner decision;
+Task09 waits for07. Neither task was started.
