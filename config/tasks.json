@@ -37,7 +37,7 @@
         "src/worker/sync/",
         "src/worker/bootstrap/"
       ],
-      "status": "pending"
+      "status": "passed"
     },
     {
       "id": "04",
