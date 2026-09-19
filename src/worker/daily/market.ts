@@ -366,6 +366,69 @@ export async function importMarketBars(
     });
   }
 }
+/** Reconstruct one retained day inside the caller transaction, using bounded cursor batches. */
+export async function retainedMarketDay(
+  client: pg.Client,
+  chain: 1 | 369,
+  source: string,
+  day: number,
+  signal: AbortSignal,
+): Promise<Observation> {
+  let result: Observation = {
+    open: null,
+    high: null,
+    low: null,
+    close: null,
+    volume: null,
+    liquidity: null,
+    intervals: 0,
+    expectedIntervals: 1440,
+    coverage: 'missing',
+    sourceTime: null,
+    observedTime: null,
+    blockNumber: null,
+    blockHash: null,
+    poolTime: null,
+  };
+  let lastInterval = -1,
+    volume = 0n,
+    hasVolume = true;
+  await client.query(
+    `DECLARE market_rows NO SCROLL CURSOR FOR SELECT interval_number,observation FROM hdd.market_samples
+  WHERE chain_id=$1 AND source=$2 AND contract_day=$3 ORDER BY source_time,identity`,
+    [chain, source, day],
+  );
+  for (;;) {
+    const { rows } = await client.query('FETCH FORWARD 128 FROM market_rows');
+    if (!rows.length) break;
+    for (const row of rows) {
+      signal.throwIfAborted();
+      const v = marketObservationSchema.parse(row.observation);
+      if (result.open === null) result.open = v.open;
+      if (!result.high || compare(v.high!, result.high) > 0) result.high = v.high;
+      if (!result.low || compare(v.low!, result.low) < 0) result.low = v.low;
+      result.close = v.close;
+      result.sourceTime = v.sourceTime;
+      result.observedTime = v.observedTime;
+      result.blockNumber = v.blockNumber;
+      result.blockHash = v.blockHash;
+      result.poolTime = v.poolTime;
+      result.liquidity = v.liquidity;
+      if (row.interval_number !== lastInterval) {
+        result.intervals++;
+        lastInterval = row.interval_number;
+      }
+      if (v.volume === null) hasVolume = false;
+      else volume += BigInt(v.volume);
+    }
+  }
+  await client.query('CLOSE market_rows');
+  result.volume = result.intervals && hasVolume ? volume.toString() : null;
+  result.coverage =
+    result.intervals === 1440 ? 'complete' : result.intervals ? 'partial' : 'missing';
+  result = marketObservationSchema.parse(result);
+  return result;
+}
 export async function finalizeMarkets(
   client: pg.Client,
   chain: 1 | 369,
@@ -400,59 +463,7 @@ export async function finalizeMarkets(
           await client.query('COMMIT');
           break;
         }
-        let result: Observation = {
-          open: null,
-          high: null,
-          low: null,
-          close: null,
-          volume: null,
-          liquidity: null,
-          intervals: 0,
-          expectedIntervals: 1440,
-          coverage: 'missing',
-          sourceTime: null,
-          observedTime: null,
-          blockNumber: null,
-          blockHash: null,
-          poolTime: null,
-        };
-        let lastInterval = -1,
-          volume = 0n,
-          hasVolume = true;
-        await client.query(
-          `DECLARE market_rows NO SCROLL CURSOR FOR SELECT interval_number,observation FROM hdd.market_samples
-        WHERE chain_id=$1 AND source=$2 AND contract_day=$3 ORDER BY source_time,identity`,
-          [chain, source, day],
-        );
-        for (;;) {
-          const { rows } = await client.query('FETCH FORWARD 128 FROM market_rows');
-          if (!rows.length) break;
-          for (const row of rows) {
-            signal.throwIfAborted();
-            const v = marketObservationSchema.parse(row.observation);
-            if (result.open === null) result.open = v.open;
-            if (!result.high || compare(v.high!, result.high) > 0) result.high = v.high;
-            if (!result.low || compare(v.low!, result.low) < 0) result.low = v.low;
-            result.close = v.close;
-            result.sourceTime = v.sourceTime;
-            result.observedTime = v.observedTime;
-            result.blockNumber = v.blockNumber;
-            result.blockHash = v.blockHash;
-            result.poolTime = v.poolTime;
-            result.liquidity = v.liquidity;
-            if (row.interval_number !== lastInterval) {
-              result.intervals++;
-              lastInterval = row.interval_number;
-            }
-            if (v.volume === null) hasVolume = false;
-            else volume += BigInt(v.volume);
-          }
-        }
-        await client.query('CLOSE market_rows');
-        result.volume = result.intervals && hasVolume ? volume.toString() : null;
-        result.coverage =
-          result.intervals === 1440 ? 'complete' : result.intervals ? 'partial' : 'missing';
-        result = marketObservationSchema.parse(result);
+        const result = await retainedMarketDay(client, chain, source, day, signal);
         const updated = await client.query(
           `INSERT INTO hdd.market_daily VALUES($1,$2,$3,$4) ON CONFLICT(chain_id,source,contract_day)
         DO UPDATE SET observation=excluded.observation WHERE hdd.market_daily.observation IS DISTINCT FROM excluded.observation`,

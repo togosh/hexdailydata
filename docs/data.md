@@ -472,4 +472,6 @@ market daily facts, consumer progress and remaining required samples using the e
 exact SQL row codec. It excludes live_metrics and export_bundles; imports cannot
 advertise nonexistent files or fresh old live observations. Older logical formats
 are rejected. A seed semantic audit checks rank cutoff/range/density and market
-metadata/coverage/bytes; these are ingestion checks, not ordinary serving queries.
+metadata/coverage/bytes. Retained days outside the pending dirty suffix are reaggregated
+with bounded cursors and compared to their stored observations, rejecting lost correction
+markers before inputs can be pruned. These are ingestion checks, not ordinary serving queries.

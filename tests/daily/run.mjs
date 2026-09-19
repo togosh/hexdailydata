@@ -244,8 +244,23 @@ try {
         'retired',
       );
       await verifyBundle(rebuilt);
+      sync = await engine(369);
+      await sync.once(signal, chain.plain(548));
+      await sync.audit(signal);
+      await rankAccounts(worker, 369, signal);
       await agePrior();
-      await service.build(369, signal);
+      const continued = await service.build(369, signal);
+      assert.notEqual(continued.id, rebuilt.id);
+      assert.equal(continued.currentIndex.blockNumber, '548');
+      assert.equal(continued.currentIndex.blockHash, hash(548).slice(2));
+      await verifyBundle(continued, await sqlRows());
+      measurements.restoreContinuation = {
+        restored: rebuilt.currentIndex,
+        continued: continued.currentIndex,
+        originalIds: before.map((b) => b.id),
+        rebuiltId: rebuilt.id,
+        continuedId: continued.id,
+      };
       assert.equal((await readdir('/exports')).filter((n) => uuid.test(n)).length, 2);
     });
   } else if (phase === 'import') {
@@ -263,6 +278,24 @@ try {
       );
       assert.equal((await api.query('SELECT count(*) FROM hdd.export_bundles')).rows[0].count, '0');
       assert.equal((await api.query('SELECT count(*) FROM hdd.live_metrics')).rows[0].count, '0');
+      await finalizeMarkets(worker, 1, 27, signal);
+      await pruneSamples(worker, 1);
+      assert.deepEqual(
+        (
+          await api.query(
+            "SELECT observation->'close' AS close FROM hdd.market_daily WHERE chain_id=1 AND source='consumer-audit' AND contract_day=20",
+          )
+        ).rows[0].close,
+        { numerator: '2', denominator: '1' },
+      );
+      assert.equal(
+        (
+          await api.query(
+            "SELECT count(*) FROM hdd.market_samples WHERE chain_id=1 AND source='consumer-audit'",
+          )
+        ).rows[0].count,
+        '0',
+      );
       await assert.rejects(
         () =>
           importSeed(
@@ -773,13 +806,63 @@ try {
     });
     await test('reader retirement, pause, cancelled stream, corruption and symlink refusal', async () => {
       await reader.startup(signal);
-      const current = (await reader.catalog(369)).bundles.find((b) => b.id === undefined);
       const id = (await api.query("SELECT id FROM hdd.export_bundles WHERE slot='current'")).rows[0]
         .id;
+      async function burst() {
+        const opened = await Promise.all(
+          Array.from({ length: 40 }, () => reader.openStream(id, 'stakes', signal)),
+        );
+        assert.equal(opened.filter((r) => r.status === 'available').length, 32);
+        assert.equal(opened.filter((r) => r.status === 'unavailable').length, 8);
+        for (const r of opened) if (r.status === 'available') r.stream.destroy();
+        await Promise.all(opened.filter((r) => r.status === 'available').map((r) => r.released));
+      }
+      await burst();
+      await burst();
+      const failed = new ExportService(async () => {
+        throw new Error('injected connection failure');
+      }, '/exports');
+      for (let i = 0; i < 40; i++)
+        await assert.rejects(
+          () => failed.openStream(id, 'stakes', signal),
+          /injected connection failure/,
+        );
+      const aborted = AbortSignal.abort(new Error('injected cancelled open'));
+      for (let i = 0; i < 40; i++)
+        await assert.rejects(
+          () => reader.openStream(id, 'stakes', aborted),
+          /injected cancelled open/,
+        );
+      await burst();
+      measurements.concurrentReaders = {
+        attempted: 40,
+        admitted: 32,
+        refused: 8,
+        repeats: 3,
+        failedConnections: 40,
+        abortedOpens: 40,
+      };
       const held = await reader.openStream(id, 'stakes', signal);
       assert.equal(held.status, 'available');
+      await worker.query(
+        "UPDATE hdd.export_bundles SET published_at=now()-interval '1 day' WHERE id=$1",
+        [id],
+      );
       await agePrior();
       await service.build(369, signal);
+      const priorAge = (
+        await api.query(
+          'SELECT extract(epoch FROM clock_timestamp()-published_at)*1000 AS ms FROM hdd.export_bundles WHERE id=$1',
+          [id],
+        )
+      ).rows[0].ms;
+      assert.ok(Number(priorAge) < 60000);
+      await assert.rejects(() => service.build(369, signal), /prior bundle grace/);
+      measurements.priorGrace = {
+        previousCurrentAgeMs: 86400000,
+        newPriorAgeMs: Number(priorAge),
+        immediatePublication: 'paused',
+      };
       await agePrior();
       await assert.rejects(() => service.build(369, signal), /active prior readers/);
       held.stream.destroy();
@@ -924,6 +1007,55 @@ try {
       );
       await assert.rejects(() => validateDailyState(worker, signal));
       await worker.query('ROLLBACK');
+      await configureMarket(worker, 1, 'consumer-audit', 'source-reported', 20);
+      const time = 1575331200 + 20 * 86400;
+      const bar = {
+        time,
+        revision: '0',
+        open: '1',
+        high: '1',
+        low: '1',
+        close: '1',
+        volume: null,
+        liquidity: null,
+      };
+      await importMarketBars(
+        worker,
+        { chain: 1, source: 'consumer-audit', bars: [bar] },
+        time + 86400,
+        signal,
+      );
+      await finalizeMarkets(worker, 1, 20, signal);
+      await importMarketBars(
+        worker,
+        {
+          chain: 1,
+          source: 'consumer-audit',
+          bars: [{ ...bar, revision: '1', open: '2', high: '2', low: '2', close: '2' }],
+        },
+        time + 86401,
+        signal,
+      );
+      await worker.query('BEGIN');
+      await validateDailyState(worker, signal); // A real pending correction remains portable.
+      await worker.query('ROLLBACK');
+      for (const dirty of [null, 21]) {
+        await worker.query('BEGIN');
+        await worker.query(
+          "UPDATE hdd.market_sources SET dirty_day=$1 WHERE chain_id=1 AND source='consumer-audit'",
+          [dirty],
+        );
+        await assert.rejects(
+          () => validateDailyState(worker, signal),
+          /Invalid portable market consumer/,
+        );
+        await worker.query('ROLLBACK');
+      }
+      measurements.consumerAudit = {
+        pendingCorrection: 'accepted',
+        lostDirtyMarker: 'rejected',
+        advancedDirtyMarker: 'rejected',
+      };
       const out = await exportSeed(worker, '/evidence/daily.seed.tar.gz', signal);
       await writeFile(
         '/evidence/seed-expectation.json',

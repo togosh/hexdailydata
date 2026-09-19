@@ -202,9 +202,12 @@ Lost commit acknowledgement is resolved against that same UUID. Unadvertised orp
 are cleaned before another build; cleanup only enumerates fixed member names inside
 ordinary owned UUID/work directories and refuses symlinks, hardlinks and unknown files.
 
-Retention is current + prior + at most one build. Prior receives60s grace and a shared
+Retention is current + prior + at most one build. Prior receives60s grace from its atomic
+slot transition (published_at records the current slot's start), and a shared
 reader advisory lease. New publication pauses when an active prior reader prevents
-retirement. Each API service permits32 active readers, each at most120s; the deployment
+retirement. Each API service reserves at most32 pending/active readers before connection
+setup, releasing admission after failed opens or stream cleanup; each stream lasts at
+most120s. The deployment
 contract remains one API process. Retired IDs admit no new readers. Prior remains
 published until its replacement is durable; its exclusive retirement lease prevents
 new readers during that build. After commit, retired files are removed. Cleanup failure

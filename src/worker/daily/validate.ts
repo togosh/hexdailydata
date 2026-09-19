@@ -1,5 +1,6 @@
 import type pg from 'pg';
-import { marketObservationSchema } from './market.ts';
+import { isDeepStrictEqual } from 'node:util';
+import { marketObservationSchema, retainedMarketDay } from './market.ts';
 import { rankingQuery } from './ranking.ts';
 /** Import/start-of-seed audit only, never an ordinary read or metric callback. */
 export async function validateDailyState(client: pg.Client, signal: AbortSignal) {
@@ -69,5 +70,32 @@ export async function validateDailyState(client: pg.Client, signal: AbortSignal)
     } finally {
       await client.query('CLOSE market_audit');
     }
+  }
+  // Retention removes whole days. A retained, supposedly consumed day must still
+  // agree with its inputs; otherwise a lost dirty marker could discard a correction.
+  await client.query(`DECLARE consumed_days NO SCROLL CURSOR FOR
+    SELECT DISTINCT m.chain_id,m.source,m.contract_day,d.observation
+    FROM hdd.market_samples m JOIN hdd.market_sources s USING(chain_id,source)
+    JOIN hdd.market_daily d USING(chain_id,source,contract_day)
+    WHERE m.contract_day<=s.through_day AND (s.dirty_day IS NULL OR m.contract_day<s.dirty_day)
+    ORDER BY m.chain_id,m.source,m.contract_day`);
+  try {
+    for (;;) {
+      const { rows } = await client.query('FETCH FORWARD 32 FROM consumed_days');
+      if (!rows.length) break;
+      for (const row of rows) {
+        const actual = await retainedMarketDay(
+          client,
+          row.chain_id,
+          row.source,
+          row.contract_day,
+          signal,
+        );
+        if (!isDeepStrictEqual(actual, row.observation))
+          throw new Error('Invalid portable market consumer progress.');
+      }
+    }
+  } finally {
+    await client.query('CLOSE consumed_days');
   }
 }

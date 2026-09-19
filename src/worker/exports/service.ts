@@ -132,11 +132,14 @@ export class ExportService {
     if (!uuid.test(id) || !datasets.includes(dataset))
       throw new Error('Invalid download identity.');
     if (this.readers >= maxReaders) return { status: 'unavailable' as const };
-    const c = await this.connect();
+    // Reserve admission before any asynchronous work, including connection setup.
+    this.readers++;
+    let c: pg.Client | undefined;
     let h,
       locked = false,
       handed = false;
     try {
+      c = await this.connect();
       const {
         rows: [l],
       } = await c.query('SELECT pg_try_advisory_lock_shared(hashtextextended($1,4247)) AS held', [
@@ -160,9 +163,8 @@ export class ExportService {
         return { status: 'unavailable' as const };
       }
       signal.throwIfAborted();
-      this.readers++;
-      handed = true;
       const stream = h.createReadStream({ autoClose: true, start: 0, signal });
+      const connection = c;
       const timer = setTimeout(
         () => stream.destroy(new Error('Download time bound exceeded.')),
         readerTimeoutMs,
@@ -171,18 +173,21 @@ export class ExportService {
       const released = new Promise<void>((resolve) =>
         stream.once('close', () => {
           clearTimeout(timer);
-          this.readers--;
-          void c
+          void connection
             .query('SELECT pg_advisory_unlock_shared(hashtextextended($1,4247))', [id])
             .catch(() => {})
-            .then(() => c.end().catch(() => {}))
-            .then(resolve);
+            .then(() => connection.end().catch(() => {}))
+            .then(() => {
+              this.readers--;
+              resolve();
+            });
         }),
       );
       c.on('error', () => stream.destroy(new Error('Download lock lost.')));
       c.on('end', () => {
         if (!stream.destroyed) stream.destroy(new Error('Download lock ended.'));
       });
+      handed = true;
       return {
         status: 'available' as const,
         stream,
@@ -193,12 +198,16 @@ export class ExportService {
       };
     } finally {
       if (!handed) {
-        await h?.close().catch(() => {});
-        if (locked)
-          await c
-            .query('SELECT pg_advisory_unlock_shared(hashtextextended($1,4247))', [id])
-            .catch(() => {});
-        await c.end();
+        try {
+          await h?.close().catch(() => {});
+          if (locked)
+            await c!
+              .query('SELECT pg_advisory_unlock_shared(hashtextextended($1,4247))', [id])
+              .catch(() => {});
+          await c?.end().catch(() => {});
+        } finally {
+          this.readers--;
+        }
       }
     }
   }
@@ -403,7 +412,7 @@ export class ExportService {
       await hook('before-publication', id);
       if (prior) await c.query('DELETE FROM hdd.export_bundles WHERE id=$1', [prior]);
       await c.query(
-        "UPDATE hdd.export_bundles SET slot='prior' WHERE chain_id=$1 AND slot='current'",
+        "UPDATE hdd.export_bundles SET slot='prior',published_at=clock_timestamp() WHERE chain_id=$1 AND slot='current'",
         [chain],
       );
       await c.query(
