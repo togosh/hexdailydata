@@ -18,7 +18,10 @@ function octal(value: number, width: number) {
   return s.padStart(width - 1, '0') + '\0';
 }
 function tarHeader(name: string, size: number) {
-  if (!/^(seed\.json|tables\/[a-z_]+\.ndjson)$/.test(name) || name.length >= 100)
+  if (
+    !/^(seed\.json|backup\.json|database\.sql|tables\/[a-z_]+\.ndjson)$/.test(name) ||
+    name.length >= 100
+  )
     throw new Error('Invalid seed member name.');
   const h = Buffer.alloc(512);
   h.write(name, 0, 100, 'ascii');
@@ -122,6 +125,7 @@ export async function readArchive(
   allowed: string[],
   visit: (name: string, size: number, content: AsyncIterable<Buffer>) => Promise<void>,
   signal: AbortSignal,
+  firstMember = 'seed.json',
 ) {
   const compressed = (await stat(path)).size;
   if (compressed > archiveLimits.totalBytes) throw new Error('Compressed seed exceeds bound.');
@@ -183,11 +187,11 @@ export async function readArchive(
       if (end < 1 || nameField.subarray(end).some((v) => v !== 0))
         throw new Error('Invalid seed member name encoding.');
       const name = nameField.subarray(0, end).toString('ascii');
-      if (!allowed.includes(name) || seen.has(name) || (seen.size === 0 && name !== 'seed.json'))
+      if (!allowed.includes(name) || seen.has(name) || (seen.size === 0 && name !== firstMember))
         throw new Error('Unknown, duplicate or misordered seed member.');
       seen.add(name);
       const size = readOctal(h.subarray(124, 136));
-      if (size > (name === 'seed.json' ? archiveLimits.manifestBytes : archiveLimits.memberBytes))
+      if (size > (name === firstMember ? archiveLimits.manifestBytes : archiveLimits.memberBytes))
         throw new Error('Seed member exceeds bound.');
       let left = size;
       async function* content() {

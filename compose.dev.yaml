@@ -1,0 +1,10 @@
+services:
+  api:
+    environment:
+      HDD_V2_MODE: development
+  worker:
+    environment:
+      HDD_V2_MODE: development
+  operator:
+    environment:
+      HDD_V2_MODE: development

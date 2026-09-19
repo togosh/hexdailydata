@@ -32,7 +32,7 @@ export async function cooldownFiles(
     async extend(until) {
       if (!Number.isSafeInteger(until) || until < 0) throw new Error('Invalid cooldown deadline.');
       const next = Math.max(until, await readOne(role));
-      await writeFile(path + '.tmp', String(next), { mode: 0o600, flush: true });
+      await writeFile(path + '.tmp', String(next), { mode: 0o640, flush: true });
       await rename(path + '.tmp', path);
     },
     async close() {},

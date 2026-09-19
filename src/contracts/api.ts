@@ -99,7 +99,7 @@ export const HomeResponseSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
     chain: ChainKeySchema,
-    mode: z.enum(['development', 'live']),
+    mode: z.enum(['development', 'production']),
     daily: DailyHeadlineSchema.nullable(),
     live: z.strictObject({
       price: observationSchema(PriceValueSchema),
@@ -168,7 +168,7 @@ export const ApiErrorSchema = z.strictObject({
   requestId: z.string().max(128),
 });
 export const StatusResponseSchema = z.strictObject({
-  mode: z.literal('development'),
+  mode: z.enum(['development', 'production']),
   chain: ChainKeySchema,
   state: z.enum(['uninitialized', 'syncing', 'current', 'degraded']),
   productionReady: z.literal(false),

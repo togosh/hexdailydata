@@ -364,7 +364,7 @@ export class ExportService {
         // Keep both published bundles until durable replacement. The exclusive lease
         // pauses new prior readers; it cannot displace an already active reader.
       }
-      await mkdir(join(this.root, work), { mode: 0o700 });
+      await mkdir(join(this.root, work), { mode: 0o750 });
       await c.query('SELECT pg_advisory_lock_shared(4243,0)');
       pin = true;
       await c.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
@@ -377,7 +377,7 @@ export class ExportService {
       let total = 0;
       for (const dataset of datasets) {
         bounded.throwIfAborted();
-        const h = await open(join(this.root, work, dataset + '.csv'), 'wx', 0o600);
+        const h = await open(join(this.root, work, dataset + '.csv'), 'wx', 0o640);
         const digest = createHash('sha256');
         let rows = 0n,
           bytes = 0;
@@ -430,7 +430,7 @@ export class ExportService {
         ...identity,
         files,
       });
-      const mh = await open(join(this.root, work, 'manifest.json'), 'wx', 0o600);
+      const mh = await open(join(this.root, work, 'manifest.json'), 'wx', 0o640);
       try {
         await mh.writeFile(JSON.stringify(bundle) + '\n');
         await mh.sync();

@@ -1,4 +1,5 @@
 ﻿import pg from 'pg';
+import { secret } from './secret.ts';
 
 export type DbRole = 'api' | 'worker' | 'migrator';
 export interface DatabaseConfig {
@@ -13,7 +14,7 @@ export function databaseConfig(role: DbRole, env = process.env): DatabaseConfig 
     host: env.HDD_V2_DB_HOST ?? '',
     database: env.HDD_V2_DB_NAME ?? '',
     user: `hdd_v2_${role}`,
-    password: env[`HDD_V2_${role.toUpperCase()}_PASSWORD`] ?? '',
+    password: secret(env, `HDD_V2_${role.toUpperCase()}_PASSWORD`) ?? '',
     instance: env.HDD_V2_DB_INSTANCE ?? '',
   };
   if (

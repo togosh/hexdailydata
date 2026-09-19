@@ -1,29 +1,155 @@
-# Development only; Task08 owns the production profile.
-name: ${HDD_V2_PROJECT:?Set a unique hexdailydata-v2 project name}
+name: ${HDD_V2_PROJECT:?Use scripts/operator/host.mjs init}
+x-app: &app
+  image: ${HDD_V2_IMAGE:?Explicit tested release image required}
+  user: '1000:1000'
+  read_only: true
+  cpus: 0.25
+  mem_limit: 512m
+  memswap_limit: 512m
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs: ['/tmp:size=16m,mode=1777']
+  networks: [private]
+  stop_grace_period: 20s
+x-db-env: &db-env
+  HDD_V2_DB_HOST: db
+  HDD_V2_DB_NAME: hexdailydata_v2
+  HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE:?Explicit instance required}
+  HDD_V2_PROJECT: ${HDD_V2_PROJECT}
+  HDD_V2_MODE: production
+  HDD_V2_ALLOW_LIVE_RPC: 'false'
+x-worker-env: &worker-env
+  <<: *db-env
+  HDD_V2_WORKER_PASSWORD_FILE: /run/secrets/worker
+  HDD_V2_STORAGE_PATH: /state
+  HDD_V2_EXPORT_PATH: /exports
+  HDD_V2_PROVIDER_STATE: /provider
+  HDD_V2_MAINTENANCE_PATH: /maintenance
+  HDD_V2_BACKUP_PATH: /backup
+  HDD_V2_BACKUP_IDENTITY_FILE: /run/secrets/backup
 services:
-  api:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile
-    ports:
-      - '127.0.0.1:${HDD_V2_HOST_PORT:-4320}:4320'
-    environment:
-      HDD_V2_MODE: development
-      HDD_V2_ALLOW_LIVE_RPC: 'false'
-      HDD_V2_HTTP_HOST: 0.0.0.0
-      HDD_V2_HTTP_PORT: '4320'
+  db:
+    image: postgres:17.11-bookworm@sha256:e8587c2065ad04a2798579d86275e12c85b73b164ed2cacaa46693d636340d08
+    user: '999:999'
+    group_add: ['1000']
     read_only: true
+    cpus: 1.25
+    mem_limit: 2560m
+    memswap_limit: 2560m
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    tmpfs: [/tmp]
+    tmpfs: ['/tmp:size=16m,mode=1777', '/var/run/postgresql:uid=999,gid=999']
+    environment:
+      POSTGRES_DB: hexdailydata_v2
+      POSTGRES_USER: hdd_v2_admin
+      POSTGRES_PASSWORD_FILE: /run/secrets/admin
+      HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE}
+      HDD_V2_API_PASSWORD_FILE: /run/secrets/api
+      HDD_V2_WORKER_PASSWORD_FILE: /run/secrets/worker
+      HDD_V2_MIGRATOR_PASSWORD_FILE: /run/secrets/migrator
+    secrets: [admin, api, worker, migrator]
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./deploy/init-v2-db.sh:/docker-entrypoint-initdb.d/01-v2.sh:ro
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U hdd_v2_admin -d hexdailydata_v2']
+      interval: 2s
+      timeout: 2s
+      retries: 40
+  api:
+    <<: *app
+    networks: [private, ingress]
+    environment:
+      <<: *db-env
+      HDD_V2_API_PASSWORD_FILE: /run/secrets/api
+      HDD_V2_EXPORT_PATH: /exports
+      HDD_V2_PROVIDER_STATE: /provider
+    secrets: [api]
+    volumes: [exports:/exports:ro, provider:/provider]
+    ports: ['127.0.0.1:${HDD_V2_HOST_PORT:-4320}:4320']
+    depends_on:
+      db: { condition: service_healthy }
     healthcheck:
       test:
         [
-          'CMD',
-          'node',
+          CMD,
+          node,
           '-e',
-          "fetch('http://127.0.0.1:4320/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:4320/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
-      interval: 10s
+      interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 10
+  worker:
+    <<: *app
+    user: '1001:1000'
+    environment: *worker-env
+    secrets: [worker, backup]
+    command: [node, dist/worker/main.js, watch]
+    healthcheck:
+      test: [CMD, node, dist/operator/worker-health.js]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    volumes:
+      [state:/state, exports:/exports, provider:/provider, maintenance:/maintenance, backup:/backup]
+    depends_on:
+      db: { condition: service_healthy }
+  operator:
+    <<: *app
+    user: '1001:1000'
+    profiles: [tools]
+    environment:
+      <<: *worker-env
+      HDD_V2_API_PASSWORD_FILE: /run/secrets/api
+    secrets: [worker, api, backup]
+    entrypoint: [node, dist/operator/main.js]
+    volumes:
+      - state:/state
+      - exports:/exports
+      - provider:/provider
+      - maintenance:/maintenance
+      - backup:/backup
+      - ${HDD_V2_OPERATOR_INPUT:?Explicit input directory}:/input:ro
+  migrate:
+    <<: *app
+    profiles: [tools]
+    environment:
+      <<: *db-env
+      HDD_V2_MIGRATOR_PASSWORD_FILE: /run/secrets/migrator
+    secrets: [migrator]
+    command: [node, dist/operator/main.js, migrate]
+  volume-init:
+    <<: *app
+    profiles: [tools]
+    user: '0:0'
+    networks: !reset []
+    network_mode: none
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    volumes:
+      [
+        db_data:/db-data,
+        state:/state,
+        exports:/exports,
+        provider:/provider,
+        maintenance:/maintenance,
+        backup:/backup,
+      ]
+    command: [sh, '-ec', '/usr/local/bin/hdd-init-volumes']
+networks:
+  private: { internal: true }
+  ingress: {}
+volumes:
+  db_data:
+  state:
+  exports:
+  provider:
+  maintenance:
+  backup:
+secrets:
+  admin: { file: '${HDD_V2_SECRET_DIR}/admin' }
+  api: { file: '${HDD_V2_SECRET_DIR}/api' }
+  worker: { file: '${HDD_V2_SECRET_DIR}/worker' }
+  migrator: { file: '${HDD_V2_SECRET_DIR}/migrator' }
+  backup: { file: '${HDD_V2_SECRET_DIR}/backup.key' }

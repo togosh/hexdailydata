@@ -104,7 +104,13 @@ export const homeSql = `SELECT d.*, h.timestamp AS close_time,
  LEFT JOIN hdd.source_history sh ON sh.chain_id=$1
  LEFT JOIN LATERAL (SELECT * FROM hdd.daily_stats WHERE chain_id=$1 ORDER BY contract_day DESC LIMIT 1) d ON true
  LEFT JOIN hdd.blocks_recent h ON h.chain_id=d.origin_chain_id AND h.number=d.close_block`;
-export async function home(db: ReadDatabase, chain: ChainKey, signal: AbortSignal, now: number) {
+export async function home(
+  db: ReadDatabase,
+  chain: ChainKey,
+  signal: AbortSignal,
+  now: number,
+  mode: 'development' | 'production' = 'development',
+) {
   return db.read(signal, async (c) => {
     db.counters.dataQueries++;
     const {
@@ -113,7 +119,7 @@ export async function home(db: ReadDatabase, chain: ChainKey, signal: AbortSigna
     return HomeResponseSchema.parse({
       schemaVersion: 1,
       chain,
-      mode: 'development',
+      mode,
       daily: r.contract_day == null ? null : headline(r),
       live: metrics(r.metrics, chain, now),
       sync: {
@@ -144,6 +150,7 @@ export async function status(
   signal: AbortSignal,
   now: number,
   live = false,
+  mode: 'development' | 'production' = 'development',
 ) {
   let database: 'ready' | 'unavailable' | 'unconfigured' = db ? 'unavailable' : 'unconfigured';
   let streams: any[] = [];
@@ -204,7 +211,7 @@ export async function status(
     }
   const own = streams.find((s) => s.chain === chain);
   return StatusResponseSchema.parse({
-    mode: 'development',
+    mode,
     chain,
     state:
       database === 'unavailable'

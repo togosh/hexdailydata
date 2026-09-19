@@ -42,7 +42,7 @@ export class SyncEngine {
     pruneMs: 0,
     replayMs: 0,
     guardsMs: 0,
-    exports: 'NOT_IMPLEMENTED',
+    exports: 'scheduled_separately',
     lastError: null as string | null,
     cursor: null as string | null,
     target: null as string | null,

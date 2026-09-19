@@ -1,324 +1,250 @@
-﻿# HEXDailyData v2
+# HEXDailyData v2
 
-A read-only HEX data product, built in this new repository. PulseChain is the initial
-serving chain; required shared Ethereum-era HEX history retains its original identity.
+Read-only HEX data API, exact TypeScript domain calculations, PostgreSQL projections,
+resumable acquisition, daily history and five immutable CSV downloads. Tasks01–06 are
+accepted offline. Task08 adds the compiled operations path below. Task07 UI and Task09
+integrated qualification remain pending. There is no supplied live dataset, qualified
+provider profile, deployed site or production-readiness claim.
 
-**Task06 provides the versioned read API.** Fastify serves real bounded read models,
-health/status and the existing React shell. Exact domain rules and runtime DTOs are tested.
-Task02 adds isolated PostgreSQL migrations and incremental projection primitives.
-Task03 adds offline-tested acquisition, continuous sync, retention and portable seeds.
-Task05 adds daily ranks, compact market observations and five immutable CSV downloads.
-Task04 adds exact current metrics, a bounded reserve-price route, scheduled worker
-observations and callable live address services. See [the live contract](docs/live.md).
-No real data, live provider qualification or deployment is supplied.
-The shell displays unavailable values. Final UI design and reference-image comparison
-belong to Task07; this shell makes no visual-fidelity claim.
+## Prerequisites
 
-## Requirements
+- Node **24.21.0**, npm **11.19.0**; `.nvmrc` records the tested patch. No global install
+  or Codex settings change is required. Use your already provisioned compatible runtime.
+- Docker Engine/Desktop with Linux containers and Compose v2 supporting `!reset`.
+  Pinned Node24.21.0/PostgreSQL17.11 images and the lockfile are used by the Dockerfile.
+  Build needs legitimate npm/Debian/image registries; subsequent runtime is offline.
+- Space for source+target during a restore drill, with **8GiB AND 20% free after working
+  space**. Durable export/backup paths use Linux named volumes. Native Windows directory
+  fsync/publication is unsupported. Windows can launch all commands below, including
+  paths with spaces. Linux secret provisioning assumes the operator runs as UID/GID1000 (private directory700, role files640).
+- A fresh environment. Never reuse v1, an existing database/volume, inherited passwords
+  or a sibling repository. Nothing requires `.git`, planner files or prior `dist`.
 
-Use **Node 24.21.0** (the pinned, tested Node 24 LTS patch) with bundled npm 11.19.0.
-The system Node on the initial Windows host was 22.14.0 and failed preflight; switch
-runtimes before installing. `.nvmrc` records the tested version. No global setting or
-runtime installation is required by the project.
+## Start the compiled stack — Windows PowerShell
 
-Docker Desktop with Linux containers is optional for the local shell. The tested
-container images are Node 24.21.0 and PostgreSQL 17.11, pinned by digest in
-`deploy/Dockerfile` and `compose.database.yaml`. The database has no published host
-port. No legacy database, folder, credentials or scripts are runtime dependencies.
-
-## Fresh checkout
-
-Run from this repository root, using Node 24:
+Run from this source directory. Quotes around the environment directory are intentional.
 
 ```powershell
-node --version
 node scripts/preflight.mjs
+node scripts/operator/host.mjs init ".local/v2 environment" 4320
+node scripts/operator/host.mjs build ".local/v2 environment"
+node scripts/operator/host.mjs provision ".local/v2 environment"
+node scripts/operator/host.mjs release ".local/v2 environment"
+node scripts/operator/host.mjs compose ".local/v2 environment" run --rm -T operator status
+```
+
+## Start the compiled stack — Linux / single host
+
+These local commands are also the supported later single-host layout. They do not
+authorize access to a server, DNS, public TLS or deployment.
+
+```sh
+node scripts/preflight.mjs
+node scripts/operator/host.mjs init '.local/v2 environment' 4320
+node scripts/operator/host.mjs build '.local/v2 environment'
+node scripts/operator/host.mjs provision '.local/v2 environment'
+node scripts/operator/host.mjs release '.local/v2 environment'
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T operator status
+```
+
+Open <http://127.0.0.1:4320>. Choose a different free port as `init`'s last argument.
+`init` creates a unique project, instance UUID, four random role passwords and an input
+directory. `build` creates one local release image. `provision` generates a private age
+key, creates/checks owned volumes, initializes only their root ownership and applies
+migrations1–4. Repeating `provision` preserves existing state. Keep this environment's
+configuration and secrets; never rerun `init` to replace them.
+
+`release` stops API+worker, runs the migration check and starts both from the same
+immutable local image ID. Failure leaves API+worker stopped and the database retained.
+It is a coordinated maintenance action, not a distributed atomic/zero-downtime upgrade.
+The ordinary API/worker are UID1000/1001, read-only root, no capabilities/Docker socket. The
+API gets only its API secret and read-only exports; DB remains private with no host port.
+The API's ingress bridge permits loopback publishing; its provider access is disabled
+and no endpoint/profile is supplied. Worker/database/operator use only an internal
+network. This proves nonroot application containers, not a rootless Docker daemon.
+
+The normal stack reserves DB1.25CPU/2.5GiB and API+worker each .25CPU/.5GiB, leaving
+.25CPU/.5GiB for a one-shot operator/helper within2CPU/4GiB. Backups spawned inside the
+worker share its limit. Do not start extra worker/API replicas or stack multiple heavy
+operator jobs. The optional edge consumes .125CPU/128MiB; stop it during an additional
+helper measurement to retain the same cap. Build/Docker control overhead is separate.
+
+For the compiled development-mode Compose variant, keep the same isolated roles and
+volumes and run this after provisioning. Providers stay disabled. Return to the normal
+production-mode image pair with `host.mjs release`.
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 environment' -f compose.dev.yaml up -d --wait api worker
+```
+
+## Readiness and normal maintenance
+
+- `/health/live`: process can respond. `/health/ready`: configured private schema4 is
+  usable, including an empty install. Home returns503 until useful observations exist.
+- `/api/v2/status`: independently aged native/metric/market progress. Production mode
+  does **not** enable providers or change `productionReady:false`/live qualification.
+- `operator doctor` and `operator status`: bounded read-only runtime/schema/path/reserve,
+  publication metadata, backup age and restore-gap observations. Exit0 = DB and backup
+  healthy with usable configured paths, exit2 = usable DB with backup/path degradation,
+  exit3 = DB unavailable or unsupported runtime.
+  They do not hash all archives or probe providers. A fresh empty install remains
+  visibly uninitialized even if its empty database has a verified backup.
+- With no source profile the worker stays in standby; it performs ordinary daily/export
+  maintenance and bounded backup scheduling. It does not fabricate data or loop on RPC.
+  Backup errors degrade backup health independently of native API reads.
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 environment' restart api worker
+node scripts/operator/host.mjs compose '.local/v2 environment' logs --tail 30 api worker
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T operator doctor
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T operator exports
+```
+
+An empty export command fails explicitly. For data acquisition choose one interface:
+**empty** (normal initial state), **synthetic demonstration** (the isolated test command
+below), **seed** (an independently trusted seed plus explicit expectation), or **rebuild**
+(an owner-provisioned source profile and separately authorized live access). No qualified
+real seed download URL is supplied. A seed is not a recovery backup.
+
+The release operator exposes `migrate`, `rebuild`, `sync --once`, `sync --watch`,
+`repair-range <retained-block>`, `exports`, `seed-export <path>` and
+`seed-import <path> <expectation.json>`. These call the same worker/services as development.
+Use the `migrate` service for migration authority; operator has no migrator/admin secret.
+Place trusted inputs in the environment's `input/` (mounted read-only at `/input`) and
+write outputs to `/state`. On Linux, input files need group1000 read permission (mode640) and input directories mode750. For example:
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T migrate
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T operator seed-import /input/seed.tar.gz /input/seed-expectation.json
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T operator seed-export /state/seed.tar.gz
+```
+
+The seed expectation contains the **destination** instance UUID, trusted SHA256,
+contract, codeHash and checkpointHash; see [sync.md](docs/sync.md). Rebuild/sync/repair
+require explicit `HDD_V2_SOURCE_PROFILE`, provider endpoint environment variables,
+persistent `HDD_V2_PROVIDER_STATE`, `HDD_V2_STORAGE_PATH` and
+`HDD_V2_ALLOW_LIVE_RPC=true`. The default Compose intentionally does not enable them.
+Later authorized use needs an explicit reviewed Compose override for profile mounts,
+secrets/environment and worker egress; never add a public fallback or reuse old secrets.
+Ordinary source operation then uses durable progress across days without per-day grants.
+
+## Encrypted backup and new-target restore
+
+```sh
+node scripts/operator/host.mjs compose '.local/v2 environment' run --rm -T operator backup
+```
+
+This uses pg_dump17, a consistent exported snapshot, gzip/ustar and age. The backup
+destination holds `current.age`, its small `verified.json` receipt and at most one
+`candidate.age`. Replacement is accepted after reading/decrypting/checksumming bytes at
+the destination. Local staging is fixed and bounded. Restore is a separate proof.
+The default named volume **emulates** an off-host destination; it is not redundancy.
+An actual pre-provisioned durable mounted destination is described in
+[operations.md](docs/operations.md), and remains unqualified here.
+
+Keep the age identity separately from the encrypted recovery copy. Never put keys,
+passwords, ciphertext or DB files into a source/evidence ZIP. The daily planning RPO is
+24h, measured from the captured snapshot, not upload completion. A worker attempts a
+replacement after23h (one-hour safety margin); failures retry no sooner than one hour.
+More than24h is degraded. Up to24h of local market observations may be unrecoverable.
+Production destination/RPO/cost need owner qualification and acceptance.
+
+To restore, first create/build/provision another environment with a new project/UUID
+and new role secrets using the startup steps. **Do not start its worker yet.** Copy your
+trusted encrypted file to its `input/recovery.age`, and provision the recovery key as
+`input/restore.key` (Linux owner1000/group1000, mode640). The new environment keeps its own normal
+backup key. Create `input/expectation.json` with these explicit nonsecret values:
+
+```json
+{
+  "sha256": "COPY_THE_TRUSTED_VERIFIED_RECEIPT_SHA256",
+  "sourceInstance": "COPY_THE_BACKUP_SOURCE_UUID",
+  "destinationInstance": "COPY_THE_NEW_ENVIRONMENT_UUID",
+  "destinationProject": "COPY_THE_NEW_ENVIRONMENT_PROJECT"
+}
+```
+
+```sh
+node scripts/operator/host.mjs compose '.local/restored environment' run --rm -T -e HDD_V2_BACKUP_IDENTITY_FILE=/input/restore.key operator restore /input/recovery.age /input/expectation.json
+node scripts/operator/host.mjs compose '.local/restored environment' up -d --wait api
+node scripts/operator/host.mjs compose '.local/restored environment' run --rm -T operator status
+node scripts/operator/host.mjs release '.local/restored environment'
+```
+
+Restore refuses a wrong identity, unrelated/nonempty schema, incompatible backup,
+symlink/traversal path or bad integrity/key. There is no force/reset flag. Data import
+and validation commit together into the existing schema; no archive SQL or old grants
+execute. Destination identity/role secrets survive. Provider permissions are not restored;
+known cooldown plus restart quarantine are retained. See the returned restore record for
+the unknown market-observation gap. Restored live observations keep their old timestamps.
+
+CSV bytes are excluded. Native reads can serve before downloads rebuild. Old missing
+bundles remain unavailable; worker regeneration uses new IDs. The running API refreshes
+publication verification independently, including retries after cancellation/failure.
+
+## Update, rollback, edge and cleanup
+
+For a source update run `build` then `release` against the same environment. The config
+records the accepted image ID and one previous compatible ID. `rollback` selects that
+previous image and reruns its migration compatibility check; it never downgrades data.
+Only schema-compatible code rollback is supported. The release action retires only an older image labeled for its own project, without force; in-use images are retained and reported. Never use global prune.
+
+```sh
+node scripts/operator/host.mjs rollback '.local/v2 environment'
+node scripts/operator/host.mjs compose '.local/v2 environment' -f compose.edge.yaml --profile edge up -d edge
+```
+
+The optional local Caddy edge serves <http://127.0.0.1:4322> with automatic HTTPS off and
+no access logs. `deploy/Caddyfile.example` is the later public TLS template; actual
+TLS/DNS/accounts/firewall/reboot are NOT_RUN. Public use requires separate authorization.
+
+Stop without deleting data: `... compose '<environment>' stop`. For a **disposable**
+environment only, inspect `environment.json` then pass its exact project name:
+
+```sh
+node scripts/operator/host.mjs destroy '.local/v2 environment' hexdailydata-v2-COPY_EXACT_PROJECT_SUFFIX
+```
+
+Cleanup refuses unknown volume ownership. It removes only that project's resources,
+preserving source, configuration, secrets and evidence for deliberate separate handling.
+
+## Development and offline witnesses
+
+```sh
 npm ci
 npm run typecheck
 npm test
 npm run build
-npm run doctor
 npm start
 ```
 
-Open <http://127.0.0.1:4320>. `npm start` serves the compiled API and React assets.
-Stop with Ctrl+C. A fresh source ZIP supports the same commands without Git or the
-sibling repository. One root `package-lock.json` pins all tested dependencies.
+The local shell is at4320 and has no DB by default. `npm run dev` runs API4320/Vite4321;
+no `.env` is loaded automatically. `npm run doctor` uses the compiled operator and
+returns3 for an unconfigured DB. Linux containers provide the supported durable path.
 
-For editing, use `npm run dev` and open <http://127.0.0.1:4321>. It starts the API on
-4320 and Vite on 4321; Ctrl+C stops both. Vite proxies `/api` and `/health` to the API.
-These fixed development ports must be free. Alternatively use `npm run dev:api` and
-`npm run dev:web` in separate terminals. The compiled server supports
-`HDD_V2_HTTP_PORT` and `HDD_V2_HTTP_HOST`; the combined dev proxy uses the default API
-port. Host defaults to loopback. No `.env` file is loaded automatically; supply
-variables in your shell or Compose environment. `.env.example` lists development options.
+From a fresh **source-only** directory, the following documented witness creates new
+isolated environments, runs the exact startup/operator path above, injects a visibly
+synthetic transport into the compiled worker only in the test helper, makes an encrypted
+backup, restores into a new identity, compares exact forward checkpoints and removes its
+own Docker resources. It needs only Node/Docker; image/package caches may be reused.
+The release API/worker mount no test/source/planner folders. Its helper is a separate
+bounded test process. Tests do not contact blockchain providers or v1.
 
-- `/health/live`: 200 while the API process can serve requests.
-- `/health/ready`: 200 when the configured private DB and schema4 are usable, including an empty schema; otherwise 503.
-- `/api/v2/status`: native stream cutoffs, coverage, independently aged metrics and market progress; production qualification remains false.
-- `/api/v2/home`: compact daily facts and four independently aged observations; useful partial data returns 200, fully uninitialized data 503.
-- All routes in [interfaces.md](docs/interfaces.md) are implemented. Unknown routes return 404; write methods return 405.
-
-`HDD_V2_MODE` defaults to `development`. Live access defaults OFF. An explicit address-service
-opt-in requires the existing source profile, persistent shared cooldown directory and private
-API database configuration; no provider URL comes from a request. Do not enable it as part
-of offline acceptance. `doctor` checks
-local tooling/configuration only; capability and cost results remain unmeasured.
-
-## Isolated containers
-
-API-only development needs no database secret. In PowerShell:
-
-```powershell
-$env:HDD_V2_PROJECT = "hexdailydata-v2-dev-$([guid]::NewGuid().ToString('N').Substring(0,8))"
-$env:HDD_V2_HOST_PORT = '4320'
-docker compose up --build -d --wait api
+```sh
+node scripts/test-ops.mjs
+node scripts/test-ops.mjs --scale
+node scripts/test-ops-lifecycle.mjs
 ```
 
-Choose another free host port if needed. Compose requires an explicit project name;
-use a new v2-specific name for each disposable run. Containers use their own project
-network. The API runs as UID 1000 with a read-only filesystem, no Linux capabilities,
-and no privilege escalation. This is a non-root application process, not a claim
-that the Docker daemon itself runs rootless.
+The scale variant reuses only the existing1M-stake/500k-account **shape** generator for
+streaming backup/restore measurement. It is not valid source replay or a full-scale seed
+audit; the small fixture separately audits retained recovery and exact forward replay.
+Evidence is under ignored `artifacts/task-08/<run>/`; secrets/data there are not delivery
+material. Keep failed runs as actual evidence, not just the successful receipts.
 
-For an optional **new, disposable** database, set `HDD_V2_POSTGRES_PASSWORD` to a new
-v2-only local password, then:
-
-```powershell
-docker compose -f compose.yaml -f compose.database.yaml up -d --wait
-```
-
-PostgreSQL runs as UID 999 and uses this project's new `db_data` volume. This optional Task01 smoke database does not apply migrations or connect the API to SQL.
-Use the separate Task02 environment below to exercise the qualified schema/roles.
-To remove only this disposable project's containers/network/volume, keep the same
-`HDD_V2_PROJECT` value and run:
-
-```powershell
-docker compose -f compose.yaml -f compose.database.yaml down --volumes
-```
-
-Do not use that cleanup on data you intend to keep. Never use global prune or an old
-project/volume name. Task08 owns production deployment and backup/restore.
-
-## Checks
-
-```powershell
-npm run format:check
-npm run typecheck
-npm test
-npm run build
-npm run test:containers
-npm run test:browser
-```
-
-Unit/domain/DTO/loopback tests are offline. The container check builds from the lockfile,
-creates a random v2 project and password, checks real PostgreSQL identity, non-root
-UIDs, health and built assets, then removes its own containers/network/volume/image.
-Image/package downloads are allowed; no blockchain endpoints are accessed.
-
-The browser check uses installed Google Chrome by default with a fresh temporary
-browser profile. Set `HDD_V2_BROWSER_CHANNEL=chromium` and install Playwright Chromium
-with `npx playwright install chromium` if Chrome is absent. Screenshots go to ignored
-`artifacts/task-01/`. This verifies the shell, not Task07 aesthetics or populated data.
-`npm run format` formats implementation files; untouched planning documents are excluded.
-
-## Contracts and boundaries
-
-`src/domain` is pure exact bigint arithmetic: units, UTC protocol days, lifecycle
-settlement effects, inclusion sets and mean-of-daily-ratios payout presets. Definitions,
-hand-worked vectors, presentation rounding and fork requirements are in
-[docs/data.md](docs/data.md). Runtime Zod schemas and inferred public types live in
-`src/contracts/api.ts`. [The DTO example](tests/fixtures/home.json) is synthetic test
-input, never runtime data. The five CSV schemas remain in `src/contracts/datasets.json`.
-
-One npm package, one API/worker image, one PostgreSQL database. API and worker
-are separate process entry points. The SQL projection library has no RPC transport and
-serves the API when explicitly configured; the Task07 browser presentation remains pending.
-Worker commands fail explicitly until their owning tasks are built.
-
-## Isolated SQL projections (Task02)
-
-Run `npm run test:sql` after `npm ci`. It creates a new private Compose network,
-PostgreSQL17 volume and four random role passwords; applies/checks migration1; runs
-actual permission, recovery, daily, fork and million-row tests; and removes only that
-run's resources. Evidence goes to ignored `artifacts/task-02/`. PostgreSQL gets
-1.5 CPU/3 GiB, the Node test client 0.5 CPU/1 GiB (combined 2 CPU/4 GiB). Host Docker
-control and the existing desktop are outside that workload allocation. No DB host
-port, Docker socket, existing volume, provider or v1 path is used.
-
-For a focused correction/review run, set `HDD_V2_SQL_SCALE=0`; this skips only the
-million-row benchmark and does not constitute new scale evidence. The test clients
-run inside the private network, never via a localhost database fallback.
-
-For a new disposable database to inspect manually, use PowerShell:
-
-```powershell
-$env:HDD_V2_PROJECT = "hexdailydata-v2-sql-$([guid]::NewGuid().ToString('N').Substring(0,8))"
-$env:HDD_V2_DB_INSTANCE = [guid]::NewGuid().ToString()
-foreach ($role in 'ADMIN','MIGRATOR','WORKER','API') {
-  [Environment]::SetEnvironmentVariable("HDD_V2_$($role)_PASSWORD", [guid]::NewGuid().ToString('N'), 'Process')
-}
-New-Item -ItemType Directory -Force artifacts/task-02 | Out-Null
-docker compose -f compose.sql.yaml up -d --wait db
-docker compose -f compose.sql.yaml run --rm runner node src/db/main.ts migrate
-docker compose -f compose.sql.yaml run --rm runner node src/db/main.ts migrate
-```
-
-The second migration is a safe checksum/version check. Keep the same environment
-while inspecting this project. To remove only this disposable database/network:
-
-```powershell
-docker compose -f compose.sql.yaml down --volumes
-```
-
-The initdb script runs only on a fresh volume. Provisioning admin, non-superuser DDL
-migrator, write worker and read API are distinct roles. `connect(databaseConfig(role))`
-requires explicit host `db`, database `hexdailydata_v2`, instance UUID and that role's
-password, then checks the server/identity/role. Missing or incompatible targets fail.
-The manual migration command uses source files mounted by this development harness;
-production migration/operations packaging remains Task08.
-
-The library entry is `CanonicalWriter.acquire(dedicatedClient, chainId)`. Initialization
-compares two supplied constructor/fork states; commits compare two normalized source
-sets, headers, day-close checks and pinned payout observations before projection.
-Task03's worker supplies raw ABI decoding, receipt/code checks and acquisition.
-These tests use synthetic inputs. No production acceptance flag or fixture
-mode serves them as real data. Read the concrete checkpoint/seed mapping in
-[docs/data.md](docs/data.md#task02-persisted-checkpoint-contract).
-
-## Acquisition, sync and portable seeds (Task03)
-
-`npm run test:sync` provisions seven sequential, private, disposable PostgreSQL targets.
-It exercises raw transport -> rebuild -> streamed seed -> fresh import -> forward sync,
-then compares an otherwise identical rebuild with retention pinned by a lagging consumer.
-The Node runner and PostgreSQL share the same 2 CPU/4 GiB allocation described above.
-Evidence and synthetic seeds go to ignored `artifacts/task-03/`; generated seeds are not
-release artifacts. `HDD_V2_SYNC_TEST_PHASE=build|early-import|import|unpruned|sparse-build|sparse-import|busy` selects a focused phase;
-import/unpruned require the matching build fixture artifacts, never a production seed.
-`sparse-import` requires `sparse-build`. `HDD_V2_SYNC_EVIDENCE` selects a new directory
-under repository artifacts; the acquisition follow-through uses `artifacts/task03-acquisition/`.
-The sparse fixture generates skipped headers lazily; the busy fixture forces bounded splits.
-
-Worker entry: `node src/worker/main.ts help` (or compiled `dist/worker/main.js`). Commands
-are `rebuild`, `once`, `watch`, `repair-range <retained-block>`, `seed-export <file>` and
-`seed-import <file> <expectation.json>`. Status is local and does not contact providers.
-Every DB command requires the explicit v2 target/role/instance configuration above.
-Run `db:migrate` with the migrator to apply/check ordered migrations 1–4. Migration 1
-is unchanged; migration 2 adds only acquisition coverage, recovery pins and seed sequence
-authority. The API remains read-only; Task06 wires stored reads while the Task07 shell remains pending.
-Migration3 adds only disposable latest observations, independent of native bootstrap.
-`npm run test:live` creates a fresh Task04 SQL project and uses raw synthetic providers;
-`npm test` includes offline live-service and scheduler checks. The source-only seed
-contract is format3/schemaVersion4; current overlays are excluded and start unavailable
-after a fresh import. No pre-existing schema/seed compatibility layer is supplied.
-
-Provider commands fail closed unless `HDD_V2_ALLOW_LIVE_RPC=true`, `HDD_V2_SOURCE_PROFILE`,
-`HDD_V2_PROVIDER_STATE`, and `HDD_V2_STORAGE_PATH` are explicit. The profile is validated
-by `src/worker/sync/profile.ts`: both chains' source IDs/operators/account groups and
-endpoint **environment variable names**, deployed code hash, constructor receipt and
-balances (including explicitly verified zero supply), fork parent/entry, finality policy,
-and frozen rebuild target. There are no default real endpoints, constructor/fork guesses,
-or synthetic runtime values. All supplied boundary identities are checked through the
-provider path. Filling these values is not authorization to run the early canary.
-
-Acquisition compares complete filtered log sets from both sources over explicit bounded
-numeric ranges, retaining actual event and boundary headers. Checked searches locate
-exact UTC closes without fetching every irrelevant block; range spans grow independently
-of event/header/byte limits. Only constructor verification reads transaction receipts.
-Sources can still share omissions. Known shared operators are rejected; unknown
-correlation is disclosed as null. Real capability, cost and14-day feasibility remain
-unqualified. See [the acquisition contract](docs/sync.md) for sparse coverage, recovery
-and the work accounting limits.
-One process-role session lock owns the worker quota files. Keep the quota directory
-persistent and shared with the eventual API process: fixed disjoint dispatch slots and
-non-borrowing lanes enforce the combined ceiling; retries and aliases do not add quota.
-Every process starts with a 60-second quiet period and honors both roles' persisted
-cooldowns. Extra replicas are unsupported. Task04 owns actual live API callers.
-
-Seed export is a consistent, streamed logical snapshot in a strict format2 `seed.tar.gz` archive. Format1 and unsupported old acceptance metadata are refused.
-Import requires an empty migrated target, its instance UUID, trusted archive SHA-256,
-contract/code identity and checkpoint hash in the expectation file. It preserves the
-destination instance and roles. Entire imports commit atomically after hashes, exact
-row types, native totals/owners/schedules, raw events, lineage and recovery-tail checks.
-Before-image JSON stays SQL text, including numbers above 2^53. Heap byte counters are
-recomputed after logical import. A trusted hash identifies a seed; it cannot establish
-chain truth by itself. Final independent live comparison remains Task10.
-
-Pruning uses seven days of **replay progress**, bounded checkpoint prefixes and durable
-`transfer_consumer`, `recovery`, `backup`, or `export` pins. Seed snapshots hold a shared
-maintenance lock. Pending payouts retain their daily rows, not unrelated transfers.
-Capacity/disk pressure pauses rather than deleting protected data. `repair-range` only
-rewinds a retained confirmed checkpoint; finalized or beyond-window disagreement stops.
-
-## Continue one task at a time
-
-Read [AGENTS.md](AGENTS.md), [product scope](docs/product.md), and the selected
-[build task](docs/build-plan.md). `node scripts/task.mjs next` shows eligible work.
-The main session writes code; one independent read-only reviewer checks the frozen
-candidate using the bounded review loop. No push, deployment, live validation, or
-next-task implementation is automatic.
-
-See [progress](docs/progress.md) for reviewed commits and local report locations,
-[reference ledger](docs/reference.md) for selectively reused definitions and licensing,
-[architecture](docs/architecture.md), [API interfaces](docs/interfaces.md),
-[testing](docs/testing.md), and [operations](docs/operations.md) for later-task contracts.
-`VALIDATION.md` is the historical starter report, not evidence of the current build.
-
-## Daily jobs and immutable exports (Task05)
-
-Run `npm run test:daily` for fresh, private SQL/file targets: schema3 upgrade, raw
-market intervals, ranking, streamed publication, process-kill recovery, seed import,
-DB-only restore and the million-stake/500,000-account export. Set
-`HDD_V2_DAILY_EVIDENCE` to a new directory under artifacts; phase selection is
-`HDD_V2_DAILY_TEST_PHASE=functional|import|restore|scale`. Import/restore use the
-matching functional artifacts. The harness removes only its own projects/volumes.
-
-Offline commands use the existing explicit v2 worker database configuration:
-`node src/worker/main.ts daily` coalesces due work; `node src/worker/main.ts export`
-forces a new bundle. Both require an existing empty/owned `HDD_V2_EXPORT_PATH` and
-need no live-provider flag. Normal watch runs the same jobs alongside metrics; bulk
-rebuild publishes at its accepted endpoint. Filesystem durability failures leave
-exports unavailable. Linux directory fsync is required for publication; Windows
-limitations are reported by the actual filesystem test, not silently waived.
-
-The narrow offline venue input is `market-import <file>`, with a bounded
-`HDD_V2_MARKET_PROFILE` JSON containing `chain, source, fromDay, method`
-(method `source-reported`). See data.md for the minute-bar wire format and limits.
-No real market history endpoint or canary was enabled. Public download routes,
-Home integration and UI remain Task06/07.
-
-## Task06 API configuration and offline acceptance
-
-An unconfigured API is a useful liveness/status shell and reports unavailable data. To
-serve stored data, supply `HDD_V2_DB_HOST=db`, `HDD_V2_DB_NAME=hexdailydata_v2`, the
-existing v2 `HDD_V2_DB_INSTANCE`, and `HDD_V2_API_PASSWORD` in the private container
-network. Only the API credential is supplied to the API. The worker/migrator owns schema
-and data preparation. Schema4 and the instance/role are checked when opening a SQL
-connection. No new migration or seed format is introduced by Task06.
-
-`HDD_V2_EXPORT_PATH` optionally identifies the existing worker-owned export directory.
-Mount it read-only. A single coalesced refresh checks current/prior publication metadata
-every five seconds and hashes only new or changed file identities, outside request
-handlers. Missing files, unsupported Windows publication durability, or verification in
-progress do not prevent native API readiness. An unchanged failed verification is retried
-when file/publication metadata changes. Windows read access needs no directory fsync;
-Task05 durable publication remains a Linux-volume operation.
-
-```powershell
-npm run openapi
-npm run openapi:check
-npm run test:api
-$env:HDD_V2_API_SCALE = '1'
-npm run test:api
-Remove-Item Env:HDD_V2_API_SCALE
-```
-
-The API suite provisions a fresh private PostgreSQL target, real Linux export files,
-source HTTP services and the compiled nonroot image. Its unique image/network/volumes
-are removed afterward. API, synthetic worker and SQL workloads fit a combined 2 CPU /
-4 GiB allocation; host Docker control/builds are outside measured runtime. Evidence
-is written under ignored `artifacts/task-06/`. Tests never contact live providers.
-Generated OpenAPI comes from the same route inventory and runtime schemas. Read the
-query defaults, errors, cache semantics and limits in [interfaces.md](docs/interfaces.md).
-No Task07 redesign, Task08 operations stack, canary, production or live qualification
-is supplied by this API implementation.
+Affected checks: `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`,
+`npm run openapi:check`, `npm run test:sync`, `npm run test:daily`, `npm run test:api`.
+Existing focused switches/evidence are described in [testing.md](docs/testing.md).
+The whole-product Task09 scale/traffic suite and all live/canary/cost qualification remain
+separate. See [product](docs/product.md), [data](docs/data.md), [interfaces](docs/interfaces.md),
+[live](docs/live.md), [operations](docs/operations.md) and [progress](docs/progress.md).

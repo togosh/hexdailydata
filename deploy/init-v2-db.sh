@@ -1,5 +1,9 @@
 #!/bin/sh
 set -eu
+# Read only explicitly mounted role files, keeping values out of argv/output.
+if [ -n "${HDD_V2_API_PASSWORD_FILE:-}" ]; then HDD_V2_API_PASSWORD=$(cat "$HDD_V2_API_PASSWORD_FILE"); export HDD_V2_API_PASSWORD; fi
+if [ -n "${HDD_V2_WORKER_PASSWORD_FILE:-}" ]; then HDD_V2_WORKER_PASSWORD=$(cat "$HDD_V2_WORKER_PASSWORD_FILE"); export HDD_V2_WORKER_PASSWORD; fi
+if [ -n "${HDD_V2_MIGRATOR_PASSWORD_FILE:-}" ]; then HDD_V2_MIGRATOR_PASSWORD=$(cat "$HDD_V2_MIGRATOR_PASSWORD_FILE"); export HDD_V2_MIGRATOR_PASSWORD; fi
 # Runs only during initdb of a NEW task-owned volume. No runtime role owns DDL.
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<'SQL'
 \getenv instance HDD_V2_DB_INSTANCE

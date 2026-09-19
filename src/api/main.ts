@@ -8,8 +8,12 @@ try {
   const dependencies = await openDependencies(process.env);
   const app = createApp(
     import.meta.url.endsWith('.js')
-      ? { webRoot: fileURLToPath(new URL('../web/', import.meta.url)), dependencies }
-      : { dependencies },
+      ? {
+          webRoot: fileURLToPath(new URL('../web/', import.meta.url)),
+          dependencies,
+          mode: config.mode,
+        }
+      : { dependencies, mode: config.mode },
   );
   try {
     await app.listen(config);
@@ -21,7 +25,7 @@ try {
   console.log(
     JSON.stringify({
       event: 'listening',
-      mode: 'development',
+      mode: config.mode,
       host: config.host,
       port: typeof address === 'object' && address ? address.port : null,
     }),

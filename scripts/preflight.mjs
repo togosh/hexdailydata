@@ -20,8 +20,8 @@ if (oldFolderNames.includes(path.basename(root).toLowerCase())) {
 }
 
 const [major, minor] = process.versions.node.split('.').map(Number);
-if (major < 22 || (major === 22 && minor < 16)) {
-  throw new Error('Use Node 24 LTS. Starter checks require at least Node 22.16.');
+if (major !== 24 || minor < 21) {
+  throw new Error('Use the supported Node24.21+ runtime; see README prerequisites.');
 }
 
 // Reading Git identity does not execute application code or package scripts.
@@ -33,19 +33,6 @@ if (git.status === 0 && fs.realpathSync(git.stdout.trim()) !== root) {
   throw new Error('The new folder is inside another Git repository.');
 }
 
-const referencePath = path.resolve(root, marker.referenceSibling);
-const reference = { present: fs.existsSync(referencePath), commit: null };
-if (reference.present) {
-  if (fs.realpathSync(referencePath) === root) {
-    throw new Error('Reference and target must differ.');
-  }
-  const result = spawnSync('git', ['-C', referencePath, 'rev-parse', 'HEAD'], {
-    encoding: 'utf8',
-    timeout: 10_000,
-  });
-  if (result.status === 0) reference.commit = result.stdout.trim();
-}
-
 console.log(
   JSON.stringify(
     {
@@ -53,8 +40,6 @@ console.log(
       root,
       targetNode: '24 LTS',
       observedNode: process.versions.node,
-      reference,
-      sourceOnlyReference: true,
       databaseAccess: false,
       providerAccess: false,
       productionReady: false,

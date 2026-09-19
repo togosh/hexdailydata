@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "doctor": "node scripts/doctor.mjs",
+    "doctor": "node dist/operator/main.js doctor",
     "worker:status": "node src/worker/main.ts status",
     "test:containers": "node scripts/test-containers.mjs",
     "test:browser": "node --test tests/browser/shell.test.mjs",
@@ -30,13 +30,16 @@
     "test:daily": "node scripts/test-daily.mjs",
     "test:api": "node scripts/test-api.mjs",
     "openapi": "node scripts/openapi.mjs",
-    "openapi:check": "node scripts/openapi.mjs --check"
+    "openapi:check": "node scripts/openapi.mjs --check",
+    "operator": "node dist/operator/main.js",
+    "test:ops": "node scripts/test-ops.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",
     "@noble/hashes": "2.0.1",
     "fastify": "5.12.5",
     "pg": "8.23.0",
+    "pg-copy-streams": "7.0.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"
@@ -44,6 +47,7 @@
   "devDependencies": {
     "@types/node": "24.13.6",
     "@types/pg": "8.23.1",
+    "@types/pg-copy-streams": "1.2.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",

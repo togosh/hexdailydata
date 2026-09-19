@@ -24,7 +24,10 @@
                     },
                     "mode": {
                       "type": "string",
-                      "const": "development"
+                      "enum": [
+                        "development",
+                        "production"
+                      ]
                     }
                   },
                   "required": [
@@ -481,7 +484,10 @@
                   "properties": {
                     "mode": {
                       "type": "string",
-                      "const": "development"
+                      "enum": [
+                        "development",
+                        "production"
+                      ]
                     },
                     "chain": {
                       "type": "string",
@@ -1084,7 +1090,7 @@
                       "type": "string",
                       "enum": [
                         "development",
-                        "live"
+                        "production"
                       ]
                     },
                     "daily": {

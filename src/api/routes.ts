@@ -36,7 +36,10 @@ export const routes = [
     path: '/health/live',
     query: none,
     params: none,
-    response: z.strictObject({ status: z.literal('live'), mode: z.literal('development') }),
+    response: z.strictObject({
+      status: z.literal('live'),
+      mode: z.enum(['development', 'production']),
+    }),
   },
   {
     id: 'ready',

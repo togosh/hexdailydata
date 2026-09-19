@@ -14,6 +14,7 @@ import { stakes, holders, indexedStake } from '../services/queries/lists.ts';
 export function createApp(
   options: {
     webRoot?: string;
+    mode?: 'development' | 'production';
     dependencies?: ApiDependencies;
     now?: () => number;
     admission?: { capacity: number; concurrent: number };
@@ -142,17 +143,24 @@ export function createApp(
       let body: unknown;
       switch (route.id) {
         case 'live':
-          body = { status: 'live', mode: 'development' };
+          body = { status: 'live', mode: options.mode ?? 'development' };
           break;
         case 'ready':
           await db().read(signal, (c) => c.query('SELECT 1'));
           body = { status: 'ready' };
           break;
         case 'status':
-          body = await status(deps.db, q.chain, signal, now(), Boolean(deps.addresses));
+          body = await status(
+            deps.db,
+            q.chain,
+            signal,
+            now(),
+            Boolean(deps.addresses),
+            options.mode,
+          );
           break;
         case 'home': {
-          body = await home(db(), q.chain, signal, now());
+          body = await home(db(), q.chain, signal, now(), options.mode);
           const h = body as Awaited<ReturnType<typeof home>>;
           if (!h.daily && Object.values(h.live).every((o) => o.value === null))
             throw new ApiFailure(

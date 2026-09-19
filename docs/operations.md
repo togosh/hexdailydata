@@ -8,8 +8,7 @@ for API/worker plus PostgreSQL and optional Caddy. No Kubernetes/Redis/message b
 Do not reuse old VPS paths, a host `hexstake` DB, or inherited credentials. Database
 port is not published by default. The local HTTP port is 127.0.0.1:4320, avoiding v1.
 
-Starter Compose is explicitly scaffold-only; task 08 writes/tests its production
-profile. Health checks distinguish live process, usable DB/schema, catching up, and
+The supported compiled Compose/release commands are in README. Health checks distinguish live process, usable DB/schema, catching up, and
 fully caught up. Use dependency health checks and actual API readiness after startup,
 not “container started” or transient systemd invocation IDs. One release command
 updates both API and worker with a tested schema compatibility procedure.
@@ -220,3 +219,91 @@ Exact old files may retain IDs only after digest verification. Other healthy SQL
 reads remain independent. Real directory fsync is tested on Linux; unsupported Windows
 acknowledgement is an explicit publication failure, not a successful durability claim.
 This is Task05's service recovery boundary, not Task08's production backup tooling.
+
+
+## Task08 supported offline operations path
+
+README is the fresh-install authority. One app image contains compiled API, worker and
+operator entrypoints, migrations, runtime dependencies/config, pg_dump17 and age.
+Images/lockfile remain pinned; pg-copy-streams is the small added dependency required
+to import bounded PostgreSQL COPY streams without executing archive SQL. No schema
+migration was needed: migrations1?4 and seed format3/schema4 are preserved.
+
+The application connects only to db/hexdailydata_v2 with its explicit instance UUID.
+Database roles remain separated. Initialization alone reads bootstrap credentials;
+API gets API only, worker gets worker and its backup identity, migration gets migrator.
+The operator maintenance service gets worker/API and the backup identity; it does not
+have DDL/admin authority. Provider state is a distinct persistent mount: both roles read both files, each UID writes only its own cooldown;
+API export storage is read-only. No runtime source/test/planner tree or Docker socket.
+Use secret files or explicit environment values, never both for a DB role. No dotenv,
+old-secret discovery or source credential defaults. Status does not echo their values.
+
+PostgreSQL snapshot export plus pg_dump --snapshot makes the metadata and dump coherent.
+The existing shared4243 snapshot lock prevents pruning during the dump; ordinary writers
+and API reads remain available. A separate4250 maintenance session lock bounds staging
+and releases on connection/process loss. A dump includes all hdd data except the installed
+migration registry, which remains owned by the destination release. It excludes identity
+schema/roles/passwords, generated CSVs, source, provider endpoints and all filesystem caches.
+The manifest allowlists source UUID, release, schema/calculation, capture time, cutoffs,
+known provider cooldown, dump length and hash. No environment/command is taken from it.
+
+Standard ustar+gzip is encrypted with age using a separately provisioned X25519 identity.
+The private POSIX destination must support durable files, directory fsync and atomic
+same-directory rename. Object-store sync folders lacking these semantics are unsupported.
+Source tools: [pg_dump17](https://www.postgresql.org/docs/17/app-pgdump.html),
+[PostgreSQL restore warning](https://www.postgresql.org/docs/17/app-pgrestore.html),
+[age](https://github.com/FiloSottile/age). Source SQL is never executed during restore:
+only current-schema allowlisted COPY table/column data goes through pg-copy-streams.
+Expected SHA256/source/destination IDs are operator input, not archive-selected targets.
+Current projections and daily/market invariants are checked before atomic acceptance.
+A backup is not an arbitrary untrusted SQL import authorization. Full seed/raw-event and
+retained rewind audits are separately exercised on the genuine small replay fixture;
+the volume-scale synthetic shape is not advertised as a full-scale seed audit.
+
+Backup maximum ciphertext, packed file and SQL member is8GiB each (fail closed, do not
+truncate). A single fixed private staging directory may contain SQL plus compressed
+archive during creation, then only the decrypted verification archive. At destination,
+current.age survives until candidate.age authenticates, parses and matches the snapshot
+manifest/dump hash. Destination bytes are hashed and read back. Rename replaces the
+single accepted ciphertext; the receipt is atomically replaced afterwards. A crash in
+between yields an unverified/degraded receipt, not a fabricated newer healthy timestamp.
+A subsequent backup may replace that already verified ciphertext. Failed candidates
+are overwritten on the next attempt under the lock; no archive-per-date retention.
+Key loss is unrecoverable; keep recovery keys separately and test them in a new target.
+
+A real mounted off-host destination can replace only the backup volume with a separately
+provisioned POSIX mount owned by UID1001/group1000. Set a Compose override's backup volume driver
+options to type=none, o=bind, device=the explicit mount path. Do not have volume-init
+chmod/chown that mounted destination: override its volumes to omit backup, and provision
+permissions beforehand. Verify the mount is actually off-host and supports the durability
+semantics above before production. No such remote mount/account/host is used here;
+local named-volume tests are an emulator, never off-host redundancy. Keep one destination
+per source instance; a different source identity may not overwrite its accepted copy.
+
+Restoring needs a new, empty, already migrated identified project and owned Linux paths.
+It never drops schemas, installs archive functions, restores role grants or overwrites
+identity. COPY import, reconciliation and checkpoint acceptance share one transaction.
+Missing exports remain unavailable until existing publication services rebuild new IDs.
+Native reads do not wait for their bytes. Old observations keep source/collection times.
+The restore record names source provenance and the unknown local-market loss interval;
+upstream native replay cannot fill it. Known cooldown is retained and at least one fresh
+quota window is quarantined. Post-snapshot provider backoff is unknowable after total loss;
+providers remain disabled until the operator separately provisions an authorized profile
+and reconciles any known external cooldown. A restored manifest never enables providers.
+
+The worker schedules normal backups without a host timer/service. A snapshot aged23h
+triggers replacement, failures retry no more often than hourly, and age>24h degrades
+backup protection. This is a24h planning default, not measured production RPO. A large
+or stalled backup can miss it; capture time, verification time and restore drill evidence
+are distinct. Native Home availability is independent of backup health. A daily backup
+can lose up to24h of local market observations; production RPO/destination still need
+owner acceptance. The existing30?40 compute+disk,3?5 backup,5?10 provider and remaining
+traffic/tax budget allocations remain planning arithmetic within60USD, not vendor quotes
+or an assumption that off-host storage/providers are free.
+
+Release stops API and worker, checks migrations with the selected image, starts both and
+checks readiness/image identity. Failed partial release stops both; DB is retained for a
+corrected release or compatible rollback. It does not claim zero downtime, data downgrade,
+container reboot equivalence to host reboot, automatic future-schema compatibility, or
+Task06 support for new operator commands. Keep only current and needed previous image;
+remove older explicitly identified task-owned images without global prune.

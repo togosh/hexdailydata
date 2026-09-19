@@ -7,7 +7,13 @@ if (command !== 'migrate')
 const client = await connect(databaseConfig('migrator'));
 try {
   await migrateCurrent(client);
-  console.log('v2 schema 3 checked/applied.');
+  console.log(
+    JSON.stringify({
+      schemaVersions: (
+        await client.query('SELECT version FROM hdd.schema_migrations ORDER BY version')
+      ).rows.map((r) => r.version),
+    }),
+  );
 } finally {
   await client.end();
 }

@@ -103,7 +103,7 @@ test('Fastify factory reports unavailable honestly, validates queries and return
   ApiErrorSchema.parse(write.json());
 });
 test('entry configuration rejects live enablement and malformed ports before listening', () => {
-  assert.deepEqual(developmentConfig({}), { host: '127.0.0.1', port: 4320 });
+  assert.deepEqual(developmentConfig({}), { host: '127.0.0.1', port: 4320, mode: 'development' });
   for (const env of [
     { HDD_V2_MODE: 'live' },
     { HDD_V2_ALLOW_LIVE_RPC: 'true' },

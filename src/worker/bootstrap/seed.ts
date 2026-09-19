@@ -34,7 +34,7 @@ async function role(client: pg.Client) {
   } = await client.query('SELECT current_user AS role');
   if (r.role !== 'hdd_v2_worker') throw new Error('Seed requires explicit worker authority.');
 }
-async function emptyTarget(client: pg.Client) {
+export async function emptyTarget(client: pg.Client) {
   // Catalogs reveal even objects the worker cannot read. Refuse extra user schemas
   // and relations rather than assuming the known application tables are the target.
   const { rows: schemas } = await client.query(`SELECT nspname FROM pg_namespace
@@ -372,7 +372,7 @@ export async function importSeed(
     throw error;
   }
 }
-async function validateState(
+export async function validateState(
   client: pg.Client,
   signal: AbortSignal,
   recoveryChain: number | null = null,
@@ -608,7 +608,7 @@ async function validateState(
  * historical state. Full reconciliation costs SQL work per checkpoint, not JS heap
  * proportional to account/undo count. Ordinary sync/API reads never do this audit.
  */
-async function validateRecovery(client: pg.Client, signal: AbortSignal) {
+export async function validateRecovery(client: pg.Client, signal: AbortSignal) {
   const { rows: chains } = await client.query(
     'SELECT chain_id,rewind_floor FROM hdd.sync_state ORDER BY chain_id',
   );

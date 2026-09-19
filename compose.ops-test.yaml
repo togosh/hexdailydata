@@ -1,0 +1,39 @@
+services:
+  runner:
+    image: ${HDD_V2_IMAGE}
+    user: '1001:1000'
+    read_only: true
+    cpus: 0.25
+    mem_limit: 512m
+    memswap_limit: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ['/tmp:size=16m,mode=1777']
+    networks: [private]
+    environment:
+      HDD_V2_DB_HOST: db
+      HDD_V2_DB_NAME: hexdailydata_v2
+      HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE}
+      HDD_V2_PROJECT: ${HDD_V2_PROJECT}
+      HDD_V2_ADMIN_PASSWORD_FILE: /run/secrets/admin
+      HDD_V2_API_PASSWORD_FILE: /run/secrets/api
+      HDD_V2_WORKER_PASSWORD_FILE: /run/secrets/worker
+      HDD_V2_MIGRATOR_PASSWORD_FILE: /run/secrets/migrator
+      HDD_V2_EXPORT_PATH: /exports
+      HDD_V2_STORAGE_PATH: /state
+      HDD_V2_PROVIDER_STATE: /provider
+      HDD_V2_MAINTENANCE_PATH: /maintenance
+      HDD_V2_BACKUP_PATH: /backup
+      HDD_V2_BACKUP_IDENTITY_FILE: /run/secrets/backup
+      HDD_V2_ALLOW_LIVE_RPC: 'false'
+    secrets: [admin, api, worker, migrator, backup]
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./src:/app/src:ro
+      - state:/state
+      - exports:/exports
+      - provider:/provider
+      - maintenance:/maintenance
+      - backup:/backup
+      - ${HDD_V2_OPERATOR_INPUT}:/input:ro
+      - ${HDD_V2_OPS_EVIDENCE:?Owned test evidence}:/evidence

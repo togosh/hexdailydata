@@ -49,7 +49,7 @@ export async function exportRoot(path: string, allowCreate = true) {
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
     if (!allowCreate) throw e;
     if ((await readdir(root)).length) throw new Error('New export root must be empty.');
-    const h = await open(marker, 'wx', 0o600);
+    const h = await open(marker, 'wx', 0o640);
     try {
       await h.writeFile('HEXDailyData exports v1\n');
       await h.sync();

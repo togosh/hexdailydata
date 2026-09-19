@@ -3,8 +3,9 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, appendFileSync, writeFileSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
 const evidence = resolve(process.env.HDD_V2_API_EVIDENCE ?? 'artifacts/task-06/api-' + Date.now());
-const rel = relative(resolve('artifacts/task-06'), evidence);
-if (rel.startsWith('..') || isAbsolute(rel)) throw new Error('Task06 evidence directory required.');
+const rel = relative(resolve('artifacts'), evidence);
+if (rel.startsWith('..') || isAbsolute(rel))
+  throw new Error('Task-owned evidence directory required.');
 mkdirSync(evidence, { recursive: true });
 const project = 'hexdailydata-v2-api-' + randomUUID().slice(0, 8);
 const env = {
