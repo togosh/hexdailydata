@@ -1,11 +1,17 @@
 ﻿import { randomBytes, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, appendFileSync } from 'node:fs';
+import { resolve, relative, isAbsolute } from 'node:path';
 const project = `hexdailydata-v2-sql-${randomUUID().slice(0, 8)}`;
 const env = { ...process.env, HDD_V2_PROJECT: project, HDD_V2_DB_INSTANCE: randomUUID() };
 for (const role of ['ADMIN', 'API', 'WORKER', 'MIGRATOR'])
   env[`HDD_V2_${role}_PASSWORD`] = randomBytes(24).toString('hex');
-mkdirSync('artifacts/task-02', { recursive: true });
+const evidence = resolve(env.HDD_V2_SQL_EVIDENCE ?? 'artifacts/task-02');
+const relativeEvidence = relative(resolve('artifacts'), evidence);
+if (relativeEvidence.startsWith('..') || isAbsolute(relativeEvidence))
+  throw new Error('SQL evidence must remain in repository artifacts.');
+env.HDD_V2_SQL_EVIDENCE = evidence;
+mkdirSync(evidence, { recursive: true });
 const compose = ['compose', '-p', project, '-f', 'compose.sql.yaml'];
 function docker(args, timeout = 60_000) {
   const r = spawnSync('docker', args, {
@@ -64,7 +70,7 @@ try {
     if (!primary) process.exitCode = 1;
   }
   appendFileSync(
-    'artifacts/task-02/runs.txt',
+    resolve(evidence, 'runs.txt'),
     `${new Date().toISOString()} ${project} exit=${process.exitCode ?? 0}\n`,
   );
 }

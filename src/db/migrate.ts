@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises';
 import type pg from 'pg';
 
-export async function migrate(client: pg.Client, sql: string) {
+export async function migrate(client: pg.Client, sql: string, additions: string[] = []) {
   const hash = createHash('sha256').update(sql).digest('hex');
   await client.query('BEGIN');
   try {
@@ -18,7 +18,15 @@ export async function migrate(client: pg.Client, sql: string) {
       const { rows } = await client.query(
         'SELECT version,sha256 FROM hdd.schema_migrations ORDER BY version',
       );
-      if (rows.length !== 1 || rows[0].version !== 1 || rows[0].sha256 !== hash)
+      const expected = [
+        hash,
+        ...additions.map((s) => createHash('sha256').update(s).digest('hex')),
+      ];
+      if (
+        !rows.length ||
+        rows.length > expected.length ||
+        rows.some((r, i) => r.version !== i + 1 || r.sha256 !== expected[i])
+      )
         throw new Error('Incompatible migration version/checksum; target left unchanged.');
     } else {
       const { rows } =
@@ -29,6 +37,16 @@ export async function migrate(client: pg.Client, sql: string) {
       await client.query(sql);
       await client.query('INSERT INTO hdd.schema_migrations VALUES(1,$1)', [hash]);
     }
+    const { rows: installed } = await client.query(
+      'SELECT version FROM hdd.schema_migrations ORDER BY version',
+    );
+    for (let i = installed.length - 1; i < additions.length; i++) {
+      await client.query(additions[i]!);
+      await client.query('INSERT INTO hdd.schema_migrations VALUES($1,$2)', [
+        i + 2,
+        createHash('sha256').update(additions[i]!).digest('hex'),
+      ]);
+    }
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => {});
@@ -37,4 +55,9 @@ export async function migrate(client: pg.Client, sql: string) {
 }
 export function initialMigration() {
   return readFile(new URL('../../migrations/0001_initial.sql', import.meta.url), 'utf8');
+}
+export async function migrateCurrent(client: pg.Client) {
+  return migrate(client, await initialMigration(), [
+    await readFile(new URL('../../migrations/0002_recovery.sql', import.meta.url), 'utf8'),
+  ]);
 }

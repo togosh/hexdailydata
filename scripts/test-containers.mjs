@@ -25,6 +25,7 @@ function docker(args, timeout = 60_000) {
   return result.stdout.trim();
 }
 console.log(`Isolated project: ${project}`);
+let primary;
 try {
   console.log(docker([...files, 'build', '--pull'], 600_000));
   console.log(docker([...files, 'up', '-d', '--wait', '--wait-timeout', '90'], 180_000));
@@ -66,9 +67,18 @@ try {
   console.log(
     'PASS: non-root containers, real health, PostgreSQL identity, built HTML/JS over loopback.',
   );
+} catch (error) {
+  primary = error;
+  console.error(error.message);
+  process.exitCode = 1;
 } finally {
-  console.log(
-    docker([...files, 'down', '--volumes', '--remove-orphans', '--rmi', 'local'], 60_000),
-  );
-  console.log(`Removed only project ${project} and its disposable volume.`);
+  try {
+    console.log(
+      docker([...files, 'down', '--volumes', '--remove-orphans', '--rmi', 'local'], 60_000),
+    );
+    console.log(`Removed only project ${project} and its disposable volume.`);
+  } catch (error) {
+    console.error('Cleanup failure:', error.message);
+    if (!primary) process.exitCode = 1;
+  }
 }

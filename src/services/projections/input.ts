@@ -39,7 +39,14 @@ const start = z.strictObject({
   days: z.number().int().min(1).max(5555),
   auto: z.boolean(),
 });
-const settlement = { stakeId: integer, address, payout: uint, penalty: uint };
+const settlement = {
+  stakeId: integer,
+  address,
+  payout: uint,
+  penalty: uint,
+  principal: uint.optional(),
+  shares: uint.optional(),
+};
 const end = z.strictObject({
   kind: z.literal('stake_end'),
   ...settlement,

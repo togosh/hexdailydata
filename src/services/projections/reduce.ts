@@ -1,4 +1,5 @@
-﻿import type pg from 'pg';
+import { query as measuredQuery } from '../../db/measure.ts';
+import type pg from 'pg';
 import {
   createStake,
   settleStake,
@@ -37,7 +38,8 @@ export function readCurrent(row: Record<string, unknown>): Current {
   };
 }
 export async function saveCurrent(client: pg.Client, chain: number, state: Current) {
-  await client.query(
+  await measuredQuery(
+    client,
     `UPDATE hdd.current_state SET contract_day=$2,${totalColumns.map((c, i) => `${c}=$${i + 3}`).join(',')},sampled_addresses=$16 WHERE chain_id=$1`,
     [
       chain,
@@ -87,7 +89,7 @@ async function account(
   state.sampled_addresses = [...new Set([...state.sampled_addresses, address])].sort().slice(0, 32);
   const {
     rows: [old],
-  } = await client.query('SELECT * FROM hdd.accounts WHERE chain_id=$1 AND address=$2', [
+  } = await measuredQuery(client, 'SELECT * FROM hdd.accounts WHERE chain_id=$1 AND address=$2', [
     chain,
     bytes(address),
   ]);
@@ -100,7 +102,8 @@ async function account(
     throw new Error('Negative account projection.');
   state.holder_count += BigInt(Number(nextLiquid > 0n) - Number(beforeLiquid > 0n));
   state.staker_count += BigInt(Number(nextCount > 0n) - Number(beforeCount > 0n));
-  await client.query(
+  await measuredQuery(
+    client,
     `INSERT INTO hdd.accounts VALUES($1,$2,$3,$4,$5,$6,$6)
  ON CONFLICT(chain_id,address) DO UPDATE SET liquid_hearts=excluded.liquid_hearts,
  accounted_hearts=excluded.accounted_hearts,stake_count=excluded.stake_count,last_block=excluded.last_block`,
@@ -116,19 +119,22 @@ async function account(
 }
 async function schedule(client: pg.Client, chain: number, day: number, delta: bigint) {
   if (delta < 0n) {
-    const { rowCount } = await client.query(
+    const { rowCount } = await measuredQuery(
+      client,
       'UPDATE hdd.share_schedule SET shares=shares+$3 WHERE chain_id=$1 AND activation_day=$2',
       [chain, day, delta.toString()],
     );
     if (rowCount !== 1) throw new Error('Missing queued share schedule.');
   } else {
-    await client.query(
+    await measuredQuery(
+      client,
       `INSERT INTO hdd.share_schedule VALUES($1,$2,$3)
  ON CONFLICT(chain_id,activation_day) DO UPDATE SET shares=hdd.share_schedule.shares+$3`,
       [chain, day, delta.toString()],
     );
   }
-  await client.query(
+  await measuredQuery(
+    client,
     'DELETE FROM hdd.share_schedule WHERE chain_id=$1 AND activation_day=$2 AND shares=0',
     [chain, day],
   );
@@ -141,7 +147,8 @@ export async function closeDay(
   block: string,
   hash: Buffer,
 ) {
-  await client.query(
+  await measuredQuery(
+    client,
     `INSERT INTO hdd.daily_stats(chain_id,contract_day,origin_chain_id,close_block,close_hash,${totalColumns.join(',')})
  VALUES($1,$2,$3,$4,$5,${totalColumns.map((_, i) => `$${i + 6}`).join(',')})`,
     [
@@ -161,7 +168,8 @@ export async function closeDay(
   state.penalty_hearts = 0n;
   const {
     rows: [row],
-  } = await client.query(
+  } = await measuredQuery(
+    client,
     'DELETE FROM hdd.share_schedule WHERE chain_id=$1 AND activation_day=$2 RETURNING shares',
     [chain, state.contract_day],
   );
@@ -184,7 +192,8 @@ export async function applyEvent(client: pg.Client, chain: number, state: Curren
   const raw = [event.topics.map(bytes), bytes(event.data), JSON.stringify(event)];
   // Duplicate whole-batch retries are resolved before the transaction. Event PKs reject overlaps.
   if (v.kind === 'transfer') {
-    await client.query(
+    await measuredQuery(
+      client,
       'INSERT INTO hdd.transfers_recent VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
       [...common, bytes(v.sender), bytes(v.recipient), v.hearts, ...raw],
     );
@@ -197,7 +206,8 @@ export async function applyEvent(client: pg.Client, chain: number, state: Curren
     if (v.sender === v.recipient) {
       const {
         rows: [row],
-      } = await client.query(
+      } = await measuredQuery(
+        client,
         'SELECT liquid_hearts FROM hdd.accounts WHERE chain_id=$1 AND address=$2',
         [chain, bytes(v.sender)],
       );
@@ -211,12 +221,11 @@ export async function applyEvent(client: pg.Client, chain: number, state: Curren
     else await account(client, chain, v.recipient, block, state, amount, 0n, 0n);
     return;
   }
-  await client.query('INSERT INTO hdd.events VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)', [
-    ...common,
-    v.kind,
-    'stakeId' in v ? v.stakeId : null,
-    ...raw,
-  ]);
+  await measuredQuery(
+    client,
+    'INSERT INTO hdd.events VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+    [...common, v.kind, 'stakeId' in v ? v.stakeId : null, ...raw],
+  );
   if (v.kind === 'stake_start') {
     const stake = createStake({
       startSeconds: BigInt(event.blockTime),
@@ -225,7 +234,8 @@ export async function applyEvent(client: pg.Client, chain: number, state: Curren
       stakeShares: BigInt(v.shares),
       isAutoStake: v.auto,
     });
-    await client.query(
+    await measuredQuery(
+      client,
       `INSERT INTO hdd.stakes(chain_id,stake_id,address,origin_chain_id,start_block,start_log,start_day,locked_day,staked_days,principal_hearts,stake_shares,is_auto_stake,lifecycle,last_block)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'unsettled',$5)`,
       [
@@ -253,11 +263,16 @@ export async function applyEvent(client: pg.Client, chain: number, state: Curren
   } else if (v.kind === 'stake_end' || v.kind === 'good_accounting') {
     const {
       rows: [row],
-    } = await client.query('SELECT * FROM hdd.stakes WHERE chain_id=$1 AND stake_id=$2', [
+    } = await measuredQuery(client, 'SELECT * FROM hdd.stakes WHERE chain_id=$1 AND stake_id=$2', [
       chain,
       v.stakeId,
     ]);
     if (!row || hex(row.address) !== v.address) throw new Error('Unknown stake/owner.');
+    if (
+      (v.principal !== undefined && v.principal !== row.principal_hearts) ||
+      (v.shares !== undefined && v.shares !== row.stake_shares)
+    )
+      throw new Error('Settlement raw principal/shares disagree with stake.');
     const stake = stakeFromRow(row),
       before = stakeStatus(stake, state.contract_day);
     const settlement = {
@@ -273,7 +288,8 @@ export async function applyEvent(client: pg.Client, chain: number, state: Curren
     );
     const status = stakeStatus(result.stake, state.contract_day),
       effects = result.effects;
-    await client.query(
+    await measuredQuery(
+      client,
       `UPDATE hdd.stakes SET lifecycle=$3,ga_day=$4,ga_block=$5,end_day=$6,end_block=$7,payout_hearts=$8,penalty_hearts=$9,last_block=$10 WHERE chain_id=$1 AND stake_id=$2`,
       [
         chain,
@@ -311,16 +327,18 @@ export async function applyPayout(client: pg.Client, chain: number, currentDay: 
   if (v.day >= currentDay) throw new Error('Cannot materialize current/future day.');
   const {
     rows: [row],
-  } = await client.query('SELECT * FROM hdd.daily_stats WHERE chain_id=$1 AND contract_day=$2', [
-    chain,
-    v.day,
-  ]);
+  } = await measuredQuery(
+    client,
+    'SELECT * FROM hdd.daily_stats WHERE chain_id=$1 AND contract_day=$2',
+    [chain, v.day],
+  );
   if (!row) throw new Error('Daily native row missing.');
   if (row.payout_status === 'materialized') {
     if (row.payout_hearts !== v.payout || row.payout_shares !== v.shares)
       throw new Error('Conflicting materialized payout.');
   } else
-    await client.query(
+    await measuredQuery(
+      client,
       `UPDATE hdd.daily_stats SET payout_status='materialized',payout_hearts=$3,payout_shares=$4,payout_block=$5,payout_hash=$6 WHERE chain_id=$1 AND contract_day=$2`,
       [chain, v.day, v.payout, v.shares, v.blockNumber, bytes(v.blockHash)],
     );

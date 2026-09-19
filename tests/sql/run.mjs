@@ -3,7 +3,7 @@ import pg from 'pg';
 import { readFileSync, writeFileSync, statfsSync } from 'node:fs';
 import { performance } from 'node:perf_hooks';
 import { connect, databaseConfig } from '../../src/db/connect.ts';
-import { migrate, initialMigration } from '../../src/db/migrate.ts';
+import { migrate, initialMigration, migrateCurrent } from '../../src/db/migrate.ts';
 import { CanonicalWriter } from '../../src/services/projections/writer.ts';
 import { reconcile } from '../../src/services/projections/initialize.ts';
 import { currentStakeStatus, totalColumns } from '../../src/services/projections/reduce.ts';
@@ -120,6 +120,8 @@ try {
     await admin.query('UPDATE hdd.schema_migrations SET version=2');
     await assert.rejects(() => migrate(migrator, sql), /version/);
     await admin.query('UPDATE hdd.schema_migrations SET version=1');
+    await migrateCurrent(migrator);
+    await migrateCurrent(migrator);
   });
   api = await db('api');
   worker = await db('worker');

@@ -51,7 +51,7 @@ services:
       HDD_V2_SQL_SCALE: ${HDD_V2_SQL_SCALE:-1}
     volumes:
       - ./:/app:ro
-      - ./artifacts/task-02:/evidence
+      - ${HDD_V2_SQL_EVIDENCE:-./artifacts/task-02}:/evidence
     networks: [sql]
     command: ['node', 'tests/sql/run.mjs']
 networks:

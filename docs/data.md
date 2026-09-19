@@ -1,5 +1,8 @@
 # Data model and retention
 
+Task03's implemented acquisition/seed/pruning mapping extends the Task02 mapping below;
+see [sync and recovery contract](sync.md). Planned later-product tables remain unimplemented.
+
 ## Storage principle
 
 Store each required event once, one current stake/account projection, and one row per

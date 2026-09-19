@@ -1,0 +1,8 @@
+# Merge only with compose.sql.yaml in a newly generated Task03 project.
+services:
+  runner:
+    environment:
+      HDD_V2_SYNC_PHASE: ${HDD_V2_SYNC_PHASE:?Explicit build/import phase required}
+    volumes:
+      - ./artifacts/task-03:/evidence
+    command: ['node', 'tests/sync/run.mjs']

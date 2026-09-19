@@ -3,7 +3,9 @@
 | Task | State | Commit / measured result |
 |---|---|---|
 | 01 | passed | Reviewed code `98ebf8c00200b5b6c2c0f889e05f559e5ebda1ba`; 29/29 tests, clean install/build, real non-root API/PostgreSQL and Chrome desktop/mobile smoke. Independent `/root/task01_review`: PASS, one full review plus one fixture delta recheck. See ignored `artifacts/task-01/report.md` and `reviewer-report.md`. |
-| 02–11 | pending | Not implemented |
+| 02 | passed | Reviewed code `237aba7`; isolated SQL, recovery, roles and million-row evidence accepted. |
+| 03 | in progress | Offline acquisition, seeds, retention and independent review. |
+| 04–11 | pending | Not implemented |
 
 The development shell has no live data/indexer. Task02 qualifies schema/projections on
 isolated disposable PostgreSQL17; the public shell remains uninitialized. Task01 source
@@ -20,7 +22,7 @@ its exact path is in the ignored report. Container test resources were removed.
 Task02 source base was clean `d5e41c7`; initial candidate `7eac828`, reviewed correction
 `237aba7`. Final status-only commit changes this page and Task02 status. SQL migration/
 role denials, exact replay/GA/fork/day/rewind, real connection loss and injected lost ack
-are tested. Final warm query p95 range0.242?0.525ms; synthetic database514,012,851 bytes,
+are tested. Final warm query p95 range 0.242 to 0.525 ms; synthetic database514,012,851 bytes,
 not a complete-product storage or live throughput qualification. Seeds/pruning/acquisition
 remain Task03; full mixed-load/production/live work is unqualified. All Task02 disposable
 resources were removed. Task03 is next eligible and was not started. No v1, live provider,

@@ -1,5 +1,7 @@
 # References and code-use ledger
 
+Task03's source-use additions are recorded in [sync and recovery contract](sync.md).
+
 ## Evidence versus design
 
 The owner's latest answers define v2 scope (product.md). Architecture, interfaces,

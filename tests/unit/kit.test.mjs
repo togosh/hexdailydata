@@ -166,12 +166,12 @@ test('preflight runs without application or database action', () => {
   assert.match(result.stdout, /"databaseAccess": false/);
 });
 
-test('worker refuses fake sync success', () => {
+test('worker default once fails closed before database/provider access', () => {
   const result = spawnSync(
     process.execPath,
-    ['--experimental-strip-types', 'src/worker/main.ts', 'sync'],
-    { encoding: 'utf8', timeout: 5_000 },
+    ['--experimental-strip-types', 'src/worker/main.ts', 'once'],
+    { encoding: 'utf8', timeout: 5_000, env: { ...process.env, HDD_V2_ALLOW_LIVE_RPC: 'false' } },
   );
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /not implemented/);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Provider work disabled/);
 });

@@ -6,7 +6,8 @@ serving chain; required shared Ethereum-era HEX history retains its original ide
 **Task 01 provides a runnable development foundation.** Fastify serves health/status
 and the built React shell. Exact domain rules and runtime DTO validation are tested.
 Task02 adds isolated PostgreSQL migrations and incremental projection primitives.
-There is no continuous sync, real data, seed importer, provider access or deployment.
+Task03 adds offline-tested acquisition, continuous sync, retention and portable seeds.
+No real data, live provider qualification or deployment is supplied.
 The shell displays unavailable values. Final UI design and reference-image comparison
 belong to Task07; this shell makes no visual-fidelity claim.
 
@@ -56,7 +57,7 @@ variables in your shell or Compose environment. `.env.example` lists development
 - Other unimplemented routes: 404; write methods: 405. Errors use the shared envelope.
 
 `HDD_V2_MODE` defaults to `development`. Live mode or `HDD_V2_ALLOW_LIVE_RPC=true`
-fails before listening. The foundation has no provider transport. `doctor` checks
+fails before listening. Provider work is confined to explicitly configured worker commands. `doctor` checks
 local tooling/configuration only; capability and cost results remain unmeasured.
 
 ## Isolated containers
@@ -175,10 +176,66 @@ production migration/operations packaging remains Task08.
 The library entry is `CanonicalWriter.acquire(dedicatedClient, chainId)`. Initialization
 compares two supplied constructor/fork states; commits compare two normalized source
 sets, headers, day-close checks and pinned payout observations before projection.
-Full ABI decoding, external receipt/code verification and source acquisition remain
-Task03. These tests use synthetic inputs. No production acceptance flag or fixture
+Task03's worker supplies raw ABI decoding, receipt/code checks and acquisition.
+These tests use synthetic inputs. No production acceptance flag or fixture
 mode serves them as real data. Read the concrete checkpoint/seed mapping in
 [docs/data.md](docs/data.md#task02-persisted-checkpoint-contract).
+
+## Acquisition, sync and portable seeds (Task03)
+
+`npm run test:sync` provisions three sequential, private, disposable PostgreSQL targets.
+It exercises raw transport -> rebuild -> streamed seed -> fresh import -> forward sync,
+then compares an otherwise identical rebuild with retention pinned by a lagging consumer.
+The Node runner and PostgreSQL share the same 2 CPU/4 GiB allocation described above.
+Evidence and synthetic seeds go to ignored `artifacts/task-03/`; generated seeds are not
+release artifacts. `HDD_V2_SYNC_TEST_PHASE=build|import|unpruned` selects a focused phase;
+import/unpruned require the matching build fixture artifacts, never a production seed.
+
+Worker entry: `node src/worker/main.ts help` (or compiled `dist/worker/main.js`). Commands
+are `rebuild`, `once`, `watch`, `repair-range <retained-block>`, `seed-export <file>` and
+`seed-import <file> <expectation.json>`. Status is local and does not contact providers.
+Every DB command requires the explicit v2 target/role/instance configuration above.
+Run `db:migrate` with the migrator to apply/check ordered migrations 1 and 2. Migration 1
+is unchanged; migration 2 adds only acquisition coverage, recovery pins and seed sequence
+authority. The API remains read-only and the public shell remains uninitialized.
+
+Provider commands fail closed unless `HDD_V2_ALLOW_LIVE_RPC=true`, `HDD_V2_SOURCE_PROFILE`,
+`HDD_V2_PROVIDER_STATE`, and `HDD_V2_STORAGE_PATH` are explicit. The profile is validated
+by `src/worker/sync/profile.ts`: both chains' source IDs/operators/account groups and
+endpoint **environment variable names**, deployed code hash, constructor receipt and
+balances (including explicitly verified zero supply), fork parent/entry, finality policy,
+and frozen rebuild target. There are no default real endpoints, constructor/fork guesses,
+or synthetic runtime values. All supplied boundary identities are checked through the
+provider path. Filling these values is not authorization to run the early canary.
+
+The initial acquisition implementation verifies contiguous headers, full filtered log
+sets and each header's complete receipt enumeration from both sources. It batches up to
+30 RPC items and adapts checkpoint ranges; unresolved single-block ambiguity pauses.
+This conservative receipt profile has substantial mandatory work. Its real capability,
+cost and 14-day feasibility remain unqualified; the approval brief counts that work.
+Sources can still be correlated. Unknown operators are disclosed as null, never proved
+independent. A profile exceeding the mandatory-work lower bound must be rejected.
+
+One process-role session lock owns the worker quota files. Keep the quota directory
+persistent and shared with the eventual API process: fixed disjoint dispatch slots and
+non-borrowing lanes enforce the combined ceiling; retries and aliases do not add quota.
+Every process starts with a 60-second quiet period and honors both roles' persisted
+cooldowns. Extra replicas are unsupported. Task04 owns actual live API callers.
+
+Seed export is a consistent, streamed logical snapshot in a strict `seed.tar.gz` format.
+Import requires an empty migrated target, its instance UUID, trusted archive SHA-256,
+contract/code identity and checkpoint hash in the expectation file. It preserves the
+destination instance and roles. Entire imports commit atomically after hashes, exact
+row types, native totals/owners/schedules, raw events, lineage and recovery-tail checks.
+Before-image JSON stays SQL text, including numbers above 2^53. Heap byte counters are
+recomputed after logical import. A trusted hash identifies a seed; it cannot establish
+chain truth by itself. Final independent live comparison remains Task10.
+
+Pruning uses seven days of **replay progress**, bounded checkpoint prefixes and durable
+`transfer_consumer`, `recovery`, `backup`, or `export` pins. Seed snapshots hold a shared
+maintenance lock. Pending payouts retain their daily rows, not unrelated transfers.
+Capacity/disk pressure pauses rather than deleting protected data. `repair-range` only
+rewinds a retained confirmed checkpoint; finalized or beyond-window disagreement stops.
 
 ## Continue one task at a time
 
