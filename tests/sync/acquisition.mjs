@@ -76,13 +76,23 @@ try {
   let sync = new SyncEngine(writer, api, sources, '/evidence');
   if (phase === 'busy') {
     const busy = fixture({ last: 205, holdersPerBlock: 300 });
-    sync = new SyncEngine(writer, api, [busy.source(1, 'one'), busy.source(1, 'two')], '/evidence');
+    sync = new SyncEngine(
+      writer,
+      api,
+      [
+        busy.source(1, 'one', f.clock, undefined, f.budget),
+        busy.source(1, 'two', f.clock, undefined, f.budget),
+      ],
+      '/evidence',
+    );
     await test('busy relevant events split bounded ranges and commit exact final state', async () => {
       await sync.initializeConstructor(busy.plain(100), hash(10000), [], signal);
       await sync.once(signal, busy.plain(204));
       await sync.audit(signal);
       assert.ok(sync.progress.splits > 0);
       assert.ok(sync.sources.every((s) => s.counters.eventsPeak <= 2000));
+      assert.ok(sync.sources.every((s) => s.rpc.budget === f.budget));
+      assert.ok(f.clock.now() >= 60_000);
       assert.equal(
         (await api.query('SELECT count(*) FROM hdd.accounts')).rows[0].count,
         String(3 + 23 * 300),
@@ -230,13 +240,23 @@ try {
         );
       });
   }
+  const observedSources = phase === 'busy' ? sync.sources : f.observed;
+  assert.equal(
+    f.budget.counters.attempts,
+    observedSources.reduce((sum, s) => sum + s.rpc.counters.requests, 0),
+  );
+  assert.equal(
+    f.budget.counters.logical,
+    observedSources.reduce((sum, s) => sum + s.rpc.counters.logical, 0),
+  );
   const report = {
     phase,
     realElapsedMs: performance.now() - started,
     progress: sync.progress,
     virtualQuotaMs: f.clock.now(),
-    generatedHeaders: f.generatedHeaders(),
-    sources: (phase === 'busy' ? sync.sources : f.observed).map((s) => ({
+    budget: f.budget.counters,
+    generatedHeaders: phase === 'busy' ? null : f.generatedHeaders(),
+    sources: observedSources.map((s) => ({
       id: s.rpc.id,
       rpc: s.rpc.counters,
       acquisition: s.counters,
