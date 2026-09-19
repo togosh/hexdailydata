@@ -184,7 +184,14 @@ export function createApp(
               'cursor_incompatible',
               'Observation changed or expired; restart pagination.',
             );
-          if (!result.indexed && !result.live)
+          const usefulIndexed =
+            result.indexed &&
+            [
+              result.indexed.liquidHearts,
+              result.indexed.accountedHearts,
+              result.indexed.stakeCount,
+            ].some((value) => value !== null);
+          if (!usefulIndexed && !result.live)
             throw result.outcome === 'quota'
               ? new ApiFailure(429, 'provider_quota', 'Live observation quota is unavailable.')
               : unavailable();

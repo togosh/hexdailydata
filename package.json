@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "HEXDailyData v2 development foundation; live sync not implemented",
+  "description": "Read-only HEX data API with bounded offline-tested synchronization",
   "engines": {
     "node": ">=24.21.0 <25"
   },

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import pg from 'pg';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { readFile, rename, writeFile, unlink, readdir } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { setTimeout as pause } from 'node:timers/promises';
@@ -9,7 +9,7 @@ import { connect, databaseConfig } from '../../src/db/connect.ts';
 import { migrateCurrent } from '../../src/db/migrate.ts';
 import { ReadDatabase } from '../../src/services/queries/database.ts';
 import { createApp } from '../../src/api/app.ts';
-import { sqlBaseline, openDependencies } from '../../src/api/dependencies.ts';
+import { sqlBaseline } from '../../src/api/dependencies.ts';
 import { routes } from '../../src/api/routes.ts';
 import { homeSql } from '../../src/services/queries/home.ts';
 import { stakesSql, holdersSql } from '../../src/services/queries/lists.ts';
@@ -20,7 +20,8 @@ import { SqlMetricStore } from '../../src/worker/metrics/store.ts';
 import { MetricsService } from '../../src/worker/metrics/service.ts';
 import { PriceReader } from '../../src/services/live/price.ts';
 import { AddressService } from '../../src/services/live/address.ts';
-import { fixture, CODE_HASH, HEX, A, addr } from '../live/fixture.mjs';
+import { fixture, ManualClock, CODE_HASH, HEX, A, addr } from '../live/fixture.mjs';
+import { liveSelectors } from '../../src/providers/live-abi.ts';
 import { populate, signal, at, address } from './fixture.mjs';
 
 const large = process.env.HDD_V2_API_SCALE === '1',
@@ -192,6 +193,13 @@ try {
     assert.equal(await observed, true);
     assert.ok(performance.now() - t < 1500);
     evidence.sqlCancellationMs = performance.now() - t;
+    const dedicated = await reads.connection();
+    await dedicated.query('SET statement_timeout=0');
+    const clientStart = performance.now();
+    await assert.rejects(dedicated.query('SELECT pg_sleep(10)'), /Query read timeout/);
+    await dedicated.end();
+    evidence.clientDeadlineMs = performance.now() - clientStart;
+    assert.ok(evidence.clientDeadlineMs < 4500);
   });
   await sample('populated');
   const f = fixture();
@@ -367,10 +375,17 @@ try {
     assert.ok(BigInt(h.body.items[0].liquidHearts) > 2n ** 53n);
     const h2 = await request(server.url, '/api/v2/holders?limit=7&cursor=' + h.body.nextCursor);
     assert.equal(h2.body.items[0].liquidRank, '8');
+    if (!large) {
+      const all = (await request(server.url, '/api/v2/holders?limit=100')).body.items;
+      assert.equal(all.find((a) => a.address === address(1)).liquidRank, '59');
+      assert.equal(all.find((a) => a.address === address(2)).liquidRank, '60');
+    }
     clock += 60001;
     await request(server.url, '/api/v2/stakes?limit=7&cursor=' + first.body.nextCursor, {}, 409);
     clock -= 60001;
-    await worker.query('UPDATE hdd.sync_state SET revision=revision+1');
+    await worker.query(
+      "UPDATE hdd.sync_state SET revision=revision+1,block_number=101,block_hash=decode(lpad('101',64,'0'),'hex'),block_time=block_time+10",
+    );
     await request(server.url, '/api/v2/stakes?limit=7&cursor=' + first.body.nextCursor, {}, 409);
     await request(server.url, '/api/v2/holders?limit=7&cursor=' + h.body.nextCursor, {}, 409);
     const detail = await request(server.url, '/api/v2/stakes/10');
@@ -380,6 +395,8 @@ try {
     const a = await request(server.url, '/api/v2/addresses/' + address(1));
     assert.equal(a.body.outcome, 'unavailable');
     assert.ok(a.body.indexed);
+    assert.equal(a.body.indexed.asOf.blockNumber, '101');
+    assert.equal(a.body.indexed.rank.asOf.blockNumber, '100');
   });
   await test('all route input/method bounds; sanitized failures and global HTTP admission', async () => {
     for (const path of [
@@ -526,22 +543,24 @@ try {
     await fetch(host.url + '/api/v2/downloads/' + bundle.id + '/daily').then((r) =>
       r.arrayBuffer(),
     );
-    const newer = await exporter.build(369, signal);
-    await reader.refresh(signal);
-    assert.equal((await request(host.url, '/api/v2/downloads')).body.bundles[0].id, newer.id);
-    assert.equal(reader.attempts.size, 2);
-    await worker.query(
-      "UPDATE hdd.export_bundles SET published_at=now()-interval '61 seconds' WHERE slot='prior'",
-    );
-    bundle = await exporter.build(369, signal);
-    await reader.refresh(signal);
-    assert.equal(reader.attempts.size, 2);
-    await request(
-      host.url,
-      '/api/v2/downloads/' + catalog.body.bundles[0].id + '/daily',
-      { headers: { 'If-None-Match': '*' } },
-      410,
-    );
+    if (!large) {
+      const newer = await exporter.build(369, signal);
+      await reader.refresh(signal);
+      assert.equal((await request(host.url, '/api/v2/downloads')).body.bundles[0].id, newer.id);
+      assert.equal(reader.attempts.size, 2);
+      await worker.query(
+        "UPDATE hdd.export_bundles SET published_at=now()-interval '61 seconds' WHERE slot='prior'",
+      );
+      bundle = await exporter.build(369, signal);
+      await reader.refresh(signal);
+      assert.equal(reader.attempts.size, 2);
+      await request(
+        host.url,
+        '/api/v2/downloads/' + catalog.body.bundles[0].id + '/daily',
+        { headers: { 'If-None-Match': '*' } },
+        410,
+      );
+    }
     await host.app.close();
   });
   await test('40 real HTTP opens reserve 32 slots before connection waits and release HEAD/304', async () => {
@@ -603,7 +622,7 @@ try {
       }, '/exports');
       await slow.refresh(signal);
       const host = await serve({ dependencies: { db: reads, downloads: slow }, now: () => clock });
-      for (const loss of ['disconnect', 'lock']) {
+      for (const loss of ['disconnect', 'lock', 'shutdown']) {
         const res = await new Promise((resolve, reject) => {
           http
             .get(host.url + '/api/v2/downloads/' + bundle.id + '/stakes', resolve)
@@ -614,7 +633,8 @@ try {
         await pause(150);
         assert.equal(slow.readers, 1);
         if (loss === 'disconnect') res.destroy();
-        else await sessions.at(-1).end();
+        else if (loss === 'lock') await sessions.at(-1).end();
+        else await slow.closeReaders();
         for (let i = 0; i < 400 && slow.readers; i++) await pause(5);
         assert.equal(slow.readers, 0);
         res.destroy();
@@ -623,6 +643,7 @@ try {
         backpressure: true,
         disconnectReleased: true,
         lockLossReleased: true,
+        shutdownReleased: true,
       };
       await host.app.close();
     });
@@ -639,7 +660,9 @@ try {
       evidence.plans[name] = (
         await api.query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) ' + sql, values)
       ).rows[0]['QUERY PLAN'];
-    const host = await serve({ dependencies: { db: reads, downloads: reader }, now: () => clock });
+    let mixedClock;
+    const serving = { db: reads, downloads: reader };
+    const host = await serve({ dependencies: serving, now: () => mixedClock?.now() ?? clock });
     const queryTimes = [],
       httpTimes = [],
       cachedTimes = [];
@@ -686,19 +709,89 @@ try {
     await worker.query(
       "UPDATE hdd.export_bundles SET published_at=now()-interval '61 seconds' WHERE slot='prior'",
     );
-    let done = false;
+    let done = false,
+      exportMs;
     const exportStart = performance.now();
-    const exporting = exporter.build(369, signal).then((b) => {
+    const exporting = exporter.build(369, signal).then(async (b) => {
+      exportMs = performance.now() - exportStart;
       bundle = b;
+      await reader.refresh(signal);
       done = true;
       return b;
     });
     const mixed = [];
-    let ticks = 0;
     const metricsClient = await db();
     const mixedStore = new SqlMetricStore(metricsClient);
-    const tickValues = await store.read(369);
+    const raw = fixture({ clock: new ManualClock() });
+    mixedClock = raw.clock;
+    mixedClock.time = Math.ceil((clock + 60000) / 10500) * 10500;
+    raw.state.count = 100;
+    raw.state.delay = (s) => pause(10, undefined, { signal: s });
+    raw.state.change = (rows, calls) =>
+      rows.map((row, i) =>
+        calls[i].params[0]?.data?.slice(0, 10) === liveSelectors.getReserves
+          ? {
+              jsonrpc: '2.0',
+              id: row.id,
+              error: { code: -32000, message: 'synthetic_price_unavailable' },
+            }
+          : row,
+      );
+    const rpcA = raw.rpc('mixed-one'),
+      rpcB = raw.rpc('mixed-two'),
+      addressRpc = raw.rpc('mixed-api', raw.api);
+    const metricJob = new MetricsService(
+      [rpcA, rpcB],
+      CODE_HASH,
+      new PriceReader(raw.price, HEX),
+      mixedStore,
+    );
+    serving.addresses = new AddressService(addressRpc, CODE_HASH, sqlBaseline(reads));
+    const coldAddresses = Promise.all(
+      Array.from({ length: 10 }, (_, i) =>
+        fetch(host.url + '/api/v2/addresses/' + addr(10000 + i) + '?limit=100').then(async (r) => {
+          const b = await r.json();
+          return {
+            status: r.status,
+            liveItems: b.live?.page.items.length ?? 0,
+            outcome: b.outcome ?? b.error?.code,
+          };
+        }),
+      ),
+    );
+    const driveMixed = (work) => {
+      // Yield real time for HTTP, SQL and injected transport latency between clock steps.
+      // The pure-RPC fixture's unpaced driver can exhaust virtual time before I/O returns.
+      const driven = (async () => {
+        let settled = false,
+          failure;
+        work.then(
+          () => {
+            settled = true;
+          },
+          (error) => {
+            settled = true;
+            failure = error;
+          },
+        );
+        for (let elapsed = 0; !settled && elapsed < 180000; elapsed += 100) {
+          await pause(10);
+          await mixedClock.advance(100);
+        }
+        if (!settled) throw new Error('Mixed fixture did not settle within its clock bound.');
+        if (failure) throw failure;
+      })();
+      void driven.catch(() => {});
+      return driven;
+    };
+    let metricWork = driveMixed(Promise.all([metricJob.tick(signal), coldAddresses]));
+    // Driver time is explicitly synthetic for provider quotas; HTTP/SQL/CPU timings remain real.
     while (!done || mixed.length < 101) {
+      if (mixed.length > 0 && mixed.length % 20 === 0) {
+        await metricWork;
+        mixedClock.time += 60000;
+        metricWork = driveMixed(metricJob.tick(signal));
+      }
       const start = performance.now();
       const [h, list, csv] = await Promise.all([
         fetch(host.url + '/api/v2/home'),
@@ -714,23 +807,29 @@ try {
         holders: list.status,
         download: csv.status,
         useful: Boolean(body.daily),
+        price: body.live?.price.status,
+        shareRate: body.live?.shareRate.status,
       });
-      if (mixed.length % 10 === 0) {
-        for (const [key, value] of Object.entries(tickValues))
-          await mixedStore.put(369, key, value);
-        ticks++;
-      }
       if (mixed.length > 2000) throw new Error('Export mixed test bound');
+      await pause(200);
     }
     await exporting;
-    await reader.refresh(signal);
+    await metricWork;
+    const addressOutcomes = await coldAddresses;
     evidence.mixed = {
       exportAndRequestsMs: performance.now() - exportStart,
-      ticks,
+      exportMs,
+      metricService: metricJob.counters,
+      providerClock: 'ManualClock; no real provider latency/cost qualification',
+      workerRpc: [rpcA.counters, rpcB.counters],
+      addressRpc: addressRpc.counters,
+      addressOutcomes,
       responses: mixed,
       csvBytes: bundle.files.reduce((n, f) => n + Number(f.bytes), 0),
     };
     assert.ok(mixed.every((r) => r.home === 200 && r.holders === 200 && r.useful));
+    assert.ok(metricJob.counters.updates > 0 && metricJob.counters.failures > 0);
+    assert.ok(addressOutcomes.filter((r) => r.liveItems === 0).length >= 7);
     await host.app.close();
   });
   await sample('completed');

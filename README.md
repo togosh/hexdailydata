@@ -203,7 +203,7 @@ Worker entry: `node src/worker/main.ts help` (or compiled `dist/worker/main.js`)
 are `rebuild`, `once`, `watch`, `repair-range <retained-block>`, `seed-export <file>` and
 `seed-import <file> <expectation.json>`. Status is local and does not contact providers.
 Every DB command requires the explicit v2 target/role/instance configuration above.
-Run `db:migrate` with the migrator to apply/check ordered migrations 1–3. Migration 1
+Run `db:migrate` with the migrator to apply/check ordered migrations 1–4. Migration 1
 is unchanged; migration 2 adds only acquisition coverage, recovery pins and seed sequence
 authority. The API remains read-only; Task06 wires stored reads while the Task07 shell remains pending.
 Migration3 adds only disposable latest observations, independent of native bootstrap.

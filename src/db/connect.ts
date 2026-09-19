@@ -28,7 +28,10 @@ export function databaseConfig(role: DbRole, env = process.env): DatabaseConfig 
   }
   return config;
 }
-export async function connect(config: DatabaseConfig): Promise<pg.Client> {
+export async function connect(
+  config: DatabaseConfig,
+  bounds: { signal?: AbortSignal; queryTimeoutMillis?: number } = {},
+): Promise<pg.Client> {
   if (
     config.host !== 'db' ||
     config.database !== 'hexdailydata_v2' ||
@@ -45,7 +48,15 @@ export async function connect(config: DatabaseConfig): Promise<pg.Client> {
     statement_timeout: 15000,
     idle_in_transaction_session_timeout: 15000,
     application_name: 'hexdailydata-v2',
+    ...(bounds.queryTimeoutMillis === undefined
+      ? {}
+      : { query_timeout: bounds.queryTimeoutMillis }),
   });
+  bounds.signal?.throwIfAborted();
+  const abort = () => {
+    void client.end().catch(() => {});
+  };
+  bounds.signal?.addEventListener('abort', abort, { once: true });
   try {
     await client.connect();
     const {
@@ -70,5 +81,7 @@ export async function connect(config: DatabaseConfig): Promise<pg.Client> {
   } catch (error) {
     await client.end().catch(() => {});
     throw error;
+  } finally {
+    bounds.signal?.removeEventListener('abort', abort);
   }
 }

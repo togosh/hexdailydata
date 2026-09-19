@@ -52,7 +52,12 @@ export async function openDependencies(env = process.env): Promise<ApiDependenci
     async close() {
       clearInterval(timer);
       stop.abort();
-      await Promise.allSettled([pending, addresses?.close(), db.close()]);
+      await Promise.allSettled([
+        pending,
+        addresses?.close(),
+        downloads?.closeReaders(),
+        db.close(),
+      ]);
     },
   };
 }

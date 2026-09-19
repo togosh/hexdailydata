@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import type { ReadStream } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
 import { open, mkdir, readdir, rename, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -34,6 +35,7 @@ export class ExportService {
   private attempts = new Map<string, string>();
   private refreshing: Promise<void> | undefined;
   private readers = 0;
+  private streams = new Set<{ stream: ReadStream; released: Promise<void> }>();
   constructor(connect: Connect, root: string) {
     this.connect = connect;
     this.root = root;
@@ -258,6 +260,9 @@ export class ExportService {
             });
         }),
       );
+      const active = { stream, released };
+      this.streams.add(active);
+      void released.then(() => this.streams.delete(active));
       c.on('error', () => stream.destroy(new Error('Download lock lost.')));
       c.on('end', () => {
         if (!stream.destroyed) stream.destroy(new Error('Download lock ended.'));
@@ -285,6 +290,11 @@ export class ExportService {
         }
       }
     }
+  }
+  async closeReaders() {
+    const active = [...this.streams];
+    for (const { stream } of active) stream.destroy();
+    await Promise.all(active.map((s) => s.released));
   }
   /** Worker-only maintenance. Holds builder lock and never follows unrecognized paths. */
   private async clean(c: pg.Client) {

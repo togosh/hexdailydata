@@ -24,7 +24,10 @@ export async function openAddressService(env = process.env, baseline?: AddressBa
     endpoint = env[source.endpointEnv];
   if (!endpoint) throw new Error('Address source endpoint NOT_CONFIGURED.');
   const transport = httpTransport(endpoint);
-  const client = await connect(databaseConfig('api', env));
+  const client = await connect(databaseConfig('api', env), {
+    signal: AbortSignal.timeout(5000),
+    queryTimeoutMillis: 3000,
+  });
   try {
     const {
       rows: [row],

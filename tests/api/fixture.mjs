@@ -19,7 +19,7 @@ export async function populate(worker, admin, large = false) {
     `INSERT INTO hdd.sync_state VALUES(369,100,decode(lpad('100',64,'0'),'hex'),1609891200,0,'confirmed',100,'{}',NULL)`,
   );
   await worker.query(
-    `INSERT INTO hdd.accounts SELECT 369,decode(lpad(to_hex(i),40,'0'),'hex'),900719925474099300000000::numeric+i,0,0,90,100 FROM generate_series(1,$1::int) i`,
+    `INSERT INTO hdd.accounts SELECT 369,decode(lpad(to_hex(i),40,'0'),'hex'),900719925474099300000000::numeric+CASE WHEN i=2 THEN 1 ELSE i END,0,0,90,100 FROM generate_series(1,$1::int) i`,
     [accounts],
   );
   await worker.query(
@@ -52,7 +52,10 @@ export async function populate(worker, admin, large = false) {
     `UPDATE hdd.accounts a SET accounted_hearts=s.total,stake_count=s.count FROM (SELECT address,sum(principal_hearts) FILTER(WHERE lifecycle='unsettled') AS total,count(*) AS count FROM hdd.stakes WHERE lifecycle IN('unsettled','good_accounted') GROUP BY address) s WHERE a.address=s.address`,
   );
   await worker.query(
-    `INSERT INTO hdd.current_state SELECT 369,400,(SELECT sum(liquid_hearts) FROM hdd.accounts),sum(principal_hearts),sum(principal_hearts),sum(principal_hearts*staked_days),sum(stake_shares),0,$1,(SELECT count(*) FROM hdd.accounts WHERE stake_count>0),100000,0,0,0,0 FROM hdd.stakes WHERE lifecycle='unsettled'`,
+    `INSERT INTO hdd.current_state SELECT 369,400,(SELECT sum(liquid_hearts) FROM hdd.accounts),sum(principal_hearts),
+      sum(principal_hearts) FILTER(WHERE lifecycle='unsettled'),sum(principal_hearts*staked_days) FILTER(WHERE lifecycle='unsettled'),
+      coalesce(sum(stake_shares) FILTER(WHERE lifecycle='unsettled' AND locked_day<=400),0),coalesce(sum(stake_shares) FILTER(WHERE lifecycle='unsettled' AND locked_day>400),0),
+      $1,(SELECT count(*) FROM hdd.accounts WHERE accounted_hearts>0),100000,0,0,0,0 FROM hdd.stakes WHERE lifecycle IN('unsettled','good_accounted')`,
     [accounts],
   );
   await worker.query(

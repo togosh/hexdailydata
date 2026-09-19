@@ -246,3 +246,11 @@ Cheap final checks: `npm run format:check`, `npm run typecheck`, `npm test`,
 `npm run openapi:check`, `npm run build`, plus the affected API and export/live tests.
 The existing browser-shell smoke has no Task07 visual-fidelity claim; Task06 evidence
 uses its own output directory so original Task01 screenshots are preserved.
+
+Mixed-load provider quotas use a paced synthetic clock and raw local JSON-RPC transport,
+including injected price failures; SQL, HTTP, export and hashing elapsed times are real.
+The actual MetricsService and AddressService share their existing worker/API lane limits.
+SQL probes cover request cancellation and the client read deadline with the server
+statement timeout disabled only inside a disposable test session. Large-download probes
+exercise backpressure, disconnect, lock loss and explicit reader shutdown; they do not
+claim a full120-second timeout observation.

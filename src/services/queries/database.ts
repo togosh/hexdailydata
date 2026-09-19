@@ -8,17 +8,29 @@ export class ReadDatabase {
   private all = new Set<pg.Client>();
   private opening = 0;
   private closed = false;
+  private stopped = new AbortController();
   readonly config: DatabaseConfig;
   readonly counters = { connections: 0, connectionSetupMs: 0, dataQueries: 0 };
   constructor(config: DatabaseConfig) {
     if (config.user !== 'hdd_v2_api') throw new Error('Read API role required.');
     this.config = config;
   }
-  async connection() {
+  async connection(signal?: AbortSignal) {
+    if (this.closed) throw unavailable();
+    const bound = AbortSignal.any([
+      this.stopped.signal,
+      AbortSignal.timeout(5000),
+      ...(signal ? [signal] : []),
+    ]);
     const started = performance.now();
-    const c = await connect(this.config);
+    const c = await connect(this.config, { signal: bound, queryTimeoutMillis: 3000 });
     c.on('error', () => {});
+    const abort = () => {
+      void c.end().catch(() => {});
+    };
+    bound.addEventListener('abort', abort, { once: true });
     try {
+      bound.throwIfAborted();
       const { rows } = await c.query(
         'SELECT version FROM hdd.schema_migrations ORDER BY version LIMIT 6',
       );
@@ -32,6 +44,8 @@ export class ReadDatabase {
     } catch (e) {
       await c.end();
       throw e;
+    } finally {
+      bound.removeEventListener('abort', abort);
     }
   }
   async read<T>(
@@ -46,7 +60,7 @@ export class ReadDatabase {
       if (this.all.size + this.opening >= 8) throw unavailable();
       this.opening++;
       try {
-        c = await this.connection();
+        c = await this.connection(signal);
         this.all.add(c);
       } finally {
         this.opening--;
@@ -84,6 +98,7 @@ export class ReadDatabase {
   }
   async close() {
     this.closed = true;
+    this.stopped.abort();
     await Promise.allSettled([...this.all].map((c) => c.end()));
     this.all.clear();
     this.idle = [];
