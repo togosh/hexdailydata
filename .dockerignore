@@ -1,7 +1,11 @@
 node_modules
+dist
 .git
 .env*
 artifacts
 .local
 *.zip
 *.dump
+tests
+docs
+.agents

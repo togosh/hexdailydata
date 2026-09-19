@@ -1,14 +1,10 @@
-# Progress
-
-Status at delivery: **architecture and starter only**. No v2 chain sync, real seed,
-production data import, dependency install, PostgreSQL integration or deployment has
-been performed. All build tasks in config/tasks.json start `pending`.
+﻿# Progress
 
 | Task | State | Commit / measured result |
 |---|---|---|
-| 01–11 | pending | Not implemented |
+| 01 | implementation complete; independent review pending | TypeScript/React foundation, exact domain/DTO tests, real isolated container and browser smoke; see ignored `artifacts/task-01/report.md` |
+| 02–11 | pending | Not implemented |
 
-Update this table as tasks finish. Link to the ignored local report or GitHub issue,
-not a checked-in copy of a database or hundreds of historical source snapshots.
-A task's implementation, offline tests, live canary and actual deployment are distinct
-claims. Maintain this file rather than appending new FINAL_FINAL documents.
+The development shell has no live data/indexer or applied v2 schema. Task01 source
+semantics do not qualify deployed contract/fork identity, provider throughput, costs,
+production readiness or Task07 visual fidelity. No v1 runtime/data was used.

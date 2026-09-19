@@ -1,166 +1,143 @@
-# HEXDailyData v2
+﻿# HEXDailyData v2
 
-A small, read-only HEX data product: useful current numbers, complete stake history,
-clear daily history, and straightforward CSVs. PulseChain first; shared Ethereum-era
-history is explicitly identified. No wallet, account, or payment is needed.
+A read-only HEX data product, built in this new repository. PulseChain is the initial
+serving chain; required shared Ethereum-era HEX history retains its original identity.
 
-**This download is an architecture and build starter, not a completed indexer.**
-The included health server and pure domain helpers are executable. Synchronization,
-seed import, the real API, and the React application are implementation tasks.
-They must not be described as working until their task checks actually pass.
+**Task 01 provides a runnable development foundation.** Fastify serves health/status
+and the built React shell. Exact domain rules and runtime DTO validation are tested.
+There is no indexer, real data, seed importer, provider access or production deployment.
+The shell displays unavailable values. Final UI design and reference-image comparison
+belong to Task07; this shell makes no visual-fidelity claim.
 
-## Start here — owner / Codex
+## Requirements
 
-1. For a genuinely fresh start, extract this repository into a **new** folder, for
-   example `C:\Code\HEXDailyData-v2`. If that workspace already exists, preserve it;
-   do not re-extract a starter over it. Never extract into the old repository.
-2. Keep the existing project at `C:\Code\HEXStakeExplorer-PulseChain` as source-only
-   reference. It is not a runtime dependency and must not be changed or executed.
-3. Open **only the new folder** in VS Code. Start a new Codex session; paste
-   `START_CODEX.md`. The first session completes **task 01 only**.
-4. Subsequent sessions use `node scripts/task.mjs next` to see eligible tasks and
-   `node scripts/task.mjs 02` (substitute the task) for the next prompt.
-5. Use the lean builder -> separate reviewer -> builder correction -> reviewer recheck
-   loop in docs/build-plan.md. Mark a task passed only after its actual acceptance checks
-   and independent review complete; then proceed using the single task-state file.
-   No GitHub push, old-system migration, or production cutover is automatic.
+Use **Node 24.21.0** (the pinned, tested Node 24 LTS patch) with bundled npm 11.19.0.
+The system Node on the initial Windows host was 22.14.0 and failed preflight; switch
+runtimes before installing. `.nvmrc` records the tested version. No global setting or
+runtime installation is required by the project.
 
-Node **24 LTS** is the target runtime. The dependency-free starter checks also run
-on Node 22.16+, but that is not the production target. Task 01 resolves and commits
-one lockfile and exact tested image digests; this kit contains no fabricated lockfile.
+Docker Desktop with Linux containers is optional for the local shell. The tested
+container images are Node 24.21.0 and PostgreSQL 17.11, pinned by digest in
+`deploy/Dockerfile` and `compose.database.yaml`. The database has no published host
+port. No legacy database, folder, credentials or scripts are runtime dependencies.
+
+## Fresh checkout
+
+Run from this repository root, using Node 24:
 
 ```powershell
-cd C:\Code\HEXDailyData-v2
+node --version
 node scripts/preflight.mjs
-node scripts/test.mjs
-node scripts/task.mjs next
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run doctor
+npm start
 ```
 
-`preflight` checks the new workspace and optionally reads the sibling Git HEAD.
-It does not inspect credentials, run old scripts, access a database, or use providers.
-Neither a preflight nor the small starter tests qualifies blockchain behavior.
+Open <http://127.0.0.1:4320>. `npm start` serves the compiled API and React assets.
+Stop with Ctrl+C. A fresh source ZIP supports the same commands without Git or the
+sibling repository. One root `package-lock.json` pins all tested dependencies.
 
-## AI workflow update
+For editing, use `npm run dev` and open <http://127.0.0.1:4321>. It starts the API on
+4320 and Vite on 4321; Ctrl+C stops both. Vite proxies `/api` and `/health` to the API.
+These fixed development ports must be free. Alternatively use `npm run dev:api` and
+`npm run dev:web` in separate terminals. The compiled server supports
+`HDD_V2_HTTP_PORT` and `HDD_V2_HTTP_HOST`; the combined dev proxy uses the default API
+port. Host defaults to loopback. No `.env` file is loaded automatically; supply
+variables in your shell or Compose environment. `.env.example` lists development options.
 
-This kit revision adds only two small instruction-only skills: `hdd-build` and
-`hdd-review`. They are not product modules or an autonomous orchestration service.
-The main Codex session builds; one separate reviewer reviews. If no subagent tool is
-available, use a separate review session. Details and bounded correction rules are
-in docs/build-plan.md. Extra agents consume extra work; do not spawn a team by default.
+- `/health/live`: 200 while the API process can serve requests.
+- `/health/ready`: 503 until data dependencies/schema are implemented and usable.
+- `/api/v2/status`: validated development/uninitialized status; no fabricated metrics.
+- `/api/v2/home`: 503 `not_implemented` (400 for invalid query parameters).
+- Other unimplemented routes: 404; write methods: 405. Errors use the shared envelope.
 
-The UI direction and actual supplied-image locations are in docs/product.md. Five
-primary references are available in the September 18 planner handoff, not embedded in
-this scaffold. Their layout details do not block Task01; final aesthetics remain Task07.
-BTC/ETH asset-price feeds are future-only, not a new requirement for this release.
+`HDD_V2_MODE` defaults to `development`. Live mode or `HDD_V2_ALLOW_LIVE_RPC=true`
+fails before listening. The foundation has no provider transport. `doctor` checks
+local tooling/configuration only; capability and cost results remain unmeasured.
 
-## Bootstrap feasibility
+## Isolated containers
 
-Independent day-1 rebuild has a **2–7-day design target and 14-day acceptance ceiling**
-for the agreed supported history on the declared hardware/provider/budget profile.
-These are unproved targets, not a measured capability of this starter. Seed import is
-separately measured and does not substitute for independent rebuild. Task 03 prepares
-an early bounded capability/throughput check for separate owner approval; resolve
-feasibility before extensive UI work, not only at final release. See the bulk-bootstrap
-section in docs/architecture.md and the bootstrap timing contract in docs/testing.md.
+API-only development needs no database secret. In PowerShell:
 
-## What is deliberately small
-
-One npm package. One release image for API and worker. One PostgreSQL database.
-Plain TypeScript modules, ordinary SQL migrations, React/Vite for the browser.
-No Redis, Kafka, Kubernetes, generic plugin framework, historical snapshot archive,
-or runtime checks of the hashes of hundreds of application source files.
-
-```text
-src/
-  domain/        exact math, HEX lifecycle and definitions
-  providers/     bounded read-only RPC and market adapters
-  db/            connections, migrations and explicit queries
-  services/      queries and application use cases
-  api/           HTTP and static-site boundary
-  worker/        bootstrap, incremental sync, metrics, exports, maintenance
-  web/           React UI; presentation, not protocol arithmetic
-  contracts/     shared API types and dataset/seed formats
-migrations/      ordered SQL, one current schema
-config/          public chain metadata and conservative default limits
-scripts/         development and operator entry points
-tests/          focused tests plus isolated integration/scale/browser suites
-docs/           the few maintained design/operating documents
+```powershell
+$env:HDD_V2_PROJECT = "hexdailydata-v2-dev-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+$env:HDD_V2_HOST_PORT = '4320'
+docker compose up --build -d --wait api
 ```
 
-There are no task-named production folders. Tests and reports are not runtime inputs.
+Choose another free host port if needed. Compose requires an explicit project name;
+use a new v2-specific name for each disposable run. Containers use their own project
+network. The API runs as UID 1000 with a read-only filesystem, no Linux capabilities,
+and no privilege escalation. This is a non-root application process, not a claim
+that the Docker daemon itself runs rootless.
 
-## What the release must do
+For an optional **new, disposable** database, set `HDD_V2_POSTGRES_PASSWORD` to a new
+v2-only local password, then:
 
-- Fast bootstrap from a portable, independently checked v2 seed, **and** a resumable
-  independent rebuild from configured historical RPC/data sources.
-- Approximately 60-second **observation** refresh for price, current T-share rate,
-  completed-day payout availability, and today's clearly labeled payout estimate.
-- Live address balance and paginated on-chain stake-list observations, separate from
-  the finalized index and daily ranks. Latest-block data is provisional, not final.
-- Complete supported stake lifecycles and daily native history; no arbitrary old
-  holder snapshots/ranks, no byte-for-byte legacy exports, no compatibility layer.
-- A fast Home summary, price/payout/T-share metrics, charts, calculator, address/stake
-  search, holder/ranking view, five standard downloads, and concise methodology.
-- Automatic normal syncing, bounded retries, useful progress, restart-safe cursors,
-  honest stale states, bounded temporary storage, tested backup/restore.
-- All-in ongoing operating target **$50–60/month maximum**. Costs and performance
-  require measurements before launch, not a promise based on the starter.
-
-## Commands: present versus planned
-
-**Available in the starter**:
-
-```text
-node scripts/preflight.mjs                  workspace-only safety check
-node scripts/test.mjs                       starter unit/HTTP/plan checks
-node scripts/task.mjs next                  eligible build tasks
-node scripts/task.mjs 01                    emit a scoped Codex prompt
-node --experimental-strip-types src/api/main.ts    scaffold health server only
+```powershell
+docker compose -f compose.yaml -f compose.database.yaml up -d --wait
 ```
 
-The scaffold listens on loopback `127.0.0.1:4320`. Its `/health/ready` deliberately
-returns 503. `/api/v2/status` explicitly says `scaffold`; it has no market numbers.
+PostgreSQL runs as UID 999 and uses this project's new `db_data` volume. It does not
+apply the draft migration or connect the API to SQL. Task02 qualifies schema/roles.
+To remove only this disposable project's containers/network/volume, keep the same
+`HDD_V2_PROJECT` value and run:
 
-**Required finished interface** (implemented and README-tested in the indicated tasks):
-
-```text
-npm ci && npm run build                     01 — reproducible source build
-npm run doctor                             01/08 — environment, capability, cost diagnostics
-npm run db:migrate                         02 — explicit v2 database only
-npm run bootstrap -- --seed FILE            03 — fresh v2 database, verified portable seed
-npm run bootstrap -- --rebuild              03 — resumable independent supported history
-npm run sync -- --once                      03 — bounded progress, no arbitrary date pinning
-npm run sync -- --watch                     03/08 — ordinary unattended scheduler
-npm run exports                            05 — current/prior immutable file bundles
-npm run backup / npm run restore            08 — one verified off-host recovery copy
-npm run verify                             09 — v2-only full release checks
-npm run live:check -- --allow-network        10 — bounded explicitly configured live canary
+```powershell
+docker compose -f compose.yaml -f compose.database.yaml down --volumes
 ```
 
-Until a command is implemented it must fail clearly, not return a fake PASS.
-The scaffold Compose files are development-only; task 08 supplies the tested production
-profile. No existing VPS path or database is mounted by the starter.
-The optional database is in `compose.database.yaml`; API-only startup needs no secret.
-To experiment with the scaffold in Docker, `docker compose up --build api` serves only
-its health endpoints. For an isolated database, first supply a NEW v2-only
-`HDD_V2_POSTGRES_PASSWORD`, then use
-`docker compose -f compose.yaml -f compose.database.yaml up -d`.
-Neither command starts a real indexer or applies the draft migration.
-Subagents must use distinct `-p` project names and host ports.
+Do not use that cleanup on data you intend to keep. Never use global prune or an old
+project/volume name. Task08 owns production deployment and backup/restore.
 
-## Documentation map
+## Checks
 
-- [Product decisions, scope and freshness](docs/product.md)
-- [Architecture and sync/publication behavior](docs/architecture.md)
-- [Database and history/retention contract](docs/data.md)
-- [API, CSV, and live-value semantics](docs/interfaces.md)
-- [Build tasks and parallel boundaries](docs/build-plan.md)
-- [Operations, budget, live access and cutover](docs/operations.md)
-- [Acceptance tests and realistic measurements](docs/testing.md)
-- [Reference source map and primary external references](docs/reference.md)
-- [Current progress](docs/progress.md)
-- [What was actually checked in this starter](VALIDATION.md)
+```powershell
+npm run format:check
+npm run typecheck
+npm test
+npm run build
+npm run test:containers
+npm run test:browser
+```
 
-Update these documents instead of adding a new numbered runbook for every repair.
-All future developers must be able to run the finished product without the old repo
-or this chat. See [AGENTS.md](AGENTS.md) for the narrow coding boundaries.
+Unit/domain/DTO/loopback tests are offline. The container check builds from the lockfile,
+creates a random v2 project and password, checks real PostgreSQL identity, non-root
+UIDs, health and built assets, then removes its own containers/network/volume/image.
+Image/package downloads are allowed; no blockchain endpoints are accessed.
+
+The browser check uses installed Google Chrome by default with a fresh temporary
+browser profile. Set `HDD_V2_BROWSER_CHANNEL=chromium` and install Playwright Chromium
+with `npx playwright install chromium` if Chrome is absent. Screenshots go to ignored
+`artifacts/task-01/`. This verifies the shell, not Task07 aesthetics or populated data.
+`npm run format` formats implementation files; untouched planning documents are excluded.
+
+## Contracts and boundaries
+
+`src/domain` is pure exact bigint arithmetic: units, UTC protocol days, lifecycle
+settlement effects, inclusion sets and mean-of-daily-ratios payout presets. Definitions,
+hand-worked vectors, presentation rounding and fork requirements are in
+[docs/data.md](docs/data.md). Runtime Zod schemas and inferred public types live in
+`src/contracts/api.ts`. [The DTO example](tests/fixtures/home.json) is synthetic test
+input, never runtime data. The five CSV schemas remain in `src/contracts/datasets.json`.
+
+One npm package, one API/worker image, one future PostgreSQL database. API and worker
+are separate process entry points. No database/RPC adapter has been implemented.
+Worker commands fail explicitly until their owning tasks are built.
+
+## Continue one task at a time
+
+Read [AGENTS.md](AGENTS.md), [product scope](docs/product.md), and the selected
+[build task](docs/build-plan.md). `node scripts/task.mjs next` shows eligible work.
+The main session writes code; one independent read-only reviewer checks the frozen
+candidate using the bounded review loop. No push, deployment, live validation, or
+next-task implementation is automatic.
+
+See [progress](docs/progress.md) for reviewed commits and local report locations,
+[reference ledger](docs/reference.md) for selectively reused definitions and licensing,
+[architecture](docs/architecture.md), [API interfaces](docs/interfaces.md),
+[testing](docs/testing.md), and [operations](docs/operations.md) for later-task contracts.
+`VALIDATION.md` is the historical starter report, not evidence of the current build.

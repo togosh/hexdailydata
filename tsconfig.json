@@ -1,22 +1,16 @@
-{
+﻿{
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
-    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "jsx": "react-jsx",
     "skipLibCheck": true
   },
-  "include": [
-    "src/domain/**/*.ts",
-    "src/contracts/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "artifacts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": ["node_modules", "dist", "artifacts", ".local"]
 }

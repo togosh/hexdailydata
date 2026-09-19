@@ -12,8 +12,14 @@ function scale(decimals: number): bigint {
 }
 export function parseUnits(value: string, decimals: number, maximum = UINT256_MAX): bigint {
   const factor = scale(decimals);
-  if (typeof value !== 'string' || value.length > 120 || !/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)) {
-    throw new TypeError('Use an unsigned plain decimal without commas, spaces or exponent notation.');
+  if (
+    typeof value !== 'string' ||
+    value.length > 120 ||
+    !/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value)
+  ) {
+    throw new TypeError(
+      'Use an unsigned plain decimal without commas, spaces or exponent notation.',
+    );
   }
   const [whole = '0', fraction = ''] = value.split('.');
   if (fraction.length > decimals) throw new RangeError('Too many decimal places.');
@@ -44,7 +50,7 @@ export function rational(numerator: bigint, denominator: bigint): Rational {
 export function displayRatio(value: Rational, decimalPlaces = 8): string {
   const factor = scale(decimalPlaces);
   if (value.numerator < 0n || value.denominator <= 0n) throw new RangeError('Invalid ratio.');
-  return formatUnits(value.numerator * factor / value.denominator, decimalPlaces);
+  return formatUnits((value.numerator * factor) / value.denominator, decimalPlaces);
 }
 export function payoutHexPerTShare(payoutHearts: bigint, dayShares: bigint): Rational {
   return rational(payoutHearts * SHARES_PER_TSHARE, dayShares * HEARTS_PER_HEX);

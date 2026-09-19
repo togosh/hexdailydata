@@ -1,11 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseUnits, formatUnits, rational, displayRatio,
-  payoutHexPerTShare, hexPerTShareBeforeBonuses, UINT256_MAX,
+  parseUnits,
+  formatUnits,
+  rational,
+  displayRatio,
+  payoutHexPerTShare,
+  hexPerTShareBeforeBonuses,
+  UINT256_MAX,
 } from '../../src/domain/units.ts';
 import {
-  contractDayAt, displayDay, newStakeTiming, HEX_LAUNCH_SECONDS,
+  contractDayAt,
+  displayDay,
+  newStakeTiming,
+  HEX_LAUNCH_SECONDS,
 } from '../../src/domain/day.ts';
 import { observationStatus } from '../../src/domain/freshness.ts';
 

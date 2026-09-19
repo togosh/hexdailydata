@@ -192,3 +192,81 @@ qualified real seed is an output of live qualification, not an invisible prerequ
 An explicit v1 export-file translator may aid first migration, but no automatic access
 to the old database is allowed; it is a separate owner-approved import, not the
 independent-rebuild proof.
+
+## Frozen foundation definitions (Task01)
+
+These definitions are implemented in pure `src/domain` functions and checked with
+literal vectors, not with a v1 status helper as the oracle. Protocol source is the
+[Etherscan HEX source record](https://etherscan.io/address/0x2b591e99afe9f32eaa6214f7b7629768c40eeb39#code),
+retrieved 2026-09-19; see reference.md for function names and limitations.
+
+Contract days start at 2019-12-03T00:00:00Z (1575331200 seconds), use UTC intervals
+[start, start+86400), and are zero based. Display day is contract day + 1. Supported
+contract days are 0–65535; a new stake whose maturity exceeds that horizon is rejected.
+A transaction on day d locks on max(d+1, 2), for 1–5555 days. Launch day 0 and day 1
+therefore both lock on day 2; day 2 locks on day 3. Ordinary cancellation is strictly
+before lockedDay. Ending on lockedDay serves zero days but is an early end subject to
+protocol penalties, not a cancellation. Historical claim-created auto-stakes originate
+on days 1–350, have at least 350 staked days, and cannot end before 350 served days.
+This historical coverage does not add auto-stakes to the ordinary calculator UI.
+
+`stakeGoodAccounting` is permitted only at/after maturity and only once. It removes
+accounted shares and settles payout/penalty accounting, but leaves principal in the
+contract locked-hearts total and does not pay the staker. A later StakeEnd repeats the
+same payout/penalty fields, removes principal, and returns principal+payout minus the
+capped penalty. It must not subtract shares or record payout/penalty a second time.
+Raw event penalty remains in the settlement; daily realized penalty is capped at
+principal+payout. Actual circulating-supply changes must follow Transfer events,
+including penalty-beneficiary mints; do not treat these pure effects as a full supply
+reducer. Task02 owns ordered event integration and replay/idempotence.
+
+| Named set / metric | queued | open | mature-open | good-accounted | ended/cancelled |
+|---|---|---|---|---|---|
+| Contract locked principal; staked percentage | yes | yes | yes | yes | no |
+| Accounted principal: weighted duration, holder accounted stake amount/count, active staker address count | yes | yes | yes | no | no |
+| Accounted payout shares after day activation | no | yes | yes | no | no |
+| Future scheduled maturities | yes | yes | no | no | no |
+
+Active stakers means distinct owners with at least one accounted-principal position;
+liquid holders means distinct addresses with a positive liquid balance. Good-accounted
+principal is neither current accounted stake principal nor yet minted liquid balance.
+Accounted sets are therefore not substitutes for contract locked supply. Weighted
+length is sum(principal hearts × original staked days) / sum(principal hearts) over
+accounted principal; it includes queued stakes consistently with the inspected legacy
+metric's explicit predicates, while payout shares do not. No remaining-duration or
+share weighting is substituted. No members yields unavailable (null), not zero.
+Years, when displayed, divide the exact day ratio by 365.
+
+Hand vectors in `tests/unit/protocol.test.mjs` use day-10 starts (lock 11): ending on
+10 returns 100 hearts without penalty; on 11 a supplied 12-heart penalty returns 88.
+GA on maturity day 21 with principal 100, shares 50, payout 30 and penalty 5 removes
+50 accounted shares and no principal; ending on 30 returns 125 and removes 100 locked
+hearts with no repeated settlement. Auto-stakes reject 349 served days and accept 350.
+Weighted duration for 100 hearts ×10 days plus 300×30 plus a queued 900×10 is exactly
+190/13 days; adding a good-accounted row changes neither numerator nor denominator.
+
+Payout/T-share = payout hearts ×10^12 / (daily shares ×10^8). HEX/T-share before
+bonuses = raw share rate ×10^12 / (100000 ×10^8). These are reduced bigint rational
+values until presentation. Wire/display payout ratios truncate to at most 8 decimal
+places, removing trailing zeros; this is not canonical settlement rounding. Raw
+payout/share inputs are retained on the wire. Token principal uses exact 8-decimal
+HEX conversion without rounding. No USD interpretation is attached to a share rate.
+
+The 1/30/365-day preset is the arithmetic mean of exact daily payout/T-share ratios
+for exactly N consecutive completed, materialized days ending at an explicit ledger
+cutoff strictly before currentDay. Fifteen days with payout 1 heart/shares 30000 give
+1/3 HEX/T-share each; fifteen with payout 2/shares 70000 give 2/7 each. Their mean is
+(1/3+2/7)/2 = **13/42**, whereas summing payouts and shares first gives **3/10** and is
+not this preset. Missing/pending days, missing amounts or zero shares yield unavailable;
+a measured zero payout with positive shares is a valid zero. No gaps are averaged away.
+
+Completed ledger payout is distinct from today's provisional estimate. Current-day
+estimation and stake reward/penalty formulas beyond these settlement event semantics
+remain Task04 and subsequent calculator integration; Task01 does not infer payout from
+3.69%/365 or claim complete historical Big-Pay-Day reward calculation.
+
+The fork contract remains architecture.md's nonoverlapping common Ethereum history
+and PulseChain suffix. Boundary 17232999 is a reference, not runtime qualification.
+Preserve original event chain/date and serving chain separately, including ended and
+GA-but-unended inherited stakes. Task03 must verify boundary hashes, entry block, code,
+constructor/fork state and source capabilities before enabling live operation.

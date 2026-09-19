@@ -18,7 +18,8 @@ export function dayStartSeconds(day: number): bigint {
   return HEX_LAUNCH_SECONDS + BigInt(day) * SECONDS_PER_DAY;
 }
 export function newStakeTiming(startSeconds: bigint, days: number) {
-  if (!Number.isInteger(days) || days < 1 || days > 5555) throw new RangeError('Stake length must be 1–5555 days.');
+  if (!Number.isInteger(days) || days < 1 || days > 5555)
+    throw new RangeError('Stake length must be 1–5555 days.');
   const transactionDay = contractDayAt(startSeconds);
   const lockedDay = Math.max(transactionDay + 1, 2);
   const maturityDay = lockedDay + days;

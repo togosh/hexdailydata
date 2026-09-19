@@ -3,9 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
-const root = fs.realpathSync(
-  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
-);
+const root = fs.realpathSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 
 if (fs.realpathSync(process.cwd()) !== root) {
   throw new Error('Run from the new v2 repository root.');
@@ -16,11 +14,7 @@ if (marker.generation !== 2 || marker.product !== 'HEXDailyData') {
   throw new Error('Wrong workspace marker.');
 }
 
-const oldFolderNames = [
-  'hexstakeexplorer-pulsechain',
-  'hexdailydata',
-  'hexdailydata-collab',
-];
+const oldFolderNames = ['hexstakeexplorer-pulsechain', 'hexdailydata', 'hexdailydata-collab'];
 if (oldFolderNames.includes(path.basename(root).toLowerCase())) {
   throw new Error('Use a new v2 folder, not a development/publishing/collaboration v1 folder.');
 }
@@ -52,15 +46,23 @@ if (reference.present) {
   if (result.status === 0) reference.commit = result.stdout.trim();
 }
 
-console.log(JSON.stringify({
-  status: 'WORKSPACE_CHECKED',
-  root,
-  targetNode: '24 LTS',
-  observedNode: process.versions.node,
-  reference,
-  sourceOnlyReference: true,
-  databaseAccess: false,
-  providerAccess: false,
-  productionReady: false,
-}, null, 2));
-console.log('Start task 01. This is a workspace check, not chain validation or an OS sandbox.');
+console.log(
+  JSON.stringify(
+    {
+      status: 'WORKSPACE_CHECKED',
+      root,
+      targetNode: '24 LTS',
+      observedNode: process.versions.node,
+      reference,
+      sourceOnlyReference: true,
+      databaseAccess: false,
+      providerAccess: false,
+      productionReady: false,
+    },
+    null,
+    2,
+  ),
+);
+console.log(
+  'Use scripts/task.mjs next for build progress. This checks the workspace, not chain validity.',
+);

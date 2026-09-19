@@ -146,3 +146,23 @@ clearly separate scenario. No interest guarantee, no transaction execution, no f
 start-date selector or unnecessary slider. Historical arbitrary-start calculators are
 not required at launch. Good-accounted/ended values in explorer are not silently reused
 as an ordinary new stake quote.
+
+## Task01 foundation boundary
+
+The runnable development API serves health and validated status; Home data explicitly
+returns 503 until its owning tasks are built. Source/compiled entry points refuse live
+mode. `src/contracts/api.ts` is the runtime Zod schema and inferred-type source for
+block references, observations, Home, live stake pages and errors. JSON example:
+`tests/fixtures/home.json` (synthetic, test-only; not imported into the application).
+No source/explorer fixture is served as current data.
+
+DTO validation rejects unsafe integer representations, negative/exponent decimals,
+unknown fields, invalid UTC timestamps, mismatched display days, zero payout
+share denominators, incompatible chain lineage and final labels on today's estimate.
+Structural DTO validation is not proof of provider truth, source capability, canonical
+finality or current freshness. Ingestion/services must derive those in their owning
+tasks. A source block timestamp and collection timestamp remain separate; collection
+cannot precede the source block. Each component is aged independently when served.
+`mode: development` replaces the unused scaffold `demo` option; there is no fake-data
+mode. Weighted duration is nullable when its accounted set is empty. All derived
+payout displays use the exact-ratio/truncate-8 policy in data.md.

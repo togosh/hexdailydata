@@ -91,3 +91,37 @@ runtime. The old repository's contract-reference notice says the explorer declar
 license None; do not bundle that full Solidity source as if it had an open-source
 redistribution grant. Keep this repository private initially; select a distribution
 license only after owner/source-license review. Dependencies keep their notices.
+
+## Task01 source-use ledger (2026-09-19)
+
+Only selected source was read; no sibling modules/tests/scripts were executed or
+imported. Sibling HEAD observed by preflight was
+`c1a3ae455a6a6a935ef1ed0db7b25e263710ea64`; it was not modified or reset. All legacy
+lookups below used reviewed baseline `e1a9cc417501479358494d4d9312ccaf2429f622`.
+
+| Reference read | Retained behavior / new location | Independent check |
+|---|---|---|
+| `packages/core/src/hex-day.mjs`, `stake-semantics.mjs` | UTC day, launch lock floor, cancellation/auto-stake/GA distinctions; new implementation in `src/domain/day.ts`, `stake.ts` | Public protocol branches and literal timing/settlement vectors |
+| `packages/calculator/src/data-inputs/payout.mjs` | Consecutive completed-window mean of exact daily ratios; new `src/domain/payout.ts` | Hand result 13/42 versus 3/10, gaps and zero denominator tests; legacy display rounding was not ported |
+| Selected predicates in `apps/indexer/src/gate45/analytics.mjs` and boundary definitions in `semantics.mjs` | Weighted principal includes queued/open/mature-open and excludes GA/ended; explicit v2 sets in `stake.ts` and data.md | Hand-weighted 190/13 vector; contract start/unlock/end branches distinguish locked principal from payout shares; no SQL/orchestration copied |
+| `packages/calculator/src/THIRD_PARTY_NOTICES.md` | Retained license caution | Explorer source declares no redistribution license |
+
+The public Etherscan source page was successfully retrieved through HTTPS by
+PowerShell on 2026-09-19 after the browser fetch returned 403. Relevant inspected
+functions: `_stakeStart`, `stakeGoodAccounting`, `stakeEnd`, `_stakeUnlock`,
+`_calcPayoutRewards`, `_stakeStartBonusHearts`, `dailyDataRange`, and historical
+claim bounds. The ignored local report records retrieval hashes. Full Solidity and
+HTML are excluded from the source ZIP; the explorer declares license None.
+These are independently checked source semantics, not a Task10 deployed-bytecode
+or fork identity check. All v2 lifecycle/metric code is newly written from these
+rules; no old runtime, database model, provider gate or full Solidity source is shipped.
+The repository remains private with no new distribution-license grant.
+
+Dependency versions were resolved from the official npm registry and Node distribution
+index; Docker digests came from the official Node/PostgreSQL registry manifests.
+Node 24 LTS, Fastify 5 support and Vite requirements were checked against the official
+[Node lifecycle](https://nodejs.org/en/about/previous-releases),
+[Fastify LTS policy](https://fastify.dev/docs/latest/Reference/LTS/) and
+[Vite guide](https://vite.dev/guide/). Exact installed versions are in package-lock.json
+and the task report. Dependency notices stay with their installed packages; source ZIPs
+exclude node_modules. No licensing review or production source qualification is claimed.

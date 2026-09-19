@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "chain": "pulsechain",
+  "mode": "development",
+  "daily": null,
+  "live": {
+    "price": {
+      "status": "unavailable",
+      "value": null,
+      "asOf": null,
+      "observedAt": null,
+      "finality": "provisional",
+      "method": "not_initialized",
+      "notes": [],
+      "reason": "no_source"
+    },
+    "shareRate": {
+      "status": "fresh",
+      "value": { "rawShareRate": "100001", "hexPerTShareBeforeBonuses": "10000.1" },
+      "asOf": {
+        "chainId": 369,
+        "blockNumber": "25000000",
+        "blockHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "blockTimestamp": "2026-09-19T00:00:00Z"
+      },
+      "observedAt": "2026-09-19T00:00:01Z",
+      "finality": "provisional",
+      "method": "test_fixture",
+      "notes": ["Synthetic contract example only; never served as live data."]
+    },
+    "latestCompletedPayout": {
+      "status": "stale",
+      "value": {
+        "contractDay": 1000,
+        "displayDay": 1001,
+        "hexPerTShare": "0.33333333",
+        "payoutHearts": "1",
+        "stakeShares": "30000",
+        "kind": "completed"
+      },
+      "asOf": {
+        "chainId": 369,
+        "blockNumber": "25000000",
+        "blockHash": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "blockTimestamp": "2026-09-19T00:00:00Z"
+      },
+      "observedAt": "2026-09-19T00:00:01Z",
+      "finality": "confirmed",
+      "method": "test_fixture",
+      "notes": ["Presentation truncates to 8 decimal places; raw ratio remains exact."]
+    },
+    "todayPayoutEstimate": {
+      "status": "unavailable",
+      "value": null,
+      "asOf": null,
+      "observedAt": null,
+      "finality": "provisional",
+      "method": "not_initialized",
+      "notes": [],
+      "reason": "no_source"
+    }
+  },
+  "sync": { "state": "uninitialized", "message": "Synthetic example, not a live response." }
+}

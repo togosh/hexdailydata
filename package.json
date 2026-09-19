@@ -1,19 +1,44 @@
 {
   "name": "hexdailydata-v2",
-  "version": "0.0.0-scaffold",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "HEXDailyData v2 architecture and safe build scaffold; live sync not implemented",
+  "description": "HEXDailyData v2 development foundation; live sync not implemented",
   "engines": {
-    "node": ">=24 <25"
+    "node": ">=24.21.0 <25"
   },
   "scripts": {
     "preflight": "node scripts/preflight.mjs",
     "test": "node scripts/test.mjs",
     "task": "node scripts/task.mjs",
-    "dev:api": "node --experimental-strip-types src/api/main.ts",
-    "worker:status": "node --experimental-strip-types src/worker/main.ts status"
+    "dev": "node scripts/dev.mjs",
+    "dev:api": "node --watch src/api/main.ts",
+    "dev:web": "vite",
+    "build": "tsc -p tsconfig.build.json && vite build",
+    "start": "node dist/api/main.js",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "doctor": "node scripts/doctor.mjs",
+    "worker:status": "node src/worker/main.ts status",
+    "test:containers": "node scripts/test-containers.mjs",
+    "test:browser": "node --test tests/browser/shell.test.mjs"
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@fastify/static": "10.1.4",
+    "fastify": "5.12.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "playwright": "1.63.0",
+    "prettier": "3.9.8",
+    "typescript": "7.0.2",
+    "vite": "8.3.0"
+  }
 }

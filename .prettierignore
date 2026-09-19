@@ -1,0 +1,15 @@
+node_modules/
+dist/
+artifacts/
+.local/
+package-lock.json
+# Preserve untouched planning/reference documents and starter configuration.
+docs/
+AGENTS.md
+START_CODEX.md
+VALIDATION.md
+.agents/
+config/
+migrations/
+src/contracts/datasets.json
+src/contracts/seed.schema.json
