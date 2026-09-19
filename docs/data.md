@@ -239,8 +239,9 @@ Years, when displayed, divide the exact day ratio by 365.
 
 Hand vectors in `tests/unit/protocol.test.mjs` use day-10 starts (lock 11): ending on
 10 returns 100 hearts without penalty; on 11 a supplied 12-heart penalty returns 88.
-GA on maturity day 21 with principal 100, shares 50, payout 30 and penalty 5 removes
-50 accounted shares and no principal; ending on 30 returns 125 and removes 100 locked
+GA on day 62 (maturity 21 plus the 14-day grace period plus 27 late days), with
+principal 100 and payout 30, has penalty floor(130 ×27/700) = 5. It removes
+50 accounted shares and no principal; ending on 70 returns 125 and removes 100 locked
 hearts with no repeated settlement. Auto-stakes reject 349 served days and accept 350.
 Weighted duration for 100 hearts ×10 days plus 300×30 plus a queued 900×10 is exactly
 190/13 days; adding a good-accounted row changes neither numerator nor denominator.

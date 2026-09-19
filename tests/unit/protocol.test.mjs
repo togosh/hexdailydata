@@ -75,11 +75,12 @@ test('GA then end removes shares and records settlement once, returns principal 
   assert.equal(stakeStatus(original, 21), 'mature_open');
   const ga = settleStake(original, {
     kind: 'good_accounting',
-    day: 21,
+    // Maturity 21 + grace 14; floor(130 * (62 - 21 - 14) / 700) = 5.
+    day: 62,
     payoutHearts: 30n,
     penaltyHearts: 5n,
   });
-  assert.equal(stakeStatus(ga.stake, 25), 'good_accounted');
+  assert.equal(stakeStatus(ga.stake, 65), 'good_accounted');
   assert.deepEqual(ga.effects, {
     lockedHeartsDelta: 0n,
     accountedSharesDelta: -50n,
@@ -90,7 +91,7 @@ test('GA then end removes shares and records settlement once, returns principal 
   });
   const ended = settleStake(
     ga.stake,
-    end(30, 10, { prevUnlocked: true, payoutHearts: 30n, penaltyHearts: 5n }),
+    end(70, 10, { prevUnlocked: true, payoutHearts: 30n, penaltyHearts: 5n }),
   );
   assert.deepEqual(ended.effects, {
     lockedHeartsDelta: -100n,
@@ -112,16 +113,16 @@ test('GA then end removes shares and records settlement once, returns principal 
   assert.throws(() =>
     settleStake(ga.stake, {
       kind: 'good_accounting',
-      day: 25,
+      day: 65,
       payoutHearts: 0n,
       penaltyHearts: 0n,
     }),
   );
-  assert.throws(() => settleStake(ga.stake, end(30, 10)));
+  assert.throws(() => settleStake(ga.stake, end(70, 10)));
   assert.throws(() =>
     settleStake(
       ga.stake,
-      end(30, 10, { prevUnlocked: true, payoutHearts: 31n, penaltyHearts: 5n }),
+      end(70, 10, { prevUnlocked: true, payoutHearts: 31n, penaltyHearts: 5n }),
     ),
   );
   const capped = settleStake(original, end(15, 4, { penaltyHearts: 200n, payoutHearts: 20n }));
