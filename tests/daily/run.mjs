@@ -906,6 +906,8 @@ try {
       await daily.exports.startup(signal);
       await daily.tick(signal, Number(chain.plain(540).timestamp) * 1000, true);
       assert.equal(daily.status.exports, 1);
+      await daily.tick(signal, Number(chain.plain(540).timestamp) * 1000);
+      assert.equal(daily.status.exports, 1, 'unchanged cutoffs must not repeat a full export');
       measurements.daily = daily.status;
     });
     await test('portable daily state validates then streams seed; corrupted rank and market metadata rejected', async () => {

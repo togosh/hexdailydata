@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { isDeepStrictEqual } from 'node:util';
 import { contractDayAt } from '../../domain/day.ts';
 import { rankAccounts } from './ranking.ts';
 import {
@@ -105,13 +106,12 @@ export class DailyService {
         "SELECT manifest,status FROM hdd.export_bundles WHERE chain_id=$1 AND slot='current'",
         [this.chain],
       );
-      const key = (v: typeof identity) =>
-        JSON.stringify([v.dailyCutoff, v.dailyPayoutBlock, v.ranking, v.markets]);
+      const key = (v: typeof identity) => [v.dailyCutoff, v.dailyPayoutBlock, v.ranking, v.markets];
       if (
         force ||
         !r ||
         r.status !== 'available' ||
-        key(identity) !== key(r.manifest) ||
+        !isDeepStrictEqual(key(identity), key(r.manifest)) ||
         !(await this.exports.catalog(this.chain)).bundles.some((b) => b.id === r.manifest.id)
       ) {
         try {
