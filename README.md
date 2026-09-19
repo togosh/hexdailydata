@@ -7,6 +7,8 @@ serving chain; required shared Ethereum-era HEX history retains its original ide
 and the built React shell. Exact domain rules and runtime DTO validation are tested.
 Task02 adds isolated PostgreSQL migrations and incremental projection primitives.
 Task03 adds offline-tested acquisition, continuous sync, retention and portable seeds.
+Task04 adds exact current metrics, a bounded reserve-price route, scheduled worker
+observations and callable live address services. See [the live contract](docs/live.md).
 No real data, live provider qualification or deployment is supplied.
 The shell displays unavailable values. Final UI design and reference-image comparison
 belong to Task07; this shell makes no visual-fidelity claim.
@@ -198,9 +200,14 @@ Worker entry: `node src/worker/main.ts help` (or compiled `dist/worker/main.js`)
 are `rebuild`, `once`, `watch`, `repair-range <retained-block>`, `seed-export <file>` and
 `seed-import <file> <expectation.json>`. Status is local and does not contact providers.
 Every DB command requires the explicit v2 target/role/instance configuration above.
-Run `db:migrate` with the migrator to apply/check ordered migrations 1 and 2. Migration 1
+Run `db:migrate` with the migrator to apply/check ordered migrations 1–3. Migration 1
 is unchanged; migration 2 adds only acquisition coverage, recovery pins and seed sequence
 authority. The API remains read-only and the public shell remains uninitialized.
+Migration3 adds only disposable latest observations, independent of native bootstrap.
+`npm run test:live` creates a fresh Task04 SQL project and uses raw synthetic providers;
+`npm test` includes offline live-service and scheduler checks. The source-only seed
+contract is format2/schemaVersion3; current overlays are excluded and start unavailable
+after a fresh import. No pre-existing schema/seed compatibility layer is supplied.
 
 Provider commands fail closed unless `HDD_V2_ALLOW_LIVE_RPC=true`, `HDD_V2_SOURCE_PROFILE`,
 `HDD_V2_PROVIDER_STATE`, and `HDD_V2_STORAGE_PATH` are explicit. The profile is validated

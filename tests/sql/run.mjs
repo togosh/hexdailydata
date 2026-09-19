@@ -594,7 +594,7 @@ try {
     const schema = JSON.parse(readFileSync('src/contracts/seed.schema.json', 'utf8'));
     const tables = (
       await api.query(
-        "SELECT tablename FROM pg_tables WHERE schemaname='hdd' AND tablename<>'schema_migrations' ORDER BY tablename",
+        "SELECT tablename FROM pg_tables WHERE schemaname='hdd' AND tablename NOT IN ('schema_migrations','live_metrics') ORDER BY tablename",
       )
     ).rows.map((r) => r.tablename);
     assert.deepEqual([...schema.properties.files.items.properties.table.enum].sort(), tables);

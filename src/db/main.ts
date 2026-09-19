@@ -7,7 +7,7 @@ if (command !== 'migrate')
 const client = await connect(databaseConfig('migrator'));
 try {
   await migrateCurrent(client);
-  console.log('v2 schema 2 checked/applied.');
+  console.log('v2 schema 3 checked/applied.');
 } finally {
   await client.end();
 }

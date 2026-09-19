@@ -22,7 +22,7 @@ export type Table = keyof typeof tables;
 export const tableNames = Object.keys(tables) as Table[];
 export const manifestSchema = z.strictObject({
   formatVersion: z.literal(2),
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   calculationVersion: z.literal('hex-native-1'),
   createdAt: z.iso.datetime(),
   chainId: z.union([z.literal(1), z.literal(369)]),

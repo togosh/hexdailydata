@@ -124,7 +124,7 @@ async function snapshot({ semantic = false } = {}) {
 }
 try {
   const migrator = await db('migrator');
-  await test('fresh/repeated schema2 plus ordered schema1 upgrade preserves ledger', async () => {
+  await test('fresh/repeated schema3 plus ordered schema1 upgrade preserves ledger', async () => {
     if (phase === 'build') await migrate(migrator, await initialMigration());
     await migrateCurrent(migrator);
     await migrateCurrent(migrator);
@@ -132,7 +132,7 @@ try {
       (await migrator.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows.map(
         (r) => r.version,
       ),
-      [1, 2],
+      [1, 2, 3],
     );
   });
   api = await db('api');
@@ -190,6 +190,18 @@ try {
         '0',
       );
       const exporter = await db('worker');
+      await exporter.query(`INSERT INTO hdd.live_metrics VALUES(369,'price',$1,'{}')`, [
+        JSON.stringify({
+          status: 'unavailable',
+          value: null,
+          asOf: null,
+          observedAt: null,
+          finality: 'provisional',
+          method: 'fixture',
+          notes: [],
+          reason: 'not_observed',
+        }),
+      ]);
       await exportSeed(exporter, '/evidence/early.seed.tar.gz', signal);
     });
     await test('multi-day once, automatic replay-age pruning and independent exact totals', async () => {
@@ -304,6 +316,7 @@ try {
       );
       assert.equal((await api.query('SELECT count(*) FROM hdd.chains')).rows[0].count, '0');
       const imported = await importSeed(worker, path, expected, signal);
+      assert.equal((await api.query('SELECT count(*) FROM hdd.live_metrics')).rows[0].count, '0');
       assert.ok(imported.recoveryCheckpoints > 0);
       sync = await engine(369);
       await sync.audit(signal);
@@ -519,6 +532,7 @@ try {
       );
       assert.equal((await api.query('SELECT count(*) FROM hdd.chains')).rows[0].count, '0');
       const imported = await importSeed(worker, seed, expected, signal);
+      assert.equal((await api.query('SELECT count(*) FROM hdd.live_metrics')).rows[0].count, '0');
       assert.ok(imported.recoveryCheckpoints > 1);
       console.log('Seed import recovery audit:', imported);
       assert.equal(

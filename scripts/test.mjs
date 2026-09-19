@@ -9,6 +9,13 @@ const tests = fs
   .filter((file) => file.endsWith('.test.mjs'))
   .sort()
   .map((file) => path.join(root, 'tests/unit', file));
+tests.push(
+  ...fs
+    .readdirSync(path.join(root, 'tests/live'))
+    .filter((file) => file.endsWith('.test.mjs'))
+    .sort()
+    .map((file) => path.join(root, 'tests/live', file)),
+);
 if (!tests.length) throw new Error('No starter tests.');
 
 // Discovery is confined to this new repository's starter unit tests.

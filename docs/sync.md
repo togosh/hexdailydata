@@ -2,7 +2,8 @@
 
 Migration 2 preserves migration 1 and adds `source_history` (one verified acquisition
 start, source pair and finality policy per chain) and `recovery_pins` (at most four named
-cutoffs per chain). These tables travel in seed format 2/schema 2. The manifest JSON
+cutoffs per chain). These native tables travel in seed format2; Task04 updates storage
+schemaVersion to3 and excludes disposable live_metrics from the archive. The manifest JSON
 Schema is generated from the runtime Zod manifest; calculation version is `hex-native-1`.
 Database identity, migration credentials and session locks never travel.
 

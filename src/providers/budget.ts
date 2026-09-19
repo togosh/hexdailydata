@@ -32,6 +32,7 @@ interface Job<T> {
   deadline: number;
   signal: AbortSignal;
   work: () => Promise<T>;
+  onDispatch?: () => void;
   resolve: (v: T) => void;
   reject: (e: unknown) => void;
 }
@@ -43,6 +44,7 @@ const slotMs = 2100,
   tolerance = 100,
   windowMs = 60_000;
 export class ProviderBudget {
+  private reserved = { http: 0, logical: 0 };
   private queue: Job<unknown>[] = [];
   private active = false;
   private started: number;
@@ -68,6 +70,7 @@ export class ProviderBudget {
     deadline: number,
     signal: AbortSignal,
     work: () => Promise<T>,
+    onDispatch?: () => void,
   ): Promise<T> {
     if (
       (this.role === 'api') !== (lane === 'address') ||
@@ -86,6 +89,7 @@ export class ProviderBudget {
         deadline,
         signal,
         work,
+        ...(onDispatch ? { onDispatch } : {}),
         resolve: resolve as (v: unknown) => void,
         reject,
       };
@@ -96,6 +100,75 @@ export class ProviderBudget {
   }
   async backoff(until: number) {
     await this.cooldown.extend(until);
+  }
+  /** Reserve one entire public job, including retry headroom, before discovery.
+   * Actual dispatch consumes the reservation; completion releases only unused work.
+   */
+  async addressRequest(deadline: number, minimumAttempts: number, signal: AbortSignal) {
+    signal.throwIfAborted();
+    if (this.role !== 'api') throw new Error('Address reservation requires API role.');
+    if (
+      !Number.isSafeInteger(deadline) ||
+      deadline > this.clock.now() + 10000 ||
+      !Number.isInteger(minimumAttempts) ||
+      minimumAttempts < 1 ||
+      minimumAttempts > 4
+    )
+      throw new Error('Invalid address deadline or work plan.');
+    const cooldown = await this.cooldown.read();
+    signal.throwIfAborted();
+    const now = this.clock.now();
+    const used = this.used.address.filter((x) => x.at > now - windowMs);
+    const cap = limits.addressReads;
+    if (
+      used.length + this.reserved.http + cap.maximumHttpAttemptsPerRequest >
+        allocations.address.httpAttempts ||
+      used.reduce((n, x) => n + x.logical, 0) +
+        this.reserved.logical +
+        cap.maximumLogicalRpcCallsPerRequest >
+        allocations.address.logicalRpcCalls
+    )
+      throw new Error('Address quota reservation unavailable.');
+    let earliest = Math.max(now, this.started + windowMs, cooldown);
+    let slot = Math.max(Math.floor(earliest / slotMs), this.lastSlot + 1);
+    if (earliest - slot * slotMs > tolerance) slot++;
+    // Existing queued work must fit too. No optimistic deadline renewal later.
+    for (let i = 0; i < minimumAttempts + this.queue.length; i++) {
+      while (slots[slot % slots.length] !== 'address') slot++;
+      earliest = Math.max(earliest, slot * slotMs);
+      slot++;
+    }
+    if (earliest >= deadline) throw new Error('Address work cannot meet deadline.');
+    let http = cap.maximumHttpAttemptsPerRequest;
+    let logical = cap.maximumLogicalRpcCallsPerRequest;
+    let closed = false;
+    this.reserved.http += http;
+    this.reserved.logical += logical;
+    const counters = { http: 0, logical: 0 };
+    return {
+      deadline,
+      counters,
+      check(count: number) {
+        if (closed || http < 1 || logical < count)
+          throw new Error('Address request work cap exceeded.');
+      },
+      charge: (count: number) => {
+        if (closed || http < 1 || logical < count)
+          throw new Error('Address request work cap exceeded.');
+        http--;
+        logical -= count;
+        counters.http++;
+        counters.logical += count;
+        this.reserved.http--;
+        this.reserved.logical -= count;
+      },
+      close: () => {
+        if (closed) return;
+        closed = true;
+        this.reserved.http -= http;
+        this.reserved.logical -= logical;
+      },
+    };
   }
   private async drain() {
     if (this.active) return;
@@ -138,6 +211,7 @@ export class ProviderBudget {
           const dispatchAt = this.clock.now();
           if (dispatchAt > slot * slotMs + tolerance || dispatchAt >= job.deadline) continue;
           job.signal.throwIfAborted();
+          job.onDispatch?.();
           this.queue.shift();
           this.lastSlot = slot;
           used.push({ at: dispatchAt, logical: job.logical });

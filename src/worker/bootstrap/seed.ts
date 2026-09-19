@@ -24,8 +24,8 @@ export async function fileHash(path: string, signal: AbortSignal) {
 }
 async function schema(client: pg.Client) {
   const { rows } = await client.query('SELECT version FROM hdd.schema_migrations ORDER BY version');
-  if (JSON.stringify(rows.map((r) => r.version)) !== '[1,2]')
-    throw new Error('Seed requires schema version 2.');
+  if (JSON.stringify(rows.map((r) => r.version)) !== '[1,2,3]')
+    throw new Error('Seed requires schema version 3.');
 }
 async function role(client: pg.Client) {
   const {
@@ -44,6 +44,7 @@ async function emptyTarget(client: pg.Client) {
   const expected = new Map([
     ...tableNames.map((t) => [`hdd.${t}`, 'r'] as const),
     ['hdd.schema_migrations', 'r'],
+    ['hdd.live_metrics', 'r'],
     ['hdd.undo_recent_sequence_seq', 'S'],
     ['hdd_identity.instance', 'r'],
   ]);
@@ -56,6 +57,8 @@ async function emptyTarget(client: pg.Client) {
   for (const table of tableNames)
     if ((await client.query(`SELECT 1 FROM hdd.${table} LIMIT 1`)).rowCount)
       throw new Error('Seed import requires empty v2 target.');
+  if ((await client.query('SELECT 1 FROM hdd.live_metrics LIMIT 1')).rowCount)
+    throw new Error('Seed import requires empty live observations.');
 }
 async function descriptor(client: pg.Client): Promise<Omit<Manifest, 'files' | 'createdAt'>> {
   const { rows } = await client.query(
@@ -83,7 +86,7 @@ async function descriptor(client: pg.Client): Promise<Omit<Manifest, 'files' | '
   });
   return {
     formatVersion: 2,
-    schemaVersion: 2,
+    schemaVersion: 3,
     calculationVersion: 'hex-native-1',
     chainId: last.chain_id,
     contractAddress: hex(last.contract_address),

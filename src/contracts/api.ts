@@ -205,3 +205,29 @@ export type Observation<T> =
       notes: string[];
       reason: string;
     };
+
+export const IndexedAddressSchema = z.strictObject({
+  asOf: BlockRefSchema,
+  finality: z.enum(['confirmed', 'finalized']),
+  liquidHearts: UIntStringSchema.nullable(),
+  accountedHearts: UIntStringSchema.nullable(),
+  stakeCount: UIntStringSchema.nullable(),
+  rankingDay: ContractDaySchema.nullable(),
+  // Task05 owns ranks. A live observation cannot fabricate one from this baseline.
+  rank: z.null(),
+});
+export const AddressResultSchema = z.strictObject({
+  outcome: z.enum(['available', 'partial', 'unavailable', 'expired', 'quota']),
+  reason: z.string().max(160).nullable(),
+  indexed: IndexedAddressSchema.nullable(),
+  live: z
+    .strictObject({
+      balanceHearts: UIntStringSchema,
+      page: LiveStakePageSchema,
+      offset: UIntStringSchema,
+      expiresAt: TimestampSchema,
+    })
+    .nullable(),
+});
+export type IndexedAddress = z.infer<typeof IndexedAddressSchema>;
+export type AddressResult = z.infer<typeof AddressResultSchema>;

@@ -4,6 +4,20 @@ import limits from '../../config/limits.json' with { type: 'json' };
 import { ProviderBudget, type Lane } from './budget.ts';
 import { address, hash } from '../services/projections/input.ts';
 import { quantity, dataHex, selectors, topics } from './abi.ts';
+import { liveSelectors } from './live-abi.ts';
+
+export type ReadTargets = {
+  tokens: readonly string[];
+  pools: readonly string[];
+  factories: readonly string[];
+};
+export type AddressRequest = Awaited<ReturnType<ProviderBudget['addressRequest']>>;
+interface CallOptions {
+  request?: AddressRequest;
+  addressDiscovery?: boolean;
+  addressPage?: boolean;
+  settledMetrics?: boolean;
+}
 
 export interface RpcCall {
   method: string;
@@ -41,7 +55,12 @@ export class RpcError extends Error {
     this.code = code;
   }
 }
-export function validateCall(call: RpcCall, contract: string) {
+export function validateCall(
+  call: RpcCall,
+  contract: string,
+  targets?: ReadTargets,
+  discovery = false,
+) {
   const p = call.params;
   if (call.method === 'eth_chainId' && p.length === 0) return;
   if (
@@ -56,7 +75,10 @@ export function validateCall(call: RpcCall, contract: string) {
   if (
     call.method === 'eth_getCode' &&
     p.length === 2 &&
-    p[0] === contract &&
+    (p[0] === contract ||
+      (typeof p[0] === 'string' &&
+        targets &&
+        [...targets.tokens, ...targets.pools, ...targets.factories].includes(p[0]))) &&
     quantity.safeParse(p[1]).success
   )
     return;
@@ -72,10 +94,48 @@ export function validateCall(call: RpcCall, contract: string) {
     if (BigInt(filter.fromBlock) <= BigInt(filter.toBlock)) return;
   }
   if (call.method === 'eth_call' && p.length === 2) {
-    const input = z.strictObject({ to: z.literal(contract), data: dataHex }).parse(p[0]);
-    z.strictObject({ blockHash: hash, requireCanonical: z.literal(true) }).parse(p[1]);
+    const input = z.strictObject({ to: address, data: dataHex }).parse(p[0]);
     const selector = input.data.slice(0, 10),
       args = input.data.slice(10);
+    if (
+      discovery &&
+      input.to === contract &&
+      selector === liveSelectors.stakeCount &&
+      p[1] === 'latest' &&
+      /^0{24}[0-9a-f]{40}$/.test(args)
+    )
+      return;
+    z.strictObject({ blockHash: hash, requireCanonical: z.literal(true) }).parse(p[1]);
+    if (input.to !== contract) {
+      if (targets?.tokens.includes(input.to) && selector === liveSelectors.decimals && !args)
+        return;
+      if (
+        targets?.pools.includes(input.to) &&
+        [
+          liveSelectors.factory,
+          liveSelectors.token0,
+          liveSelectors.token1,
+          liveSelectors.getReserves,
+        ].includes(selector) &&
+        !args
+      )
+        return;
+      if (
+        targets?.factories.includes(input.to) &&
+        selector === liveSelectors.getPair &&
+        /^0{24}[0-9a-f]{40}0{24}[0-9a-f]{40}$/.test(args)
+      )
+        return;
+      throw new Error('Read-only RPC target rejected.');
+    }
+    if (
+      (selector === liveSelectors.currentDay ||
+        (targets?.tokens.includes(contract) && selector === liveSelectors.decimals)) &&
+      !args
+    )
+      return;
+    if (selector === liveSelectors.stakeCount && /^0{24}[0-9a-f]{40}$/.test(args)) return;
+    if (selector === liveSelectors.stakeLists && /^0{24}[0-9a-f]{104}$/.test(args)) return;
     if ((selector === selectors.totalSupply || selector === selectors.globalInfo) && args === '')
       return;
     if (selector === selectors.balanceOf && /^0{24}[0-9a-f]{40}$/.test(args)) return;
@@ -106,6 +166,7 @@ export class RpcClient {
   readonly contract: string;
   readonly transport: Transport;
   readonly budget: ProviderBudget;
+  readonly targets: ReadTargets | undefined;
   constructor(
     id: string,
     operator: string | null,
@@ -113,6 +174,7 @@ export class RpcClient {
     contract: string,
     transport: Transport,
     budget: ProviderBudget,
+    targets?: ReadTargets,
   ) {
     address.parse(contract);
     this.id = id;
@@ -121,107 +183,169 @@ export class RpcClient {
     this.contract = contract;
     this.transport = transport;
     this.budget = budget;
+    if (targets) {
+      if (targets.tokens.length > 3 || targets.pools.length > 3 || targets.factories.length > 2)
+        throw new Error('Price allowlist too large.');
+      for (const value of [...targets.tokens, ...targets.pools, ...targets.factories])
+        address.parse(value);
+    }
+    this.targets = targets;
   }
   async calls(
     calls: RpcCall[],
     signal: AbortSignal,
     deadline = this.budget.clock.now() + 300_000,
     lane: Lane = 'sync',
+    options: CallOptions = {},
   ): Promise<unknown[]> {
-    if (!calls.length || calls.length > 30) throw new Error('RPC batch size out of bounds.');
+    if (lane === 'address' && !options.request)
+      throw new Error('Address request reservation required.');
+    if (options.settledMetrics && lane !== 'metrics')
+      throw new Error('Metrics batch scope required.');
+    if (
+      (options.addressPage || options.addressDiscovery) &&
+      (lane !== 'address' || !options.request)
+    )
+      throw new Error('Address batch scope required.');
+    if (options.request && deadline !== options.request.deadline)
+      throw new Error('Request deadline cannot be renewed.');
+    if (!calls.length || calls.length > (options.addressPage ? 104 : 30))
+      throw new Error('RPC batch size out of bounds.');
+    if (
+      options.addressDiscovery &&
+      (calls.length !== 3 ||
+        calls[0]?.method !== 'eth_chainId' ||
+        calls[1]?.method !== 'eth_getBlockByNumber' ||
+        calls[2]?.method !== 'eth_call')
+    )
+      throw new Error('Invalid discovery batch.');
+    if (
+      options.addressPage &&
+      calls.some(
+        (c) =>
+          !['eth_getBlockByNumber', 'eth_getCode', 'eth_call'].includes(c.method) ||
+          (c.method === 'eth_call' &&
+            ![selectors.balanceOf, liveSelectors.stakeCount, liveSelectors.stakeLists].includes(
+              (c.params[0] as { data: string }).data.slice(0, 10),
+            )),
+      )
+    )
+      throw new Error('Invalid bounded address batch.');
     const guard = performance.now();
-    for (const call of calls) validateCall(call, this.contract);
+    for (const call of calls)
+      validateCall(call, this.contract, this.targets, options.addressDiscovery);
     const requests = calls.map((call) => ({ jsonrpc: '2.0', id: this.nextId++, ...call }));
     const body = JSON.stringify(requests);
     this.counters.guardsMs += performance.now() - guard;
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.budget.run(lane, calls.length, deadline, signal, async () => {
-          const remaining = deadline - this.budget.clock.now();
-          if (remaining <= 0) throw new Error('Provider deadline expired.');
-          const controller = new AbortController();
-          const timeout = setTimeout(
-            () => controller.abort(new Error('Provider timeout.')),
-            Math.min(remaining, limits.provider.requestTimeoutSeconds * 1000),
-          );
-          const combined = AbortSignal.any([signal, controller.signal]);
-          const start = performance.now();
-          this.counters.requests++;
-          this.counters.logical += calls.length;
-          for (const method of new Set(calls.map((call) => call.method)))
-            this.counters.physicalMethods[method] =
-              (this.counters.physicalMethods[method] ?? 0) + 1;
-          for (const call of calls)
-            this.counters.methods[call.method] = (this.counters.methods[call.method] ?? 0) + 1;
-          for (const call of calls)
-            if (call.method === 'eth_call') {
-              const selector = (call.params[0] as { data: string }).data.slice(0, 10);
-              this.counters.selectors[selector] = (this.counters.selectors[selector] ?? 0) + 1;
-            }
-          try {
-            const response = await this.transport(body, combined);
-            const buffers: Buffer[] = [];
-            let size = 0;
-            for await (const chunk of response.body) {
-              combined.throwIfAborted();
-              size += chunk.byteLength;
-              this.counters.bytes += chunk.byteLength;
-              if (size > limits.provider.maximumResponseBytes) {
-                controller.abort();
-                throw new RangeError('Provider response exceeds byte bound.');
-              }
-              buffers.push(Buffer.from(chunk));
-            }
-            if (response.status === 429 || response.status >= 500) {
-              const retry = response.retryAfter;
-              const delay =
-                retry && /^\d+$/.test(retry)
-                  ? Number(retry) * 1000
-                  : retry
-                    ? Date.parse(retry) - this.budget.clock.now()
-                    : 0;
-              await this.budget.backoff(
-                this.budget.clock.now() +
-                  Math.max(Number.isFinite(delay) ? delay : 0, 1000 * 2 ** attempt),
-              );
-              throw new RpcError(response.status);
-            }
-            if (response.status !== 200)
-              throw new Error(`Provider HTTP status ${response.status}.`);
-            const parsed: unknown = JSON.parse(
-              new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers, size)),
+        options.request?.check(calls.length);
+        return await this.budget.run(
+          lane,
+          calls.length,
+          deadline,
+          signal,
+          async () => {
+            const remaining = deadline - this.budget.clock.now();
+            if (remaining <= 0) throw new Error('Provider deadline expired.');
+            const controller = new AbortController();
+            const timeout = setTimeout(
+              () => controller.abort(new Error('Provider timeout.')),
+              Math.min(remaining, limits.provider.requestTimeoutSeconds * 1000),
             );
-            const rows = z
-              .array(
-                z
-                  .object({
-                    jsonrpc: z.literal('2.0'),
-                    id: z.number().int(),
-                    result: z.unknown().optional(),
-                    error: z.object({ code: z.number().int() }).passthrough().optional(),
-                  })
-                  .strict(),
-              )
-              .length(requests.length)
-              .parse(parsed);
-            const byId = new Map(rows.map((row) => [row.id, row]));
-            if (byId.size !== requests.length) throw new Error('Duplicate RPC response identity.');
-            return requests.map((request) => {
-              const row = byId.get(request.id);
-              if (!row || 'result' in row === 'error' in row)
-                throw new Error('Missing/conflicting RPC response identity.');
-              if (row.error) {
-                if ([-32005, -32602].includes(row.error.code))
-                  throw new RangeError('Provider range/capability error.');
-                throw new RpcError(row.error.code);
+            const combined = AbortSignal.any([signal, controller.signal]);
+            const start = performance.now();
+            this.counters.requests++;
+            this.counters.logical += calls.length;
+            for (const method of new Set(calls.map((call) => call.method)))
+              this.counters.physicalMethods[method] =
+                (this.counters.physicalMethods[method] ?? 0) + 1;
+            for (const call of calls)
+              this.counters.methods[call.method] = (this.counters.methods[call.method] ?? 0) + 1;
+            for (const call of calls)
+              if (call.method === 'eth_call') {
+                const selector = (call.params[0] as { data: string }).data.slice(0, 10);
+                this.counters.selectors[selector] = (this.counters.selectors[selector] ?? 0) + 1;
               }
-              return row.result;
-            });
-          } finally {
-            clearTimeout(timeout);
-            this.counters.transportMs += performance.now() - start;
-          }
-        });
+            try {
+              const response = await this.transport(body, combined);
+              combined.throwIfAborted();
+              const buffers: Buffer[] = [];
+              let size = 0;
+              for await (const chunk of response.body) {
+                combined.throwIfAborted();
+                size += chunk.byteLength;
+                this.counters.bytes += chunk.byteLength;
+                if (size > limits.provider.maximumResponseBytes) {
+                  controller.abort();
+                  throw new RangeError('Provider response exceeds byte bound.');
+                }
+                buffers.push(Buffer.from(chunk));
+              }
+              if (response.status === 429 || response.status >= 500) {
+                const retry = response.retryAfter;
+                const delay =
+                  retry && /^\d+$/.test(retry)
+                    ? Number(retry) * 1000
+                    : retry
+                      ? Date.parse(retry) - this.budget.clock.now()
+                      : 0;
+                await this.budget.backoff(
+                  this.budget.clock.now() +
+                    Math.max(Number.isFinite(delay) ? delay : 0, 1000 * 2 ** attempt),
+                );
+                throw new RpcError(response.status);
+              }
+              if (response.status !== 200)
+                throw new Error(`Provider HTTP status ${response.status}.`);
+              const parsed: unknown = JSON.parse(
+                new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(buffers, size)),
+              );
+              const rows = z
+                .array(
+                  z
+                    .object({
+                      jsonrpc: z.literal('2.0'),
+                      id: z.number().int(),
+                      result: z.unknown().optional(),
+                      error: z.object({ code: z.number().int() }).passthrough().optional(),
+                    })
+                    .strict(),
+                )
+                .length(requests.length)
+                .parse(parsed);
+              const byId = new Map(rows.map((row) => [row.id, row]));
+              if (byId.size !== requests.length)
+                throw new Error('Duplicate RPC response identity.');
+              return requests.map((request) => {
+                const row = byId.get(request.id);
+                if (!row || 'result' in row === 'error' in row)
+                  throw new Error('Missing/conflicting RPC response identity.');
+                if (row.error) {
+                  if (options.settledMetrics) return { metricReadError: row.error.code };
+                  // Speculative indices are never values. The address service may ignore
+                  // these ONLY when the authoritative pinned count proves index >= count.
+                  if (
+                    options.addressPage &&
+                    request.method === 'eth_call' &&
+                    (request.params[0] as { data: string }).data.startsWith(
+                      liveSelectors.stakeLists,
+                    )
+                  )
+                    return { stakeReadError: row.error.code };
+                  if ([-32005, -32602].includes(row.error.code))
+                    throw new RangeError('Provider range/capability error.');
+                  throw new RpcError(row.error.code);
+                }
+                return row.result;
+              });
+            } finally {
+              clearTimeout(timeout);
+              this.counters.transportMs += performance.now() - start;
+            }
+          },
+          options.request ? () => options.request!.charge(calls.length) : undefined,
+        );
       } catch (error) {
         signal.throwIfAborted();
         if (

@@ -132,3 +132,20 @@ Task03 acquisition follow-through uses the existing v2 ABI definitions and synth
 transport fixtures only. No additional v1 files, runtime, credentials or data were read.
 Filtered-range corroboration replaces mandatory historical receipts; constructor identity
 verification remains. The sparse range/seed contract is documented in sync.md.
+
+## Task04 source-use ledger
+
+Selected tracked files were read with `git show` at the same reference commit
+`e1a9cc417501479358494d4d9312ccaf2429f622`: core `stake-list-decode.mjs`,
+`global-info.mjs`, `hex-minimal-abi.mjs`, and current-price/onchain `math.mjs`,
+`estimate.mjs`, `policy.mjs`. Retained interface facts: seven-word stake layout,
+13-word globals, reserve units/orientation, peg assumptions and depth semantics.
+New implementations live in providers/live-abi.ts, services/live/price.ts and
+domain/current.ts; no legacy modules or policy identities are runtime dependencies.
+No v1 code was executed/imported and no v1 data/credentials were accessed.
+
+The preserved Task01 Solidity receipt was read for the current estimator's rules;
+its bytes still match the previously recorded SHA256. Function/line references,
+literal independently derived synthetic vectors and remaining proof limits are in
+[live observations](live.md). Actual pinned historic-state verification and deployed
+identity remain unperformed. The existing source/license cautions remain unchanged.

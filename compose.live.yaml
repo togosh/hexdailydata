@@ -1,0 +1,6 @@
+# Task04 synthetic transport and SQL only; merge with the isolated SQL harness.
+services:
+  runner:
+    volumes:
+      - ${HDD_V2_LIVE_EVIDENCE:?Explicit task-owned evidence directory}:/evidence
+    command: ['node', 'tests/live/sql.mjs']
