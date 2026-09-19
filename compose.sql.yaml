@@ -1,0 +1,61 @@
+﻿# Disposable SQL acceptance environment; DB has no host port and the network is private.
+name: ${HDD_V2_PROJECT:?Use a new hexdailydata-v2-sql run name}
+services:
+  db:
+    image: postgres:17.11-bookworm@sha256:e8587c2065ad04a2798579d86275e12c85b73b164ed2cacaa46693d636340d08
+    user: postgres
+    read_only: true
+    cpus: 1.5
+    mem_limit: 3g
+    memswap_limit: 3g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql:uid=999,gid=999
+    environment:
+      POSTGRES_DB: hexdailydata_v2
+      POSTGRES_USER: hdd_v2_admin
+      POSTGRES_PASSWORD: ${HDD_V2_ADMIN_PASSWORD:?New disposable password required}
+      HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE:?Run UUID required}
+      HDD_V2_API_PASSWORD: ${HDD_V2_API_PASSWORD:?New role password required}
+      HDD_V2_WORKER_PASSWORD: ${HDD_V2_WORKER_PASSWORD:?New role password required}
+      HDD_V2_MIGRATOR_PASSWORD: ${HDD_V2_MIGRATOR_PASSWORD:?New role password required}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./deploy/init-v2-db.sh:/docker-entrypoint-initdb.d/01-v2.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U hdd_v2_admin -d hexdailydata_v2']
+      interval: 2s
+      timeout: 2s
+      retries: 40
+    networks: [sql]
+  runner:
+    image: node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+    user: node
+    read_only: true
+    cpus: 0.5
+    mem_limit: 1g
+    memswap_limit: 1g
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    working_dir: /app
+    environment:
+      HDD_V2_DB_HOST: db
+      HDD_V2_DB_NAME: hexdailydata_v2
+      HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE}
+      HDD_V2_API_PASSWORD: ${HDD_V2_API_PASSWORD}
+      HDD_V2_WORKER_PASSWORD: ${HDD_V2_WORKER_PASSWORD}
+      HDD_V2_MIGRATOR_PASSWORD: ${HDD_V2_MIGRATOR_PASSWORD}
+      HDD_V2_ADMIN_PASSWORD: ${HDD_V2_ADMIN_PASSWORD}
+      HDD_V2_SQL_SCALE: ${HDD_V2_SQL_SCALE:-1}
+    volumes:
+      - ./:/app:ro
+      - ./artifacts/task-02:/evidence
+    networks: [sql]
+    command: ['node', 'tests/sql/run.mjs']
+networks:
+  sql:
+    internal: true
+volumes:
+  db_data:

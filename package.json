@@ -22,17 +22,21 @@
     "doctor": "node scripts/doctor.mjs",
     "worker:status": "node src/worker/main.ts status",
     "test:containers": "node scripts/test-containers.mjs",
-    "test:browser": "node --test tests/browser/shell.test.mjs"
+    "test:browser": "node --test tests/browser/shell.test.mjs",
+    "db:migrate": "node src/db/main.ts migrate",
+    "test:sql": "node scripts/test-sql.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",
     "fastify": "5.12.5",
+    "pg": "8.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "24.13.6",
+    "@types/pg": "8.23.1",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",

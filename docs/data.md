@@ -271,3 +271,121 @@ and PulseChain suffix. Boundary 17232999 is a reference, not runtime qualificati
 Preserve original event chain/date and serving chain separately, including ended and
 GA-but-unended inherited stakes. Task03 must verify boundary hashes, entry block, code,
 constructor/fork state and source capabilities before enabling live operation.
+
+## Task02 persisted checkpoint contract
+
+Migration 1 is now executed on fresh private PostgreSQL17 targets. The table list
+above describes the complete product plan; Task02 creates only `chains`, `sync_state`,
+`current_state`, `accounts`, `stakes`, `share_schedule`, `daily_stats`, `events`,
+`transfers_recent`, `blocks_recent`, `checkpoints_recent`, `undo_recent` and the migration
+ledger. Market/cache/export/job tables remain later migrations. No runtime request
+rechecks source files. Migration checksums apply only to explicit migration commands.
+
+The SQL boundary accepts decimal strings, validates them, and uses bigint arithmetic.
+`hdd.amount` is exact NUMERIC with scale zero and bounds 0..2^256-1. `hdd.total` is
+scale-zero NUMERIC in [0,10^102); this covers (2^63-1) positions each of uint256 principal,
+weighted by at most5555 days. Aggregate overflow stops the transaction. Unconstrained
+NUMERIC plus explicit checks deliberately rejects fractional SQL inputs instead of
+rounding them through a NUMERIC(p,0) cast. Counts, block numbers and stake IDs are
+nonnegative signed BIGINT (at most2^63-1); days are bounded integers. No amounts pass
+through JavaScript Number. Addresses/hashes use 20/32-byte BYTEA domains. Day sample
+addresses are a bounded BYTEA array populated from the same validated address inputs.
+
+The accepted-input boundary compares two complete **supplied** normalized event sets,
+including raw topics/data and decoded values, plus contiguous headers, day-close supply
+and deterministic balance samples. Known shared operators are rejected; unknown source
+correlation is recorded as null. Matching sources can share an omission: agreement is
+not an independence or completeness proof. Task03 must provide complete acquisition,
+correct ABI decoding, receipt/code identity, finality qualification and corroborated
+pinned calls. Task02 has no provider transport and makes no live acceptance claim.
+
+A commit contains at most2048 contiguous headers,2000 supplied logs per source,32 day
+boundaries and1024 materialized daily words. More work must be split into checkpoints.
+DailyDataUpdate protocol logs are retained independently from pinned materialized words;
+a delayed read may fill multiple earlier days without inventing a new protocol log.
+One materialization per day per batch is permitted; equal later observations preserve
+the first accepted identity, conflicting amounts fail. Current/future-day payout is
+never materialized. Raw settlement penalty is stored on the stake; daily penalty is
+capped at principal+payout and recorded once, at GA or first End. Transfers alone change
+circulating supply. Claim logs have no extra mint effects beyond their Transfer and
+StakeStart logs. No claim/BPD payout estimator is implemented here.
+
+| Durable state | Owning transaction / position | Rewind | Seed v1 representation |
+|---|---|---|---|
+| Chain identity, constructor state, fork boundary | Explicit empty-chain initialization; two supplied states must agree; constructor sum and fork full SQL aggregate/owner/schedule audit | Initialization is the floor; cannot rewind behind it | chains plus referenced parent/entry identities in manifest |
+| Current accounts and stake lifecycle | Native writer commit at sync block/hash | Exact changed-row before-images; newly inserted rows deleted | accounts, stakes |
+| Current supply, locked/accounted principal, weighted numerator, active/queued shares, rate, holder/staker counts, in-day starts/ends/payout/penalty | current_state, same native commit; no asynchronous native consumer | Entire small accumulator row restored | current_state, including contract_day |
+| At most32 lexicographically smallest touched addresses in the current day | current_state.sampled_addresses, same commit | Restored with accumulator | current_state; not a historical holder snapshot |
+| Queued-share activation totals | share_schedule per activation day; starts/cancels update only that day; midnight consumes it | Updates/inserts/deletions restored | share_schedule |
+| Daily native close and pending/materialized payout | daily_stats; native facts close strictly before UTC transition; both sources supply supply and sampled balance checks; materialized words carry a separate accepted observation block/hash | Affected day rows/owned payout fields restore via full exact prior row | daily_stats, including payout status and observation identity |
+| Accepted cursor, finality, source IDs/digests, ranking cutoff | sync_state advanced with all native reducers and CAS | checkpoint.previous_sync restores fields; revision advances monotonically to fence stale writers | sync_state; manifest checkpoint repeats block/hash/time/finality/revision/rewindFloor |
+| Recent headers/transfers and protocol evidence | Same commit; events keyed by original chain/block/log; receipt digest handles exact whole-batch retry | Inserts/changes restored in reverse order | blocks_recent, transfers_recent, events |
+| Batch receipts and before-images | checkpoints_recent and undo_recent in same transaction | Reverse sequence per checkpoint; removed suffix receipts cascade only their own undo | Both tables; JSON numbers restored inside SQL, never JSON-parsed through Number |
+
+Queued/open/mature-open are derived from explicit start/lock/term and the requested
+current day; settled lifecycle is explicitly persisted as good_accounted/ended/cancelled.
+Maturity changes no accounted sums; it needs no daily stake rewrite. Activation shifts
+one day's scheduled share sum into active shares. Only changed accounts/stakes are
+written. Ranking values and the shared ranking_day cutoff remain unavailable (null);
+Task05 must publish values and that one cutoff in one transaction. No date-only account
+rewrites occur. Native daily reducers have no separate delayed position because they
+commit synchronously. Payout completion is independently represented per ledger day;
+pending payout does not retain unrelated transfer history. Market consumers are not
+implemented and must add their own explicit cutoff when introduced.
+
+The writer owns one dedicated connection and session advisory lock (4242,chain).
+Connection or lock loss invalidates it; callers must explicitly acquire a new writer.
+Before retrying an uncertain commit, the writer looks for the exact batch digest at
+the target checkpoint. It never reapplies additive changes merely because an ack was
+lost. A conflicting duplicate fails. Unsupported partial/overlapping retries must be
+rebuilt from the committed cursor. The SQL tests inject an after-COMMIT exception for
+lost-ack coverage and separately terminate a real backend during an open transaction.
+
+Rewind is allowed only in confirmed mode, to a retained checkpoint at/above rewind_floor
+and within604800 seconds of validated chain progress. Finalized disagreement stops for
+explicit repair. Before-images include deletes (for example consumed activation totals),
+current accumulators, daily materialization and cursor acceptance. Revision is a fencing
+token, so logical state/cursor equality after rewind excludes only its deliberately
+increased value; replay uses that new revision. Sequence gaps from failed transactions
+are harmless, not business progress. No delayed overlay jobs are wired in Task02;
+future cache/export/market jobs must invalidate observations after the rewound cutoff
+before publication, while preserving independently sourced unaffected market facts.
+
+No pruning scheduler runs. Publication stops at4096 retained checkpoints,128 MiB of
+measured undo tuple bytes, or256 MiB of measured recent header/transfer tuple bytes per
+chain. These are logical tuple accounting limits, not physical database size guarantees
+(indexes, TOAST overhead, WAL and dead tuples are measured separately). The initial
+rewind_floor remains pinned until Task03 implements explicit safe retention advancement.
+That operation must keep consumer/recovery/export pins, respect seven days of **replay**
+time, delete only unneeded prefixes, and adjust receipts/counters atomically. Pressure
+never silently deletes protected inputs. Initial fork copies are one necessary serving
+projection; common-origin events are not copied. Full SQL reconciliation is performed
+at initialization/audit checkpoints, not on each batch or public request.
+
+The seed manifest's table allowlist now exactly matches implemented durable data and
+checkpoint tables; migration ledger, instance identity, credentials and advisory locks
+are excluded. SQL tests check this alignment and restore actual data/progress through
+rewind. They are **not** a portable seed import/export proof; archive security, row codec
+(including BYTEA/large NUMERIC), semantic import, pruning and rebuild/seed equality remain03.
+
+### Query/index purposes
+
+Every table's primary key supports point lookup/upsert or scoped ordered checkpoint
+access: chain/current/sync by chain; accounts by chain/address; stakes by chain/stake;
+daily and schedule by chain/day; original events/transfers by origin/block/log; recent
+headers by chain/number; receipts by chain/revision; undo sequence for ordering. The
+receipt unique(chain,block) index resolves lost acknowledgements and selects rewind
+suffixes. `undo_checkpoint(chain,revision,sequence DESC)` supports bounded reverse undo.
+`stakes_address(chain,address,stake_id)` supports keyset owner pages; `stakes_maturity`
+supports future unsettled maturity ranges without changing mature rows;
+`events_stake(origin_chain_id,stake_id,block_number,log_index)` supports lifecycle history.
+There are no rank, generation, date-per-account or unused market/export indexes in v1.
+The million-row harness saves real EXPLAIN(ANALYZE,BUFFERS) plans for these serving queries.
+
+Fork initialization retains the parent boundary as the serving cursor/floor and copies
+that state. The declared first native block is still unconsumed: its number/hash must
+match the first ordinary native batch, which applies its events and any elapsed day
+boundaries. The entry may be on a later day. A daily close whose last block is still
+common history retains origin1. Once a serving fork exists, new parent commits/rewinds
+are refused so they cannot invalidate inherited state/common event references. A future
+independent Ethereum suffix needs an explicit task-owned extension; it is not enabled here.

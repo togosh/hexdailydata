@@ -42,7 +42,10 @@
       "required": [
         "blockNumber",
         "blockHash",
-        "finality"
+        "finality",
+        "revision",
+        "blockTime",
+        "rewindFloor"
       ],
       "properties": {
         "blockNumber": {
@@ -58,6 +61,18 @@
             "finalized",
             "confirmed"
           ]
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "blockTime": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "rewindFloor": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
         }
       },
       "additionalProperties": false
@@ -136,8 +151,7 @@
       }
     },
     "schemaVersion": {
-      "type": "integer",
-      "minimum": 1
+      "const": 1
     },
     "calculationVersion": {
       "type": "string",
@@ -161,15 +175,16 @@
             "enum": [
               "chains",
               "sync_state",
+              "current_state",
               "blocks_recent",
               "events",
               "transfers_recent",
               "undo_recent",
+              "checkpoints_recent",
               "stakes",
               "accounts",
-              "daily_stats",
-              "market_daily",
-              "market_samples"
+              "share_schedule",
+              "daily_stats"
             ]
           },
           "path": {

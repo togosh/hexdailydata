@@ -5,7 +5,8 @@ serving chain; required shared Ethereum-era HEX history retains its original ide
 
 **Task 01 provides a runnable development foundation.** Fastify serves health/status
 and the built React shell. Exact domain rules and runtime DTO validation are tested.
-There is no indexer, real data, seed importer, provider access or production deployment.
+Task02 adds isolated PostgreSQL migrations and incremental projection primitives.
+There is no continuous sync, real data, seed importer, provider access or deployment.
 The shell displays unavailable values. Final UI design and reference-image comparison
 belong to Task07; this shell makes no visual-fidelity claim.
 
@@ -81,8 +82,8 @@ v2-only local password, then:
 docker compose -f compose.yaml -f compose.database.yaml up -d --wait
 ```
 
-PostgreSQL runs as UID 999 and uses this project's new `db_data` volume. It does not
-apply the draft migration or connect the API to SQL. Task02 qualifies schema/roles.
+PostgreSQL runs as UID 999 and uses this project's new `db_data` volume. This optional Task01 smoke database does not apply migrations or connect the API to SQL.
+Use the separate Task02 environment below to exercise the qualified schema/roles.
 To remove only this disposable project's containers/network/volume, keep the same
 `HDD_V2_PROJECT` value and run:
 
@@ -124,9 +125,60 @@ hand-worked vectors, presentation rounding and fork requirements are in
 `src/contracts/api.ts`. [The DTO example](tests/fixtures/home.json) is synthetic test
 input, never runtime data. The five CSV schemas remain in `src/contracts/datasets.json`.
 
-One npm package, one API/worker image, one future PostgreSQL database. API and worker
-are separate process entry points. No database/RPC adapter has been implemented.
+One npm package, one API/worker image, one PostgreSQL database. API and worker
+are separate process entry points. The SQL projection library has no RPC transport and
+is not wired to the uninitialized public shell.
 Worker commands fail explicitly until their owning tasks are built.
+
+## Isolated SQL projections (Task02)
+
+Run `npm run test:sql` after `npm ci`. It creates a new private Compose network,
+PostgreSQL17 volume and four random role passwords; applies/checks migration1; runs
+actual permission, recovery, daily, fork and million-row tests; and removes only that
+run's resources. Evidence goes to ignored `artifacts/task-02/`. PostgreSQL gets
+1.5 CPU/3 GiB, the Node test client 0.5 CPU/1 GiB (combined 2 CPU/4 GiB). Host Docker
+control and the existing desktop are outside that workload allocation. No DB host
+port, Docker socket, existing volume, provider or v1 path is used.
+
+For a focused correction/review run, set `HDD_V2_SQL_SCALE=0`; this skips only the
+million-row benchmark and does not constitute new scale evidence. The test clients
+run inside the private network, never via a localhost database fallback.
+
+For a new disposable database to inspect manually, use PowerShell:
+
+```powershell
+$env:HDD_V2_PROJECT = "hexdailydata-v2-sql-$([guid]::NewGuid().ToString('N').Substring(0,8))"
+$env:HDD_V2_DB_INSTANCE = [guid]::NewGuid().ToString()
+foreach ($role in 'ADMIN','MIGRATOR','WORKER','API') {
+  [Environment]::SetEnvironmentVariable("HDD_V2_$($role)_PASSWORD", [guid]::NewGuid().ToString('N'), 'Process')
+}
+New-Item -ItemType Directory -Force artifacts/task-02 | Out-Null
+docker compose -f compose.sql.yaml up -d --wait db
+docker compose -f compose.sql.yaml run --rm runner node src/db/main.ts migrate
+docker compose -f compose.sql.yaml run --rm runner node src/db/main.ts migrate
+```
+
+The second migration is a safe checksum/version check. Keep the same environment
+while inspecting this project. To remove only this disposable database/network:
+
+```powershell
+docker compose -f compose.sql.yaml down --volumes
+```
+
+The initdb script runs only on a fresh volume. Provisioning admin, non-superuser DDL
+migrator, write worker and read API are distinct roles. `connect(databaseConfig(role))`
+requires explicit host `db`, database `hexdailydata_v2`, instance UUID and that role's
+password, then checks the server/identity/role. Missing or incompatible targets fail.
+The manual migration command uses source files mounted by this development harness;
+production migration/operations packaging remains Task08.
+
+The library entry is `CanonicalWriter.acquire(dedicatedClient, chainId)`. Initialization
+compares two supplied constructor/fork states; commits compare two normalized source
+sets, headers, day-close checks and pinned payout observations before projection.
+Full ABI decoding, external receipt/code verification and source acquisition remain
+Task03. These tests use synthetic inputs. No production acceptance flag or fixture
+mode serves them as real data. Read the concrete checkpoint/seed mapping in
+[docs/data.md](docs/data.md#task02-persisted-checkpoint-contract).
 
 ## Continue one task at a time
 
