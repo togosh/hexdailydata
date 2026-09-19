@@ -31,3 +31,19 @@ push or deployment occurred. Task01 retained temporary checkout remains untouche
 Task03 status-only commit changes this page and task metadata after independent PASS.
 The reviewed implementation is `73d461b`; Task04 and Task05 are next eligible and were
 not started. No live canary, provider/v1 data access, push or deployment occurred.
+
+Task03 acquisition follow-through (offline): reviewed code `794213a` (production delta
+`0810eb6`), based on delivered `6d46c00`. Paired filtered event ranges now use sparse real
+headers and exact UTC boundary search; only constructor receipts remain mandatory.
+Seed format2 versions sparse acceptance; migrations and Tasks01-03 remain preserved.
+47 units,12 SQL groups and28 sync groups passed under the existing2CPU/4GiB fixture
+allocation; affected sparse/busy phases reran after a test-accounting correction.
+Independent `/root/task03_acquisition_review`: PASS, one full review plus one correction
+recheck, including independently executed raw growth/identity/day/seed/recovery probes.
+A65,535-block witness uses62 header calls across both sources and no historical receipts;
+adding4096 unrelated transactions per queried block changes bytes, not call counts.
+The dense fixture has higher search/fence call overhead; no universal speedup or live
+feasibility claim. Reports/evidence and updated PREPARED/NOT_RUN brief are in ignored
+`artifacts/task03-acquisition/`; original Task03 evidence is preserved. Task04/05 remain
+unstarted; next is the planner decision on this delta/cost ledger. No live/v1/canary,
+push or deployment occurred. This final status entry is separate from reviewed source.
