@@ -104,6 +104,8 @@ try {
     assert.deepEqual(await (await fetch(base + '/api/v2/home')).json(), fixture.expected);
     assert.equal(await page.locator('.home-context').count(), 0);
     assert.equal(await page.locator('.home-metrics .meta').count(), 0);
+    assert.doesNotMatch(await page.locator('.home-page').innerText(), /≈/);
+    assert.equal(await page.locator('.home-facts .panel-context').count(), 0);
     assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).count(), 0);
     assert.deepEqual(await page.locator('.home-today dt').allTextContents(), [
       'New Stakes',
@@ -146,6 +148,21 @@ try {
       today.y >= supply.y + supply.height && mobileChart.y >= today.y + today.height,
       'Supply, Today, then chart',
     );
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 390, height: 780 },
+      { width: 375, height: 812 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const nav = await page.locator('.bottom-nav').boundingBox();
+      for (const selector of ['.home-metrics', '.home-facts', '.home-today']) {
+        const box = await page.locator(selector).boundingBox();
+        assert.ok(box.y >= 0 && box.y + box.height < nav.y, selector + ' fits initial mobile view');
+      }
+      assert.equal(await page.evaluate(() => scrollY), 0);
+      await capture('home-' + viewport.width + 'x' + viewport.height);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     await capture('home-390');
     await page.screenshot({ path: resolve(folder, 'visual-home-390-full.png'), fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -154,6 +171,19 @@ try {
       facts = await page.locator('.home-facts').boundingBox();
     assert.equal(chart.y, facts.y);
     assert.ok(chart.y + chart.height < 850 && chart.x < facts.x);
+    const desktopToday = await page.locator('.home-today').boundingBox();
+    assert.equal(desktopToday.y, facts.y);
+    assert.ok(desktopToday.x > facts.x, 'desktop panels sit side by side');
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1366, height: 768 },
+    ]) {
+      await page.setViewportSize(viewport);
+      const shortcuts = await page.locator('.home-shortcuts').boundingBox();
+      assert.ok(shortcuts.y + shortcuts.height < viewport.height, 'desktop quick actions fit');
+      await capture('home-' + viewport.width + 'x' + viewport.height);
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
     const before = traffic.filter((url) => url.includes('/api/')).length;
     const button = page.getByRole('button', { name: 'Exact values & methodology', exact: true });
     await button.click();

@@ -35,7 +35,6 @@ export default function Home() {
     rs = observationState(rate, now),
     cs = observationState(completed, now),
     es = observationState(estimate, now, estimate?.value?.contractDay);
-  const dailyNote = snapshot ? snapshot.dateUtc + ' · indexed state' : 'Native index unavailable';
   const clock = new Date(now).toISOString();
   const hexDay = displayDay(contractDayAt(BigInt(Math.floor(now / 1000))));
   const totalPayout = estimate?.value ? formatUnits(BigInt(estimate.value.payoutHearts), 8) : null;
@@ -146,7 +145,6 @@ export default function Home() {
                 Supply &amp; Staking
               </h2>
             </div>
-            <p className="panel-context">{dailyNote}</p>
             <dl className="fact-rows">
               {facts.map(([label, value, unit]) => (
                 <div key={label}>
@@ -169,9 +167,6 @@ export default function Home() {
                 </dd>
               </div>
             </dl>
-            <p className="panel-context">
-              Original duration · HEX-weighted · <a href="/learn">Methodology</a>
-            </p>
           </section>
           <section className="panel home-today">
             <div className="home-panel-heading">
@@ -180,7 +175,6 @@ export default function Home() {
                 Today in HEX
               </h2>
             </div>
-            <p className="panel-context">{dayLabel(hexDay - 1)} · in progress</p>
             <dl className="fact-rows">
               {activityRows.map(([label, value, unit]) => (
                 <div
@@ -195,9 +189,6 @@ export default function Home() {
                 </div>
               ))}
             </dl>
-            <p className="panel-context">
-              Net changes since prior close. Payouts estimated, not final.
-            </p>
           </section>
         </div>
         <div className="home-chart-slot">
@@ -227,7 +218,6 @@ export default function Home() {
         ))}
       </nav>
       <p className="home-footnote">
-        Price/rate observations · completed payout · indexed totals. ≈ means truncated precision.{' '}
         <button className="text-action" onClick={() => setDetails(true)} aria-haspopup="dialog">
           Exact values &amp; methodology
         </button>

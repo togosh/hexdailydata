@@ -131,6 +131,13 @@ duration). Today shows in-day New Stakes, Ended Stakes, New Holders/Stakers (net
 the prior close), NET HEX Locked, estimated protocol Payouts and capped Penalties.
 Current-day activity remains unavailable when the index is on another protocol day.
 
+The owner's density refinement removes approximation glyphs and the Supply panel's
+date/methodology footnotes. Exact values and definitions remain in Home details.
+Six headline tiles plus complete Supply and Today panels fit the normal initial
+390px mobile viewport above navigation; larger text and extreme values may reflow.
+Desktop places the chart and both panels alongside one another so quick actions
+remain visible without the tall stacked-panel gap.
+
 | Page | Original filename |
 |---|---|
 | Home | HEXDailyData_Mockup_Home.png |

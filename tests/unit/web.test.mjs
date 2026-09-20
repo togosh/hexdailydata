@@ -56,15 +56,15 @@ test('browser ages old successful responses, preserves stale status and expires 
 });
 const bytes = Buffer.from(JSON.stringify(Array.from({ length: 400 }, (_, i) => rawRow(1255 + i))));
 test('compact Home display preserves tiny values and flags truncated magnitudes without floats', () => {
-  assert.equal(compactNumber('622163456789.123'), '≈622.16B');
+  assert.equal(compactNumber('622163456789.123'), '622.16B');
   assert.equal(compactNumber('0.003876', 7), '0.003876');
   assert.equal(compactNumber('0.000000000000000001', 7), '0.000000000000000001');
-  assert.equal(compactNumber('9007199254740993.1'), '≈9.00 × 10^15');
+  assert.equal(compactNumber('9007199254740993.1'), '9.00 × 10^15');
   assert.equal(compactNumber('0'), '0');
   assert.equal(compactNumber(null), 'Unavailable');
   assert.equal(yearsFromDays('365.25'), '1.00000000');
   assert.equal(yearsFromDays('3652.5'), '10.00000000');
-  assert.equal(compactNumber(yearsFromDays('3562'), 2, false), '≈9.75');
+  assert.equal(compactNumber(yearsFromDays('3562'), 2, false), '9.75');
 });
 test('TVL multiplies exact decimal strings, including zero, tiny prices and large products', () => {
   assert.equal(multiplyDecimals('622163456789.123', '0.003876'), '2411505558.514640748');

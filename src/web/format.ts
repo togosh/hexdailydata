@@ -72,15 +72,14 @@ export function compactNumber(
   const sign = exact.startsWith('-') ? '-' : '';
   if (abbreviate && whole.length > 15) {
     const digits = whole + fraction;
-    return '≈' + sign + digits[0] + '.' + digits.slice(1, 3) + ' × 10^' + (whole.length - 1);
+    return sign + digits[0] + '.' + digits.slice(1, 3) + ' × 10^' + (whole.length - 1);
   }
   const power = abbreviate ? Math.min(4, Math.floor((whole.length - 1) / 3)) : 0;
   const shifted = power
     ? decimal(sign + whole + (fraction ? '.' + fraction : '') + 'e-' + power * 3)
     : exact;
   const displayed = numberText(shifted, places);
-  const approximate = decimal(displayed.replaceAll(',', '')) !== shifted;
-  return (approximate ? '≈' : '') + displayed + ['', 'K', 'M', 'B', 'T'][power];
+  return displayed + ['', 'K', 'M', 'B', 'T'][power];
 }
 export function yearsFromDays(days: string | null | undefined): string | null {
   if (days == null) return null;

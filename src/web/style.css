@@ -953,7 +953,7 @@ main:has(.home-page) {
 }
 .home-dashboard {
   display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
   gap: 14px;
   align-items: start;
   margin-bottom: 14px;
@@ -965,10 +965,17 @@ main:has(.home-page) {
   background: var(--surface);
 }
 .home-fact-stack {
+  display: contents;
+}
+.home-facts {
   grid-column: 2;
+}
+.home-today {
+  grid-column: 3;
+}
+.home-facts,
+.home-today {
   grid-row: 1;
-  display: grid;
-  gap: 14px;
   min-width: 0;
 }
 .home-chart-slot {
@@ -1133,6 +1140,19 @@ main:has(.home-page) {
   .home-metrics {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .home-dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .home-facts {
+    grid-column: 1;
+  }
+  .home-today {
+    grid-column: 2;
+  }
+  .home-chart-slot {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
 }
 @media (max-width: 760px) {
   body {
@@ -1215,20 +1235,20 @@ main:has(.home-page) {
 
   .home-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 6px;
+    margin-bottom: 8px;
   }
   .home-metrics .metric {
-    padding: 10px;
+    padding: 7px 10px;
   }
   .home-metrics dt {
     font-size: 0.8rem;
     gap: 7px;
-    min-height: 32px;
+    min-height: 23px;
   }
   .home-metrics dd {
-    font-size: 1.5rem;
-    margin: 5px 0 7px;
+    font-size: 1.4rem;
+    margin: 3px 0;
   }
   .home-metrics .meta {
     font-size: 0.75rem;
@@ -1244,16 +1264,27 @@ main:has(.home-page) {
     width: 100%;
   }
   .home-fact-stack {
-    gap: 10px;
+    display: grid;
+    gap: 8px;
+  }
+  .home-facts,
+  .home-today {
+    grid-column: auto;
+    grid-row: auto;
   }
   .home-panel-heading {
-    padding: 10px 12px;
+    padding: 7px 12px;
   }
   .fact-rows {
     padding: 0 12px;
   }
   .fact-rows > div {
-    padding: 5px 0;
+    padding: 3px 0;
+    align-items: baseline;
+    line-height: 1.35;
+  }
+  .fact-rows dd {
+    font-size: 0.85rem;
   }
   .panel-context {
     margin: 7px 12px;
