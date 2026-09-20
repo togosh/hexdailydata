@@ -216,3 +216,16 @@ Actual dark/light captures, before/after evidence and archives are in
 other page-body, v1, live-provider, push or deployment work. Native initialization/live
 qualification pending; Task09 NOT_STARTED. Stop for owner Home visual review.
 This entry is a documentation-only commit after reviewed source.
+
+Task07 Home chart/APY refinement PASS; OWNER_VISUAL_APPROVAL_PENDING. Reviewed code
+`52ba18ae0f43aac2422c86cb061b1b60e956b032` swaps circulating/locked rows, removes
+Home chart table/source/link and exact-values control, and adds Stake APY estimates
+for1/5/10Y. APY assumes10,000HEX and today's estimated payout held constant; exact
+integer share/bonus math and annualized maturity returns, with missing/expiry handling.
+Independent `/root/home_panels_review` full review PASS, no corrections. Format/types,
+101units/build/shell and full browser/7visual groups PASS. Small-fixture p95 headlines
+1,237.8ms/chart1,806.3ms; no new scale qualification. Full/scrolled dark/light captures,
+review and archives are in `artifacts/task-07/home-apy-20260920/`. Task resources cleaned.
+No new API/provider/migration, v1 execution, push or deployment. Native initialization/
+live qualification pending; Task09 NOT_STARTED. Stop for owner Home visual review.
+This is a documentation-only status entry after reviewed source.
