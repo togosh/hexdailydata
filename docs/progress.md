@@ -203,3 +203,16 @@ in `artifacts/task-07/home-panels-20260920/`. Task resources cleaned. Native ini
 and live qualification remain pending; Task09 NOT_STARTED. No v1 execution, live
 providers, push or deployment. Stop for owner Home visual review. This is a status-only
 entry after reviewed code.
+
+Task07 Home density refinement PASS; OWNER_VISUAL_APPROVAL_PENDING. Reviewed code
+`2d8ed6ec3d833d9843462a580522f63262640fd5` removes approximation glyphs and Supply
+notes; six tiles and both full panels fit above navigation at390x844/390x780/375x812.
+Desktop chart/panels sit side by side, with shortcuts visible at1366x768. Independent
+`/root/home_panels_review` full review PASS, no corrections. Format/types/99 units/build,
+shell and final visual browser checks pass; unchanged broader journeys reused as documented.
+Small-fixture p95: headlines1,205.6ms, chart1,778.7ms; no new scale qualification.
+Actual dark/light captures, before/after evidence and archives are in
+`artifacts/task-07/home-density-20260920/`. Scoped test resources cleaned. No backend,
+other page-body, v1, live-provider, push or deployment work. Native initialization/live
+qualification pending; Task09 NOT_STARTED. Stop for owner Home visual review.
+This entry is a documentation-only commit after reviewed source.
