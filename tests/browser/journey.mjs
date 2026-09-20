@@ -335,7 +335,7 @@ try {
         await page.getByLabel('HEX amount', { exact: true }).fill('10000');
         await page.getByLabel('Whole days').fill('365');
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
-        await page.getByText('0.972011620873', { exact: true }).waitFor();
+        await page.getByTitle('0.972011620873', { exact: true }).waitFor();
         await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
         await page.getByLabel('Constant daily payout assumption').selectOption('30');
         await page.getByLabel('Hypothetical future USD per HEX').fill('0.01');
@@ -344,7 +344,7 @@ try {
         for (const width of [390, 1440])
           await capture('calculator', width, width === 390 ? 844 : 1000);
         await page.getByLabel('HEX amount', { exact: true }).fill('20000');
-        assert.equal(await page.getByText('0.972011620873', { exact: true }).count(), 0);
+        assert.equal(await page.getByTitle('0.972011620873', { exact: true }).count(), 0);
         await page.route('**/api/v2/calculator/inputs?*', (r) =>
           r.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
         );

@@ -412,18 +412,144 @@ summary {
 }
 .calculator-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
   align-items: start;
 }
-.calculator-grid form > label {
-  margin-bottom: 16px;
+.calculator-heading {
+  align-items: end;
 }
-.calculator-grid form > h2:not(:first-child) {
-  margin-top: 26px;
+.calculator-heading h1 {
+  font-size: clamp(1.65rem, 3vw, 2.3rem);
 }
-.calculator-grid form > .primary {
-  width: 100%;
+.calculator-context,
+.calculator-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.calculator-context {
+  padding-bottom: 4px;
+}
+.calculator-grid > .panel {
+  padding: 0;
+  margin: 0;
+  background: var(--surface);
+  overflow: hidden;
+}
+.calculator-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.calculator-panel-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 1rem;
+}
+.calculator-tag,
+.scenario-badge {
+  color: var(--link);
+  font-size: 0.75rem;
+}
+.calculator-panel-body {
+  padding: 16px;
+}
+.calculator-fields,
+.future-price-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+.future-price-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.calculator-page label {
+  min-width: 0;
+  font-size: 0.85rem;
+}
+.calculator-page input {
+  font-size: 1.35rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.calculator-page input::placeholder {
+  font-size: 0.85rem;
+  font-weight: 400;
+}
+.calculator-page .primary {
+  min-height: 56px;
+}
+.calculator-details {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 8px;
+  font-size: 0.8rem;
+}
+.calculator-details summary {
+  padding: 5px 0;
+  color: var(--muted);
+}
+.calculator-details label {
+  margin-top: 10px;
+}
+.calculator-page .calculator-exact {
+  padding: 0;
+}
+.calculator-exact dd {
+  font-size: 0.8rem;
+}
+.calculator-quote {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px 0 0;
+}
+.calculator-quote > div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--input);
+}
+.calculator-quote .share-result {
+  border-color: var(--accent);
+}
+.calculator-quote dt {
+  font-size: 0.75rem;
+}
+.calculator-quote dd {
+  font-size: clamp(1.1rem, 2vw, 1.65rem);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.share-result dd {
+  color: var(--link);
+}
+.scenario-values .usd-result dd {
+  color: #3ee8bf;
+}
+:root[data-theme='light'] .scenario-values .usd-result dd {
+  color: #007c61;
+}
+.scenario-results {
+  border-top: 1px solid var(--line);
+  margin-top: 16px;
+  padding-top: 12px;
+}
+.scenario-results h3 {
+  font-size: 0.85rem;
+  margin: 0;
+  color: var(--muted);
+}
+.scenario-values {
   margin-top: 10px;
 }
 .presets {
@@ -438,22 +564,6 @@ summary {
   display: block;
   color: inherit;
   font-size: 0.68rem;
-}
-.result-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.result-grid > div {
-  padding: 14px;
-  background: var(--input);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.result-grid dd {
-  font-size: 1.2rem;
-  font-weight: 600;
-  overflow-wrap: anywhere;
 }
 .accent {
   color: var(--link);
@@ -577,6 +687,14 @@ summary {
   }
 }
 @media (max-width: 600px) {
+  .calculator-panel-body {
+    padding: 12px;
+  }
+  .calculator-fields,
+  .calculator-quote,
+  .future-price-row {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  }
   body {
     font-size: 14px;
   }
@@ -652,16 +770,6 @@ summary {
   .learn-grid {
     grid-template-columns: 1fr;
     gap: 14px;
-  }
-  .result-grid {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .result-grid > div {
-    padding: 10px;
-  }
-  .result-grid dd {
-    font-size: 1.07rem;
   }
   .glossary {
     grid-template-columns: 1fr;

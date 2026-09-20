@@ -346,6 +346,17 @@ try {
       await page.goto(base + path);
       await page.locator('h1').waitFor({ state: 'attached' });
       await page.waitForTimeout(250);
+      if (name === 'calculator') {
+        await page.waitForFunction(() => !document.querySelector('button.primary:disabled'));
+        await page.getByLabel('HEX amount', { exact: true }).fill('10000');
+        await page.getByLabel('Whole days').fill('3650');
+        await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
+        await page.getByLabel('Constant daily payout assumption').selectOption('30');
+        await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
+        await page.getByLabel('Hypothetical future USD per HEX').fill('0.01');
+        await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
+        await page.locator('.share-result .value').waitFor();
+      }
       for (const width of [320, 390, 960, 1440]) {
         await page.setViewportSize({
           width,
@@ -353,12 +364,28 @@ try {
         });
         await page.evaluate(() => scrollTo(0, 0));
         await capture(name + '-' + width + '-smoke');
-        if (width === 960) {
+        if (width === 390 || width === 960 || width === 1440) {
           await page.screenshot({
-            path: resolve(folder, 'visual-' + name + '-960-full.png'),
+            path: resolve(folder, 'visual-' + name + '-' + width + '-full.png'),
             fullPage: true,
           });
-          if (name === 'home') {
+          if (width === 390) {
+            const total = await page.evaluate(() => document.documentElement.scrollHeight);
+            for (let y = 0, part = 1; y < total; y += 724, part++) {
+              await page.evaluate((top) => scrollTo(0, top), y);
+              await page.screenshot({
+                path: resolve(folder, `visual-${name}-390-scroll-${part}.png`),
+              });
+              if (
+                await page.evaluate(
+                  () => scrollY + innerHeight >= document.documentElement.scrollHeight,
+                )
+              )
+                break;
+            }
+            await page.evaluate(() => scrollTo(0, 0));
+          }
+          if (width === 960 && name === 'home') {
             await page.getByRole('button', { name: 'Use light mode' }).click();
             await capture('home-960-light');
             await page.getByRole('button', { name: 'Use dark mode' }).click();
