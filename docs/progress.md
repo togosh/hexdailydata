@@ -229,3 +229,18 @@ review and archives are in `artifacts/task-07/home-apy-20260920/`. Task resource
 No new API/provider/migration, v1 execution, push or deployment. Native initialization/
 live qualification pending; Task09 NOT_STARTED. Stop for owner Home visual review.
 This is a documentation-only status entry after reviewed source.
+
+Task07 Home 30-day APY refinement PASS; OWNER_VISUAL_APPROVAL_PENDING. Reviewed code
+`22fea368bf920256409f21f749906df0542b8499` uses the exact arithmetic mean of 30
+completed daily payouts per T-share, including penalties, with today's eligible raw
+share rate and the existing 10,000 HEX / 1/5/10Y assumptions. History loads independently;
+failed history remains unavailable through retries until success. Independent
+`/root/home_panels_review` PASS after one correction/recheck. 102 units, format/types/
+build/shell and final full browser checks pass. Final small-fixture p95: headlines
+1,120.1 ms, chart 1,709.9 ms, APY 1,316.7 ms. Million-row scale at `6a29c605` passed
+(headlines 1,204.6 ms, chart 1,780.5 ms); reused for the client retry-only correction.
+Full/scrolled dark/light screenshots, review and archives are in
+`artifacts/task-07/home-apy30-20260920/`. Task resources cleaned. No backend/provider
+changes, v1 execution, push or deployment. Native initialization/live qualification
+pending; Task09 NOT_STARTED. Stop for owner Home visual review.
+This is a documentation-only status entry after reviewed source.
