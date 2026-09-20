@@ -18,7 +18,13 @@ const browser = await chromium.launch({ channel: process.env.HDD_V2_BROWSER_CHAN
 let context, page;
 async function open(viewport = { width: 390, height: 844 }, deviceScaleFactor = 1) {
   await context?.close();
-  context = await browser.newContext({ viewport, deviceScaleFactor, reducedMotion: 'reduce' });
+  context = await browser.newContext({
+    viewport,
+    deviceScaleFactor,
+    reducedMotion: 'reduce',
+    colorScheme: 'light',
+    timezoneId: 'America/Chicago',
+  });
   await context.addInitScript((at) => {
     window.__testNow = at;
     const Original = Date;
@@ -83,20 +89,40 @@ try {
     await pause(250);
   }
   await open();
-  await test('SYNTHETIC compiled API values, four priority metrics in 390x844, high supply, chart and exact details', async () => {
+  await test('SYNTHETIC compiled API values, requested six-metric order, Supply then Today, chart and exact details', async () => {
     await home();
     assert.deepEqual(await (await fetch(base + '/api/v2/home')).json(), fixture.expected);
     assert.match(await page.locator('[data-metric="price"] dd').innerText(), /\$0\.003876/);
     assert.match(await page.locator('[data-metric="duration"] dd').innerText(), /9\.75/);
-    for (const name of ['price', 'completed', 'staked', 'duration']) {
+    assert.deepEqual(
+      await page
+        .locator('.home-metrics > [data-metric]')
+        .evaluateAll((nodes) => nodes.map((n) => n.dataset.metric)),
+      ['price', 'completed', 'rate', 'staked', 'holders', 'stakers'],
+    );
+    assert.equal(
+      await page.locator('[data-metric="holders"] dd').innerText(),
+      fixture.expected.daily.holderCount,
+    );
+    assert.equal(
+      await page.locator('[data-metric="stakers"] dd').innerText(),
+      fixture.expected.daily.stakerCount,
+    );
+    for (const name of ['price', 'completed', 'rate', 'staked', 'holders', 'stakers']) {
       const box = await page.locator('[data-metric="' + name + '"]').boundingBox();
       assert.ok(
         box.y > 0 && box.y + box.height < 770,
         name + ' fully visible above bottom navigation',
       );
     }
-    const supply = await page.getByRole('heading', { name: 'Supply & staking' }).boundingBox();
-    assert.ok(supply.y < 700, 'supply context high on mobile');
+    const supply = await page.locator('.home-facts').boundingBox();
+    const today = await page.locator('.home-today').boundingBox();
+    const mobileChart = await page.locator('.home-chart').boundingBox();
+    assert.ok(supply.y < 740, 'supply context directly after metrics on mobile');
+    assert.ok(
+      today.y >= supply.y + supply.height && mobileChart.y >= today.y + today.height,
+      'Supply, Today, then chart',
+    );
     await capture('home-390');
     await page.screenshot({ path: resolve(folder, 'visual-home-390-full.png'), fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1000 });
@@ -116,10 +142,18 @@ try {
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert.match(await dialog.innerText(), new RegExp(fixture.expected.live.price.value.usdPerHex));
     assert.ok((await dialog.innerText()).includes(fixture.expected.daily.circulatingHex));
+    const payoutHearts = BigInt(fixture.expected.live.todayPayoutEstimate.value.payoutHearts);
+    const totalPayout =
+      `${payoutHearts / 100000000n}.${(payoutHearts % 100000000n).toString().padStart(8, '0')}`.replace(
+        /\.?0+$/,
+        '',
+      );
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await dialog.getByRole('button', { name: 'Copy price', exact: true }).click();
     await dialog.getByText('Copied', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '0.003876 USD/HEX');
+    await dialog.getByRole('button', { name: 'Copy estimated total payout', exact: true }).click();
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), totalPayout);
     assert.equal(
       traffic.filter((url) => url.includes('/api/')).length,
       before,
@@ -133,6 +167,54 @@ try {
     assert.equal(await page.locator('tbody tr').count(), 7);
     await page.getByRole('button', { name: '30D', exact: true }).click();
     await page.getByText('Data table · 30 records', { exact: true }).waitFor();
+  });
+  await test('dark default, adjacent theme/menu controls, persistent light mode, device UTC/day rollover and estimate expiry', async () => {
+    await open();
+    await home();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.dataset.theme),
+      'dark',
+      'default stays dark even with light OS preference',
+    );
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+      const theme = await page.locator('.theme-toggle').boundingBox();
+      const menu = await page.locator('.menu-toggle').boundingBox();
+      const day = await page.getByTestId('hex-day').boundingBox();
+      const utc = await page.getByTestId('utc-clock').boundingBox();
+      assert.ok(theme.y < 90 && theme.x + theme.width <= menu.x && Math.abs(theme.y - menu.y) < 1);
+      assert.ok(day.x < utc.x && Math.abs(day.y - utc.y) < 1);
+      await page.getByRole('button', { name: 'Use light mode' }).click();
+      await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+      assert.equal(
+        await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme),
+        'light',
+      );
+      await capture('home-' + width + '-light');
+      if (width === 390)
+        await page.screenshot({
+          path: resolve(folder, 'visual-home-390-light-full.png'),
+          fullPage: true,
+        });
+      await page.reload();
+      await page.getByRole('button', { name: 'Use dark mode' }).waitFor();
+      assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+      await page.getByRole('button', { name: 'Use dark mode' }).click();
+    }
+    const beforeMidnight = Date.parse('2026-09-19T23:59:59Z');
+    await page.evaluate((at) => (window.__testNow = at), beforeMidnight);
+    await page.getByTestId('utc-clock').getByText('23:59:59 UTC', { exact: true }).waitFor();
+    assert.equal(await page.getByTestId('hex-day').innerText(), 'HEX Day 2483');
+    await page.evaluate((at) => (window.__testNow = at + 1000), beforeMidnight);
+    await page.getByTestId('utc-clock').getByText('00:00:00 UTC', { exact: true }).waitFor();
+    assert.equal(await page.getByTestId('hex-day').innerText(), 'HEX Day 2484');
+    assert.equal(await page.locator('[data-metric="estimate"] dd').innerText(), 'Unavailable');
+    assert.equal(
+      await page.locator('[data-metric="total-estimate"] dd').innerText(),
+      'Unavailable',
+    );
+    await open({ width: 1440, height: 1000 });
+    await home();
   });
   await test('header search, mobile menu, Escape/focus, bottom destinations, browser back and final-row clearance', async () => {
     await page.getByLabel('Header address or stake ID', { exact: true }).fill('1');
@@ -207,6 +289,10 @@ try {
         await page.evaluate(() => scrollTo(0, 0));
         await capture(name + '-' + width + '-smoke');
       }
+      await page.getByRole('button', { name: 'Use light mode' }).click();
+      await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
+      await capture(name + '-1440-light-smoke');
+      await page.getByRole('button', { name: 'Use dark mode' }).click();
       await page.setViewportSize({ width: 320, height: 844 });
       await page.evaluate(() => (document.documentElement.style.fontSize = '200%'));
       assert.equal(

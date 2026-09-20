@@ -19,6 +19,24 @@ const links = [
 export default function App() {
   const [path, setPath] = useState(location.pathname);
   const [menu, setMenu] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      return localStorage.getItem('hdd-v2-theme') === 'light' ? 'light' : 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#050d18' : '#f5f8fc');
+    try {
+      localStorage.setItem('hdd-v2-theme', theme);
+    } catch {
+      // A blocked preference store must not disable the theme control.
+    }
+  }, [theme]);
   useEffect(() => {
     const changed = () => {
       setMenu(false);
@@ -89,15 +107,25 @@ export default function App() {
         <div className="header-search">
           <SearchForm compact />
         </div>
-        <button
-          className="menu-toggle"
-          aria-label="Open navigation menu"
-          aria-haspopup="dialog"
-          aria-expanded={menu}
-          onClick={() => setMenu(true)}
-        >
-          <Icon name="menu" />
-        </button>
+        <div className="header-actions">
+          <button
+            className="theme-toggle"
+            aria-label={`Use ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Use ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          >
+            <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+          </button>
+          <button
+            className="menu-toggle"
+            aria-label="Open navigation menu"
+            aria-haspopup="dialog"
+            aria-expanded={menu}
+            onClick={() => setMenu(true)}
+          >
+            <Icon name="menu" />
+          </button>
+        </div>
       </header>
       {menu && (
         <Dialog title="Navigation" onClose={() => setMenu(false)}>

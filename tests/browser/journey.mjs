@@ -567,7 +567,7 @@ try {
           .locator('[data-metric="completed"]')
           .getByText(/2026-09-16/)
           .waitFor();
-        assert.match(await page.locator('[data-metric="estimate"]').innerText(), /2026-09-19/);
+        assert.match(await page.locator('.home-today').innerText(), /2026-09-19/);
         await page.unrouteAll();
         await page.route('**/api/v2/stakes/1099511627775?*', (r) =>
           r.fulfill({

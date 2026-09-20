@@ -115,6 +115,13 @@ The owner's September20 correction makes these five authoritative for compositio
 density, typography and navigation. Mostly follow them while preserving v2 data semantics;
 Home/shared-shell visual acceptance remains pending owner review:
 
+The owner's subsequent Home refinement orders the headline tiles: HEX Price, completed
+Payout per T-share, T-share Rate, % Staked, Holders, Stakers. Supply & Staking follows,
+then Today in HEX; weighted original duration belongs in Supply & Staking. Today uses
+available current-day estimates, not invented activity counts. A device-clock HEX
+display day sits left and UTC time right; the header has a dark/light toggle beside
+the menu, defaulting to dark with an explicitly selected preference retained.
+
 | Page | Original filename |
 |---|---|
 | Home | HEXDailyData_Mockup_Home.png |

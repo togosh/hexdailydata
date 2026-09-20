@@ -36,6 +36,11 @@ const paths = {
   search: 'M16 16L22 22M18 10a8 8 0 1 0-16 0a8 8 0 0 0 16 0',
   home: 'M2 11L12 2L22 11M5 9V22H10V15H14V22H19V9',
   menu: 'M3 5H21M3 12H21M3 19H21',
+  sun: 'M16 12a4 4 0 1 0-8 0a4 4 0 0 0 8 0M12 2V4M12 20V22M2 12H4M20 12H22M5 5L6.5 6.5M17.5 17.5L19 19M5 19L6.5 17.5M17.5 6.5L19 5',
+  moon: 'M20.9 13A9 9 0 0 1 11 3.1a9 9 0 1 0 9.9 9.9Z',
+  person: 'M16 7a4 4 0 1 0-8 0a4 4 0 0 0 8 0M4 22v-3a8 8 0 0 1 16 0v3Z',
+  people:
+    'M8 12a4 4 0 1 0 0-8a4 4 0 0 0 0 8M2 21v-3a6 6 0 0 1 12 0v3M17 4a4 4 0 0 1 0 8M17 15a5 5 0 0 1 5 5',
   link: 'M10 14l4-4M8 16l-1 1a4 4 0 0 1-6-6l5-5a4 4 0 0 1 6 0M16 8l1-1a4 4 0 0 1 6 6l-5 5a4 4 0 0 1-6 0',
 } as const;
 export type IconName = keyof typeof paths;

@@ -1,5 +1,7 @@
 ﻿import { lazy, Suspense, useEffect, useState } from 'react';
 import { HomeResponseSchema } from '../contracts/api.ts';
+import { contractDayAt, displayDay } from '../domain/day.ts';
+import { formatUnits } from '../domain/units.ts';
 import { useResource, endpoint, useClock } from './api.ts';
 import { Metric, Table, Copy } from './components.tsx';
 import {
@@ -33,21 +35,32 @@ export default function Home() {
     cs = observationState(completed, now),
     es = observationState(estimate, now, estimate?.value?.contractDay);
   const dailyNote = h?.daily ? h.daily.dateUtc + ' · native daily' : 'Native daily unavailable';
+  const clock = new Date(now).toISOString();
+  const hexDay = displayDay(contractDayAt(BigInt(Math.floor(now / 1000))));
+  const totalPayout = estimate?.value ? formatUnits(BigInt(estimate.value.payoutHearts), 8) : null;
   const ready = !!(
     h?.daily?.stakedPercent != null &&
-    h.daily.weightedStakeLengthDays != null &&
+    h.daily.holderCount != null &&
+    h.daily.stakerCount != null &&
+    rs !== 'unavailable' &&
     ps !== 'unavailable' &&
     cs !== 'unavailable'
   );
   const facts = [
     ['Locked principal (incl. GA)', h?.daily?.stakedHex, 'HEX'],
     ['Circulating supply', h?.daily?.circulatingHex, 'HEX'],
-    ['Holders', h?.daily?.holderCount, ''],
-    ['Stakers', h?.daily?.stakerCount, ''],
   ] as const;
   return (
     <div className="home-page">
       <h1 className="sr-only">Your daily view</h1>
+      <div className="home-clock" aria-label="Current HEX day and UTC time from your device clock">
+        <span data-testid="hex-day">
+          HEX Day <strong>{hexDay}</strong>
+        </span>
+        <time dateTime={clock} data-testid="utc-clock">
+          {clock.slice(11, 19)} UTC
+        </time>
+      </div>
       <div className="home-context">
         <span className="chain-context">
           <Icon name="link" />
@@ -67,7 +80,7 @@ export default function Home() {
         <Metric
           id="price"
           icon="price"
-          title="HEX price"
+          title="HEX Price"
           value={ps === 'unavailable' ? null : price?.value?.usdPerHex}
           prefix="$"
           display={compactNumber(price?.value?.usdPerHex, 7)}
@@ -88,46 +101,25 @@ export default function Home() {
         <Metric
           id="completed"
           icon="chart"
-          title="Completed payout"
+          title="Payout per T-share"
           value={cs === 'unavailable' ? null : completed?.value?.hexPerTShare}
           unit="HEX/T-share"
           display={compactNumber(completed?.value?.hexPerTShare, 3)}
           note={
             <>
               <span>
-                {completed?.value ? dayLabel(completed.value.contractDay) : 'No materialized day'}
+                {completed?.value
+                  ? 'Completed · ' + dayLabel(completed.value.contractDay)
+                  : 'No materialized day'}
               </span>
               <span>{compactObservation(completed, now, cs)}</span>
             </>
           }
         />
         <Metric
-          id="staked"
-          icon="pie"
-          title="Percentage staked"
-          value={h?.daily?.stakedPercent}
-          unit="%"
-          display={compactNumber(h?.daily?.stakedPercent, 2, false)}
-          note={dailyNote}
-        />
-        <Metric
-          id="duration"
-          icon="clock"
-          title="Weighted stake length"
-          value={h?.daily?.weightedStakeLengthDays}
-          unit="years"
-          display={compactNumber(yearsFromDays(h?.daily?.weightedStakeLengthDays), 2, false)}
-          note={
-            <>
-              <span>Original duration · HEX-weighted</span>
-              <span>{dailyNote}</span>
-            </>
-          }
-        />
-        <Metric
           id="rate"
           icon="database"
-          title="T-share rate"
+          title="T-share Rate"
           value={rs === 'unavailable' ? null : rate?.value?.hexPerTShareBeforeBonuses}
           unit="HEX/T-share"
           display={compactNumber(rate?.value?.hexPerTShareBeforeBonuses, 1, false)}
@@ -139,22 +131,29 @@ export default function Home() {
           }
         />
         <Metric
-          id="estimate"
-          icon="calendar"
-          title="Today’s payout estimate"
-          value={es === 'unavailable' ? null : estimate?.value?.hexPerTShare}
-          unit="HEX/T-share"
-          display={compactNumber(estimate?.value?.hexPerTShare, 3)}
-          note={
-            <>
-              <span>
-                {es !== 'unavailable' && estimate?.value
-                  ? dayLabel(estimate.value.contractDay)
-                  : 'No current-day estimate'}
-              </span>
-              <span>{compactObservation(estimate, now, es)} · not final</span>
-            </>
-          }
+          id="staked"
+          icon="pie"
+          title="% Staked"
+          value={h?.daily?.stakedPercent}
+          unit="%"
+          display={compactNumber(h?.daily?.stakedPercent, 2, false)}
+          note={dailyNote}
+        />
+        <Metric
+          id="holders"
+          icon="person"
+          title="Holders"
+          value={h?.daily?.holderCount}
+          display={compactNumber(h?.daily?.holderCount, 0, false)}
+          note={dailyNote}
+        />
+        <Metric
+          id="stakers"
+          icon="people"
+          title="Stakers"
+          value={h?.daily?.stakerCount}
+          display={compactNumber(h?.daily?.stakerCount, 0, false)}
+          note={dailyNote}
         />
       </dl>
       {(home.loading || home.error) && (
@@ -171,29 +170,70 @@ export default function Home() {
         </p>
       )}
       <div className="home-dashboard">
-        <section className="panel home-facts">
-          <div className="home-panel-heading">
-            <h2>
-              <Icon name="database" />
-              Supply &amp; staking
-            </h2>
-          </div>
-          <p className="panel-context">{dailyNote}</p>
-          <dl className="fact-rows">
-            {facts.map(([label, value, unit]) => (
-              <div key={label}>
-                <dt>{label}</dt>
+        <div className="home-fact-stack">
+          <section className="panel home-facts">
+            <div className="home-panel-heading">
+              <h2>
+                <Icon name="database" />
+                Supply &amp; Staking
+              </h2>
+            </div>
+            <p className="panel-context">{dailyNote}</p>
+            <dl className="fact-rows">
+              {facts.map(([label, value, unit]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>
+                    {compactNumber(value, unit ? 2 : 0, !!unit)}
+                    {value != null && unit && <small> {unit}</small>}
+                  </dd>
+                </div>
+              ))}
+              <div data-metric="duration">
+                <dt>Weighted stake length</dt>
                 <dd>
-                  {compactNumber(value, unit ? 2 : 0, !!unit)}
-                  {value != null && unit && <small> {unit}</small>}
+                  {compactNumber(yearsFromDays(h?.daily?.weightedStakeLengthDays), 2, false)}
+                  {h?.daily?.weightedStakeLengthDays != null && <small> years</small>}
                 </dd>
               </div>
-            ))}
-          </dl>
-          <p className="panel-context">
-            Native daily snapshot · <a href="/learn">Methodology</a>
-          </p>
-        </section>
+            </dl>
+            <p className="panel-context">
+              Original duration · HEX-weighted · <a href="/learn">Methodology</a>
+            </p>
+          </section>
+          <section className="panel home-today">
+            <div className="home-panel-heading">
+              <h2>
+                <Icon name="calendar" />
+                Today in HEX
+              </h2>
+            </div>
+            <p className="panel-context">
+              {es !== 'unavailable' && estimate?.value
+                ? dayLabel(estimate.value.contractDay)
+                : 'No current-day estimate'}
+            </p>
+            <dl className="fact-rows">
+              <div data-metric="estimate">
+                <dt>Estimated payout / T-share</dt>
+                <dd>
+                  {compactNumber(es === 'unavailable' ? null : estimate?.value?.hexPerTShare, 3)}
+                  {es !== 'unavailable' && <small> HEX</small>}
+                </dd>
+              </div>
+              <div data-metric="total-estimate">
+                <dt>Estimated total payout</dt>
+                <dd>
+                  {compactNumber(es === 'unavailable' ? null : totalPayout, 2)}
+                  {es !== 'unavailable' && <small> HEX</small>}
+                </dd>
+              </div>
+            </dl>
+            <p className="panel-context">
+              {compactObservation(estimate, now, es)} · estimate, not final
+            </p>
+          </section>
+        </div>
         <div className="home-chart-slot">
           {chart && (
             <Suspense fallback={<p>Loading chart controls…</p>}>
@@ -232,6 +272,10 @@ export default function Home() {
             PulseChain HEX. Current observations are provisional; completed payout identifies the
             latest materialized day and may lag yesterday. Today’s estimate excludes unknown future
             changes and penalties. It is not final.
+          </p>
+          <p>
+            The top clock uses your device’s UTC time and one-based HEX display day, not a source
+            block or data freshness claim.
           </p>
           <p>
             Daily values use their own dated native snapshot. Locked principal includes
@@ -281,6 +325,12 @@ export default function Home() {
                       <td className="exact">
                         {exact ?? 'Unavailable'}
                         {exact && <Copy text={exact} label={'Copy ' + key} />}
+                        {key === 'todayPayoutEstimate' && totalPayout != null && (
+                          <small className="block">
+                            Exact estimated total: {totalPayout} HEX
+                            <Copy text={totalPayout} label="Copy estimated total payout" />
+                          </small>
+                        )}
                       </td>
                       <td className="exact">
                         {row.asOf
@@ -318,6 +368,8 @@ export default function Home() {
                   >
                     {[
                       ...facts,
+                      ['Holders', h.daily.holderCount, ''],
+                      ['Stakers', h.daily.stakerCount, ''],
                       ['Percentage staked', h.daily.stakedPercent, '%'],
                       ['Weighted original duration', h.daily.weightedStakeLengthDays, 'days'],
                     ].map(([label, value, unit]) => (

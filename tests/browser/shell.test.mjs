@@ -74,7 +74,7 @@ test('built website renders honest native-unavailable states on desktop and mobi
       );
       assert.equal(
         await page
-          .locator('[data-metric] dd')
+          .locator('.home-metrics [data-metric] dd')
           .allTextContents()
           .then((values) => values.filter((v) => v === 'Unavailable').length),
         6,
@@ -123,12 +123,35 @@ test('built website renders honest native-unavailable states on desktop and mobi
       }
     }
     await page.evaluate(() => (document.documentElement.style.fontSize = ''));
+    // Private/restricted storage must not break Home or its keyboard-operable toggle.
+    await page.addInitScript(() => {
+      Storage.prototype.getItem = () => {
+        throw new DOMException('Blocked', 'SecurityError');
+      };
+      Storage.prototype.setItem = () => {
+        throw new DOMException('Blocked', 'SecurityError');
+      };
+    });
+    await page.reload();
+    const light = page.getByRole('button', { name: 'Use light mode' });
+    await light.focus();
+    await page.keyboard.press('Enter');
+    await page.getByRole('button', { name: 'Use dark mode' }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
+    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await page.getByRole('dialog').waitFor();
+    await page.screenshot({ path: `${evidence}/light-details-320.png` });
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Use dark mode' }).click();
+    assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark');
     await page.route('**/api/v2/home?*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await page.reload();
     await page.getByText('Current native data is unavailable.', { exact: false }).waitFor();
     assert.equal(await page.locator('dd').first().textContent(), 'Unavailable');
     assert.deepEqual(errors, []);
-    console.log(`Browser: ${browser.version()}; desktop/mobile and API failure states passed.`);
+    console.log(
+      `Browser: ${browser.version()}; desktop/mobile, dialogs, blocked-storage theme control and API failure states passed.`,
+    );
   } finally {
     await browser?.close();
     server.kill('SIGTERM');
