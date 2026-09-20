@@ -179,3 +179,14 @@ Screenshots, command logs, review and source/evidence archives are in ignored
 This status-only commit follows the reviewed code. Native initialization and live
 qualification remain pending. Task09 NOT_STARTED; no v1 execution, live providers,
 push or deployment. Stop for owner Home/shared-shell visual review before further work.
+
+Task07 Home refinement PASS; OWNER_VISUAL_APPROVAL_PENDING. Reviewed code
+`1d586e5efaeca13d0e909e9292019e2b22d8845a` adds HEX day/UTC clock, dark-default theme
+control and the owner's six-tile order, then Supply & Staking and Today in HEX estimates.
+Independent `/root/home_refinement_review` PASS with no corrections; final format/type/
+98-unit/build/shell/full browser checks passed. Synthetic small-fixture p95: headlines
+1,228.2ms, chart 1,802.9ms; no new scale/live qualification. Actual dark/light desktop/
+mobile captures and compact evidence are in `artifacts/task-07/home-refinement-20260920/`.
+Task resources cleaned. Native initialization/live qualification remain pending;
+Task09 NOT_STARTED. No v1 execution, live providers, push or deployment. Stop for owner
+Home visual review. This entry is a documentation-only commit after reviewed source.
