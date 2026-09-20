@@ -314,7 +314,7 @@ try {
           }),
         ),
     );
-    const last = await page.locator('.site-footer p').boundingBox(),
+    const last = await page.locator('.site-footer nav').boundingBox(),
       bottom = await page.locator('.bottom-nav').boundingBox();
     assert.ok(last.y + last.height < bottom.y, 'last footer row clears fixed controls');
   });
