@@ -210,6 +210,18 @@ test('30-day preset is exact mean of ratios: (1/3 + 2/7)/2 = 13/42, not 3/10', (
   );
 });
 
+test('30 completed payouts retain one exceptional payout without treating it as every day', () => {
+  const rows = Array.from({ length: 30 }, (_, i) => ({
+    contractDay: i + 1,
+    status: 'completed',
+    payoutHearts: i === 29 ? 3100000000n : 100000000n,
+    stakeShares: 1000000000000n,
+  }));
+  const result = payoutPreset(rows, 30, 30, 31);
+  assert.equal(result.status, 'available');
+  assert.deepEqual(result.value, { numerator: 2n, denominator: 1n });
+});
+
 test('missing, pending and zero-denominator payout days never become zero', () => {
   assert.equal(payoutPreset(payoutRows().slice(1), 30, 30, 31).reason, 'missing_days');
   for (const [change, reason] of [

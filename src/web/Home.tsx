@@ -1,7 +1,8 @@
 ﻿import { lazy, Suspense, useEffect, useState, useMemo } from 'react';
 import { HomeResponseSchema } from '../contracts/api.ts';
+import { CalculatorResponseSchema } from '../contracts/reads.ts';
 import { contractDayAt, displayDay } from '../domain/day.ts';
-import { formatUnits, displayRatio, payoutHexPerTShare } from '../domain/units.ts';
+import { formatUnits, displayRatio } from '../domain/units.ts';
 import { stakeApy } from '../domain/calculator.ts';
 import { useResource, endpoint, useClock } from './api.ts';
 import { Metric } from './components.tsx';
@@ -14,6 +15,13 @@ export default function Home() {
   const now = useClock(),
     h = home.data;
   const snapshot = h?.current;
+  // Historical scenarios load independently after Home; headlines never wait for them.
+  const inputs = useResource(
+    h ? endpoint('/calculator/inputs') : null,
+    CalculatorResponseSchema,
+    true,
+  );
+  const average = inputs.data?.presets.find((preset) => preset.window === 30);
   const [chart, setChart] = useState(false);
   useEffect(() => {
     if (!home.loading) {
@@ -47,13 +55,23 @@ export default function Home() {
     ['Penalties', activity?.penaltiesHex, 'HEX'],
   ] as const;
   const apys = useMemo(() => {
-    if (rs === 'unavailable' || es === 'unavailable' || !rate?.value || !estimate?.value)
+    if (
+      rs === 'unavailable' ||
+      !rate?.value ||
+      inputs.error ||
+      average?.status !== 'available' ||
+      !average.value ||
+      average.count !== 30 ||
+      average.toDay == null ||
+      average.fromDay !== average.toDay - 29 ||
+      average.toDay >= hexDay - 1
+    )
       return null;
     try {
-      const daily = payoutHexPerTShare(
-        BigInt(estimate.value.payoutHearts),
-        BigInt(estimate.value.stakeShares),
-      );
+      const daily = {
+        numerator: BigInt(average.value.numerator),
+        denominator: BigInt(average.value.denominator),
+      };
       return ([1, 5, 10] as const).map((years) => {
         const result = stakeApy(
           10000n * 100000000n,
@@ -69,7 +87,7 @@ export default function Home() {
     } catch {
       return null;
     }
-  }, [rate?.value, estimate?.value, rs, es, hexDay]);
+  }, [rate?.value, average, inputs.error, rs, hexDay]);
   const ready = !!(
     snapshot?.stakedPercent != null &&
     snapshot.holderCount != null &&
@@ -211,7 +229,7 @@ export default function Home() {
             </dl>
           </section>
         </div>
-        <section className="panel home-apy">
+        <section className="panel home-apy" data-testid="stake-apy" data-ready={apys !== null}>
           <div className="home-panel-heading">
             <h2>
               <Icon name="pie" />
@@ -226,7 +244,7 @@ export default function Home() {
               </div>
             ))}
           </dl>
-          <p className="apy-assumption">10,000 HEX / today's payout held constant</p>
+          <p className="apy-assumption">10,000 HEX · 30-day payout average</p>
         </section>
         <div className="home-chart-slot">
           {chart && (

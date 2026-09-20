@@ -3,6 +3,9 @@ import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { stakeApy } from '../../src/domain/calculator.ts';
+import { displayRatio } from '../../src/domain/units.ts';
+import { compactNumber } from '../../src/web/format.ts';
 import { setTimeout as pause } from 'node:timers/promises';
 const [base, scenario, evidence] = process.argv.slice(2);
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
@@ -41,6 +44,7 @@ async function open(viewport = { width: 390, height: 844 }, deviceScaleFactor = 
       for (const [key, selector] of [
         ['headlines', '[data-testid="headlines"][data-ready="true"]'],
         ['chart', '[data-testid="history-chart"][data-ready="true"]'],
+        ['apy', '[data-testid="stake-apy"][data-ready="true"]'],
       ]) {
         if (!window.__paint[key + 'Pending'] && document.querySelector(selector)) {
           window.__paint[key + 'Pending'] = true;
@@ -72,6 +76,7 @@ async function home() {
   await page.goto(base);
   await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
   await page.locator('[data-testid="history-chart"][data-ready="true"]').waitFor();
+  await page.locator('[data-testid="stake-apy"][data-ready="true"]').waitFor();
 }
 async function capture(name) {
   assert.equal(
@@ -401,25 +406,110 @@ try {
     await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
     await capture('home-chart-failure');
   });
-  await test('APY distinguishes zero, tiny nonzero and missing inputs', async () => {
+  await test('APY uses the completed30-day exact mean and current rate, independent of today; gaps and failed history stay unavailable', async () => {
     await open();
     const boundary = structuredClone(fixture.expected);
+    const inputs = await (await fetch(base + '/api/v2/calculator/inputs')).json();
+    const mean = inputs.presets.find((p) => p.window === 30);
+    const original = structuredClone(mean);
     await page.route('**/api/v2/home?*', (r) =>
       r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(boundary) }),
     );
-    boundary.live.todayPayoutEstimate.value.payoutHearts = '0';
+    await page.route('**/api/v2/calculator/inputs?*', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(inputs) }),
+    );
+    const expected = () =>
+      [1, 5, 10].map(
+        (years) =>
+          compactNumber(
+            displayRatio(
+              stakeApy(
+                1000000000000n,
+                years,
+                BigInt(boundary.live.shareRate.value.rawShareRate),
+                {
+                  numerator: BigInt(mean.value.numerator),
+                  denominator: BigInt(mean.value.denominator),
+                },
+                BigInt(fixture.at / 1000),
+              ),
+            ),
+            2,
+            false,
+          ) + '%',
+      );
+    await home();
+    assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), expected());
+    const baseline = await page.locator('.home-apy dd').allTextContents();
+    boundary.live.todayPayoutEstimate = {
+      ...boundary.live.todayPayoutEstimate,
+      status: 'unavailable',
+      value: null,
+    };
+    await home();
+    assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), baseline);
+    boundary.live.shareRate.value.rawShareRate = (
+      BigInt(boundary.live.shareRate.value.rawShareRate) * 2n
+    ).toString();
+    await home();
+    assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), expected());
+    assert.notDeepEqual(await page.locator('.home-apy dd').allTextContents(), baseline);
+    mean.value.numerator = '0';
     await home();
     assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), Array(3).fill('0%'));
-    boundary.live.todayPayoutEstimate.value.payoutHearts = '1';
+    mean.value = {
+      numerator: '1',
+      denominator: '1000000000000000000000000000000',
+      hexPerTShare: '0',
+    };
     await home();
     assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), Array(3).fill('<0.01%'));
-    boundary.live.shareRate = { ...boundary.live.shareRate, status: 'unavailable', value: null };
+    mean.status = 'unavailable';
+    mean.reason = 'missing_days';
+    mean.count = 29;
+    mean.value = null;
     await page.reload();
-    await page.locator('[data-metric="rate"] dd').getByText('Unavailable').waitFor();
+    await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
     assert.deepEqual(
       await page.locator('.home-apy dd').allTextContents(),
       Array(3).fill('Unavailable'),
     );
+    Object.assign(mean, original);
+    await home();
+    await page.unroute('**/api/v2/calculator/inputs?*');
+    await page.route('**/api/v2/calculator/inputs?*', (r) =>
+      r.fulfill({ status: 503, body: '{}' }),
+    );
+    const failed = page.waitForResponse((r) => r.url().includes('/calculator/inputs?'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await failed;
+    await page.waitForFunction(() => document.querySelector('.home-apy').dataset.ready === 'false');
+    assert.deepEqual(
+      await page.locator('.home-apy dd').allTextContents(),
+      Array(3).fill('Unavailable'),
+    );
+    assert.equal(
+      await page.locator('[data-testid="headlines"]').getAttribute('data-ready'),
+      'true',
+    );
+    await capture('home-apy-history-unavailable');
+    await page.unroute('**/api/v2/calculator/inputs?*');
+    let release;
+    const wait = new Promise((resolve) => (release = resolve));
+    await page.route('**/api/v2/calculator/inputs?*', async (r) => {
+      await wait;
+      await r.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(inputs),
+      });
+    });
+    await page.reload();
+    await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
+    await page.locator('[data-testid="history-chart"][data-ready="true"]').waitFor();
+    assert.equal(await page.locator('.home-apy').getAttribute('data-ready'), 'false');
+    release();
+    await page.locator('[data-testid="stake-apy"][data-ready="true"]').waitFor();
     await open();
   });
   await test('11 fresh useful-headline/chart timings on small realistic fixture, existing mobile network profile', async () => {
@@ -436,7 +526,9 @@ try {
       });
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
       await home();
-      await page.waitForFunction(() => window.__paint.headlines && window.__paint.chart);
+      await page.waitForFunction(
+        () => window.__paint.headlines && window.__paint.chart && window.__paint.apy,
+      );
       timings.push(
         await page.evaluate(() => ({
           ...window.__paint,
@@ -479,6 +571,7 @@ try {
           homeBytes: fixture.homeBytes,
           headlinesP95: p95('headlines'),
           chartP95: p95('chart'),
+          apyP95: p95('apy'),
         },
       },
       null,

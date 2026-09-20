@@ -146,6 +146,14 @@ estimated payout held constant, annualized from maturity proceeds. This is not a
 observed historical APY or a guarantee. No new provider is added; expired/missing
 inputs remain unavailable. The assumption is visible in the panel and explained in Learn.
 
+The owner's following APY correction replaces today's payout assumption with the
+arithmetic mean of daily HEX/T-share payouts over30 consecutive completed days,
+including their realized penalties, ending at the latest indexed completed payout.
+It reuses the existing calculator30-day preset and today's eligible Home share rate;
+10,000HEX and1/5/10Y annualization remain unchanged. History loads independently of
+headlines. Missing/pending coverage or a failed history request makes APY unavailable,
+without falling back to a one-day estimate. Panel label:10,000 HEX · 30-day payout average.
+
 | Page | Original filename |
 |---|---|
 | Home | HEXDailyData_Mockup_Home.png |

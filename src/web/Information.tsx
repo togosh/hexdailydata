@@ -174,13 +174,15 @@ export function Learn() {
         <section className="panel">
           <h2>Payout &amp; calculator assumptions</h2>
           <p>
-            Home's Stake APY estimates use a 10,000 HEX stake, the current raw share rate and
-            today's estimated payout per T-share held constant. Terms are 365, 1825 and 3650 days.
-            The calculator's exact amount/duration bonuses and share issuance floors apply. APY is
-            (ending HEX / starting HEX) raised to 1 / years, minus 1, expressed as a percentage. It
-            annualizes a payout at maturity; rewards do not compound daily. Future payouts,
-            penalties and USD prices are not predicted. Expired inputs make the estimates
-            unavailable.
+            Home's Stake APY estimates use a 10,000 HEX stake, the current raw share rate and the
+            arithmetic mean payout per T-share over 30 consecutive completed days, ending at the
+            latest indexed completed payout, held constant. Penalties included in those daily
+            payouts remain included. Missing or pending days make the average unavailable. Terms are
+            365, 1825 and 3650 days. The calculator's exact amount/duration bonuses and share
+            issuance floors apply. APY is (ending HEX / starting HEX) raised to 1 / years, minus 1,
+            expressed as a percentage. It annualizes a payout at maturity; rewards do not compound
+            daily. Future payouts, penalties and USD prices are not predicted. An expired share rate
+            or unavailable history makes the estimates unavailable.
           </p>
           <p>
             A completed payout belongs to its actual materialized day. Today’s payout is an estimate
