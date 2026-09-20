@@ -252,3 +252,14 @@ unchanged. Format/types/build and seven visual browser groups PASS; independent
 `/root/home_panels_review` PASS. Desktop/mobile captures and compact evidence in
 `artifacts/task-07/home-copy-20260920/`. Scoped resources cleaned. No live providers,
 push, deployment or Task09. Stop for owner visual review. This entry is status only.
+
+Task07 Home alignment and market layout VISUAL_PASS; DATA_INTEGRATION_PENDING;
+OWNER_VISUAL_APPROVAL_PENDING. Reviewed code `c05663009b7cddd07251e3fdc5f6a8996eaab059`
+aligns desktop chart/Today/Supply+APY bottoms and adds PulseChain gas plus six asset
+cards below. Gas/BTC/ETH/PLS/PLSX/INC/PRVX explicitly show Unavailable; provider scope
+and PRVX identity await owner clarification. No feed integration is claimed.
+Format/types/build and seven visual groups PASS, including 1366x768 quick-action fit
+and initial mobile six/Supply/Today fit. Independent `/root/home_panels_review` PASS
+for visual scope only. Evidence/captures: `artifacts/task-07/home-market-layout-20260920/`.
+No backend changes, live providers, v1 execution, push/deploy or Task09. Stop for owner
+visual/data-source review. This is a documentation-only status entry.
