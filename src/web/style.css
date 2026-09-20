@@ -1054,7 +1054,7 @@ main:has(.home-page) {
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
-  padding: 0 10px 10px;
+  padding: 8px 10px 10px;
 }
 .market-quotes > div {
   border: 1px solid var(--line);
@@ -1216,6 +1216,12 @@ main:has(.home-page) {
   }
   .home-facts .fact-rows > div {
     padding: 4px 0;
+  }
+  .home-today .fact-rows > div {
+    padding: 4px 0;
+  }
+  .home-dashboard .fact-rows dd {
+    font-size: 0.9rem;
   }
   .home-apy .fact-rows > div {
     padding: 2px 0;
