@@ -417,12 +417,11 @@ try {
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stale) }),
         );
         await page.reload();
-        await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
-        await page.getByRole('dialog').getByText(/stale/).first().waitFor();
+        assert.match(await page.locator('[data-metric="rate"] dd').innerText(), /12,345.6/);
         await capture('home-stale');
-        await page.getByRole('button', { name: 'Refresh observations', exact: true }).click();
-        await page.getByRole('dialog').getByText(/stale/).first().waitFor();
-        await page.keyboard.press('Escape');
+        const refreshed = page.waitForResponse((r) => r.url().includes('/api/v2/home?'));
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await refreshed;
         await page.evaluate((t) => (window.__testNow = t), at + 1801000);
         await page.waitForFunction(
           () => document.querySelector('[data-metric="price"] dd').textContent === 'Unavailable',
@@ -559,13 +558,11 @@ try {
           }),
         );
         await page.reload();
-        await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
-        await page
-          .getByRole('dialog')
-          .getByText(/2026-09-16/)
-          .first()
-          .waitFor();
-        await page.keyboard.press('Escape');
+        await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
+        assert.equal(
+          await page.locator('[data-metric="completed"] dd').innerText(),
+          compactNumber(delayed.live.latestCompletedPayout.value.hexPerTShare, 3) + 'HEX',
+        );
         assert.match(await page.getByTestId('utc-clock').getAttribute('datetime'), /^2026-09-19T/);
         await page.unrouteAll();
         await page.route('**/api/v2/stakes/1099511627775?*', (r) =>

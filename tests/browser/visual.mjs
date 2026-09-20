@@ -82,14 +82,9 @@ async function capture(name) {
   await page.screenshot({ path: resolve(folder, 'visual-' + name + '.png') });
 }
 async function refreshHome() {
-  await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
-  await page.getByRole('button', { name: 'Refresh observations', exact: true }).click();
-  await page.keyboard.press('Escape');
-}
-async function checkHomeState(state) {
-  await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
-  await page.getByRole('dialog').getByText(new RegExp(state)).first().waitFor();
-  await page.keyboard.press('Escape');
+  const response = page.waitForResponse((r) => r.url().includes('/api/v2/home?'));
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await response;
 }
 try {
   for (let i = 0; i < 60; i++) {
@@ -99,7 +94,7 @@ try {
     await pause(250);
   }
   await open();
-  await test('SYNTHETIC compiled API values, requested six-metric order, Supply then Today, chart and exact details', async () => {
+  await test('SYNTHETIC compiled API values, requested six-metric order, Supply then Today, chart controls and APY estimates', async () => {
     await home();
     assert.deepEqual(await (await fetch(base + '/api/v2/home')).json(), fixture.expected);
     assert.equal(await page.locator('.home-context').count(), 0);
@@ -167,6 +162,7 @@ try {
     await page.screenshot({ path: resolve(folder, 'visual-home-390-full.png'), fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await capture('home-1440');
+    await page.screenshot({ path: resolve(folder, 'visual-home-1440-full.png'), fullPage: true });
     const chart = await page.locator('.home-chart').boundingBox(),
       facts = await page.locator('.home-facts').boundingBox();
     assert.equal(chart.y, facts.y);
@@ -184,42 +180,33 @@ try {
       await capture('home-' + viewport.width + 'x' + viewport.height);
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
-    const before = traffic.filter((url) => url.includes('/api/')).length;
-    const button = page.getByRole('button', { name: 'Exact values & methodology', exact: true });
-    await button.click();
-    const dialog = page.getByRole('dialog');
-    await dialog.waitFor();
-    await capture('details-1440');
-    await page.setViewportSize({ width: 390, height: 844 });
-    await capture('details-390');
-    await page.setViewportSize({ width: 1440, height: 1000 });
-    assert.match(await dialog.innerText(), new RegExp(fixture.expected.live.price.value.usdPerHex));
-    assert.ok((await dialog.innerText()).includes(fixture.expected.current.circulatingHex));
-    const payoutHearts = BigInt(fixture.expected.live.todayPayoutEstimate.value.payoutHearts);
-    const totalPayout =
-      `${payoutHearts / 100000000n}.${(payoutHearts % 100000000n).toString().padStart(8, '0')}`.replace(
-        /\.?0+$/,
-        '',
-      );
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await dialog.getByRole('button', { name: 'Copy price', exact: true }).click();
-    await dialog.getByText('Copied', { exact: true }).waitFor();
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '0.003876 USD/HEX');
-    await dialog.getByRole('button', { name: 'Copy estimated total payout', exact: true }).click();
-    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), totalPayout);
     assert.equal(
-      traffic.filter((url) => url.includes('/api/')).length,
-      before,
-      'Details does no provider or API fanout',
+      await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).count(),
+      0,
     );
-    await page.keyboard.press('Escape');
-    assert.equal(await button.evaluate((e) => e === document.activeElement), true);
+    assert.equal(await page.locator('.home-chart details').count(), 0);
+    assert.equal(await page.locator('.home-chart a').count(), 0);
+    assert.doesNotMatch(
+      await page.locator('.home-chart').innerText(),
+      /Native daily history|Data table/,
+    );
+    assert.deepEqual(await page.locator('.home-facts dt').allTextContents(), [
+      'Circulating supply',
+      'Locked principal (incl. GA)',
+      'TVL Staked',
+      'Avg Stake Length',
+    ]);
+    assert.deepEqual(await page.locator('.home-apy dt').allTextContents(), ['1Y', '5Y', '10Y']);
+    for (const value of await page.locator('.home-apy dd').allTextContents())
+      assert.match(value, /^\d[\d,.]*%$/);
     await page.getByRole('button', { name: '7D', exact: true }).click();
-    await page.getByText('Data table · 7 records', { exact: true }).waitFor();
-    await page.getByText('Data table · 7 records', { exact: true }).click();
-    assert.equal(await page.locator('tbody tr').count(), 7);
+    await page.waitForFunction(
+      () => document.querySelectorAll('.home-chart svg circle').length === 7,
+    );
     await page.getByRole('button', { name: '30D', exact: true }).click();
-    await page.getByText('Data table · 30 records', { exact: true }).waitFor();
+    await page.waitForFunction(
+      () => document.querySelectorAll('.home-chart svg circle').length === 30,
+    );
   });
   await test('dark default, adjacent theme/menu controls, persistent light mode, device UTC/day rollover and estimate expiry', async () => {
     await open();
@@ -264,6 +251,10 @@ try {
     assert.equal(
       await page.locator('[data-metric="total-estimate"] dd').innerText(),
       'Unavailable',
+    );
+    assert.deepEqual(
+      await page.locator('.home-apy dd').allTextContents(),
+      Array(3).fill('Unavailable'),
     );
     await open({ width: 1440, height: 1000 });
     await home();
@@ -367,9 +358,9 @@ try {
     await home();
     const response = fixture.expected;
     await page.evaluate((at) => (window.__testNow = at + 121000), fixture.at);
-    await checkHomeState('stale');
+    assert.match(await page.locator('[data-metric="price"] dd').innerText(), /0\.003876/);
     await refreshHome();
-    await checkHomeState('stale');
+    assert.match(await page.locator('[data-metric="price"] dd').innerText(), /0\.003876/);
     await page.route('**/api/v2/home?*', (r) =>
       r.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
     );
@@ -384,6 +375,10 @@ try {
       () => document.querySelector('[data-metric="price"] dd').textContent === 'Unavailable',
     );
     assert.equal(await page.locator('[data-metric="tvl"] dd').innerText(), 'Unavailable');
+    assert.deepEqual(
+      await page.locator('.home-apy dd').allTextContents(),
+      Array(3).fill('Unavailable'),
+    );
     await capture('home-expired-failed-refresh');
     await page.unroute('**/api/v2/home?*');
     await page.evaluate((at) => (window.__testNow = at), fixture.at);
@@ -400,16 +395,32 @@ try {
     assert.match(await page.locator('[data-metric="staked"] dd').innerText(), /^0/);
     await page.setViewportSize({ width: 320, height: 844 });
     await capture('home-extreme-320');
-    await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
-    assert.ok(
-      (await page.getByRole('dialog').innerText()).includes(boundary.current.circulatingHex),
-    );
-    await page.keyboard.press('Escape');
     await page.unroute('**/api/v2/home?*');
     await page.route('**/api/v2/daily?*', (r) => r.abort());
     await page.reload();
     await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
     await capture('home-chart-failure');
+  });
+  await test('APY distinguishes zero, tiny nonzero and missing inputs', async () => {
+    await open();
+    const boundary = structuredClone(fixture.expected);
+    await page.route('**/api/v2/home?*', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(boundary) }),
+    );
+    boundary.live.todayPayoutEstimate.value.payoutHearts = '0';
+    await home();
+    assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), Array(3).fill('0%'));
+    boundary.live.todayPayoutEstimate.value.payoutHearts = '1';
+    await home();
+    assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), Array(3).fill('<0.01%'));
+    boundary.live.shareRate = { ...boundary.live.shareRate, status: 'unavailable', value: null };
+    await page.reload();
+    await page.locator('[data-metric="rate"] dd').getByText('Unavailable').waitFor();
+    assert.deepEqual(
+      await page.locator('.home-apy dd').allTextContents(),
+      Array(3).fill('Unavailable'),
+    );
+    await open();
   });
   await test('11 fresh useful-headline/chart timings on small realistic fixture, existing mobile network profile', async () => {
     for (let i = 0; i < 11; i++) {

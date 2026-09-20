@@ -138,6 +138,14 @@ Six headline tiles plus complete Supply and Today panels fit the normal initial
 Desktop places the chart and both panels alongside one another so quick actions
 remain visible without the tall stacked-panel gap.
 
+The owner next removes Home's chart table, source strip, All charts link and separate
+exact-values/methodology control; Charts keeps its full table. Circulating supply
+precedes locked principal. Home now includes explicitly estimated Stake APY for
+1/5/10-year terms: a 10,000 HEX ordinary stake at the current raw share rate, today's
+estimated payout held constant, annualized from maturity proceeds. This is not an
+observed historical APY or a guarantee. No new provider is added; expired/missing
+inputs remain unavailable. The assumption is visible in the panel and explained in Learn.
+
 | Page | Original filename |
 |---|---|
 | Home | HEXDailyData_Mockup_Home.png |
@@ -186,5 +194,5 @@ Address02 and Download02 are1448x1086 composite canvases; Chart02 is682x2048.
 Actual captures use390x844 and1440x1000 CSS viewports, dark theme, device scale1;
 320px and200% layout checks are separate. These are not mockup CSS viewport claims.
 Compact native metrics, navy panels and magenta accents retain the supplied hierarchy.
-Unsupported APY, address history, sixth downloads and asset/gas panels are omitted.
+Unsupported observed APY, address history, sixth downloads and asset/gas panels are omitted.
 Owner aesthetic acceptance remains pending independently of implementation review.

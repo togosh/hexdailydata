@@ -74,7 +74,7 @@ export function Chart({
             className="chart"
             viewBox="0 0 800 270"
             role="img"
-            aria-label={`${title}, ${unit}. Exact values and gaps in the data table below.`}
+            aria-label={`${title}, ${unit}. ${compact ? 'Exact daily values available on the Charts page.' : 'Exact values and gaps in the data table below.'}`}
           >
             {[35, 127, 220].map((y) => (
               <line key={y} x1="70" x2="770" y1={y} y2={y} className="gridline" />
@@ -112,41 +112,40 @@ export function Chart({
       ) : (
         <p className="notice">No records in this range. Select an available interval below.</p>
       )}
-      <details open={!compact}>
-        <summary>Data table · {points.length} records</summary>
-        {compact && (
-          <p className="meta">
-            Missing dates and unavailable values break the line. Values and source blocks are listed
-            below.
-          </p>
-        )}
-        <Table
-          title={`${title} — exact published values`}
-          headings={['Date (UTC)', unit, 'State', 'Source detail']}
-        >
-          {points.slice(page * 100, (page + 1) * 100).map((p) => (
-            <tr key={p.key}>
-              <td>{p.date}</td>
-              <td className="exact">{p.value === null ? 'Unavailable' : numberText(p.value)}</td>
-              <td>{p.status}</td>
-              <td>{p.detail}</td>
-            </tr>
-          ))}
-        </Table>
-        {points.length > 100 && (
-          <div className="pager">
-            <button disabled={!page} onClick={() => setPage(page - 1)}>
-              Previous rows
-            </button>
-            <span>
-              {page * 100 + 1}–{Math.min(points.length, (page + 1) * 100)} of {points.length}
-            </span>
-            <button disabled={(page + 1) * 100 >= points.length} onClick={() => setPage(page + 1)}>
-              Next rows
-            </button>
-          </div>
-        )}
-      </details>
+      {!compact && (
+        <details open>
+          <summary>Data table · {points.length} records</summary>
+          <Table
+            title={`${title} — exact published values`}
+            headings={['Date (UTC)', unit, 'State', 'Source detail']}
+          >
+            {points.slice(page * 100, (page + 1) * 100).map((p) => (
+              <tr key={p.key}>
+                <td>{p.date}</td>
+                <td className="exact">{p.value === null ? 'Unavailable' : numberText(p.value)}</td>
+                <td>{p.status}</td>
+                <td>{p.detail}</td>
+              </tr>
+            ))}
+          </Table>
+          {points.length > 100 && (
+            <div className="pager">
+              <button disabled={!page} onClick={() => setPage(page - 1)}>
+                Previous rows
+              </button>
+              <span>
+                {page * 100 + 1}–{Math.min(points.length, (page + 1) * 100)} of {points.length}
+              </span>
+              <button
+                disabled={(page + 1) * 100 >= points.length}
+                onClick={() => setPage(page + 1)}
+              >
+                Next rows
+              </button>
+            </div>
+          )}
+        </details>
+      )}
     </div>
   );
 }
@@ -164,7 +163,6 @@ export function HomeChart({ date }: { date: string | null }) {
   return (
     <section className="panel home-chart">
       <div className="home-chart-toolbar">
-        <span>Native daily history</span>
         <div className="range-buttons" aria-label="Payout history range">
           {[7, 30].map((n) => (
             <button key={n} aria-pressed={days === n} onClick={() => setDays(n)}>
@@ -172,7 +170,6 @@ export function HomeChart({ date }: { date: string | null }) {
             </button>
           ))}
         </div>
-        <a href="/charts">All charts ↗</a>
       </div>
       {data.data ? (
         <Chart

@@ -57,7 +57,7 @@ export function Metric({
       </dt>
       <dd>
         {value != null && display !== undefined ? (
-          <span className="value">
+          <span className="value" title={(prefix ?? '') + value + (unit ? ' ' + unit : '')}>
             {prefix}
             {display}
             {unit && <small> {unit}</small>}

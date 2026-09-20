@@ -1,17 +1,12 @@
-﻿import { lazy, Suspense, useEffect, useState } from 'react';
+﻿import { lazy, Suspense, useEffect, useState, useMemo } from 'react';
 import { HomeResponseSchema } from '../contracts/api.ts';
 import { contractDayAt, displayDay } from '../domain/day.ts';
-import { formatUnits } from '../domain/units.ts';
+import { formatUnits, displayRatio, payoutHexPerTShare } from '../domain/units.ts';
+import { stakeApy } from '../domain/calculator.ts';
 import { useResource, endpoint, useClock } from './api.ts';
-import { Metric, Table, Copy } from './components.tsx';
-import {
-  compactNumber,
-  observationState,
-  dayLabel,
-  yearsFromDays,
-  multiplyDecimals,
-} from './format.ts';
-import { Dialog, Icon, type IconName } from './visuals.tsx';
+import { Metric } from './components.tsx';
+import { compactNumber, observationState, yearsFromDays, multiplyDecimals } from './format.ts';
+import { Icon, type IconName } from './visuals.tsx';
 
 const HomeChart = lazy(() => import('./History.tsx').then((m) => ({ default: m.HomeChart })));
 export default function Home() {
@@ -19,8 +14,7 @@ export default function Home() {
   const now = useClock(),
     h = home.data;
   const snapshot = h?.current;
-  const [chart, setChart] = useState(false),
-    [details, setDetails] = useState(false);
+  const [chart, setChart] = useState(false);
   useEffect(() => {
     if (!home.loading) {
       const t = setTimeout(() => setChart(true), 0);
@@ -52,6 +46,30 @@ export default function Home() {
     ['Payouts (est.)', es === 'unavailable' ? null : totalPayout, 'HEX'],
     ['Penalties', activity?.penaltiesHex, 'HEX'],
   ] as const;
+  const apys = useMemo(() => {
+    if (rs === 'unavailable' || es === 'unavailable' || !rate?.value || !estimate?.value)
+      return null;
+    try {
+      const daily = payoutHexPerTShare(
+        BigInt(estimate.value.payoutHearts),
+        BigInt(estimate.value.stakeShares),
+      );
+      return ([1, 5, 10] as const).map((years) => {
+        const result = stakeApy(
+          10000n * 100000000n,
+          years,
+          BigInt(rate.value.rawShareRate),
+          daily,
+          BigInt(Math.floor(now / 86400000) * 86400),
+        );
+        return daily.numerator > 0n && result.numerator * 100n < result.denominator
+          ? '<0.01'
+          : compactNumber(displayRatio(result), 2, false);
+      });
+    } catch {
+      return null;
+    }
+  }, [rate?.value, estimate?.value, rs, es, hexDay]);
   const ready = !!(
     snapshot?.stakedPercent != null &&
     snapshot.holderCount != null &&
@@ -61,8 +79,8 @@ export default function Home() {
     cs !== 'unavailable'
   );
   const facts = [
-    ['Locked principal (incl. GA)', snapshot?.stakedHex, 'HEX'],
     ['Circulating supply', snapshot?.circulatingHex, 'HEX'],
+    ['Locked principal (incl. GA)', snapshot?.stakedHex, 'HEX'],
   ] as const;
   return (
     <div className="home-page">
@@ -191,6 +209,23 @@ export default function Home() {
             </dl>
           </section>
         </div>
+        <section className="panel home-apy">
+          <div className="home-panel-heading">
+            <h2>
+              <Icon name="pie" />
+              Stake APY (est.)
+            </h2>
+          </div>
+          <dl className="fact-rows">
+            {[1, 5, 10].map((years, i) => (
+              <div key={years}>
+                <dt>{years}Y</dt>
+                <dd>{apys ? apys[i] + '%' : 'Unavailable'}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="apy-assumption">10,000 HEX / today's payout held constant</p>
+        </section>
         <div className="home-chart-slot">
           {chart && (
             <Suspense fallback={<p>Loading chart controls…</p>}>
@@ -217,148 +252,6 @@ export default function Home() {
           </a>
         ))}
       </nav>
-      <p className="home-footnote">
-        <button className="text-action" onClick={() => setDetails(true)} aria-haspopup="dialog">
-          Exact values &amp; methodology
-        </button>
-      </p>
-      {details && (
-        <Dialog title="Home details & methodology" onClose={() => setDetails(false)}>
-          <p>
-            PulseChain HEX. Current observations are provisional; completed payout identifies the
-            latest materialized day and may lag yesterday. Today’s estimate excludes unknown future
-            changes and penalties. It is not final.
-          </p>
-          <p>
-            The top clock uses your device’s UTC time and one-based HEX display day, not a source
-            block or data freshness claim.
-          </p>
-          <p>
-            Totals include all positive-liquid HEX holders and all owners of accounted stakes
-            (queued, active or mature-open; GA excluded), at the latest indexed block. They are not
-            daily changes. Locked principal includes good-accounted (GA) stakes. Percentage includes
-            all locked principal; weighted original duration uses accounted principal. Display years
-            use 365.25 days. Values are truncated for display; the exact received strings below
-            remain selectable and copyable, including after expiry.
-          </p>
-          <p>
-            TVL marks indexed locked HEX at the available USD price, including its peg assumption.
-            It is not realizable liquidity. New Holders/Stakers are signed net population changes,
-            not first-time addresses. NET HEX Locked compares locked principal with the exact
-            prior-day close. Missing prior-day coverage stays unavailable. Starts/ends and capped
-            penalties are indexed in-day events; Today activity is unavailable if the index is on an
-            older day.
-          </p>
-          <button onClick={home.refresh} disabled={home.loading}>
-            Refresh observations
-          </button>
-          <p>
-            <a href="/learn">Full methodology</a> · <a href="/status">Independent data status</a>
-          </p>
-          {h ? (
-            <>
-              <Table
-                title="Current observation detail"
-                headings={['Metric / eligibility', 'Exact received value', 'Source / method']}
-              >
-                {Object.entries(h.live).map(([key, row]) => {
-                  const exact =
-                    row.value === null
-                      ? null
-                      : 'usdPerHex' in row.value
-                        ? row.value.usdPerHex + ' USD/HEX'
-                        : 'rawShareRate' in row.value
-                          ? row.value.rawShareRate +
-                            ' raw / ' +
-                            row.value.hexPerTShareBeforeBonuses +
-                            ' HEX/T-share'
-                          : row.value.hexPerTShare +
-                            ' HEX/T-share · ' +
-                            dayLabel(row.value.contractDay);
-                  return (
-                    <tr key={key}>
-                      <td>
-                        {key}
-                        <small className="block">
-                          {observationState(
-                            row,
-                            now,
-                            key === 'todayPayoutEstimate'
-                              ? estimate?.value?.contractDay
-                              : undefined,
-                          )}{' '}
-                          · {row.finality}
-                        </small>
-                      </td>
-                      <td className="exact">
-                        {exact ?? 'Unavailable'}
-                        {exact && <Copy text={exact} label={'Copy ' + key} />}
-                        {key === 'todayPayoutEstimate' && totalPayout != null && (
-                          <small className="block">
-                            Exact estimated total: {totalPayout} HEX
-                            <Copy text={totalPayout} label="Copy estimated total payout" />
-                          </small>
-                        )}
-                      </td>
-                      <td className="exact">
-                        {row.asOf
-                          ? 'Chain ' +
-                            row.asOf.chainId +
-                            ' · block ' +
-                            row.asOf.blockNumber +
-                            ' · ' +
-                            row.asOf.blockTimestamp
-                          : 'No source block'}
-                        <small className="block">
-                          Collected: {row.observedAt ?? 'Unavailable'}
-                        </small>
-                        <small className="block">
-                          {row.method} · {row.notes.join(' · ')}
-                        </small>
-                        {row.value && 'valuation' in row.value && (
-                          <small className="block">{row.value.valuation}</small>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </Table>
-              {snapshot && (
-                <>
-                  <p className="meta">
-                    Current indexed state {dayLabel(snapshot.contractDay)} · chain{' '}
-                    {snapshot.asOf.chainId} · block {snapshot.asOf.blockNumber} ·{' '}
-                    {snapshot.asOf.blockTimestamp ?? 'Block time unavailable'}
-                  </p>
-                  <Table title="Exact indexed values" headings={['Metric', 'Exact received value']}>
-                    {[
-                      ...facts,
-                      ['Holders', snapshot.holderCount, ''],
-                      ['Stakers', snapshot.stakerCount, ''],
-                      ['Percentage staked', snapshot.stakedPercent, '%'],
-                      ['Weighted original duration', snapshot.weightedStakeLengthDays, 'days'],
-                      ['TVL Staked', tvl, 'USD'],
-                      ...activityRows,
-                    ].map(([label, value, unit]) => (
-                      <tr key={label}>
-                        <td>{label}</td>
-                        <td className="exact">
-                          {value ?? 'Unavailable'} {value != null ? unit : ''}
-                          {value != null && <Copy text={value} label={'Copy ' + label} />}
-                        </td>
-                      </tr>
-                    ))}
-                  </Table>
-                </>
-              )}
-            </>
-          ) : (
-            <p>
-              Native observations are unavailable. Reported HDS history remains separate in Charts.
-            </p>
-          )}
-        </Dialog>
-      )}
     </div>
   );
 }

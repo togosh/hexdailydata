@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { quoteStake, payoutScenario, UINT72_MAX } from '../../src/domain/calculator.ts';
+import { quoteStake, payoutScenario, stakeApy, UINT72_MAX } from '../../src/domain/calculator.ts';
 import { parseUnits, displayRatio } from '../../src/domain/units.ts';
 import { HEX_LAUNCH_SECONDS, newStakeTiming } from '../../src/domain/day.ts';
 
@@ -68,4 +68,64 @@ test('scenario uses exact mean 13/42, exact share scaling and hypothetical futur
   assert.equal(displayRatio(scenario.usd), '1.75');
   assert.equal(payoutScenario(q, { numerator: 13n, denominator: 42n }, null).usd, null);
   assert.throws(() => payoutScenario(q, { numerator: 13n, denominator: 0n }, null));
+});
+
+// Construct an exact 10% annualized end balance independently of the root routine.
+test('stake APY annualizes total maturity proceeds for 1, 5 and 10 years without floating point', () => {
+  const principal = 10000n * 100000000n;
+  for (const years of [1, 5, 10]) {
+    const quote = quoteStake(principal, years * 365, 466866n, HEX_LAUNCH_SECONDS);
+    const denominator = 10n ** BigInt(years);
+    const gain = 11n ** BigInt(years) - denominator;
+    const daily = {
+      numerator: 10000n * gain * 1000000000000n,
+      denominator: denominator * quote.stakeShares * BigInt(years * 365),
+    };
+    assert.equal(
+      displayRatio(stakeApy(principal, years, 466866n, daily, HEX_LAUNCH_SECONDS)),
+      '10',
+    );
+    assert.equal(
+      displayRatio(
+        stakeApy(principal, years, 466866n, { numerator: 0n, denominator: 1n }, HEX_LAUNCH_SECONDS),
+      ),
+      '0',
+    );
+    const tiny = stakeApy(
+      principal,
+      years,
+      466866n,
+      { numerator: 1n, denominator: 10n ** 30n },
+      HEX_LAUNCH_SECONDS,
+    );
+    assert.equal(tiny.numerator, 0n);
+  }
+  assert.throws(() =>
+    stakeApy(principal, 2, 466866n, { numerator: 1n, denominator: 1n }, HEX_LAUNCH_SECONDS),
+  );
+  assert.throws(() =>
+    stakeApy(principal, 1, 0n, { numerator: 1n, denominator: 1n }, HEX_LAUNCH_SECONDS),
+  );
+});
+
+test('stake APY matches independent Decimal witnesses with actual duration bonuses and share floors', () => {
+  // Python Decimal at70 digits; principal10000 HEX, raw rate466866, daily1.654 HEX/T-share.
+  for (const [years, expected] of [
+    [1, '1.55174295'],
+    [5, '2.46456212'],
+    [10, '3.33249016'],
+  ]) {
+    assert.equal(
+      displayRatio(
+        stakeApy(
+          1000000000000n,
+          years,
+          466866n,
+          { numerator: 1654n, denominator: 1000n },
+          HEX_LAUNCH_SECONDS,
+        ),
+      ),
+      expected,
+    );
+  }
 });

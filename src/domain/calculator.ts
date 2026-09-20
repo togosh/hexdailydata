@@ -56,3 +56,30 @@ export function payoutScenario(
       : rational(totalHex.numerator * price.numerator, totalHex.denominator * price.denominator);
   return { rewardHex, totalHex, usd };
 }
+
+/** Annualized end-of-term return, not daily compounding. Root truncated to 12 places. */
+export function stakeApy(
+  principalHearts: bigint,
+  years: 1 | 5 | 10,
+  rawShareRate: bigint,
+  daily: Rational,
+  startSeconds: bigint,
+): Rational {
+  if (![1, 5, 10].includes(years)) throw new RangeError('Unsupported APY term.');
+  const quote = quoteStake(principalHearts, years * 365, rawShareRate, startSeconds);
+  const { totalHex } = payoutScenario(quote, daily, null);
+  const numerator = totalHex.numerator * HEARTS_PER_HEX;
+  const denominator = totalHex.denominator * principalHearts;
+  const scale = 10n ** 12n;
+  const exponent = BigInt(years);
+  const target = numerator * scale ** exponent;
+  let low = scale;
+  let high = scale * 2n;
+  while (high ** exponent * denominator <= target) high *= 2n;
+  while (high - low > 1n) {
+    const middle = (low + high) / 2n;
+    if (middle ** exponent * denominator <= target) low = middle;
+    else high = middle;
+  }
+  return rational((low - scale) * 100n, scale);
+}
