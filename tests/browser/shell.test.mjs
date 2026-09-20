@@ -85,6 +85,44 @@ test('built website renders honest native-unavailable states on desktop and mobi
       );
       await page.screenshot({ path: `${evidence}/shell-${name}.png`, fullPage: true });
     }
+    // Dialog controls must remain inside their own scrollport, not merely the page.
+    // Navigation lives outside main and does not inherit its enlarged-text wrapping.
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const scale of ['100%', '200%']) {
+        await page.evaluate(
+          (fontSize) => (document.documentElement.style.fontSize = fontSize),
+          scale,
+        );
+        for (const opener of ['Details', 'Open navigation menu']) {
+          const trigger = page.getByRole('button', { name: opener, exact: true });
+          await trigger.click();
+          const dialog = page.getByRole('dialog');
+          const close = dialog.getByRole('button', { name: 'Close', exact: true });
+          await close.waitFor();
+          const geometry = await close.evaluate((button) => {
+            const modal = button.closest('dialog');
+            const control = button.getBoundingClientRect(),
+              box = modal.getBoundingClientRect();
+            return {
+              fits: control.left >= box.left && control.right <= box.right,
+              scrollsHorizontally: modal.scrollWidth > modal.clientWidth,
+            };
+          });
+          assert.deepEqual(
+            geometry,
+            { fits: true, scrollsHorizontally: false },
+            `${opener} ${width}px ${scale}`,
+          );
+          await page.screenshot({
+            path: `${evidence}/dialog-${opener === 'Details' ? 'details' : 'navigation'}-${width}-${scale.slice(0, -1)}.png`,
+          });
+          await page.keyboard.press('Escape');
+          assert.equal(await trigger.evaluate((button) => document.activeElement === button), true);
+        }
+      }
+    }
+    await page.evaluate(() => (document.documentElement.style.fontSize = ''));
     await page.route('**/api/v2/home?*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await page.reload();
     await page.getByText('Current native data is unavailable.', { exact: false }).waitFor();

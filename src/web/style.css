@@ -807,6 +807,8 @@ main:has(.home-page) {
 }
 .dialog-heading h2 {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .dialog-heading button {
   flex-shrink: 0;
