@@ -403,7 +403,11 @@ try {
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(change) }),
         );
         await go('/');
-        await page.getByText('Unavailable', { exact: true }).first().waitFor();
+        await page
+          .locator('[data-metric="rate"] dd')
+          .filter({ hasText: /12,345.6/ })
+          .waitFor();
+        assert.equal(await page.locator('[data-metric="price"] dd').innerText(), 'Unavailable');
         assert.match(await page.locator('[data-metric="rate"] dd').innerText(), /12,345.6/);
         await capture('home-price-missing');
         await page.unrouteAll();

@@ -97,16 +97,18 @@ export default function Calculator() {
           <h1>Stake Calculator</h1>
           <p>Calculate T-shares and explore future value scenarios.</p>
         </div>
-        <span className="calculator-context">Start today · {dayDate(day)} UTC</span>
+        <div className="calculator-heading-actions">
+          <span className="calculator-context">Start today · {dayDate(day)} UTC</span>
+          <Feedback
+            {...input}
+            refresh={() => {
+              setResult(undefined);
+              input.refresh();
+            }}
+            hasData={!!input.data}
+          />
+        </div>
       </div>
-      <Feedback
-        {...input}
-        refresh={() => {
-          setResult(undefined);
-          input.refresh();
-        }}
-        hasData={!!input.data}
-      />
       <form
         className="calculator-grid"
         onSubmit={calculate}
