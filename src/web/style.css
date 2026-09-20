@@ -808,6 +808,10 @@ main:has(.home-page) {
 .dialog-heading h2 {
   margin: 0;
 }
+.dialog-heading button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
 .site-dialog td .copy {
   display: flex;
   margin-top: 10px;
