@@ -561,7 +561,7 @@ try {
         await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
         assert.equal(
           await page.locator('[data-metric="completed"] dd').innerText(),
-          compactNumber(delayed.live.latestCompletedPayout.value.hexPerTShare, 3) + 'HEX',
+          compactNumber(delayed.live.latestCompletedPayout.value.hexPerTShare, 3) + ' HEX',
         );
         assert.match(await page.getByTestId('utc-clock').getAttribute('datetime'), /^2026-09-19T/);
         await page.unrouteAll();

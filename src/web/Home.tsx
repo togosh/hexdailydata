@@ -167,7 +167,7 @@ export default function Home() {
               {facts.map(([label, value, unit]) => (
                 <div key={label}>
                   <dt>{label}</dt>
-                  <dd>
+                  <dd title={value ?? 'Unavailable'}>
                     {compactNumber(value, unit ? 2 : 0, !!unit)}
                     {value != null && unit && <small> {unit}</small>}
                   </dd>
@@ -175,11 +175,13 @@ export default function Home() {
               ))}
               <div data-metric="tvl">
                 <dt>TVL Staked</dt>
-                <dd>{tvl == null ? 'Unavailable' : '$' + compactNumber(tvl, 2)}</dd>
+                <dd title={tvl == null ? 'Unavailable' : tvl + ' USD'}>
+                  {tvl == null ? 'Unavailable' : '$' + compactNumber(tvl, 2)}
+                </dd>
               </div>
               <div data-metric="duration">
                 <dt>Avg Stake Length</dt>
-                <dd>
+                <dd title={yearsFromDays(snapshot?.weightedStakeLengthDays) ?? 'Unavailable'}>
                   {compactNumber(yearsFromDays(snapshot?.weightedStakeLengthDays), 2, false)}
                   {snapshot?.weightedStakeLengthDays != null && <small> years</small>}
                 </dd>
@@ -200,7 +202,7 @@ export default function Home() {
                   data-metric={label === 'Payouts (est.)' ? 'total-estimate' : undefined}
                 >
                   <dt>{label}</dt>
-                  <dd>
+                  <dd title={value ?? 'Unavailable'}>
                     {compactNumber(value, unit ? 2 : 0, !!unit)}
                     {value != null && unit && <small> {unit}</small>}
                   </dd>

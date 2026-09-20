@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { z } from 'zod';
 import { DailyResponseSchema } from '../contracts/reads.ts';
 import { metricDefinitions, type Metric as ArchiveMetric } from '../contracts/history.ts';
@@ -50,11 +50,13 @@ export function Chart({
   title,
   unit,
   compact = false,
+  controls,
 }: {
   points: Point[];
   title: string;
   unit: string;
   compact?: boolean;
+  controls?: ReactNode;
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [points]);
@@ -66,8 +68,9 @@ export function Chart({
           {compact && <Icon name="chart" />}
           {title}
         </h2>
-        <span className="meta">{unit}</span>
+        {controls ?? <span className="meta">{unit}</span>}
       </div>
+      {compact && <span className="meta">{unit}</span>}
       {points.length ? (
         <>
           <svg
@@ -160,23 +163,24 @@ export function HomeChart({ date }: { date: string | null }) {
       : null,
     DailyResponseSchema,
   );
+  const controls = (
+    <div className="range-buttons" aria-label="Payout history range">
+      {[7, 30].map((n) => (
+        <button key={n} aria-pressed={days === n} onClick={() => setDays(n)}>
+          {n}D
+        </button>
+      ))}
+    </div>
+  );
   return (
     <section className="panel home-chart">
-      <div className="home-chart-toolbar">
-        <div className="range-buttons" aria-label="Payout history range">
-          {[7, 30].map((n) => (
-            <button key={n} aria-pressed={days === n} onClick={() => setDays(n)}>
-              {n}D
-            </button>
-          ))}
-        </div>
-      </div>
       {data.data ? (
         <Chart
           points={nativePoints(data.data, 'payout')}
           title="Payout per T-share"
           unit="HEX/T-share"
           compact
+          controls={controls}
         />
       ) : (
         <p>
