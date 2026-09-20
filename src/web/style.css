@@ -1033,11 +1033,11 @@ main:has(.home-page) {
 .gas-quote {
   padding: 0 12px;
 }
-.gas-quote > div {
+.home-gas .gas-quote > div {
   padding: 1px 0;
   line-height: 1.25;
 }
-.gas-quote dt {
+.home-gas .gas-quote dt {
   font-size: 0.8rem;
 }
 .gas-quote dd,
@@ -1045,7 +1045,7 @@ main:has(.home-page) {
   font-weight: 650;
   overflow-wrap: anywhere;
 }
-.gas-quote dd {
+.home-gas .gas-quote dd {
   font-size: 0.8rem;
 }
 .market-quotes dt {
@@ -1222,7 +1222,7 @@ main:has(.home-page) {
     padding: 7px 12px;
   }
   .home-shortcuts a {
-    padding: 9px 18px;
+    padding: 8px 18px;
   }
   .home-metrics .metric {
     padding: 10px;
