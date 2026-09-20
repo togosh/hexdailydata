@@ -327,6 +327,25 @@ try {
       await worker.query('ROLLBACK');
     }
   });
+  await test('current Home preserves inherited checkpoint origin until the first native block', async () => {
+    await worker.query('BEGIN');
+    try {
+      const db = { counters: { dataQueries: 0 }, read: async (_signal, fn) => fn(worker) };
+      await worker.query(`UPDATE hdd.sync_state s SET block_number=c.parent_block,block_hash=c.parent_hash
+        FROM hdd.chains c WHERE s.chain_id=c.chain_id AND s.chain_id=369`);
+      const inherited = await home(db, 'pulsechain', signal, clock);
+      assert.equal(inherited.current.asOf.chainId, 1);
+      assert.equal(inherited.current.asOf.blockNumber, '89');
+      await worker.query(`UPDATE hdd.sync_state s SET block_number=c.entry_block,block_hash=c.entry_hash
+        FROM hdd.chains c WHERE s.chain_id=c.chain_id AND s.chain_id=369`);
+      const native = await home(db, 'pulsechain', signal, clock);
+      assert.equal(native.current.asOf.chainId, 369);
+      assert.equal(native.current.asOf.blockNumber, '90');
+      assert.equal(db.counters.dataQueries, 2);
+    } finally {
+      await worker.query('ROLLBACK');
+    }
+  });
   await test('bounded date/history/calculator reads and dirty source disclosure', async () => {
     const daily = await request(server.url, '/api/v2/daily?from=2021-01-04&to=2021-01-05');
     assert.equal(daily.body.items.length, 2);

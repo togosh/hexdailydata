@@ -106,7 +106,7 @@ const currentColumns = [
   'ends',
   'penalty_hearts',
 ];
-function currentHeadline(r: Record<string, any>, chain: ChainKey) {
+function currentHeadline(r: Record<string, any>) {
   if (r.current_contract_day == null || r.sync_block == null) return null;
   const values = Object.fromEntries(currentColumns.map((key) => [key, r['current_' + key]]));
   const difference = (key: string) =>
@@ -119,7 +119,7 @@ function currentHeadline(r: Record<string, any>, chain: ChainKey) {
   return {
     ...headline({
       ...values,
-      origin_chain_id: chainId(chain),
+      origin_chain_id: r.current_origin_chain_id,
       close_block: r.sync_block,
       close_hash: r.sync_hash,
       close_time: r.sync_time,
@@ -137,8 +137,11 @@ function currentHeadline(r: Record<string, any>, chain: ChainKey) {
 }
 // One current/sync row, latest daily and exact prior-day baseline, four metrics.
 // Prior-day absence is unknown, never an implicit zero or an older-day comparison.
+// Fork initialization copies the Ethereum parent cursor before any native commit.
 export const homeSql = `SELECT d.*, h.timestamp AS close_time,
  s.block_number AS sync_block,s.block_time AS sync_time,s.block_hash AS sync_hash,s.finality AS sync_finality,
+ CASE WHEN chain.initialization='fork' AND s.block_number=chain.parent_block AND s.block_hash=chain.parent_hash
+ THEN 1 ELSE s.chain_id END AS current_origin_chain_id,
  ${currentColumns.map((key) => `c.${key} AS current_${key}`).join(',')},
  previous.contract_day AS previous_day,previous.holder_count AS previous_holder_count,
  previous.staker_count AS previous_staker_count,previous.locked_hearts AS previous_locked_hearts,
@@ -146,6 +149,7 @@ export const homeSql = `SELECT d.*, h.timestamp AS close_time,
  (SELECT jsonb_object_agg(metric,observation) FROM hdd.live_metrics WHERE chain_id=$1) AS metrics
  FROM (VALUES(1)) anchor(n)
  LEFT JOIN hdd.sync_state s ON s.chain_id=$1
+ LEFT JOIN hdd.chains chain ON chain.chain_id=s.chain_id
  LEFT JOIN hdd.current_state c ON c.chain_id=$1
  LEFT JOIN hdd.daily_stats previous ON previous.chain_id=$1 AND previous.contract_day=c.contract_day-1
  LEFT JOIN hdd.source_history sh ON sh.chain_id=$1
@@ -168,7 +172,7 @@ export async function home(
       chain,
       mode,
       daily: r.contract_day == null ? null : headline(r),
-      current: currentHeadline(r, chain),
+      current: currentHeadline(r),
       live: metrics(r.metrics, chain, now),
       sync: {
         state:
