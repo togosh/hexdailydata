@@ -9,7 +9,8 @@
 | 05 | passed (offline) | Reviewed code `a9bf7bec00c9da468b8759ab68fa06506f9f48e2`; 70 units, 11 daily groups, fresh seed/DB-restore continuation, 3 scale groups, 28 sync and 5 live-service SQL groups. Independent `/root/task05_review`: PASS after one full review and one correction/recheck. Actual reports/commands in ignored `artifacts/task-05/`. |
 | 06 | passed (offline) | Reviewed code `c7ae880c2455239a511a1136dccb3e60f9ace44e`; 76 units, actual API/SQL/Linux/compiled-image/restore and affected export checks. Independent `/root/task06_review`: PASS after one full review and one correction/recheck. 1M-stake/500k-account Home query p95 0.840ms, HTTP p95 2.079ms, 2,429 bytes; scale evidence reused from `751353c`. Report and exact provenance in ignored `artifacts/task-06/REPORT.md`. |
 | 08 | passed (offline) | Reviewed code `740b947`; 79 units, 12 recovery groups and 9 lifecycle groups. Independent review and source-bound scale evidence are detailed below and in ignored `artifacts/task-08/`. |
-| 07, 09–11 | pending | Not implemented |
+| 07 | passed (offline) | Reviewed code `dfbe8c5`; 97 units, compiled UI/API journeys, 11 cold mobile samples. Independent `/root/task07_review`: PASS after one correction; see Task07 entry below. |
+| 09-11 | pending | Not started |
 
 The development shell has no live data/indexer. Task02 qualifies schema/projections on
 isolated disposable PostgreSQL17; the public shell remains uninitialized. Task01 source
@@ -146,3 +147,18 @@ commit after reviewed code. Live source feasibility and native completeness rema
 unproved; RPC/subgraph probes, canary, Tasks07/09, v1/production import, signup, purchases,
 push and deployment were not run. Next remains separately authorized source feasibility
 qualification or an explicit owner decision on Task07; Task09 waits for07.
+
+Task07 offline website PASS. Reviewed code `dfbe8c5bfe5147b84ea05f706d2f121ffb2f80af`
+implements the actual API-backed pages using all five supplied original references.
+Independent `/root/task07_review` passed one full review plus one correction/recheck
+for Status freshness; it also checked 60 independent arithmetic vectors and real UI.
+Final affected format/type/97-unit/build/browser checks passed; unchanged API/OpenAPI
+and scale evidence reuse is explicit. On 1M stakes/500k accounts, 11 cold mobile loads
+had primary-headline p95 1,446.40ms, chart p95 2,058.60ms, Home 2,458 bytes and query
+p95 19.45ms under the declared 2CPU/4GiB and throttled browser profile.
+Reports, actual screenshots, exact commands, raw samples and reviewer evidence are
+in ignored `artifacts/task-07/`; new test resources were removed, original evidence
+and spent/blocked resources preserved. This commit records status only. Native
+initialization/live qualification, owner visual approval and launch remain pending.
+No RPC/subgraph probes, HDS re-download, canary, Task09, v1 import, push or deployment.
+Task09 is next only after owner acceptance and a separate start request.
