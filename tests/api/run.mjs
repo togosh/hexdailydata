@@ -331,7 +331,7 @@ try {
     await worker.query('BEGIN');
     try {
       const db = { counters: { dataQueries: 0 }, read: async (_signal, fn) => fn(worker) };
-      await worker.query(`UPDATE hdd.sync_state s SET block_number=c.parent_block,block_hash=c.parent_hash
+      await worker.query(`UPDATE hdd.sync_state s SET block_number=c.parent_block,block_hash=c.parent_hash,rewind_floor=c.parent_block
         FROM hdd.chains c WHERE s.chain_id=c.chain_id AND s.chain_id=369`);
       const inherited = await home(db, 'pulsechain', signal, clock);
       assert.equal(inherited.current.asOf.chainId, 1);
