@@ -263,3 +263,16 @@ and initial mobile six/Supply/Today fit. Independent `/root/home_panels_review` 
 for visual scope only. Evidence/captures: `artifacts/task-07/home-market-layout-20260920/`.
 No backend changes, live providers, v1 execution, push/deploy or Task09. Stop for owner
 visual/data-source review. This is a documentation-only status entry.
+
+Task07 official logos/half-screen refinement VISUAL_PASS; DATA_INTEGRATION_PENDING.
+Owner accepted the preceding Home baseline. Reviewed code
+`0fa5f0fa5109262ff86c6608f5b5c196a2db97c2` adds seven sourced local logos (15,852 bytes),
+replaces the shared HEX mark, and expands PulseChain Costs to five requested rows.
+Costs/prices remain Unavailable pending data feeds. Recurring 960x1080 viewport/full
+captures now cover every main route; desktop gutters and cost spacing were checked.
+Types/build/format/shell and seven final visual groups PASS; independent
+`/root/home_panels_review` PASS for visual scope. Small-fixture p95 headlines1458.1ms,
+chart2131.9ms, APY1655ms. Sources: docs/token-artwork.md; evidence/screenshots:
+`artifacts/task-07/home-logos-20260920/`. Owned resources cleaned. Static logo downloads
+only; no live data providers, v1 execution, push/deploy or Task09. Stop for owner review.
+This is a documentation-only status entry after reviewed source.
