@@ -162,3 +162,20 @@ and spent/blocked resources preserved. This commit records status only. Native
 initialization/live qualification, owner visual approval and launch remain pending.
 No RPC/subgraph probes, HDS re-download, canary, Task09, v1 import, push or deployment.
 Task09 is next only after owner acceptance and a separate start request.
+
+Task07 Home/shared-shell visual correction PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed code `a6a9666331a691b7b20d50deff1c2454ec7d40eb` follows the five authoritative
+local references with compact metrics, chart/facts composition and responsive navigation.
+Other page bodies and v2 data semantics remain preserved. Independent
+`/root/visual_alignment_review` passed one full review plus two focused rechecks;
+the final check independently verified both dialogs at 320/390px and 100%/200% text.
+Affected format/build/browser checks passed on final code; unchanged typecheck,
+98-unit and full empty/archive/native workflow evidence is reused from `462c523`.
+Eleven fresh throttled browser loads against the synthetic 120-stake/60-account SQL
+fixture measured headline p95 1,266.4ms, chart p95 1,847.1ms and Home 2,508 bytes.
+These are small-fixture measurements; prior million-row evidence remains unchanged.
+Screenshots, command logs, review and source/evidence archives are in ignored
+`artifacts/task-07/visual-alignment-20260920/`; task containers/volumes are cleaned.
+This status-only commit follows the reviewed code. Native initialization and live
+qualification remain pending. Task09 NOT_STARTED; no v1 execution, live providers,
+push or deployment. Stop for owner Home/shared-shell visual review before further work.
