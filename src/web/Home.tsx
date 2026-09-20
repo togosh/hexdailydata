@@ -233,7 +233,7 @@ export default function Home() {
           <div className="home-panel-heading">
             <h2>
               <Icon name="pie" />
-              Stake APY (est.)
+              Stake APY
             </h2>
           </div>
           <dl className="fact-rows">
@@ -244,7 +244,6 @@ export default function Home() {
               </div>
             ))}
           </dl>
-          <p className="apy-assumption">10,000 HEX · 30-day payout average</p>
         </section>
         <div className="home-chart-slot">
           {chart && (

@@ -989,11 +989,6 @@ main:has(.home-page) {
 .home-apy .fact-rows > div {
   padding: 5px 0;
 }
-.apy-assumption {
-  font-size: 0.75rem;
-  color: var(--muted);
-  margin: 5px 15px 9px;
-}
 .home-chart-slot {
   grid-column: 1;
   grid-row: 1 / 3;

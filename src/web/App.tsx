@@ -178,7 +178,6 @@ export default function App() {
           <a href="/status">Data status</a>
           <a href="/api/v2/status?chain=pulsechain">API metadata</a>
         </nav>
-        <p>Read-only data. Each source has its own observation time and coverage.</p>
       </footer>
       <nav className="bottom-nav" aria-label="Mobile destinations">
         {links.map(([href, label, icon]) => (
