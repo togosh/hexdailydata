@@ -1,9 +1,9 @@
 import { StatusResponseSchema } from '../contracts/api.ts';
 import { DownloadsResponseSchema } from '../contracts/reads.ts';
 import { reportedHistoryResponseSchema } from '../contracts/history.ts';
-import { endpoint, useResource } from './api.ts';
+import { endpoint, useClock, useResource } from './api.ts';
 import { Feedback, Table } from './components.tsx';
-import { dayLabel, today, numberText } from './format.ts';
+import { dayLabel, today, numberText, observationState } from './format.ts';
 
 const descriptions = {
   daily: ['Daily statistics', 'Native daily supply, staking and materialized or pending payouts.'],
@@ -221,11 +221,24 @@ export function Learn() {
   );
 }
 export function Status() {
+  const now = useClock();
   const data = useResource(endpoint('/status'), StatusResponseSchema);
   const archive = useResource(
     endpoint('/daily', { source: 'hexdailystats', from: today(), to: today() }),
     reportedHistoryResponseSchema,
   );
+  const streams = (data.data?.streams ?? []).map((s) => ({
+    ...s,
+    freshness: observationState(
+      { status: s.freshness, asOf: s.asOf, observedAt: s.asOf.blockTimestamp },
+      now,
+    ),
+  }));
+  const currentStream = streams.find((s) => s.chain === data.data?.chain);
+  const indexState =
+    data.data?.state === 'current' && currentStream?.freshness !== 'fresh'
+      ? 'degraded'
+      : data.data?.state;
   return (
     <>
       <p className="eyebrow">Coverage &amp; freshness</p>
@@ -237,12 +250,12 @@ export function Status() {
           <>
             <dl className="summary-grid">
               <div>
-                <dt>Database</dt>
+                <dt>Database at last response</dt>
                 <dd>{data.data.database}</dd>
               </div>
               <div>
                 <dt>Index</dt>
-                <dd>{data.data.state}</dd>
+                <dd>{indexState}</dd>
               </div>
               <div>
                 <dt>Providers</dt>
@@ -257,7 +270,7 @@ export function Status() {
               Offline implementation is separate from native initialization and live-source
               qualification.
             </p>
-            {data.data.streams.map((s) => (
+            {streams.map((s) => (
               <p key={s.chain}>
                 {s.chain} · block {s.asOf.blockNumber} · {s.freshness} · source{' '}
                 {s.asOf.blockTimestamp}. Daily through{' '}
@@ -270,8 +283,10 @@ export function Status() {
             >
               {data.data.observations.map((o) => (
                 <tr key={o.chain + o.metric}>
-                  <td>{o.metric}</td>
-                  <td>{o.status}</td>
+                  <td>
+                    {o.chain} · {o.metric}
+                  </td>
+                  <td>{observationState(o, now)}</td>
                   <td>{o.asOf?.blockTimestamp ?? 'Unavailable'}</td>
                   <td>{o.observedAt ?? 'Unavailable'}</td>
                 </tr>

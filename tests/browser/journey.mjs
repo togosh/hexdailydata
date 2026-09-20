@@ -629,6 +629,74 @@ try {
         await page.evaluate((t) => (window.__testNow = t), at);
         await page.unrouteAll();
       });
+      await test('status ages real observations and streams without refreshing their source time', async () => {
+        await go('/status');
+        const table = page.getByRole('region', { name: 'Independent current observations' });
+        await table.getByRole('cell', { name: 'fresh', exact: true }).first().waitFor();
+        const times = await table
+          .locator('tbody tr')
+          .evaluateAll((rows) =>
+            rows.map((row) => [...row.children].slice(2).map((c) => c.textContent)),
+          );
+        const states = (state) =>
+          page.waitForFunction((wanted) => {
+            const cells = [...document.querySelectorAll('tbody tr td:nth-child(2)')];
+            return cells.length === 4 && cells.every((c) => c.textContent === wanted);
+          }, state);
+        const requestsBefore = traffic.filter((r) => r.url.includes('/api/v2/status?')).length;
+        await page.evaluate((t) => (window.__testNow = t), at + 121000);
+        await states('stale');
+        await page.getByText(/pulsechain · block 100 · stale/).waitFor();
+        await page.evaluate((t) => (window.__testNow = t), at + 1801000);
+        await states('unavailable');
+        await page.getByText(/pulsechain · block 100 · unavailable/).waitFor();
+        assert.equal(
+          traffic.filter((r) => r.url.includes('/api/v2/status?')).length,
+          requestsBefore,
+        );
+        // A successful HTTP refresh with the same source must not revive expired observations.
+        const refreshed = page.waitForResponse((r) => r.url().includes('/api/v2/status?'));
+        await page.getByRole('button', { name: 'Refresh', exact: true }).first().click();
+        await refreshed;
+        await states('unavailable');
+        assert.deepEqual(
+          await table
+            .locator('tbody tr')
+            .evaluateAll((rows) =>
+              rows.map((row) => [...row.children].slice(2).map((c) => c.textContent)),
+            ),
+          times,
+        );
+        await page.route('**/api/v2/status?*', (r) =>
+          r.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
+        );
+        await page.getByRole('button', { name: 'Refresh', exact: true }).first().click();
+        await page.getByText('Data is unavailable.', { exact: false }).waitFor();
+        await states('unavailable');
+        await capture('status-expired');
+        const status = await (await fetch(base + '/api/v2/status')).json();
+        status.state = 'current';
+        status.streams.push({
+          ...status.streams[0],
+          chain: 'ethereum',
+          asOf: { ...status.streams[0].asOf, chainId: 1 },
+          freshness: 'unavailable',
+        });
+        status.observations[0].status = 'stale';
+        status.observations[1].status = 'unavailable';
+        await page.unrouteAll();
+        await page.route('**/api/v2/status?*', (r) =>
+          r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(status) }),
+        );
+        await go('/status');
+        await page.getByText('current', { exact: true }).waitFor();
+        await table.getByRole('cell', { name: 'stale', exact: true }).waitFor();
+        await table.getByRole('cell', { name: 'unavailable', exact: true }).waitFor();
+        await page.evaluate((t) => (window.__testNow = t), at + 121000);
+        await page.getByText('degraded', { exact: true }).waitFor();
+        await page.evaluate((t) => (window.__testNow = t), at);
+        await page.unrouteAll();
+      });
     }
   }
   assert.deepEqual(errors, []);

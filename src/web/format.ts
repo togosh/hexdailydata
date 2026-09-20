@@ -39,12 +39,12 @@ export const dayLabel = (day: number) => `${dayDate(day)} · day ${day + 1}`;
 export const dateShift = (date: string, days: number) =>
   new Date(Date.parse(date) + days * 86400000).toISOString().slice(0, 10);
 export const today = () => new Date().toISOString().slice(0, 10);
-export function observationState<T>(
-  row: Observation<T> | undefined,
+export function observationState(
+  row: Pick<Observation<unknown>, 'status' | 'asOf' | 'observedAt'> | undefined,
   now: number,
   estimateDay?: number,
 ) {
-  if (!row || row.status === 'unavailable') return 'unavailable';
+  if (!row?.asOf || !row.observedAt || row.status === 'unavailable') return 'unavailable';
   if (estimateDay !== undefined && estimateDay !== contractDayAt(BigInt(Math.floor(now / 1000))))
     return 'unavailable';
   const source = Date.parse(row.asOf.blockTimestamp),

@@ -258,7 +258,7 @@ claim a full120-second timeout observation.
 ## Task07 browser suite
 
 Run npm run build then npm run test:web for a fresh private SQL project, actual
-compiled API/assets, empty?retained HDS-only?synthetic native+HDS journeys. The
+compiled API/assets, empty, retained HDS-only, then synthetic native+HDS journeys. The
 optional -- --scale uses another new1M-stake/500k-account fixture, without large
 exports/backups, and11fresh Chromium documents. Browser overhead runs on the host;
 DB1.5CPU/3GiB, API.25CPU/512MiB and setup.25CPU/512MiB total2CPU/4GiB.

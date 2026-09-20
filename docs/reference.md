@@ -162,7 +162,7 @@ reference receipts and acquisition-correction evidence remain unchanged.
 
 Read only the retained Task01 HEX.sol source (SHA256
 78680f17586d87cb85cd30eb4666f6d250dd1d12e33e0e76f96844a639b0f7fc),
-constants at724?734 and _stakeStart/_stakeStartBonusHearts at1515?1667.
+constants at724-734 and _stakeStart/_stakeStartBonusHearts at1515-1667.
 No old application code was imported or executed; no new network source was fetched.
 The full Solidity source remains excluded under the existing license caution.
 

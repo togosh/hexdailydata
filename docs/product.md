@@ -158,8 +158,8 @@ Task08 remains accepted; Task09 may begin only after the returned Task07 result 
 
 The five owner-supplied original PNGs recovered from the September18 planner handoff
 are developer references in docs/ui-reference, not runtime assets. Home, Calculator,
-Address02 and Download02 are1448?1086 composite canvases; Chart02 is682?2048.
-Actual captures use390?844 and1440?1000 CSS viewports, dark theme, device scale1;
+Address02 and Download02 are1448x1086 composite canvases; Chart02 is682x2048.
+Actual captures use390x844 and1440x1000 CSS viewports, dark theme, device scale1;
 320px and200% layout checks are separate. These are not mockup CSS viewport claims.
 Compact native metrics, navy panels and magenta accents retain the supplied hierarchy.
 Unsupported APY, address history, sixth downloads and asset/gas panels are omitted.

@@ -235,7 +235,7 @@ export default function Calculator() {
                   </div>
                 </dl>
                 <p role="status">
-                  Calculated {formatUnits(shown.quote.stakeShares, 12)} T-shares ? maturity{' '}
+                  Calculated {formatUnits(shown.quote.stakeShares, 12)} T-shares; maturity{' '}
                   {dayLabel(shown.quote.maturityDay)}.
                 </p>
                 <p className="meta">

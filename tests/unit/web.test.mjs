@@ -38,6 +38,12 @@ test('browser ages old successful responses, preserves stale status and expires 
     'unavailable',
   );
   assert.equal(observationState({ ...row, status: 'stale' }, time), 'stale');
+  assert.equal(observationState({ ...row, status: 'unavailable' }, time), 'unavailable');
+  assert.equal(observationState({ ...row, asOf: null, observedAt: null }, time), 'unavailable');
+  assert.equal(
+    observationState({ ...row, observedAt: new Date(time + 1000).toISOString() }, time),
+    'unavailable',
+  );
   const day = Math.floor((time / 1000 - 1575331200) / 86400);
   assert.equal(observationState(row, time + 61000, day), 'unavailable');
 });

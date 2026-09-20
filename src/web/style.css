@@ -714,6 +714,7 @@ summary {
     gap: 14px;
   }
   .result-grid {
+    grid-template-columns: 1fr;
     gap: 8px;
   }
   .result-grid > div {
