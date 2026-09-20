@@ -81,6 +81,16 @@ async function capture(name) {
   );
   await page.screenshot({ path: resolve(folder, 'visual-' + name + '.png') });
 }
+async function refreshHome() {
+  await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
+  await page.getByRole('button', { name: 'Refresh observations', exact: true }).click();
+  await page.keyboard.press('Escape');
+}
+async function checkHomeState(state) {
+  await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
+  await page.getByRole('dialog').getByText(new RegExp(state)).first().waitFor();
+  await page.keyboard.press('Escape');
+}
 try {
   for (let i = 0; i < 60; i++) {
     try {
@@ -92,6 +102,19 @@ try {
   await test('SYNTHETIC compiled API values, requested six-metric order, Supply then Today, chart and exact details', async () => {
     await home();
     assert.deepEqual(await (await fetch(base + '/api/v2/home')).json(), fixture.expected);
+    assert.equal(await page.locator('.home-context').count(), 0);
+    assert.equal(await page.locator('.home-metrics .meta').count(), 0);
+    assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).count(), 0);
+    assert.deepEqual(await page.locator('.home-today dt').allTextContents(), [
+      'New Stakes',
+      'Ended Stakes',
+      'New Holders (net)',
+      'New Stakers (net)',
+      'NET HEX Locked',
+      'Payouts (est.)',
+      'Penalties',
+    ]);
+    assert.match(await page.locator('[data-metric="tvl"] dd').innerText(), /\$.*2\.41B/);
     assert.match(await page.locator('[data-metric="price"] dd').innerText(), /\$0\.003876/);
     assert.match(await page.locator('[data-metric="duration"] dd').innerText(), /9\.75/);
     assert.deepEqual(
@@ -102,11 +125,11 @@ try {
     );
     assert.equal(
       await page.locator('[data-metric="holders"] dd').innerText(),
-      fixture.expected.daily.holderCount,
+      fixture.expected.current.holderCount,
     );
     assert.equal(
       await page.locator('[data-metric="stakers"] dd').innerText(),
-      fixture.expected.daily.stakerCount,
+      fixture.expected.current.stakerCount,
     );
     for (const name of ['price', 'completed', 'rate', 'staked', 'holders', 'stakers']) {
       const box = await page.locator('[data-metric="' + name + '"]').boundingBox();
@@ -132,7 +155,7 @@ try {
     assert.equal(chart.y, facts.y);
     assert.ok(chart.y + chart.height < 850 && chart.x < facts.x);
     const before = traffic.filter((url) => url.includes('/api/')).length;
-    const button = page.getByRole('button', { name: 'Details', exact: true });
+    const button = page.getByRole('button', { name: 'Exact values & methodology', exact: true });
     await button.click();
     const dialog = page.getByRole('dialog');
     await dialog.waitFor();
@@ -141,7 +164,7 @@ try {
     await capture('details-390');
     await page.setViewportSize({ width: 1440, height: 1000 });
     assert.match(await dialog.innerText(), new RegExp(fixture.expected.live.price.value.usdPerHex));
-    assert.ok((await dialog.innerText()).includes(fixture.expected.daily.circulatingHex));
+    assert.ok((await dialog.innerText()).includes(fixture.expected.current.circulatingHex));
     const payoutHearts = BigInt(fixture.expected.live.todayPayoutEstimate.value.payoutHearts);
     const totalPayout =
       `${payoutHearts / 100000000n}.${(payoutHearts % 100000000n).toString().padStart(8, '0')}`.replace(
@@ -208,7 +231,6 @@ try {
     await page.evaluate((at) => (window.__testNow = at + 1000), beforeMidnight);
     await page.getByTestId('utc-clock').getByText('00:00:00 UTC', { exact: true }).waitFor();
     assert.equal(await page.getByTestId('hex-day').innerText(), 'HEX Day 2484');
-    assert.equal(await page.locator('[data-metric="estimate"] dd').innerText(), 'Unavailable');
     assert.equal(
       await page.locator('[data-metric="total-estimate"] dd').innerText(),
       'Unavailable',
@@ -315,13 +337,13 @@ try {
     await home();
     const response = fixture.expected;
     await page.evaluate((at) => (window.__testNow = at + 121000), fixture.at);
-    await page.locator('[data-metric="price"]').getByText(/Stale/).waitFor();
-    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-    await page.locator('[data-metric="price"]').getByText(/Stale/).waitFor();
+    await checkHomeState('stale');
+    await refreshHome();
+    await checkHomeState('stale');
     await page.route('**/api/v2/home?*', (r) =>
       r.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
     );
-    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await refreshHome();
     await page
       .getByRole('status')
       .getByText(/Data is unavailable/)
@@ -331,13 +353,14 @@ try {
     await page.waitForFunction(
       () => document.querySelector('[data-metric="price"] dd').textContent === 'Unavailable',
     );
+    assert.equal(await page.locator('[data-metric="tvl"] dd').innerText(), 'Unavailable');
     await capture('home-expired-failed-refresh');
     await page.unroute('**/api/v2/home?*');
     await page.evaluate((at) => (window.__testNow = at), fixture.at);
     const boundary = structuredClone(response);
-    boundary.daily.stakedPercent = '0';
-    boundary.daily.weightedStakeLengthDays = null;
-    boundary.daily.circulatingHex = '90071992547409931234567890.00000001';
+    boundary.current.stakedPercent = '0';
+    boundary.current.weightedStakeLengthDays = null;
+    boundary.current.circulatingHex = '90071992547409931234567890.00000001';
     boundary.live.price.value.usdPerHex = '0.000000000000000000000000000000000001';
     await page.route('**/api/v2/home?*', (r) =>
       r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(boundary) }),
@@ -347,8 +370,10 @@ try {
     assert.match(await page.locator('[data-metric="staked"] dd').innerText(), /^0/);
     await page.setViewportSize({ width: 320, height: 844 });
     await capture('home-extreme-320');
-    await page.getByRole('button', { name: 'Details', exact: true }).click();
-    assert.ok((await page.getByRole('dialog').innerText()).includes(boundary.daily.circulatingHex));
+    await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
+    assert.ok(
+      (await page.getByRole('dialog').innerText()).includes(boundary.current.circulatingHex),
+    );
     await page.keyboard.press('Escape');
     await page.unroute('**/api/v2/home?*');
     await page.route('**/api/v2/daily?*', (r) => r.abort());

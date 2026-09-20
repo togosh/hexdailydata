@@ -7,6 +7,7 @@ import {
   observationState,
   compactNumber,
   yearsFromDays,
+  multiplyDecimals,
 } from '../../src/web/format.ts';
 import { loadArchive, plot } from '../../src/web/history.ts';
 import { inspectInput } from '../../src/worker/history/input.ts';
@@ -64,6 +65,17 @@ test('compact Home display preserves tiny values and flags truncated magnitudes 
   assert.equal(yearsFromDays('365.25'), '1.00000000');
   assert.equal(yearsFromDays('3652.5'), '10.00000000');
   assert.equal(compactNumber(yearsFromDays('3562'), 2, false), '≈9.75');
+});
+test('TVL multiplies exact decimal strings, including zero, tiny prices and large products', () => {
+  assert.equal(multiplyDecimals('622163456789.123', '0.003876'), '2411505558.514640748');
+  assert.equal(
+    multiplyDecimals('9007199254740993.00000001', '0.00000001'),
+    '90071992.5474099300000001',
+  );
+  assert.equal(multiplyDecimals('0', '1.5'), '0');
+  assert.equal(multiplyDecimals(null, '1'), null);
+  const large = multiplyDecimals('9'.repeat(120), '9'.repeat(80));
+  assert.ok(compactNumber(large).includes('10^199'));
 });
 const inspected = inspectInput(
   bytes,

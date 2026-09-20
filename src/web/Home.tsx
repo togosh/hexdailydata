@@ -6,10 +6,10 @@ import { useResource, endpoint, useClock } from './api.ts';
 import { Metric, Table, Copy } from './components.tsx';
 import {
   compactNumber,
-  compactObservation,
   observationState,
   dayLabel,
   yearsFromDays,
+  multiplyDecimals,
 } from './format.ts';
 import { Dialog, Icon, type IconName } from './visuals.tsx';
 
@@ -18,6 +18,7 @@ export default function Home() {
   const home = useResource(endpoint('/home'), HomeResponseSchema, true);
   const now = useClock(),
     h = home.data;
+  const snapshot = h?.current;
   const [chart, setChart] = useState(false),
     [details, setDetails] = useState(false);
   useEffect(() => {
@@ -34,21 +35,35 @@ export default function Home() {
     rs = observationState(rate, now),
     cs = observationState(completed, now),
     es = observationState(estimate, now, estimate?.value?.contractDay);
-  const dailyNote = h?.daily ? h.daily.dateUtc + ' · native daily' : 'Native daily unavailable';
+  const dailyNote = snapshot ? snapshot.dateUtc + ' · indexed state' : 'Native index unavailable';
   const clock = new Date(now).toISOString();
   const hexDay = displayDay(contractDayAt(BigInt(Math.floor(now / 1000))));
   const totalPayout = estimate?.value ? formatUnits(BigInt(estimate.value.payoutHearts), 8) : null;
+  const tvl = multiplyDecimals(
+    snapshot?.stakedHex,
+    ps === 'unavailable' ? null : price?.value?.usdPerHex,
+  );
+  const activity = snapshot?.displayDay === hexDay ? snapshot.activity : null;
+  const activityRows = [
+    ['New Stakes', activity?.newStakes, ''],
+    ['Ended Stakes', activity?.endedStakes, ''],
+    ['New Holders (net)', activity?.netHolders, ''],
+    ['New Stakers (net)', activity?.netStakers, ''],
+    ['NET HEX Locked', activity?.netLockedHex, 'HEX'],
+    ['Payouts (est.)', es === 'unavailable' ? null : totalPayout, 'HEX'],
+    ['Penalties', activity?.penaltiesHex, 'HEX'],
+  ] as const;
   const ready = !!(
-    h?.daily?.stakedPercent != null &&
-    h.daily.holderCount != null &&
-    h.daily.stakerCount != null &&
+    snapshot?.stakedPercent != null &&
+    snapshot.holderCount != null &&
+    snapshot.stakerCount != null &&
     rs !== 'unavailable' &&
     ps !== 'unavailable' &&
     cs !== 'unavailable'
   );
   const facts = [
-    ['Locked principal (incl. GA)', h?.daily?.stakedHex, 'HEX'],
-    ['Circulating supply', h?.daily?.circulatingHex, 'HEX'],
+    ['Locked principal (incl. GA)', snapshot?.stakedHex, 'HEX'],
+    ['Circulating supply', snapshot?.circulatingHex, 'HEX'],
   ] as const;
   return (
     <div className="home-page">
@@ -61,21 +76,6 @@ export default function Home() {
           {clock.slice(11, 19)} UTC
         </time>
       </div>
-      <div className="home-context">
-        <span className="chain-context">
-          <Icon name="link" />
-          PulseChain
-        </span>
-        <span className="context-note">Independent source ages</span>
-        <div className="home-actions">
-          <button onClick={() => setDetails(true)} aria-haspopup="dialog">
-            Details
-          </button>
-          <button onClick={home.refresh} disabled={home.loading}>
-            Refresh
-          </button>
-        </div>
-      </div>
       <dl className="home-metrics" data-testid="headlines" data-ready={ready}>
         <Metric
           id="price"
@@ -84,76 +84,44 @@ export default function Home() {
           value={ps === 'unavailable' ? null : price?.value?.usdPerHex}
           prefix="$"
           display={compactNumber(price?.value?.usdPerHex, 7)}
-          note={
-            <>
-              <span>{compactObservation(price, now, ps)}</span>
-              <span>
-                Provisional
-                {price?.value
-                  ? price.value.valuation === 'peg_assumed'
-                    ? ' · USD peg assumed'
-                    : ' · USD anchor'
-                  : ''}
-              </span>
-            </>
-          }
         />
         <Metric
           id="completed"
           icon="chart"
           title="Payout per T-share"
           value={cs === 'unavailable' ? null : completed?.value?.hexPerTShare}
-          unit="HEX/T-share"
+          unit="HEX"
           display={compactNumber(completed?.value?.hexPerTShare, 3)}
-          note={
-            <>
-              <span>
-                {completed?.value
-                  ? 'Completed · ' + dayLabel(completed.value.contractDay)
-                  : 'No materialized day'}
-              </span>
-              <span>{compactObservation(completed, now, cs)}</span>
-            </>
-          }
         />
         <Metric
           id="rate"
           icon="database"
           title="T-share Rate"
           value={rs === 'unavailable' ? null : rate?.value?.hexPerTShareBeforeBonuses}
-          unit="HEX/T-share"
+          unit="HEX"
           display={compactNumber(rate?.value?.hexPerTShareBeforeBonuses, 1, false)}
-          note={
-            <>
-              <span>{compactObservation(rate, now, rs)}</span>
-              <span>Provisional · before bonuses</span>
-            </>
-          }
         />
         <Metric
           id="staked"
           icon="pie"
           title="% Staked"
-          value={h?.daily?.stakedPercent}
+          value={snapshot?.stakedPercent}
           unit="%"
-          display={compactNumber(h?.daily?.stakedPercent, 2, false)}
-          note={dailyNote}
+          display={compactNumber(snapshot?.stakedPercent, 2, false)}
         />
         <Metric
           id="holders"
           icon="person"
-          title="Holders"
-          value={h?.daily?.holderCount}
-          display={compactNumber(h?.daily?.holderCount, 0, false)}
-          note={dailyNote}
+          title="All Holders"
+          value={snapshot?.holderCount}
+          display={compactNumber(snapshot?.holderCount, 0, false)}
         />
         <Metric
           id="stakers"
           icon="people"
-          title="Stakers"
-          value={h?.daily?.stakerCount}
-          display={compactNumber(h?.daily?.stakerCount, 0, false)}
-          note={dailyNote}
+          title="All Stakers"
+          value={snapshot?.stakerCount}
+          display={compactNumber(snapshot?.stakerCount, 0, false)}
         />
       </dl>
       {(home.loading || home.error) && (
@@ -189,11 +157,15 @@ export default function Home() {
                   </dd>
                 </div>
               ))}
+              <div data-metric="tvl">
+                <dt>TVL Staked</dt>
+                <dd>{tvl == null ? 'Unavailable' : '$' + compactNumber(tvl, 2)}</dd>
+              </div>
               <div data-metric="duration">
-                <dt>Weighted stake length</dt>
+                <dt>Avg Stake Length</dt>
                 <dd>
-                  {compactNumber(yearsFromDays(h?.daily?.weightedStakeLengthDays), 2, false)}
-                  {h?.daily?.weightedStakeLengthDays != null && <small> years</small>}
+                  {compactNumber(yearsFromDays(snapshot?.weightedStakeLengthDays), 2, false)}
+                  {snapshot?.weightedStakeLengthDays != null && <small> years</small>}
                 </dd>
               </div>
             </dl>
@@ -208,29 +180,23 @@ export default function Home() {
                 Today in HEX
               </h2>
             </div>
-            <p className="panel-context">
-              {es !== 'unavailable' && estimate?.value
-                ? dayLabel(estimate.value.contractDay)
-                : 'No current-day estimate'}
-            </p>
+            <p className="panel-context">{dayLabel(hexDay - 1)} · in progress</p>
             <dl className="fact-rows">
-              <div data-metric="estimate">
-                <dt>Estimated payout / T-share</dt>
-                <dd>
-                  {compactNumber(es === 'unavailable' ? null : estimate?.value?.hexPerTShare, 3)}
-                  {es !== 'unavailable' && <small> HEX</small>}
-                </dd>
-              </div>
-              <div data-metric="total-estimate">
-                <dt>Estimated total payout</dt>
-                <dd>
-                  {compactNumber(es === 'unavailable' ? null : totalPayout, 2)}
-                  {es !== 'unavailable' && <small> HEX</small>}
-                </dd>
-              </div>
+              {activityRows.map(([label, value, unit]) => (
+                <div
+                  key={label}
+                  data-metric={label === 'Payouts (est.)' ? 'total-estimate' : undefined}
+                >
+                  <dt>{label}</dt>
+                  <dd>
+                    {compactNumber(value, unit ? 2 : 0, !!unit)}
+                    {value != null && unit && <small> {unit}</small>}
+                  </dd>
+                </div>
+              ))}
             </dl>
             <p className="panel-context">
-              {compactObservation(estimate, now, es)} · estimate, not final
+              Net changes since prior close. Payouts estimated, not final.
             </p>
           </section>
         </div>
@@ -261,7 +227,7 @@ export default function Home() {
         ))}
       </nav>
       <p className="home-footnote">
-        Provisional observations age independently. ≈ indicates truncated display precision.{' '}
+        Price/rate observations · completed payout · indexed totals. ≈ means truncated precision.{' '}
         <button className="text-action" onClick={() => setDetails(true)} aria-haspopup="dialog">
           Exact values &amp; methodology
         </button>
@@ -278,12 +244,24 @@ export default function Home() {
             block or data freshness claim.
           </p>
           <p>
-            Daily values use their own dated native snapshot. Locked principal includes
-            good-accounted (GA) stakes. Percentage includes all locked principal; weighted original
-            duration uses accounted principal. Display years use 365.25 days. Values are truncated
-            for display; the exact received strings below remain selectable and copyable, including
-            after expiry.
+            Totals include all positive-liquid HEX holders and all owners of accounted stakes
+            (queued, active or mature-open; GA excluded), at the latest indexed block. They are not
+            daily changes. Locked principal includes good-accounted (GA) stakes. Percentage includes
+            all locked principal; weighted original duration uses accounted principal. Display years
+            use 365.25 days. Values are truncated for display; the exact received strings below
+            remain selectable and copyable, including after expiry.
           </p>
+          <p>
+            TVL marks indexed locked HEX at the available USD price, including its peg assumption.
+            It is not realizable liquidity. New Holders/Stakers are signed net population changes,
+            not first-time addresses. NET HEX Locked compares locked principal with the exact
+            prior-day close. Missing prior-day coverage stays unavailable. Starts/ends and capped
+            penalties are indexed in-day events; Today activity is unavailable if the index is on an
+            older day.
+          </p>
+          <button onClick={home.refresh} disabled={home.loading}>
+            Refresh observations
+          </button>
           <p>
             <a href="/learn">Full methodology</a> · <a href="/status">Independent data status</a>
           </p>
@@ -355,23 +333,22 @@ export default function Home() {
                   );
                 })}
               </Table>
-              {h.daily && (
+              {snapshot && (
                 <>
                   <p className="meta">
-                    Native daily {dayLabel(h.daily.contractDay)} · chain {h.daily.asOf.chainId} ·
-                    block {h.daily.asOf.blockNumber} ·{' '}
-                    {h.daily.asOf.blockTimestamp ?? 'Block time unavailable'}
+                    Current indexed state {dayLabel(snapshot.contractDay)} · chain{' '}
+                    {snapshot.asOf.chainId} · block {snapshot.asOf.blockNumber} ·{' '}
+                    {snapshot.asOf.blockTimestamp ?? 'Block time unavailable'}
                   </p>
-                  <Table
-                    title="Exact native daily values"
-                    headings={['Metric', 'Exact received value']}
-                  >
+                  <Table title="Exact indexed values" headings={['Metric', 'Exact received value']}>
                     {[
                       ...facts,
-                      ['Holders', h.daily.holderCount, ''],
-                      ['Stakers', h.daily.stakerCount, ''],
-                      ['Percentage staked', h.daily.stakedPercent, '%'],
-                      ['Weighted original duration', h.daily.weightedStakeLengthDays, 'days'],
+                      ['Holders', snapshot.holderCount, ''],
+                      ['Stakers', snapshot.stakerCount, ''],
+                      ['Percentage staked', snapshot.stakedPercent, '%'],
+                      ['Weighted original duration', snapshot.weightedStakeLengthDays, 'days'],
+                      ['TVL Staked', tvl, 'USD'],
+                      ...activityRows,
                     ].map(([label, value, unit]) => (
                       <tr key={label}>
                         <td>{label}</td>

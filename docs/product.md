@@ -122,6 +122,15 @@ available current-day estimates, not invented activity counts. A device-clock HE
 display day sits left and UTC time right; the header has a dark/light toggle beside
 the menu, defaulting to dark with an explicitly selected preference retained.
 
+The next owner refinement removes the PulseChain/Details/Refresh strip and all
+subtext beneath the six headline values. Source/day/freshness information remains
+in the lower details control; eligibility/expiry still applies. Holders/Stakers now
+use all current indexed populations, not daily deltas. Supply includes TVL Staked
+(indexed locked HEX × eligible USD price) and Avg Stake Length (HEX-weighted original
+duration). Today shows in-day New Stakes, Ended Stakes, New Holders/Stakers (net since
+the prior close), NET HEX Locked, estimated protocol Payouts and capped Penalties.
+Current-day activity remains unavailable when the index is on another protocol day.
+
 | Page | Original filename |
 |---|---|
 | Home | HEXDailyData_Mockup_Home.png |

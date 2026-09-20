@@ -163,7 +163,7 @@ export function createApp(
         case 'home': {
           body = await home(db(), q.chain, signal, now(), options.mode);
           const h = body as Awaited<ReturnType<typeof home>>;
-          if (!h.daily && Object.values(h.live).every((o) => o.value === null))
+          if (!h.current && !h.daily && Object.values(h.live).every((o) => o.value === null))
             throw new ApiFailure(
               503,
               'not_initialized',

@@ -44,7 +44,7 @@ export function Metric({
   value: string | null | undefined;
   unit?: string;
   prefix?: string;
-  note: ReactNode;
+  note?: ReactNode;
   id?: string;
   display?: string;
   icon?: IconName;
@@ -71,7 +71,7 @@ export function Metric({
           />
         )}
       </dd>
-      <div className="meta">{note}</div>
+      {note != null && <div className="meta">{note}</div>}
     </div>
   );
 }

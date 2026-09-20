@@ -11,7 +11,7 @@ import { ReadDatabase } from '../../src/services/queries/database.ts';
 import { createApp } from '../../src/api/app.ts';
 import { sqlBaseline } from '../../src/api/dependencies.ts';
 import { routes } from '../../src/api/routes.ts';
-import { homeSql } from '../../src/services/queries/home.ts';
+import { homeSql, home } from '../../src/services/queries/home.ts';
 import { stakesSql, holdersSql } from '../../src/services/queries/lists.ts';
 import { dailySql, marketSql } from '../../src/services/queries/history.ts';
 import { ExportService } from '../../src/worker/exports/service.ts';
@@ -291,6 +291,41 @@ try {
     assert.ok(partial.body.live.shareRate.value);
     await request(server.url, '/api/v2/home?chain=ethereum', {}, 503);
     await store.put(369, 'price', first.body.live.price);
+  });
+  await test('current Home totals and signed in-day changes use exact adjacent baseline', async () => {
+    // Transaction-local synthetic edge cases; production projections remain untouched.
+    await worker.query('BEGIN');
+    try {
+      const db = { counters: { dataQueries: 0 }, read: async (_signal, fn) => fn(worker) };
+      await worker.query(`UPDATE hdd.current_state SET holder_count=9007199254740993,
+        staker_count=70, starts=9,ends=12,locked_hearts=1234567890123456789,penalty_hearts=123456789`);
+      await worker.query(`UPDATE hdd.daily_stats SET holder_count=9007199254740995,
+        staker_count=67,locked_hearts=1234567890123456790 WHERE contract_day=399`);
+      const result = await home(db, 'pulsechain', signal, clock);
+      assert.equal(result.current.holderCount, '9007199254740993');
+      assert.equal(result.current.stakerCount, '70');
+      assert.equal(result.daily.holderCount, '9007199254740995');
+      assert.deepEqual(result.current.activity, {
+        newStakes: '9',
+        endedStakes: '12',
+        netHolders: '-2',
+        netStakers: '3',
+        netLockedHex: '-0.00000001',
+        penaltiesHex: '1.23456789',
+      });
+      assert.equal(result.current.contractDay, 400);
+      assert.equal(result.current.asOf.blockNumber, '100');
+      await worker.query('DELETE FROM hdd.daily_stats WHERE contract_day=399');
+      const gap = await home(db, 'pulsechain', signal, clock);
+      assert.equal(gap.current.activity.netHolders, null);
+      assert.equal(gap.current.activity.netStakers, null);
+      assert.equal(gap.current.activity.netLockedHex, null);
+      assert.equal(gap.current.activity.newStakes, '9');
+      assert.equal(gap.daily.contractDay, 398);
+      assert.equal(db.counters.dataQueries, 2);
+    } finally {
+      await worker.query('ROLLBACK');
+    }
   });
   await test('bounded date/history/calculator reads and dirty source disclosure', async () => {
     const daily = await request(server.url, '/api/v2/daily?from=2021-01-04&to=2021-01-05');

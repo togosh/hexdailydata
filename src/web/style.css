@@ -892,36 +892,7 @@ main:has(.home-page) {
   color: var(--ink);
   border-left: 3px solid var(--accent);
 }
-.home-context {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 22px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  padding: 0 12px;
-  margin-bottom: 14px;
-  min-height: 44px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  color: var(--muted);
-}
-.chain-context {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted);
-}
-.chain-context .icon {
-  width: 18px;
-  height: 18px;
-}
-.home-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: auto;
-}
-.home-actions button,
+
 .text-action {
   background: none;
   border: 0;
@@ -963,9 +934,8 @@ main:has(.home-page) {
   font-weight: 650;
 }
 .home-metrics dd small {
-  display: block;
-  margin-top: 4px;
-  font-size: 0.75rem;
+  display: inline;
+  font-size: 0.7rem;
   font-weight: 400;
   white-space: normal;
 }
@@ -1242,17 +1212,7 @@ main:has(.home-page) {
   main:has(.home-page) {
     padding: 10px 14px;
   }
-  .home-context {
-    margin-bottom: 10px;
-    gap: 10px;
-    padding: 0 8px;
-  }
-  .context-note {
-    display: none;
-  }
-  .home-actions {
-    gap: 12px;
-  }
+
   .home-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;

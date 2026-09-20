@@ -180,8 +180,8 @@ try {
           await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();
           for (const [id, value] of [
             ['price', expected.live.price.value.usdPerHex],
-            ['staked', expected.daily.stakedPercent],
-            ['duration', expected.daily.weightedStakeLengthDays],
+            ['staked', expected.current.stakedPercent],
+            ['duration', expected.current.weightedStakeLengthDays],
             ['completed', expected.live.latestCompletedPayout.value.hexPerTShare],
           ])
             assert.ok(
@@ -417,16 +417,12 @@ try {
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stale) }),
         );
         await page.reload();
-        await page
-          .getByText(/Stale · 2m/)
-          .first()
-          .waitFor();
+        await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
+        await page.getByRole('dialog').getByText(/stale/).first().waitFor();
         await capture('home-stale');
-        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
-        await page
-          .getByText(/Stale · 2m/)
-          .first()
-          .waitFor();
+        await page.getByRole('button', { name: 'Refresh observations', exact: true }).click();
+        await page.getByRole('dialog').getByText(/stale/).first().waitFor();
+        await page.keyboard.press('Escape');
         await page.evaluate((t) => (window.__testNow = t), at + 1801000);
         await page.waitForFunction(
           () => document.querySelector('[data-metric="price"] dd').textContent === 'Unavailable',
@@ -563,10 +559,13 @@ try {
           }),
         );
         await page.reload();
+        await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
         await page
-          .locator('[data-metric="completed"]')
+          .getByRole('dialog')
           .getByText(/2026-09-16/)
+          .first()
           .waitFor();
+        await page.keyboard.press('Escape');
         assert.match(await page.locator('.home-today').innerText(), /2026-09-19/);
         await page.unrouteAll();
         await page.route('**/api/v2/stakes/1099511627775?*', (r) =>

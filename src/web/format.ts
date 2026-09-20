@@ -4,7 +4,7 @@ import type { Observation } from '../contracts/api.ts';
 
 /** Expand an admitted decimal token without passing its significant digits through Number. */
 export function decimal(token: string): string {
-  if (token.length > 160 || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(token))
+  if (token.length > 320 || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(token))
     throw new Error('Invalid decimal.');
   const negative = token.startsWith('-');
   const [mantissa = '', exponent = '0'] = token.replace(/^-/, '').toLowerCase().split('e');
@@ -39,6 +39,27 @@ export const dayLabel = (day: number) => `${dayDate(day)} · day ${day + 1}`;
 export const dateShift = (date: string, days: number) =>
   new Date(Date.parse(date) + days * 86400000).toISOString().slice(0, 10);
 export const today = () => new Date().toISOString().slice(0, 10);
+/** Exact presentation-only product, including sub-cent prices and large locked amounts. */
+export function multiplyDecimals(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): string | null {
+  if (a == null || b == null) return null;
+  const parts = [a, b].map((token) => decimal(token).split('.'));
+  const places = parts.reduce((n, [, fraction = '']) => n + fraction.length, 0);
+  const product = parts.reduce(
+    (n, [whole = '0', fraction = '']) => n * BigInt(whole + fraction),
+    1n,
+  );
+  const sign = product < 0n ? '-' : '';
+  const digits = (product < 0n ? -product : product).toString().padStart(places + 1, '0');
+  return (
+    sign +
+    (places
+      ? (digits.slice(0, -places) + '.' + digits.slice(-places)).replace(/\.?0+$/, '')
+      : digits)
+  );
+}
 /** Display-only truncation: exact strings stay in Home Details; never round a nonzero to zero. */
 export function compactNumber(
   value: string | null | undefined,

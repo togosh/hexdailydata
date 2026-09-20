@@ -59,6 +59,15 @@ has `daily`, `live.price`, `live.shareRate`, `live.todayPayoutEstimate`, and
 `live.latestCompletedPayout`. Each is independent. Estimated values always carry their
 method and assumption labels. Charts and catalog payloads are not nested in Home.
 
+Home also exposes nullable `current`: the small indexed accumulator at its explicit
+sync block, finality and protocol day. Its holder/staker fields are whole populations,
+not changes (positive-liquid accounts; accounted-stake owners excluding GA-only).
+Current supply and HEX-weighted original duration use the same checkpoint. Activity
+starts/ends and capped penalties are in-day accumulators. Net holder/staker/locked-HEX
+changes compare only the exact prior-day close; missing coverage returns null, never
+zero or a comparison with an older day. All amounts/counts, including signed changes,
+remain strings. The query still performs no account/stake scan or provider request.
+
 A single compact request should paint all available headlines, even when some parts
 are unavailable. No “select generation -> overview -> four required requests -> price”
 waterfall. Mount price and other metrics immediately. Chart fetches cannot reject the

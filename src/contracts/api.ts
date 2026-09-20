@@ -95,12 +95,33 @@ const CompletedPayoutSchema = PayoutValueSchema.refine((value) => value.kind ===
 const EstimatedPayoutSchema = PayoutValueSchema.refine(
   (value) => value.kind === 'current_day_estimate',
 );
+const SignedIntegerSchema = z
+  .string()
+  .max(79)
+  .regex(/^(0|-?[1-9][0-9]*)$/);
+const SignedHexSchema = z
+  .string()
+  .max(121)
+  .regex(/^-?(0|[1-9][0-9]*)(\.[0-9]{1,8})?$/);
+export const CurrentHomeSchema = DailyHeadlineSchema.safeExtend({
+  asOf: BlockRefSchema,
+  finality: z.enum(['confirmed', 'finalized']),
+  activity: z.strictObject({
+    newStakes: UIntStringSchema,
+    endedStakes: UIntStringSchema,
+    netHolders: SignedIntegerSchema.nullable(),
+    netStakers: SignedIntegerSchema.nullable(),
+    netLockedHex: SignedHexSchema.nullable(),
+    penaltiesHex: DecimalStringSchema,
+  }),
+});
 export const HomeResponseSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
     chain: ChainKeySchema,
     mode: z.enum(['development', 'production']),
     daily: DailyHeadlineSchema.nullable(),
+    current: CurrentHomeSchema.nullable(),
     live: z.strictObject({
       price: observationSchema(PriceValueSchema),
       shareRate: observationSchema(ShareRateValueSchema),
@@ -124,6 +145,7 @@ export const HomeResponseSchema = z
       (expected === 369 && block.chainId === 1 && BigInt(block.blockNumber) <= 17_232_999n);
     return (
       allowed(home.daily?.asOf ?? null) &&
+      allowed(home.current?.asOf ?? null) &&
       Object.values(home.live).every((row) => allowed(row.asOf))
     );
   }, 'Source chain does not match serving history');

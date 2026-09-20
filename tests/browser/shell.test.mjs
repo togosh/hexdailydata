@@ -94,7 +94,7 @@ test('built website renders honest native-unavailable states on desktop and mobi
           (fontSize) => (document.documentElement.style.fontSize = fontSize),
           scale,
         );
-        for (const opener of ['Details', 'Open navigation menu']) {
+        for (const opener of ['Exact values & methodology', 'Open navigation menu']) {
           const trigger = page.getByRole('button', { name: opener, exact: true });
           await trigger.click();
           const dialog = page.getByRole('dialog');
@@ -115,7 +115,7 @@ test('built website renders honest native-unavailable states on desktop and mobi
             `${opener} ${width}px ${scale}`,
           );
           await page.screenshot({
-            path: `${evidence}/dialog-${opener === 'Details' ? 'details' : 'navigation'}-${width}-${scale.slice(0, -1)}.png`,
+            path: `${evidence}/dialog-${opener === 'Exact values & methodology' ? 'details' : 'navigation'}-${width}-${scale.slice(0, -1)}.png`,
           });
           await page.keyboard.press('Escape');
           assert.equal(await trigger.evaluate((button) => document.activeElement === button), true);
@@ -138,7 +138,7 @@ test('built website renders honest native-unavailable states on desktop and mobi
     await page.keyboard.press('Enter');
     await page.getByRole('button', { name: 'Use dark mode' }).waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'light');
-    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await page.getByRole('button', { name: 'Exact values & methodology', exact: true }).click();
     await page.getByRole('dialog').waitFor();
     await page.screenshot({ path: `${evidence}/light-details-320.png` });
     await page.keyboard.press('Escape');

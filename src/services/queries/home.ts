@@ -94,13 +94,60 @@ export function metrics(raw: Record<string, unknown> | null, chain: ChainKey, no
     ),
   );
 }
-// At most one daily/current/sync row and four metric rows. No large-table aggregate.
+const currentColumns = [
+  'contract_day',
+  'circulating_hearts',
+  'locked_hearts',
+  'accounted_hearts',
+  'weighted_days',
+  'holder_count',
+  'staker_count',
+  'starts',
+  'ends',
+  'penalty_hearts',
+];
+function currentHeadline(r: Record<string, any>, chain: ChainKey) {
+  if (r.current_contract_day == null || r.sync_block == null) return null;
+  const values = Object.fromEntries(currentColumns.map((key) => [key, r['current_' + key]]));
+  const difference = (key: string) =>
+    r.previous_day == null ? null : (BigInt(values[key]) - BigInt(r['previous_' + key])).toString();
+  const netLocked = difference('locked_hearts');
+  const signedHex =
+    netLocked == null
+      ? null
+      : (netLocked.startsWith('-') ? '-' : '') + formatUnits(BigInt(netLocked.replace('-', '')), 8);
+  return {
+    ...headline({
+      ...values,
+      origin_chain_id: chainId(chain),
+      close_block: r.sync_block,
+      close_hash: r.sync_hash,
+      close_time: r.sync_time,
+    }),
+    finality: r.sync_finality,
+    activity: {
+      newStakes: values.starts,
+      endedStakes: values.ends,
+      netHolders: difference('holder_count'),
+      netStakers: difference('staker_count'),
+      netLockedHex: signedHex,
+      penaltiesHex: formatUnits(BigInt(values.penalty_hearts), 8),
+    },
+  };
+}
+// One current/sync row, latest daily and exact prior-day baseline, four metrics.
+// Prior-day absence is unknown, never an implicit zero or an older-day comparison.
 export const homeSql = `SELECT d.*, h.timestamp AS close_time,
- s.block_number AS sync_block,s.block_time AS sync_time, sh.start_block AS history_start,
+ s.block_number AS sync_block,s.block_time AS sync_time,s.block_hash AS sync_hash,s.finality AS sync_finality,
+ ${currentColumns.map((key) => `c.${key} AS current_${key}`).join(',')},
+ previous.contract_day AS previous_day,previous.holder_count AS previous_holder_count,
+ previous.staker_count AS previous_staker_count,previous.locked_hearts AS previous_locked_hearts,
+ sh.start_block AS history_start,
  (SELECT jsonb_object_agg(metric,observation) FROM hdd.live_metrics WHERE chain_id=$1) AS metrics
  FROM (VALUES(1)) anchor(n)
  LEFT JOIN hdd.sync_state s ON s.chain_id=$1
  LEFT JOIN hdd.current_state c ON c.chain_id=$1
+ LEFT JOIN hdd.daily_stats previous ON previous.chain_id=$1 AND previous.contract_day=c.contract_day-1
  LEFT JOIN hdd.source_history sh ON sh.chain_id=$1
  LEFT JOIN LATERAL (SELECT * FROM hdd.daily_stats WHERE chain_id=$1 ORDER BY contract_day DESC LIMIT 1) d ON true
  LEFT JOIN hdd.blocks_recent h ON h.chain_id=d.origin_chain_id AND h.number=d.close_block`;
@@ -121,6 +168,7 @@ export async function home(
       chain,
       mode,
       daily: r.contract_day == null ? null : headline(r),
+      current: currentHeadline(r, chain),
       live: metrics(r.metrics, chain, now),
       sync: {
         state:

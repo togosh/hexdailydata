@@ -3,6 +3,7 @@
   "chain": "pulsechain",
   "mode": "development",
   "daily": null,
+  "current": null,
   "live": {
     "price": {
       "status": "unavailable",
