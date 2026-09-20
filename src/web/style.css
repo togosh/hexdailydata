@@ -1030,12 +1030,21 @@ main:has(.home-page) {
 .home-market-row .panel {
   min-width: 0;
 }
+.home-gas {
+  display: flex;
+  flex-direction: column;
+}
 .gas-quote {
   padding: 0 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 .home-gas .gas-quote > div {
   padding: 1px 0;
   line-height: 1.25;
+  flex: 1;
+  align-items: center;
 }
 .home-gas .gas-quote dt {
   font-size: 0.8rem;
@@ -1216,6 +1225,11 @@ main:has(.home-page) {
   margin: 10px 0;
   color: var(--feedback);
   font-size: 0.85rem;
+}
+@media (min-width: 761px) {
+  .site-footer {
+    width: calc(100% - 48px);
+  }
 }
 @media (min-width: 1101px) {
   .home-market-row .home-panel-heading {
