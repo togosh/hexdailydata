@@ -244,3 +244,11 @@ Full/scrolled dark/light screenshots, review and archives are in
 changes, v1 execution, push or deployment. Native initialization/live qualification
 pending; Task09 NOT_STARTED. Stop for owner Home visual review.
 This is a documentation-only status entry after reviewed source.
+
+Task07 Home copy cleanup PASS; OWNER_VISUAL_APPROVAL_PENDING. Reviewed code
+`74c1d545961fb53b912e0a1c9658682a6d41e745` removes the Stake APY estimate suffix,
+its principal/history caption and the shared footer observation paragraph. Calculations
+unchanged. Format/types/build and seven visual browser groups PASS; independent
+`/root/home_panels_review` PASS. Desktop/mobile captures and compact evidence in
+`artifacts/task-07/home-copy-20260920/`. Scoped resources cleaned. No live providers,
+push, deployment or Task09. Stop for owner visual review. This entry is status only.
