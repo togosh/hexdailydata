@@ -111,8 +111,9 @@ must remain simulations, not predictions. Later owner-supplied direction can ref
 The September 18 planner handoff actually contains eight unchanged owner-supplied
 PNGs: `HEXDailyData-v2-Planner-Handoff-2026-09-18.zip`, under
 `HEXDailyData-v2-Planner-Handoff/ui/`. Task07 carries the five selected originals unchanged in docs/ui-reference/.
-Use these five as the planner's proposed primary references; final aesthetic choices
-remain Task07, not a new approval requirement for Task01:
+The owner's September20 correction makes these five authoritative for composition,
+density, typography and navigation. Mostly follow them while preserving v2 data semantics;
+Home/shared-shell visual acceptance remains pending owner review:
 
 | Page | Original filename |
 |---|---|

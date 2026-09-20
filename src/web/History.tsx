@@ -6,6 +6,7 @@ import { displayRatio, hexPerTShareBeforeBonuses } from '../domain/units.ts';
 import { endpoint, request, RequestError, useResource } from './api.ts';
 import { dateShift, today, numberText } from './format.ts';
 import { Feedback, Table } from './components.tsx';
+import { Icon } from './visuals.tsx';
 import { loadArchive, validRange, plot, type Point } from './history.ts';
 
 type Daily = z.infer<typeof DailyResponseSchema>;
@@ -61,7 +62,10 @@ export function Chart({
   return (
     <div data-testid="history-chart" data-ready={points.some((p) => p.value !== null)}>
       <div className="section-heading">
-        <h2>{title}</h2>
+        <h2>
+          {compact && <Icon name="chart" />}
+          {title}
+        </h2>
         <span className="meta">{unit}</span>
       </div>
       {points.length ? (
@@ -98,16 +102,24 @@ export function Chart({
               {points.at(-1)?.date}
             </text>
           </svg>
-          <p className="meta">
-            Missing dates and unavailable values break the line. Same-date records remain separate
-            markers and rows.
-          </p>
+          {!compact && (
+            <p className="meta">
+              Missing dates and unavailable values break the line. Same-date records remain separate
+              markers and rows.
+            </p>
+          )}
         </>
       ) : (
         <p className="notice">No records in this range. Select an available interval below.</p>
       )}
       <details open={!compact}>
         <summary>Data table · {points.length} records</summary>
+        {compact && (
+          <p className="meta">
+            Missing dates and unavailable values break the line. Values and source blocks are listed
+            below.
+          </p>
+        )}
         <Table
           title={`${title} — exact published values`}
           headings={['Date (UTC)', unit, 'State', 'Source detail']}
@@ -139,19 +151,27 @@ export function Chart({
   );
 }
 export function HomeChart({ date }: { date: string | null }) {
+  const [days, setDays] = useState(30);
   const data = useResource(
     date
       ? endpoint('/daily', {
-          from: dateShift(date, -29) < '2019-12-03' ? '2019-12-03' : dateShift(date, -29),
+          from: dateShift(date, 1 - days) < '2019-12-03' ? '2019-12-03' : dateShift(date, 1 - days),
           to: date,
         })
       : null,
     DailyResponseSchema,
   );
   return (
-    <section className="panel">
-      <div className="section-heading">
-        <p className="eyebrow">Native daily history</p>
+    <section className="panel home-chart">
+      <div className="home-chart-toolbar">
+        <span>Native daily history</span>
+        <div className="range-buttons" aria-label="Payout history range">
+          {[7, 30].map((n) => (
+            <button key={n} aria-pressed={days === n} onClick={() => setDays(n)}>
+              {n}D
+            </button>
+          ))}
+        </div>
         <a href="/charts">All charts ↗</a>
       </div>
       {data.data ? (

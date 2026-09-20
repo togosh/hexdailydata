@@ -1,5 +1,6 @@
-import { useState, type ReactNode, type FormEvent } from 'react';
+import { useId, useState, type ReactNode, type FormEvent } from 'react';
 import { numberText } from './format.ts';
+import { Icon, type IconName } from './visuals.tsx';
 
 export function Value({
   value,
@@ -36,6 +37,8 @@ export function Metric({
   prefix,
   note,
   id,
+  display,
+  icon = 'chart',
 }: {
   title: string;
   value: string | null | undefined;
@@ -43,17 +46,30 @@ export function Metric({
   prefix?: string;
   note: ReactNode;
   id?: string;
+  display?: string;
+  icon?: IconName;
 }) {
   return (
     <div className="metric" data-metric={id}>
-      <dt>{title}</dt>
+      <dt>
+        <Icon name={icon} />
+        {title}
+      </dt>
       <dd>
-        <Value
-          value={value}
-          {...(unit ? { unit } : {})}
-          {...(prefix ? { prefix } : {})}
-          places={4}
-        />
+        {value != null && display !== undefined ? (
+          <span className="value">
+            {prefix}
+            {display}
+            {unit && <small> {unit}</small>}
+          </span>
+        ) : (
+          <Value
+            value={value}
+            {...(unit ? { unit } : {})}
+            {...(prefix ? { prefix } : {})}
+            places={4}
+          />
+        )}
       </dd>
       <div className="meta">{note}</div>
     </div>
@@ -132,6 +148,7 @@ export function Table({
   );
 }
 export function SearchForm({ compact = false }: { compact?: boolean }) {
+  const id = useId();
   const [value, setValue] = useState(''),
     [error, setError] = useState('');
   const submit = (event: FormEvent) => {
@@ -153,15 +170,12 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   };
   return (
     <form className={'search ' + (compact ? 'compact' : '')} onSubmit={submit}>
-      <label
-        htmlFor={compact ? 'quick-search' : 'search-input'}
-        className={compact ? 'sr-only' : ''}
-      >
-        Address or stake ID
+      <label htmlFor={id} className={compact ? 'sr-only' : ''}>
+        {compact ? 'Header address or stake ID' : 'Address or stake ID'}
       </label>
       <div className="inline">
         <input
-          id={compact ? 'quick-search' : 'search-input'}
+          id={id}
           value={value}
           onChange={(e) => {
             setValue(e.target.value);
@@ -171,12 +185,14 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
           spellCheck={false}
           maxLength={80}
           aria-invalid={!!error}
-          aria-describedby={error ? 'search-error' : undefined}
+          aria-describedby={error ? id + '-error' : undefined}
         />
-        <button className="primary">Search</button>
+        <button className="primary" aria-label={compact ? 'Search from header' : 'Search'}>
+          {compact ? <Icon name="search" /> : 'Search'}
+        </button>
       </div>
       {error && (
-        <p id="search-error" role="alert">
+        <p id={id + '-error'} role="alert">
           {error}
         </p>
       )}

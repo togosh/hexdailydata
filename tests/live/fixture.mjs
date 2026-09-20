@@ -137,7 +137,11 @@ export function fixture({
     nextShares: 50n,
     shares: 100n,
     shareRate: 123456n,
+    dailyPayoutHearts: 42n,
+    dailyPayoutShares: 100n,
+    reserves: null,
     supply: 1004489950000n,
+    locked: 0n,
     stalled: null,
     list: null,
     hint: null,
@@ -199,7 +203,7 @@ export function fixture({
       return (
         '0x' +
         [
-          0,
+          state.locked,
           state.nextShares,
           state.shareRate,
           state.penalty,
@@ -221,7 +225,14 @@ export function fixture({
         end = Number(BigInt('0x' + args.slice(64)));
       return (
         '0x' +
-        [32, end - begin, ...Array.from({ length: end - begin }, () => 42n + (100n << 72n))]
+        [
+          32,
+          end - begin,
+          ...Array.from(
+            { length: end - begin },
+            () => state.dailyPayoutHearts + (state.dailyPayoutShares << 72n),
+          ),
+        ]
           .map(word)
           .join('')
       );
@@ -244,11 +255,12 @@ export function fixture({
     if (sel === s.token1) return '0x' + word(BigInt(pool.token1));
     if (sel === s.getReserves) {
       const reserve = (token) =>
-        token === HEX
+        state.reserves?.[token] ??
+        (token === HEX
           ? 1000n * 10n ** 8n
           : token === WRAPPED
             ? 1000n * 10n ** 18n
-            : 25000n * 10n ** 6n;
+            : 25000n * 10n ** 6n);
       return '0x' + [reserve(pool.token0), reserve(pool.token1), state.update].map(word).join('');
     }
     throw new Error('Unexpected fixture selector ' + sel);

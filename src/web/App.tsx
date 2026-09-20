@@ -1,5 +1,7 @@
 ﻿import { lazy, Suspense, useEffect, useState } from 'react';
 import Home from './Home.tsx';
+import { SearchForm } from './components.tsx';
+import { Dialog, HexMark, Icon, type IconName } from './visuals.tsx';
 import './style.css';
 const History = lazy(() => import('./History.tsx'));
 const Calculator = lazy(() => import('./Calculator.tsx'));
@@ -8,16 +10,18 @@ const Downloads = lazy(() => import('./Information.tsx').then((m) => ({ default:
 const Learn = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Learn })));
 const Status = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Status })));
 const links = [
-  ['/', 'Home'],
-  ['/charts', 'Charts'],
-  ['/search', 'Search'],
-  ['/calculator', 'Calculator'],
-  ['/downloads', 'Downloads'],
-];
+  ['/', 'Home', 'home'],
+  ['/charts', 'Charts', 'chart'],
+  ['/calculator', 'Calculator', 'calendar'],
+  ['/downloads', 'Data', 'database'],
+  ['/search', 'Search', 'search'],
+] satisfies [string, string, IconName][];
 export default function App() {
   const [path, setPath] = useState(location.pathname);
+  const [menu, setMenu] = useState(false);
   useEffect(() => {
     const changed = () => {
+      setMenu(false);
       setPath(location.pathname);
       window.scrollTo(0, 0);
       requestAnimationFrame(() => document.querySelector<HTMLElement>('main')?.focus());
@@ -67,22 +71,49 @@ export default function App() {
       </a>
       <header className="site-header">
         <a href="/" className="brand" aria-label="HEXDailyData home">
-          <span className="brand-mark" aria-hidden="true">
-            ⬡
-          </span>
+          <HexMark />
           <span>
-            HEXDailyData<small>PulseChain research &amp; staking data</small>
+            HEXDailyData<small>PulseChain HEX research &amp; staking data</small>
           </span>
         </a>
-        <span className="chain-badge">PulseChain</span>
-        <nav aria-label="Main navigation">
+        <nav className="desktop-nav" aria-label="Main navigation">
           {links.map(([href, label]) => (
             <a href={href} key={href} aria-current={active === href ? 'page' : undefined}>
               {label}
             </a>
           ))}
+          <a href="/learn" aria-current={active === '/learn' ? 'page' : undefined}>
+            Learn
+          </a>
         </nav>
+        <div className="header-search">
+          <SearchForm compact />
+        </div>
+        <button
+          className="menu-toggle"
+          aria-label="Open navigation menu"
+          aria-haspopup="dialog"
+          aria-expanded={menu}
+          onClick={() => setMenu(true)}
+        >
+          <Icon name="menu" />
+        </button>
       </header>
+      {menu && (
+        <Dialog title="Navigation" onClose={() => setMenu(false)}>
+          <nav className="menu-links" aria-label="All destinations">
+            {[
+              ...links,
+              ['/learn', 'Learn & methodology', 'chart'],
+              ['/status', 'Data status', 'chart'],
+            ].map(([href, label]) => (
+              <a key={href} href={href} aria-current={active === href ? 'page' : undefined}>
+                {label}
+              </a>
+            ))}
+          </nav>
+        </Dialog>
+      )}
       <main id="content" tabIndex={-1}>
         <Suspense fallback={<p role="status">Loading page…</p>}>
           {path === '/' ? (
@@ -108,9 +139,12 @@ export default function App() {
         </Suspense>
       </main>
       <footer className="site-footer">
-        <span>
-          HEXDailyData <small>· PulseChain</small>
-        </span>
+        <a href="/" className="brand">
+          <HexMark />
+          <span>
+            HEXDailyData<small>PulseChain HEX research &amp; staking data</small>
+          </span>
+        </a>
         <nav aria-label="More information">
           <a href="/learn">Learn &amp; methodology</a>
           <a href="/status">Data status</a>
@@ -118,6 +152,14 @@ export default function App() {
         </nav>
         <p>Read-only data. Each source has its own observation time and coverage.</p>
       </footer>
+      <nav className="bottom-nav" aria-label="Mobile destinations">
+        {links.map(([href, label, icon]) => (
+          <a href={href} key={href} aria-current={active === href ? 'page' : undefined}>
+            <Icon name={icon} />
+            {label}
+          </a>
+        ))}
+      </nav>
     </>
   );
 }

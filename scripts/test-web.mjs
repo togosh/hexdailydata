@@ -42,9 +42,10 @@ function command(binary, args, timeout = 120000) {
   return r.stdout.trim();
 }
 const docker = (args, timeout) => command('docker', [...compose, ...args], timeout);
-function browser(scenario) {
+function browser(scenario, script = 'tests/browser/journey.mjs') {
+  if (process.argv.includes('--visual-only') && scenario !== 'visual') return;
   const port = docker(['port', 'web', '4320']).split(':').at(-1);
-  const args = ['tests/browser/journey.mjs', `http://127.0.0.1:${port}`, scenario, evidence];
+  const args = [script, `http://127.0.0.1:${port}`, scenario, evidence];
   const output = command(process.execPath, args, 300000);
   writeFileSync(resolve(evidence, `${scenario}.log`), output + '\n');
   console.log(output);
@@ -125,6 +126,10 @@ try {
   );
   docker(['up', '-d', 'web']);
   browser(env.HDD_V2_WEB_SCENARIO);
+  if (process.argv.includes('--visual') || process.argv.includes('--visual-only')) {
+    console.log(docker(['run', '--rm', '-T', 'runner', 'node', 'tests/browser/visual-setup.mjs']));
+    browser('visual', 'tests/browser/visual.mjs');
+  }
   writeFileSync(
     resolve(evidence, 'result.json'),
     JSON.stringify({ status: 'PASS', project, scenario: env.HDD_V2_WEB_SCENARIO }, null, 2),

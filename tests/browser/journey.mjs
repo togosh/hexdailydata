@@ -3,7 +3,7 @@ import { chromium, firefox, webkit } from 'playwright';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
-import { numberText } from '../../src/web/format.ts';
+import { compactNumber, yearsFromDays } from '../../src/web/format.ts';
 
 const [base, scenario, evidence] = process.argv.slice(2);
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
@@ -186,7 +186,11 @@ try {
           ])
             assert.ok(
               (await page.locator(`[data-metric="${id}"] dd`).innerText()).includes(
-                numberText(value, 4),
+                compactNumber(
+                  id === 'duration' ? yearsFromDays(value) : value,
+                  id === 'price' ? 7 : id === 'completed' ? 3 : 2,
+                  id !== 'duration' && id !== 'staked',
+                ),
               ),
               `${id} content equality`,
             );
@@ -414,13 +418,13 @@ try {
         );
         await page.reload();
         await page
-          .getByText(/Last known 2m/)
+          .getByText(/Stale · 2m/)
           .first()
           .waitFor();
         await capture('home-stale');
         await page.getByRole('button', { name: 'Refresh', exact: true }).click();
         await page
-          .getByText(/Last known 2m/)
+          .getByText(/Stale · 2m/)
           .first()
           .waitFor();
         await page.evaluate((t) => (window.__testNow = t), at + 1801000);
@@ -541,7 +545,7 @@ try {
         });
         await go('/charts');
         await page
-          .getByRole('navigation', { name: 'Main navigation' })
+          .getByRole('navigation', { name: 'Mobile destinations' })
           .getByRole('link', { name: 'Home', exact: true })
           .click();
         await page.locator('[data-testid="headlines"][data-ready="true"]').waitFor();

@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { decimal, numberText, observationState } from '../../src/web/format.ts';
+import {
+  decimal,
+  numberText,
+  observationState,
+  compactNumber,
+  yearsFromDays,
+} from '../../src/web/format.ts';
 import { loadArchive, plot } from '../../src/web/history.ts';
 import { inspectInput } from '../../src/worker/history/input.ts';
 import { rawRow, selection } from '../history/fixture.mjs';
@@ -48,6 +54,17 @@ test('browser ages old successful responses, preserves stale status and expires 
   assert.equal(observationState(row, time + 61000, day), 'unavailable');
 });
 const bytes = Buffer.from(JSON.stringify(Array.from({ length: 400 }, (_, i) => rawRow(1255 + i))));
+test('compact Home display preserves tiny values and flags truncated magnitudes without floats', () => {
+  assert.equal(compactNumber('622163456789.123'), '≈622.16B');
+  assert.equal(compactNumber('0.003876', 7), '0.003876');
+  assert.equal(compactNumber('0.000000000000000001', 7), '0.000000000000000001');
+  assert.equal(compactNumber('9007199254740993.1'), '≈9.00 × 10^15');
+  assert.equal(compactNumber('0'), '0');
+  assert.equal(compactNumber(null), 'Unavailable');
+  assert.equal(yearsFromDays('365.25'), '1.00000000');
+  assert.equal(yearsFromDays('3652.5'), '10.00000000');
+  assert.equal(compactNumber(yearsFromDays('3562'), 2, false), '≈9.75');
+});
 const inspected = inspectInput(
   bytes,
   selection(bytes, { toSourceDay: 1654, toDate: '2024-06-13' }),

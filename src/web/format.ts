@@ -39,6 +39,55 @@ export const dayLabel = (day: number) => `${dayDate(day)} · day ${day + 1}`;
 export const dateShift = (date: string, days: number) =>
   new Date(Date.parse(date) + days * 86400000).toISOString().slice(0, 10);
 export const today = () => new Date().toISOString().slice(0, 10);
+/** Display-only truncation: exact strings stay in Home Details; never round a nonzero to zero. */
+export function compactNumber(
+  value: string | null | undefined,
+  places = 2,
+  abbreviate = true,
+): string {
+  if (value == null) return 'Unavailable';
+  const exact = decimal(value);
+  const [whole = '', fraction = ''] = exact.replace(/^-/, '').split('.');
+  const sign = exact.startsWith('-') ? '-' : '';
+  if (abbreviate && whole.length > 15) {
+    const digits = whole + fraction;
+    return '≈' + sign + digits[0] + '.' + digits.slice(1, 3) + ' × 10^' + (whole.length - 1);
+  }
+  const power = abbreviate ? Math.min(4, Math.floor((whole.length - 1) / 3)) : 0;
+  const shifted = power
+    ? decimal(sign + whole + (fraction ? '.' + fraction : '') + 'e-' + power * 3)
+    : exact;
+  const displayed = numberText(shifted, places);
+  const approximate = decimal(displayed.replaceAll(',', '')) !== shifted;
+  return (approximate ? '≈' : '') + displayed + ['', 'K', 'M', 'B', 'T'][power];
+}
+export function yearsFromDays(days: string | null | undefined): string | null {
+  if (days == null) return null;
+  const [whole = '0', fraction = ''] = decimal(days).split('.');
+  const scale = 10n ** BigInt(fraction.length);
+  // 365.25 days per display year; retain eight places before presentation truncation.
+  const units = (BigInt(whole + fraction) * 10000000000n) / (36525n * scale);
+  return `${units / 100000000n}.${(units % 100000000n).toString().padStart(8, '0')}`;
+}
+export function compactObservation(
+  row: Observation<unknown> | undefined,
+  now: number,
+  state: string,
+) {
+  if (!row?.asOf) return 'Unavailable';
+  const seconds = Math.max(
+    0,
+    Math.floor(
+      (now -
+        Math.min(
+          Date.parse(row.asOf.blockTimestamp),
+          Date.parse(row.observedAt ?? row.asOf.blockTimestamp),
+        )) /
+        1000,
+    ),
+  );
+  return `${state === 'fresh' ? 'Observed' : state === 'stale' ? 'Stale' : 'Expired'} · ${seconds < 60 ? seconds + 's' : Math.floor(seconds / 60) + 'm'} ago`;
+}
 export function observationState(
   row: Pick<Observation<unknown>, 'status' | 'asOf' | 'observedAt'> | undefined,
   now: number,
