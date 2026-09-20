@@ -254,3 +254,25 @@ SQL probes cover request cancellation and the client read deadline with the serv
 statement timeout disabled only inside a disposable test session. Large-download probes
 exercise backpressure, disconnect, lock loss and explicit reader shutdown; they do not
 claim a full120-second timeout observation.
+
+## Task07 browser suite
+
+Run npm run build then npm run test:web for a fresh private SQL project, actual
+compiled API/assets, empty?retained HDS-only?synthetic native+HDS journeys. The
+optional -- --scale uses another new1M-stake/500k-account fixture, without large
+exports/backups, and11fresh Chromium documents. Browser overhead runs on the host;
+DB1.5CPU/3GiB, API.25CPU/512MiB and setup.25CPU/512MiB total2CPU/4GiB.
+Raw source clocks are explicitly synthetic2026-09-19; browser navigation timing is
+real. CDP applies150ms RTT/10Mbps down/1.5Mbps up/4xCPU, disables cache and verifies
+observed loopback latency. Required Home values are price, percentage staked,
+principal-weighted original duration and completed payout. Chart completion means
+30nonempty native daily payout markers after the whole selected response validates.
+Nearest-rank p95 uses ceil(n*.95)-1. Each metric is asserted against SQL/API fixtures.
+
+The small suite requires the separately retained approved input at
+artifacts/task-pulsechain-history/input. It never downloads data. Inputs copy into
+its own run directory, use the compiled importer and actual new destination UUID.
+Missing original bytes fail the real-archive proof explicitly. Normal production
+startup has no synthetic scenario switch; test-only server and setup live under tests.
+Run outputs use new artifacts/task-07/web-* directories; automatic teardown targets
+only that run's Compose project. Original evidence and blocked cleanup stay untouched.

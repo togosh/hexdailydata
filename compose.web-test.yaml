@@ -1,0 +1,47 @@
+# Task07 only. Compiled application, private fresh SQL and controlled raw fake providers.
+services:
+  runner:
+    cpus: 0.25
+    mem_limit: 512m
+    memswap_limit: 512m
+    environment:
+      HDD_V2_PROJECT: ${HDD_V2_PROJECT}
+      HDD_V2_ALLOW_LIVE_RPC: 'false'
+    volumes:
+      - ${HDD_V2_WEB_EVIDENCE:?New task evidence}:/evidence
+      - ${HDD_V2_WEB_INPUT:?New task input}:/input:ro
+      - exports:/exports
+    command: ['node', 'tests/browser/setup.mjs', 'empty']
+  web:
+    image: node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+    user: node
+    read_only: true
+    cpus: 0.25
+    mem_limit: 512m
+    memswap_limit: 512m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    working_dir: /app
+    environment:
+      HDD_V2_DB_HOST: db
+      HDD_V2_DB_NAME: hexdailydata_v2
+      HDD_V2_DB_INSTANCE: ${HDD_V2_DB_INSTANCE}
+      HDD_V2_API_PASSWORD: ${HDD_V2_API_PASSWORD}
+      HDD_V2_EXPORT_PATH: /exports
+      HDD_V2_ALLOW_LIVE_RPC: 'false'
+      HDD_V2_WEB_SCENARIO: ${HDD_V2_WEB_SCENARIO:-empty}
+    volumes:
+      - ./:/app:ro
+      - exports:/exports:ro
+    ports: ['127.0.0.1::4320']
+    networks: [sql, ingress]
+    command: ['node', 'tests/browser/server.mjs']
+  storage-init:
+    image: node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6
+    network_mode: none
+    volumes: [exports:/exports]
+    command: ['chown', '1000:1000', '/exports']
+networks:
+  ingress:
+volumes:
+  exports:

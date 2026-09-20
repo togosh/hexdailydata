@@ -157,3 +157,27 @@ Task05 reused v2 closeDay/applyPayout, canonical event timestamps, domain unit/r
 helpers, source replay fixtures, shared quota scheduling and portable row codec. No v1
 source file, application module, credentials or data was accessed for this task. Earlier
 reference receipts and acquisition-correction evidence remain unchanged.
+
+## Task07 ordinary-stake arithmetic and UI references
+
+Read only the retained Task01 HEX.sol source (SHA256
+78680f17586d87cb85cd30eb4666f6d250dd1d12e33e0e76f96844a639b0f7fc),
+constants at724?734 and _stakeStart/_stakeStartBonusHearts at1515?1667.
+No old application code was imported or executed; no new network source was fetched.
+The full Solidity source remains excluded under the existing license caution.
+
+New domain/calculator.ts implements the mathematical interface facts: 20% per364
+extra days (denominator1820), extra-day cap3640, 10% size bonus capped at150million
+HEX (denominator150quadrillion hearts), one combined bonus floor, then issuance floor
+at raw shareRate/100000. Principal and shares must fit uint72; rate fits uint40.
+Existing UTC timing is reused. New unit witnesses are literal results independently
+calculated with Python Fraction from term and size fractions, never the TS helper.
+For100000000001hearts/2days, combined bonus55011721 differs from separate floors
+55011720; rate123456 yields81045078183shares. For15000000000000000hearts/3641days,
+bonus31500000000000000 and37665241057542768shares. One-heart/cap neighbors,
+3640/3641/5555, storage bounds and UTC rollover have separate tests. A2T-share,
+21day scenario at13/42HEX/T-share/day yields13HEX, not12.6 from3/10.
+
+The five PNGs in docs/ui-reference are unchanged owner-supplied planner handoff
+references, used as developer documentation only. No font, logo crop or full prior
+product engine is redistributed into browser assets.

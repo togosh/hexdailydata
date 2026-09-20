@@ -42,7 +42,7 @@ The HDS PulseChain overlay provides explicitly source-reported daily statistics 
 daily reference prices through an opt-in daily API variant and local operator CSV.
 Its source-record dates are not proven market-close times. It does not initialize native
 state, satisfy native history completeness, make Home/calculator/live inputs ready,
-or establish live source feasibility. Task07/09 and the feasibility condition remain open.
+or establish live source feasibility. Task09 and the launch feasibility condition remain open.
 
 ## Freshness is per component
 
@@ -110,7 +110,7 @@ must remain simulations, not predictions. Later owner-supplied direction can ref
 
 The September 18 planner handoff actually contains eight unchanged owner-supplied
 PNGs: `HEXDailyData-v2-Planner-Handoff-2026-09-18.zip`, under
-`HEXDailyData-v2-Planner-Handoff/ui/`. They are not embedded in this 64-file scaffold.
+`HEXDailyData-v2-Planner-Handoff/ui/`. Task07 carries the five selected originals unchanged in docs/ui-reference/.
 Use these five as the planner's proposed primary references; final aesthetic choices
 remain Task07, not a new approval requirement for Task01:
 
@@ -122,11 +122,8 @@ remain Task07, not a new approval requirement for Task01:
 | Downloads | HEXDailyData_Mockup_Download02.png |
 | Charts | HEXDailyData_Mockup_Chart02.png |
 
-Before Task07's visual comparison, copy only the selected originals into
-`docs/ui-reference/` and record the actual reference/capture viewport and theme here.
-A composited phone/desktop image does not establish a CSS viewport. If the handoff is
-not available to that builder, request those specific files, not a new design exercise.
-The other three images are alternatives, not mandatory context for each task.
+The selected originals are now available in docs/ui-reference/. They are not final
+aesthetic approval; actual Task07 captures are recorded separately.
 
 Product/data contracts override illustrative labels: do not add address-history
 sparklines, historical holder snapshots, extra CSV/JSON products, arbitrary APY labels,
@@ -151,3 +148,19 @@ Ongoing total infrastructure/provider/backup budget ≤$60/month, ideally ≤$50
 purchases are authorized by this starter. Ordinary development and isolated tests are
 authorized; task 10 permits bounded configured live read-only validation. The old VPS,
 its database, code, credentials and scheduled jobs are never touched by this build.
+
+## Task07 reference use and owner scheduling decision (2026-09-19)
+
+The owner authorized offline UI implementation before source feasibility is measured.
+The pre-UI checkpoint is deferred, NOT satisfied. Native acquisition, initialization,
+live-source qualification and production proof remain required before launch.
+Task08 remains accepted; Task09 may begin only after the returned Task07 result is accepted.
+
+The five owner-supplied original PNGs recovered from the September18 planner handoff
+are developer references in docs/ui-reference, not runtime assets. Home, Calculator,
+Address02 and Download02 are1448?1086 composite canvases; Chart02 is682?2048.
+Actual captures use390?844 and1440?1000 CSS viewports, dark theme, device scale1;
+320px and200% layout checks are separate. These are not mockup CSS viewport claims.
+Compact native metrics, navy panels and magenta accents retain the supplied hierarchy.
+Unsupported APY, address history, sixth downloads and asset/gas panels are omitted.
+Owner aesthetic acceptance remains pending independently of implementation review.

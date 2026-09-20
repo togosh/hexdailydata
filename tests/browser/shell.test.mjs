@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
-test('built React shell renders honest unavailable states on desktop and mobile', async () => {
+test('built website renders honest native-unavailable states on desktop and mobile', async () => {
   const server = spawn(process.execPath, ['dist/api/main.js'], {
     env: {
       ...process.env,
@@ -57,27 +57,27 @@ test('built React shell renders honest unavailable states on desktop and mobile'
         ? route.continue()
         : route.abort(),
     );
-    const evidence = process.env.HDD_V2_BROWSER_EVIDENCE ?? 'artifacts/task-01';
+    const evidence = process.env.HDD_V2_BROWSER_EVIDENCE ?? 'artifacts/task-07/smoke-' + Date.now();
     if (!/^artifacts\/task-\d{2}(\/[a-z0-9_-]+)*$/.test(evidence))
       throw new Error('Task-owned browser evidence required.');
     await mkdir(evidence, { recursive: true });
     for (const [name, width, height] of [
-      ['desktop', 1280, 800],
+      ['desktop', 1440, 1000],
       ['mobile', 390, 844],
     ]) {
       await page.setViewportSize({ width, height });
       await page.goto(base);
-      await page.getByRole('status').filter({ hasText: 'Development API connected.' }).waitFor();
+      await page.getByText('Current native data is unavailable.', { exact: false }).waitFor();
       assert.equal(
-        await page.getByRole('heading', { name: 'HEXDailyData', exact: true }).count(),
+        await page.getByRole('heading', { name: 'Your daily view', exact: true }).count(),
         1,
       );
       assert.equal(
         await page
-          .locator('dd')
+          .locator('[data-metric] dd')
           .allTextContents()
           .then((values) => values.filter((v) => v === 'Unavailable').length),
-        4,
+        6,
       );
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
@@ -85,9 +85,9 @@ test('built React shell renders honest unavailable states on desktop and mobile'
       );
       await page.screenshot({ path: `${evidence}/shell-${name}.png`, fullPage: true });
     }
-    await page.route('**/api/v2/status', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await page.route('**/api/v2/home?*', (route) => route.fulfill({ status: 503, body: '{}' }));
     await page.reload();
-    await page.getByRole('status').filter({ hasText: 'Development API unavailable.' }).waitFor();
+    await page.getByText('Current native data is unavailable.', { exact: false }).waitFor();
     assert.equal(await page.locator('dd').first().textContent(), 'Unavailable');
     assert.deepEqual(errors, []);
     console.log(`Browser: ${browser.version()}; desktop/mobile and API failure states passed.`);

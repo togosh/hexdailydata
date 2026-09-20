@@ -1,52 +1,123 @@
-﻿import { useEffect, useState } from 'react';
-import { StatusResponseSchema } from '../contracts/api.ts';
+﻿import { lazy, Suspense, useEffect, useState } from 'react';
+import Home from './Home.tsx';
 import './style.css';
-
+const History = lazy(() => import('./History.tsx'));
+const Calculator = lazy(() => import('./Calculator.tsx'));
+const Search = lazy(() => import('./Search.tsx'));
+const Downloads = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Downloads })));
+const Learn = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Learn })));
+const Status = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Status })));
+const links = [
+  ['/', 'Home'],
+  ['/charts', 'Charts'],
+  ['/search', 'Search'],
+  ['/calculator', 'Calculator'],
+  ['/downloads', 'Downloads'],
+];
 export default function App() {
-  const [status, setStatus] = useState('Connecting to the development API…');
+  const [path, setPath] = useState(location.pathname);
   useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5_000);
-    void fetch('/api/v2/status', { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('API unavailable');
-        StatusResponseSchema.parse(await response.json());
-        if (active) setStatus('Development API connected. HEX data is not available yet.');
-      })
-      .catch(() => {
-        if (active) setStatus('Development API unavailable. HEX data is not available yet.');
-      })
-      .finally(() => clearTimeout(timeout));
+    const changed = () => {
+      setPath(location.pathname);
+      window.scrollTo(0, 0);
+      requestAnimationFrame(() => document.querySelector<HTMLElement>('main')?.focus());
+    };
+    const clicked = (event: MouseEvent) => {
+      const link = (event.target as Element).closest('a');
+      if (
+        !link ||
+        event.defaultPrevented ||
+        event.button ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        link.target ||
+        link.hasAttribute('download')
+      )
+        return;
+      const url = new URL(link.href);
+      if (
+        url.origin !== location.origin ||
+        url.hash ||
+        url.pathname.startsWith('/api/') ||
+        url.pathname.startsWith('/health/')
+      )
+        return;
+      event.preventDefault();
+      if (url.pathname !== location.pathname || url.search !== location.search)
+        history.pushState(null, '', url);
+      changed();
+    };
+    window.addEventListener('popstate', changed);
+    document.addEventListener('click', clicked);
     return () => {
-      active = false;
-      clearTimeout(timeout);
-      controller.abort();
+      window.removeEventListener('popstate', changed);
+      document.removeEventListener('click', clicked);
     };
   }, []);
-
+  useEffect(() => {
+    document.title = `${path === '/' ? 'Home' : path.split('/')[1]} · HEXDailyData`;
+  }, [path]);
+  const active = path.startsWith('/address/') || path.startsWith('/stake/') ? '/search' : path;
   return (
-    <main>
-      <header>
-        <h1>HEXDailyData</h1>
-        <span>PulseChain</span>
+    <>
+      <a className="skip" href="#content">
+        Skip to content
+      </a>
+      <header className="site-header">
+        <a href="/" className="brand" aria-label="HEXDailyData home">
+          <span className="brand-mark" aria-hidden="true">
+            ⬡
+          </span>
+          <span>
+            HEXDailyData<small>PulseChain research &amp; staking data</small>
+          </span>
+        </a>
+        <span className="chain-badge">PulseChain</span>
+        <nav aria-label="Main navigation">
+          {links.map(([href, label]) => (
+            <a href={href} key={href} aria-current={active === href ? 'page' : undefined}>
+              {label}
+            </a>
+          ))}
+        </nav>
       </header>
-      <p role="status">{status}</p>
-      <section aria-labelledby="metrics-title">
-        <h2 id="metrics-title">Current HEX data</h2>
-        <dl>
-          {['HEX price', 'T-share rate', 'Today’s payout estimate', 'Latest completed payout'].map(
-            (label) => (
-              <div className="metric" key={label}>
-                <dt>{label}</dt>
-                <dd>Unavailable</dd>
-              </div>
-            ),
+      <main id="content" tabIndex={-1}>
+        <Suspense fallback={<p role="status">Loading page…</p>}>
+          {path === '/' ? (
+            <Home />
+          ) : path === '/charts' ? (
+            <History />
+          ) : path === '/calculator' ? (
+            <Calculator />
+          ) : path === '/downloads' ? (
+            <Downloads />
+          ) : path === '/learn' ? (
+            <Learn />
+          ) : path === '/status' ? (
+            <Status />
+          ) : path === '/search' || /^\/(address|stake)\//.test(path) ? (
+            <Search key={path} path={path} />
+          ) : (
+            <>
+              <h1>Page not found</h1>
+              <a href="/">Return Home</a>
+            </>
           )}
-        </dl>
-      </section>
-      <p>Shared Ethereum-era HEX history will be identified separately from PulseChain activity.</p>
-      <footer>Development shell · Live data qualification and final interface are pending.</footer>
-    </main>
+        </Suspense>
+      </main>
+      <footer className="site-footer">
+        <span>
+          HEXDailyData <small>· PulseChain</small>
+        </span>
+        <nav aria-label="More information">
+          <a href="/learn">Learn &amp; methodology</a>
+          <a href="/status">Data status</a>
+          <a href="/api/v2/status?chain=pulsechain">API metadata</a>
+        </nav>
+        <p>Read-only data. Each source has its own observation time and coverage.</p>
+      </footer>
+    </>
   );
 }

@@ -2,8 +2,8 @@
 
 Read-only HEX data API, exact TypeScript domain calculations, PostgreSQL projections,
 resumable acquisition, daily history and five immutable CSV downloads. Tasks01–06 are
-accepted offline. Task08 adds the compiled operations path below. Task07 UI and Task09
-integrated qualification remain pending. The HDS PulseChain integration adds an attributed
+accepted offline. Task08 adds the compiled operations path below. Task07 adds the mobile-first website, source-labeled charts, lookup, calculator and
+download pages. Task09 integrated qualification remains pending. The HDS PulseChain integration adds an attributed
 reported-history overlay; it is not a native seed or live source qualification. There is
 no qualified native provider profile, deployed site or production-readiness claim.
 

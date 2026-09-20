@@ -12,8 +12,8 @@ import {
   AddressResultSchema,
   LiveStakePageSchema,
 } from './api.ts';
-import { marketObservationSchema } from '../worker/daily/market.ts';
-import { bundleSchema } from '../worker/exports/manifest.ts';
+import { marketObservationSchema } from './market.ts';
+import { bundleSchema } from './downloads.ts';
 
 export const AddressSchema = z
   .string()

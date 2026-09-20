@@ -10,6 +10,7 @@ import { PageCursors } from '../services/queries/cursor.ts';
 import { home, status, chainId } from '../services/queries/home.ts';
 import { daily, markets, calculator } from '../services/queries/history.ts';
 import { stakes, holders, indexedStake } from '../services/queries/lists.ts';
+import { AddressSchema, StakeIdSchema } from '../contracts/reads.ts';
 
 export function createApp(
   options: {
@@ -298,8 +299,29 @@ export function createApp(
       }
       return reply.type('application/json; charset=utf-8').send(json);
     });
-  if (options.webRoot)
+  if (options.webRoot) {
     app.register(fastifyStatic, { root: options.webRoot, index: ['index.html'], dotfiles: 'deny' });
+    for (const path of [
+      '/charts',
+      '/search',
+      '/calculator',
+      '/downloads',
+      '/learn',
+      '/status',
+      '/address/:address',
+      '/stake/:id',
+    ]) {
+      app.get(path, (request, reply) => {
+        const params = request.params as { address?: string; id?: string };
+        if (
+          (params.address && !AddressSchema.safeParse(params.address).success) ||
+          (params.id && !StakeIdSchema.safeParse(params.id).success)
+        )
+          return reply.code(404).send(errorBody(request.id, 'not_found', 'Route not found.'));
+        return reply.sendFile('index.html');
+      });
+    }
+  }
   return app;
 }
 function matches(value: string | undefined, etag: string) {

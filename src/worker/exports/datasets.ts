@@ -1,5 +1,4 @@
 import type pg from 'pg';
-import contract from '../../contracts/datasets.json' with { type: 'json' };
 import { dayStartSeconds } from '../../domain/day.ts';
 import {
   displayRatio,
@@ -10,12 +9,8 @@ import {
 import { stakedPercent } from '../../domain/stake.ts';
 import { marketObservationSchema } from '../daily/market.ts';
 
-export const datasets = ['daily', 'stakes', 'holders', 'maturities', 'markets'] as const;
-export type Dataset = (typeof datasets)[number];
-export const definitions = Object.fromEntries(contract.datasets.map((d) => [d.name, d])) as Record<
-  Dataset,
-  (typeof contract.datasets)[number]
->;
+import { datasets, definitions, type Dataset } from '../../contracts/datasets.ts';
+export { datasets, definitions, type Dataset } from '../../contracts/datasets.ts';
 export const date = (day: number) =>
   new Date(Number(dayStartSeconds(day)) * 1000).toISOString().slice(0, 10);
 const timestamp = (seconds: string) => new Date(Number(seconds) * 1000).toISOString();
