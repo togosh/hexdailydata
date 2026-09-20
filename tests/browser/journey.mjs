@@ -566,7 +566,7 @@ try {
           .first()
           .waitFor();
         await page.keyboard.press('Escape');
-        assert.match(await page.locator('.home-today').innerText(), /2026-09-19/);
+        assert.match(await page.getByTestId('utc-clock').getAttribute('datetime'), /^2026-09-19T/);
         await page.unrouteAll();
         await page.route('**/api/v2/stakes/1099511627775?*', (r) =>
           r.fulfill({
