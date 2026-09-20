@@ -190,3 +190,16 @@ mobile captures and compact evidence are in `artifacts/task-07/home-refinement-2
 Task resources cleaned. Native initialization/live qualification remain pending;
 Task09 NOT_STARTED. No v1 execution, live providers, push or deployment. Stop for owner
 Home visual review. This entry is a documentation-only commit after reviewed source.
+
+Task07 Home panels PASS; OWNER_VISUAL_APPROVAL_PENDING. Reviewed code
+`d21efd2bc1cc444389141157318729789a6e8154` removes the context strip/tile subtext,
+shows whole current holder/staker populations, TVL/average length and seven Today rows.
+New populations are labeled net changes; payouts remain estimates. Independent
+`/root/home_panels_review` PASS after one source-origin correction/recheck. Format/types,
+99 units, compiled API13 groups, shell/full browser and refreshed visual captures PASS.
+Final isolated million-row p95: headlines1,196.3ms, chart1,793.8ms, Home query16.52ms.
+Actual dark/light desktop/mobile screenshots, source/evidence archives and review are
+in `artifacts/task-07/home-panels-20260920/`. Task resources cleaned. Native initialization
+and live qualification remain pending; Task09 NOT_STARTED. No v1 execution, live
+providers, push or deployment. Stop for owner Home visual review. This is a status-only
+entry after reviewed code.
