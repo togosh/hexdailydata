@@ -495,6 +495,35 @@ try {
     );
     await capture('home-apy-history-unavailable');
     await page.unroute('**/api/v2/calculator/inputs?*');
+    let releaseRetry;
+    const retryGate = new Promise((resolve) => (releaseRetry = resolve));
+    await page.route('**/api/v2/calculator/inputs?*', async (r) => {
+      await retryGate;
+      await r.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(inputs),
+      });
+    });
+    const retry = page.waitForRequest((r) => r.url().includes('/calculator/inputs?'));
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await retry;
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    assert.deepEqual(
+      await page.locator('.home-apy dd').allTextContents(),
+      Array(3).fill('Unavailable'),
+      'A pending retry cannot restore APY before a successful response',
+    );
+    assert.equal(
+      await page.locator('[data-testid="headlines"]').getAttribute('data-ready'),
+      'true',
+    );
+    releaseRetry();
+    await page.locator('[data-testid="stake-apy"][data-ready="true"]').waitFor();
+    assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), expected());
+    await page.unroute('**/api/v2/calculator/inputs?*');
     let release;
     const wait = new Promise((resolve) => (release = resolve));
     await page.route('**/api/v2/calculator/inputs?*', async (r) => {

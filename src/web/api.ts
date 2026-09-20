@@ -93,8 +93,9 @@ export function useResource<T>(url: string | null, schema: z.ZodType<T>, poll = 
       const controller = new AbortController();
       pending = controller;
       setState((s) => ({
+        // A retry is not recovery: retain same-resource errors until a successful response.
+        ...(s.url === url ? s : {}),
         url,
-        ...(s.url === url && s.data !== undefined ? { data: s.data } : {}),
         loading: true,
       }));
       try {
