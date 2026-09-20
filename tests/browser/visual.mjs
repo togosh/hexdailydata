@@ -445,6 +445,7 @@ try {
       ...boundary.live.todayPayoutEstimate,
       status: 'unavailable',
       value: null,
+      reason: 'not_observed',
     };
     await home();
     assert.deepEqual(await page.locator('.home-apy dd').allTextContents(), baseline);
