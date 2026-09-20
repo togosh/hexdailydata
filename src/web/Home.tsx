@@ -253,6 +253,36 @@ export default function Home() {
           )}
         </div>
       </div>
+      <div className="home-market-row">
+        <section className="panel home-gas" aria-labelledby="home-gas-title">
+          <div className="home-panel-heading">
+            <h2 id="home-gas-title">
+              <Icon name="link" />
+              PulseChain Gas
+            </h2>
+          </div>
+          <dl className="gas-quote">
+            <dt>Gas price</dt>
+            <dd title="Gas price feed is not connected">Unavailable</dd>
+          </dl>
+        </section>
+        <section className="panel home-markets" aria-labelledby="home-markets-title">
+          <div className="home-panel-heading">
+            <h2 id="home-markets-title">
+              <Icon name="chart" />
+              Market Prices
+            </h2>
+          </div>
+          <dl className="market-quotes">
+            {['BTC', 'ETH', 'PLS', 'PLSX', 'INC', 'PRVX'].map((symbol) => (
+              <div key={symbol}>
+                <dt>{symbol}</dt>
+                <dd title="Market price feed is not connected">Unavailable</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      </div>
       <nav className="home-shortcuts" aria-label="Quick actions">
         {(
           [

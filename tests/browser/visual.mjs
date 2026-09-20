@@ -175,6 +175,15 @@ try {
     const desktopToday = await page.locator('.home-today').boundingBox();
     assert.equal(desktopToday.y, facts.y);
     assert.ok(desktopToday.x > facts.x, 'desktop panels sit side by side');
+    const apy = await page.locator('.home-apy').boundingBox();
+    for (const panel of [chart, desktopToday]) {
+      assert.ok(
+        Math.abs(panel.y + panel.height - (apy.y + apy.height)) < 2,
+        'desktop columns share a bottom edge without vertical gaps',
+      );
+    }
+    const market = await page.locator('.home-market-row').boundingBox();
+    assert.ok(market.y >= chart.y + chart.height, 'market panels follow the HEX panels');
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 1366, height: 768 },

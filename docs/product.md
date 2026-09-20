@@ -165,6 +165,13 @@ without falling back to a one-day estimate. Panel label:10,000 HEX · 30-day pay
 The selected originals are now available in docs/ui-reference/. They are not final
 aesthetic approval; actual Task07 captures are recorded separately.
 
+The owner's subsequent Home request authorizes PulseChain gas and market-price panels
+for BTC, ETH, PLS, PLSX, INC and PRVX. The first visual pass aligns desktop column
+bottoms and adds these panels below the HEX content. Their values remain explicitly
+unavailable: v2 has no admitted gas or six-asset price feed. Provider selection and
+PRVX contract identity are pending owner clarification; this layout does not authorize
+live requests or claim that feed integration is complete.
+
 Product/data contracts override illustrative labels: do not add address-history
 sparklines, historical holder snapshots, extra CSV/JSON products, arbitrary APY labels,
 BTC/ETH asset-price panels or other unsupported fields to imitate an image. These
