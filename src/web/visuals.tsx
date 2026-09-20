@@ -1,30 +1,38 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 
-// Presentation adapted from the owner's supplied v1 components.jsx HexMark and
-// product-components.jsx Icon excerpts. No v1 runtime or data dependencies.
-export function HexMark() {
-  const id = useId();
+import hexLogo from './assets/tokens/hex.svg?no-inline';
+import btcLogo from './assets/tokens/btc.svg?no-inline';
+import ethLogo from './assets/tokens/eth.svg?no-inline';
+import plsLogo from './assets/tokens/pls.svg?no-inline';
+import plsxLogo from './assets/tokens/plsx.svg?no-inline';
+import incLogo from './assets/tokens/inc.png?no-inline';
+import prvxLogo from './assets/tokens/prvx.webp?no-inline';
+
+const tokenLogos = {
+  BTC: btcLogo,
+  ETH: ethLogo,
+  PLS: plsLogo,
+  PLSX: plsxLogo,
+  INC: incLogo,
+  PRVX: prvxLogo,
+};
+export function TokenLogo({ symbol }: { symbol: keyof typeof tokenLogos }) {
   return (
-    <svg className="hex-mark" viewBox="0 0 52 48" aria-hidden="true">
-      <defs>
-        <linearGradient id={id} x1=".2" y1="1" x2=".8" y2="0">
-          <stop stopColor="#ffcc00" />
-          <stop offset=".45" stopColor="#ff6030" />
-          <stop offset=".72" stopColor="#ff007d" />
-          <stop offset="1" stopColor="#ef00e7" />
-        </linearGradient>
-      </defs>
-      <path fill={`url(#${id})`} d="M13 1h26l13 23-13 23H13L0 24Z" />
-      <path
-        d="M7 35 17 17h19l10 18M13 46 22 30h11l9 16M8 34 18 34l7 12"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <img
+      className="token-logo"
+      src={tokenLogos[symbol]}
+      width="24"
+      height="24"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
   );
 }
+export function HexMark() {
+  return <img className="hex-mark" src={hexLogo} width="52" height="48" alt="" decoding="async" />;
+}
+// Icons adapted from the supplied v1 presentation excerpt; logos above are official assets.
 const paths = {
   chart: 'M4 20V13H7V20M10 20V8H13V20M16 20V3H19V20',
   price: 'M12 2V22M17 6H10a4 4 0 0 0 0 8h4a4 4 0 0 1 0 8H6',

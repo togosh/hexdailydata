@@ -7,7 +7,7 @@ import { stakeApy } from '../domain/calculator.ts';
 import { useResource, endpoint, useClock } from './api.ts';
 import { Metric } from './components.tsx';
 import { compactNumber, observationState, yearsFromDays, multiplyDecimals } from './format.ts';
-import { Icon, type IconName } from './visuals.tsx';
+import { Icon, TokenLogo, type IconName } from './visuals.tsx';
 
 const HomeChart = lazy(() => import('./History.tsx').then((m) => ({ default: m.HomeChart })));
 export default function Home() {
@@ -258,12 +258,18 @@ export default function Home() {
           <div className="home-panel-heading">
             <h2 id="home-gas-title">
               <Icon name="link" />
-              PulseChain Gas
+              PulseChain Costs
             </h2>
           </div>
-          <dl className="gas-quote">
-            <dt>Gas price</dt>
-            <dd title="Gas price feed is not connected">Unavailable</dd>
+          <dl className="fact-rows gas-quote">
+            {['PLS Price', 'PRC20 Transfer', 'PulseX Swap', 'Add Liquidity', 'Gas Price'].map(
+              (label) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd title="Price and gas feeds are not connected">Unavailable</dd>
+                </div>
+              ),
+            )}
           </dl>
         </section>
         <section className="panel home-markets" aria-labelledby="home-markets-title">
@@ -274,9 +280,12 @@ export default function Home() {
             </h2>
           </div>
           <dl className="market-quotes">
-            {['BTC', 'ETH', 'PLS', 'PLSX', 'INC', 'PRVX'].map((symbol) => (
+            {(['BTC', 'ETH', 'PLS', 'PLSX', 'INC', 'PRVX'] as const).map((symbol) => (
               <div key={symbol}>
-                <dt>{symbol}</dt>
+                <dt>
+                  <TokenLogo symbol={symbol} />
+                  {symbol}
+                </dt>
                 <dd title="Market price feed is not connected">Unavailable</dd>
               </div>
             ))}

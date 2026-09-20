@@ -1031,23 +1031,39 @@ main:has(.home-page) {
   min-width: 0;
 }
 .gas-quote {
-  margin: 0;
-  padding: 10px 15px;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
+  padding: 0 12px;
 }
-.gas-quote dt,
-.market-quotes dt {
-  color: var(--muted);
+.gas-quote > div {
+  padding: 1px 0;
+  line-height: 1.25;
+}
+.gas-quote dt {
   font-size: 0.8rem;
 }
 .gas-quote dd,
 .market-quotes dd {
   font-weight: 650;
   overflow-wrap: anywhere;
+}
+.gas-quote dd {
+  font-size: 0.8rem;
+}
+.market-quotes dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+.token-logo {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  flex: none;
+}
+.hex-mark {
+  object-fit: contain;
 }
 .market-quotes {
   display: grid;
@@ -1202,6 +1218,12 @@ main:has(.home-page) {
   font-size: 0.85rem;
 }
 @media (min-width: 1101px) {
+  .home-market-row .home-panel-heading {
+    padding: 7px 12px;
+  }
+  .home-shortcuts a {
+    padding: 9px 18px;
+  }
   .home-metrics .metric {
     padding: 10px;
   }

@@ -101,6 +101,11 @@ try {
   await open();
   await test('SYNTHETIC compiled API values, requested six-metric order, Supply then Today, chart controls and APY estimates', async () => {
     await home();
+    await page.locator('.market-quotes').scrollIntoViewIfNeeded();
+    await page
+      .locator('.home-page .token-logo, .site-header .hex-mark')
+      .evaluateAll((images) => Promise.all(images.map((image) => image.decode())));
+    await page.evaluate(() => scrollTo(0, 0));
     assert.deepEqual(await (await fetch(base + '/api/v2/home')).json(), fixture.expected);
     assert.equal(await page.locator('.home-context').count(), 0);
     assert.equal(await page.locator('.home-metrics .meta').count(), 0);
@@ -341,10 +346,24 @@ try {
       await page.goto(base + path);
       await page.locator('h1').waitFor({ state: 'attached' });
       await page.waitForTimeout(250);
-      for (const width of [320, 390, 1440]) {
-        await page.setViewportSize({ width, height: width === 1440 ? 1000 : 844 });
+      for (const width of [320, 390, 960, 1440]) {
+        await page.setViewportSize({
+          width,
+          height: width === 960 ? 1080 : width === 1440 ? 1000 : 844,
+        });
         await page.evaluate(() => scrollTo(0, 0));
         await capture(name + '-' + width + '-smoke');
+        if (width === 960) {
+          await page.screenshot({
+            path: resolve(folder, 'visual-' + name + '-960-full.png'),
+            fullPage: true,
+          });
+          if (name === 'home') {
+            await page.getByRole('button', { name: 'Use light mode' }).click();
+            await capture('home-960-light');
+            await page.getByRole('button', { name: 'Use dark mode' }).click();
+          }
+        }
       }
       await page.getByRole('button', { name: 'Use light mode' }).click();
       await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');
