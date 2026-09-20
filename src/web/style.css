@@ -1230,7 +1230,7 @@ main:has(.home-page) {
     padding: 20px 0;
   }
   main:has(.home-page) {
-    padding: 10px 14px;
+    padding: 8px 14px;
   }
 
   .home-metrics {
@@ -1239,7 +1239,7 @@ main:has(.home-page) {
     margin-bottom: 8px;
   }
   .home-metrics .metric {
-    padding: 7px 10px;
+    padding: 6px 10px;
   }
   .home-metrics dt {
     font-size: 0.8rem;
