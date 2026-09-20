@@ -276,3 +276,16 @@ chart2131.9ms, APY1655ms. Sources: docs/token-artwork.md; evidence/screenshots:
 `artifacts/task-07/home-logos-20260920/`. Owned resources cleaned. Static logo downloads
 only; no live data providers, v1 execution, push/deploy or Task09. Stop for owner review.
 This is a documentation-only status entry after reviewed source.
+
+Task07 Stake Calculator refinement VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed code `a0119c1aea35f75f418af747a6c45a6fae1df585` follows v1's compact
+stake/quote and future-value panels, with expandable exact details and mobile stacking.
+V2 arithmetic, assumptions, input invalidation and freshness gating are preserved.
+Recurring screenshots now include full vertical mobile and actual scrolled views for
+all main routes, alongside 960px half-desktop and 1440px desktop. Types/build/format,
+15 focused units, full native browser journeys and seven visual groups PASS in Chrome;
+Firefox/WebKit unavailable. Separate `/root/home_panels_review` PASS, including its
+15 units and keyboard/form probe. Initial Home readiness test race retained and fixed.
+Evidence/screenshots: `artifacts/task-07/calculator-visual-20260920/`. Owned resources
+cleaned. No live providers, v1 execution, other page-body redesign, push/deploy or Task09.
+Stop for owner Calculator visual review. Documentation-only status entry.
