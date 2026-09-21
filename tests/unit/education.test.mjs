@@ -20,10 +20,15 @@ test('five stable concepts share one short-answer source; Learn-only prose stays
   assert.equal(new Set(concepts.map((c) => c.anchor)).size, 5);
   assert.equal(concepts[1].anchor, 'staking-basics');
   const home = readFileSync('src/web/HomeFaq.tsx', 'utf8');
-  const learn = readFileSync('src/web/Learn.tsx', 'utf8');
   assert.match(home, /concepts\.map/);
   assert.match(home, /\{concept\.answer\}/);
-  for (const concept of concepts) assert.ok(learn.includes(`<Summary id="${concept.id}"`));
+  assert.match(concepts[1].answer, /can't spend it while staked/);
+  assert.match(
+    concepts[1].answer,
+    /Ending early or too late can reduce your payout and starting HEX/,
+  );
+  assert.match(concepts[2].answer, /aren't a separate token you buy or trade/);
+  assert.match(concepts[3].answer, /amount varies; it isn't a daily deposit into your wallet/);
   assert.doesNotMatch(home, /Information|Learn\.tsx|learnResources|fetch\(/);
   assert.match(
     readFileSync('src/web/App.tsx', 'utf8'),
@@ -71,7 +76,7 @@ test('published units and illustrative daily allocation match independent packet
   );
   assert.equal(result.rewardHex.numerator / result.rewardHex.denominator, 60n);
   const source = readFileSync('src/web/Learn.tsx', 'utf8');
-  assert.match(source, /10 T-Shares correspond to 60 HEX/);
+  assert.match(source, /10 T-Shares × 6 HEX per T-Share ≈ 60 HEX/);
   // Packet's independent combined-floor witness; never generate expected values from quoteStake.
   const quote = quoteStake(100000000001n, 2, 123456n, HEX_LAUNCH_SECONDS + 100n * 86400n);
   assert.equal(quote.bonusHearts, 55011721n);

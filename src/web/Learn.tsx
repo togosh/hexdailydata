@@ -18,138 +18,159 @@ export default function Learn() {
     <article className="learn-page">
       <header className="learn-heading">
         <h1>Learn HEX</h1>
-        <p>Understand staking, T-Shares, payouts and the numbers on HEXDailyData.</p>
+        <p>Make sense of staking and the numbers.</p>
         <nav className="learn-jumps" aria-label="Learn sections">
-          <a href="#start">Start here</a>
-          <a href="#staking">Understand staking</a>
-          <a href="#data">Understand the data</a>
+          <a href="#start">The basics</a>
+          <a href="#staking">Staking</a>
+          <a href="#data">The data</a>
         </nav>
       </header>
 
       <section id="start">
-        <h2>Start here</h2>
+        <h2>The basics</h2>
         <div className="learn-intro">
           <section id="hex">
-            <h3>HEX in a minute</h3>
+            <h3>What is HEX?</h3>
             <Summary id="hex" />
-            <p>
-              Starting a stake burns the committed HEX from the liquid balance and records its
-              principal and shares in the contract. Ending it mints the calculated return, after any
-              applicable penalty. “Locked HEX” on this site describes that recorded stake principal,
-              not tokens deposited into a savings account.
-            </p>
           </section>
           <section id="pulsechain">
-            <h3>HEX, PulseChain and this website</h3>
+            <h3>Why PulseChain?</h3>
             <Summary id="pulsechain" />
-            <p>
-              HEX staking is different from staking PLS to operate a network validator. HEXDailyData
-              is an independent, read-only research site: it explains records and estimates, but
-              does not hold funds or start, end or manage stakes.
-            </p>
           </section>
         </div>
       </section>
 
       <section id="staking-basics">
         <h2>How a stake works</h2>
-        <Summary id="staking" />
         <ol className="stake-lifecycle">
           <li>
-            <strong>Choose</strong>
-            <p>
-              Select an amount and a term. A longer commitment can increase shares, but also leaves
-              that principal unavailable for longer.
-            </p>
+            <strong>Choose &amp; start</strong>
+            <p>Pick an amount and number of days. Starting the stake commits that HEX.</p>
           </li>
           <li>
-            <strong>Start</strong>
-            <p>
-              The contract records the stake. An ordinary new stake waits until the next protocol
-              day before becoming active.
-            </p>
+            <strong>While it runs</strong>
+            <p>Your T-Shares determine your part of each day's payout. The amount varies.</p>
           </li>
           <li>
-            <strong>Accrue</strong>
+            <strong>End your stake</strong>
             <p>
-              Eligible shares receive allocations from each day's payout pool during the committed
-              term. The amount can vary from day to day.
-            </p>
-          </li>
-          <li>
-            <strong>Mature</strong>
-            <p>
-              The term finishes. It does not automatically settle or continue earning extra payout
-              for days beyond the term.
-            </p>
-          </li>
-          <li>
-            <strong>Settle</strong>
-            <p>
-              Stake End calculates and mints the return. Applicable penalties and transaction fees
-              affect the outcome.
+              After the term finishes, use Stake End to receive the result. Payment isn't automatic.
             </p>
           </li>
         </ol>
-        <p className="learn-aside">
-          <strong>Optional after maturity: Good Accounting.</strong> This records a mature stake's
-          payout and penalty without sending the proceeds to its owner. Anyone may call it for a
-          mature stake; the owner still needs Stake End to receive the return. It does not erase a
-          penalty already incurred.
+        <p>
+          Ending early or too late can reduce your payout and starting HEX. Reaching maturity does
+          not add extra earning days.
         </p>
       </section>
 
       <section id="staking">
-        <h2>Understand staking</h2>
+        <h2>Three terms you’ll see everywhere</h2>
         <section id="tshares">
-          <h3>T-Shares are your allocation units</h3>
+          <h3>What are my T-Shares for?</h3>
           <Summary id="tshares" />
-          <p>
-            An existing stake's assigned shares do not automatically increase when the global share
-            rate rises. More T-Shares mean a larger fraction of the same eligible payout pool, not a
-            guaranteed dollar return.
-          </p>
         </section>
         <section>
-          <h3>Share rate is not APY</h3>
+          <h3>What does the share rate tell me?</h3>
           <p>
-            The displayed T-Share rate is the effective HEX required per T-Share before amount and
-            duration bonuses. It is different from HEX's market price and from a return percentage.
-            A higher rate produces fewer new shares from otherwise identical inputs.
+            It sets how many shares a new stake gets. For the same amount and length, a higher rate
+            means fewer T-Shares. It is not an interest rate.
           </p>
         </section>
         <section id="payout">
-          <h3>Payout is an allocation, not a daily deposit</h3>
+          <h3>What is payout per T-Share?</h3>
           <Summary id="payout" />
-          <p>
-            For ordinary post-launch days, the contract's payout calculation includes protocol
-            issuance and the portion of stake penalties redistributed to the payout pool. Not all
-            penalties go to stakers. Future payouts depend on protocol state and activity; they are
-            not fixed interest from a borrower.
+        </section>
+        <section className="learn-example" aria-labelledby="example-title">
+          <h3 id="example-title">A simple example</h3>
+          <p>Suppose your stake is earning and the day’s payout is 6 HEX per T-Share.</p>
+          <p className="example-equation">
+            <strong>10 T-Shares × 6 HEX per T-Share ≈ 60 HEX</strong>
           </p>
-          <p className="learn-example">
-            <strong>Simple example — not a forecast:</strong> at exactly 6 HEX per T-Share for one
-            eligible day, 10 T-Shares correspond to 60 HEX before stake-level integer rounding and
-            any settlement penalties. Nothing in that example promises tomorrow's payout or a USD
-            value.
+          <p>
+            For that day, before any end-of-stake penalties. Example only—not a forecast. See the
+            exact rounding under <a href="#math">Show me the math</a>.
           </p>
         </section>
-        <section>
-          <h3>Duration bonuses are shares, not free liquid HEX</h3>
+        <a className="learn-source-link" href="/calculator">
+          Try the calculator →
+        </a>
+      </section>
+
+      <section id="data">
+        <h2>What the labels mean</h2>
+        <dl className="learn-labels">
+          <div>
+            <dt>Live</dt>
+            <dd>A recent reading. Its age is shown.</dd>
+          </div>
+          <div>
+            <dt>Indexed</dt>
+            <dd>Saved through the date shown—not necessarily live.</dd>
+          </div>
+          <div>
+            <dt>HDS reported</dt>
+            <dd>Historical figures originally published by HEXDailyStats.</dd>
+          </div>
+          <div>
+            <dt>Unavailable</dt>
+            <dd>We don't have a reliable value. It does not mean zero.</dd>
+          </div>
+        </dl>
+        <p>
+          An estimate uses assumptions. Even after a day ends, its payout may still be waiting to be
+          recorded.
+        </p>
+        <div className="learn-page-links">
+          <a href="/charts">Explore charts</a>
+          <a href="/search">Find an address</a>
+          <a href="/downloads">Download data</a>
+        </div>
+      </section>
+
+      <section aria-labelledby="project-resources">
+        <h2 id="project-resources">Explore further</h2>
+        <p>Project websites and tool entry points. These links leave HEXDailyData.</p>
+        <ul className="learn-resources" aria-labelledby="project-resources">
+          {primaryResources.map((resource) => (
+            <li key={resource.href}>
+              <ExternalLink {...resource} />
+              <p>{resource.description}</p>
+            </li>
+          ))}
+        </ul>
+        <p>
+          External tools can move funds. Check the URL, network and transaction details. Never share
+          your recovery phrase or private key. These links are not a safety guarantee.
+        </p>
+      </section>
+
+      <section className="learn-depth" aria-labelledby="learn-depth-title">
+        <h2 id="learn-depth-title">Go a little deeper</h2>
+        <details id="longer-stakes" className="learn-disclosure">
+          <summary>Does a longer stake always mean a better result?</summary>
           <p>
-            Longer terms and larger amounts can increase the effective amount used to issue stake
-            shares, within the contract's caps. That does not immediately mint bonus HEX or
-            guarantee an annual yield. The current calculator models a new ordinary stake; it does
-            not recreate every historical claim-era stake.
+            A longer term can create more T-Shares, within the contract’s limits. But your HEX stays
+            committed longer. More shares do not guarantee a better dollar result.
           </p>
+        </details>
+        <details id="maturity-questions" className="learn-disclosure">
+          <summary>What happens when my stake matures?</summary>
           <p>
-            <strong>Before committing:</strong> early or late settlement can reduce principal as
-            well as payout. Maturity is not automatic, and token price changes and fees can outweigh
-            HEX-denominated rewards. The calendar and exact contract rules matter.
+            Its earning term is finished. It does not end itself or gain extra payout days. The
+            owner still needs Stake End to receive the return; leaving it too long can cause a
+            penalty.
           </p>
-        </section>
-        <details className="learn-disclosure">
-          <summary>Stake states</summary>
+        </details>
+        <details id="good-accounting" className="learn-disclosure">
+          <summary>What is Good Accounting?</summary>
+          <p>
+            It records the result of a mature stake without paying it to the owner. Anyone can do
+            it; the owner still needs Stake End. It does not remove penalties already incurred.
+          </p>
+        </details>
+        <details id="stake-states" className="learn-disclosure">
+          <summary>What do the stake statuses mean?</summary>
           <dl className="learn-glossary">
             <dt>Queued</dt>
             <dd>
@@ -182,102 +203,25 @@ export default function Learn() {
             rows, which retain their own label. “Current” means unended, not “currently earning.”
           </p>
         </details>
-        <a className="learn-source-link" href="#resources">
-          Sources &amp; details
-        </a>
-      </section>
-
-      <section id="data">
-        <h2>Understand the data</h2>
-        <h3>Start with the label, not just the number</h3>
-        <p>
-          <strong>Live</strong> describes a recent provisional observation at a particular block.
-          <strong> Indexed</strong> means accepted records through the shown cutoff.
-          <strong> HDS reported</strong> identifies a retained HEXDailyStats observation, not a new
-          measurement by this site. Their timestamps and meanings can differ.
-        </p>
-        <p>
-          A blank or unavailable value is not zero. “No upcoming maturities” is a known empty
-          schedule; an unavailable index means the schedule is unknown. A partial live stake page is
-          not a complete address total.
-        </p>
-        <h3>The most useful distinctions</h3>
-        <p>
-          <strong>Price versus reference price.</strong> A historical HDS reference price is an
-          observation from that archive, not guaranteed market-close data or a price you can trade
-          at.
-        </p>
-        <p>
-          <strong>Completed payout versus estimate.</strong> A day can have ended while its protocol
-          payout record is still pending. Today's estimate remains provisional, even after a
-          refresh.
-        </p>
-        <p>
-          <strong>Stakes versus stakers.</strong> One address can have many stakes; one person can
-          control many addresses. Current holders, current stakers and historical-ever counts are
-          not interchangeable or necessarily distinct people.
-        </p>
-        <p>
-          <strong>Supply versus locked principal.</strong> Liquid/circulating HEX and recorded stake
-          principal are separate. Do not add an old indexed staking amount to a newer live balance
-          and call it one exact current total.
-        </p>
-        <h3>Use the right page</h3>
-        <ul className="learn-destinations">
-          <li>
-            <a href="/">Home</a> — Current observations and headline statistics, each with its own
-            status.
-          </li>
-          <li>
-            <a href="/charts">Charts</a> — Historical patterns, sources, date coverage and exact
-            records.
-          </li>
-          <li>
-            <a href="/calculator">Calculator</a> — New-stake shares and explicitly hypothetical
-            payout/price scenarios.
-          </li>
-          <li>
-            <a href="/search">Search</a> — An address or stake's records, timing, live coverage and
-            dated ranks.
-          </li>
-          <li>
-            <a href="/downloads">Data</a> — The five standard CSV datasets and their units and
-            coverage.
-          </li>
-        </ul>
-      </section>
-
-      <section>
-        <h2>Using HEX on PulseChain</h2>
-        <p>
-          HEXDailyData does not buy, sell or stake tokens. Using external tools generally requires a
-          compatible self-custody wallet, the correct network and enough PLS for transaction fees. A
-          token swap and a HEX stake are separate contract interactions.
-        </p>
-        <p>
-          Before signing elsewhere, check the destination domain, network, token address, quoted
-          amounts, slippage and any spending allowance or stake duration. Never give a website,
-          message or support agent your recovery phrase or private key.
-        </p>
-        <p>
-          <strong>External tools can move funds.</strong> Project-published links are starting
-          points for your own investigation, not a safety audit or investment recommendation.
-          Smart-contract, wallet, market and liquidity risks remain. This page offers education, not
-          a promise of returns or a recommendation of how much or how long to stake.
-        </p>
-        <h3 id="project-resources">Project resources &amp; external tools</h3>
-        <ul className="learn-resources" aria-labelledby="project-resources">
-          {primaryResources.map((resource) => (
-            <li key={resource.href}>
-              <ExternalLink {...resource} />
-              <p>{resource.description}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="learn-depth" aria-labelledby="learn-depth-title">
-        <h2 id="learn-depth-title">Deeper detail</h2>
+        <details id="using-tools" className="learn-disclosure">
+          <summary>Before using an external tool</summary>
+          <p>
+            HEXDailyData does not buy, sell or stake tokens. Using external tools generally requires
+            a compatible self-custody wallet, the correct network and enough PLS for transaction
+            fees. A token swap and a HEX stake are separate contract interactions.
+          </p>
+          <p>
+            Before signing elsewhere, check the destination domain, network, token address, quoted
+            amounts, slippage and any spending allowance or stake duration. Never give a website,
+            message or support agent your recovery phrase or private key.
+          </p>
+          <p>
+            <strong>External tools can move funds.</strong> Project-published links are starting
+            points for your own investigation, not a safety audit or investment recommendation.
+            Smart-contract, wallet, market and liquidity risks remain. This page offers education,
+            not a promise of returns or a recommendation of how much or how long to stake.
+          </p>
+        </details>
         <details id="math" className="learn-disclosure">
           <summary>Show me the math</summary>
           <h3>Units</h3>
@@ -329,7 +273,53 @@ export default function Learn() {
         </details>
 
         <details id="methodology" className="learn-disclosure">
-          <summary>How HEXDailyData measures data</summary>
+          <summary>How the data is measured</summary>
+          <h3 id="protocol-context">HEX staking and this site</h3>
+          <p>
+            Starting a stake burns the committed HEX from the liquid balance and records its
+            principal and shares in the contract. Ending it mints the calculated return, after any
+            applicable penalty. “Locked HEX” on this site describes that recorded stake principal,
+            not tokens deposited into a savings account.
+          </p>
+          <p>
+            HEX staking is different from staking PLS to operate a network validator. HEXDailyData
+            is an independent, read-only research site: it explains records and estimates, but does
+            not hold funds or start, end or manage stakes.
+          </p>
+          <p className="learn-aside">
+            <strong>Optional after maturity: Good Accounting.</strong> This records a mature stake's
+            payout and penalty without sending the proceeds to its owner. Anyone may call it for a
+            mature stake; the owner still needs Stake End to receive the return. It does not erase a
+            penalty already incurred.
+          </p>
+          <h3 id="share-mechanics">Shares, bonuses and payouts</h3>
+          <p>
+            An existing stake's assigned shares do not automatically increase when the global share
+            rate rises. More T-Shares mean a larger fraction of the same eligible payout pool, not a
+            guaranteed dollar return.
+          </p>
+          <p>
+            The displayed T-Share rate is the effective HEX required per T-Share before amount and
+            duration bonuses. It is different from HEX's market price and from a return percentage.
+            A higher rate produces fewer new shares from otherwise identical inputs.
+          </p>
+          <p>
+            For ordinary post-launch days, the contract's payout calculation includes protocol
+            issuance and the portion of stake penalties redistributed to the payout pool. Not all
+            penalties go to stakers. Future payouts depend on protocol state and activity; they are
+            not fixed interest from a borrower.
+          </p>
+          <p>
+            Longer terms and larger amounts can increase the effective amount used to issue stake
+            shares, within the contract's caps. That does not immediately mint bonus HEX or
+            guarantee an annual yield. The current calculator models a new ordinary stake; it does
+            not recreate every historical claim-era stake.
+          </p>
+          <p>
+            <strong>Before committing:</strong> early or late settlement can reduce principal as
+            well as payout. Maturity is not automatic, and token price changes and fees can outweigh
+            HEX-denominated rewards. The calendar and exact contract rules matter.
+          </p>
           <h3>Sources, freshness and missing values</h3>
           <p>
             Native history is built from accepted protocol records; live values are separately aged
@@ -346,6 +336,27 @@ export default function Learn() {
             HDS reported history is an attributed HEXDailyStats archive, independently selectable in
             Charts. It does not supply Home's current price, raw share rate or calculator presets.
           </p>
+          <p>
+            <strong>Live</strong> describes a recent provisional observation at a particular block.
+            <strong> Indexed</strong> means accepted records through the shown cutoff.
+            <strong> HDS reported</strong> identifies a retained HEXDailyStats observation, not a
+            new measurement by this site. Their timestamps and meanings can differ.
+          </p>
+          <p>
+            A blank or unavailable value is not zero. “No upcoming maturities” is a known empty
+            schedule; an unavailable index means the schedule is unknown. A partial live stake page
+            is not a complete address total.
+          </p>
+          <p>
+            <strong>Price versus reference price.</strong> A historical HDS reference price is an
+            observation from that archive, not guaranteed market-close data or a price you can trade
+            at.
+          </p>
+          <p>
+            <strong>Completed payout versus estimate.</strong> A day can have ended while its
+            protocol payout record is still pending. Today's estimate remains provisional, even
+            after a refresh.
+          </p>
           <h3>Counts and stake amounts</h3>
           <p>
             Locked principal includes queued, active, mature-open and GA stakes. Accounted principal
@@ -359,6 +370,16 @@ export default function Learn() {
             from historical-ever holders. Do not combine those series without their definitions. A
             live page is a bounded observation, not proof that every stake was fetched. Provider
             unavailability or index lag never establishes absence.
+          </p>
+          <p>
+            <strong>Stakes versus stakers.</strong> One address can have many stakes; one person can
+            control many addresses. Current holders, current stakers and historical-ever counts are
+            not interchangeable or necessarily distinct people.
+          </p>
+          <p>
+            <strong>Supply versus locked principal.</strong> Liquid/circulating HEX and recorded
+            stake principal are separate. Do not add an old indexed staking amount to a newer live
+            balance and call it one exact current total.
           </p>
           <h3>Duration and days</h3>
           <p>
@@ -414,6 +435,29 @@ export default function Learn() {
             keep their earlier origin and dates. Native readiness, HDS coverage, market availability
             and standard CSV publication are separate.
           </p>
+          <h3 id="site-pages">Use the right page</h3>
+          <ul className="learn-destinations">
+            <li>
+              <a href="/">Home</a> — Current observations and headline statistics, each with its own
+              status.
+            </li>
+            <li>
+              <a href="/charts">Charts</a> — Historical patterns, sources, date coverage and exact
+              records.
+            </li>
+            <li>
+              <a href="/calculator">Calculator</a> — New-stake shares and explicitly hypothetical
+              payout/price scenarios.
+            </li>
+            <li>
+              <a href="/search">Search</a> — An address or stake's records, timing, live coverage
+              and dated ranks.
+            </li>
+            <li>
+              <a href="/downloads">Data</a> — The five standard CSV datasets and their units and
+              coverage.
+            </li>
+          </ul>
           <p>
             <a href="/status">Data status</a> ·{' '}
             <a href="/api/v2/status?chain=pulsechain">API metadata</a>

@@ -5,8 +5,7 @@ export default function HomeFaq() {
     <section className="home-faq" aria-labelledby="home-faq-title">
       <div>
         <h2 id="home-faq-title">New to HEX?</h2>
-        <p className="home-faq-subtitle">Understand the numbers.</p>
-        <p>Start with five short answers about HEX, staking and the data on this page.</p>
+        <p className="home-faq-subtitle">Start with the basics.</p>
         <a href="/learn">Learn HEX →</a>
       </div>
       <div>

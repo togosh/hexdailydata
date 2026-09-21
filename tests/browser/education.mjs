@@ -6,9 +6,10 @@ import { mkdirSync, readFileSync, writeFileSync, readdirSync, statSync } from 'n
 import { resolve } from 'node:path';
 import { concepts } from '../../src/web/education.ts';
 import { primaryResources, deeperResources } from '../../src/web/learnResources.ts';
+import { readingCopy } from './education-reading.mjs';
 
 const [
-  output = 'artifacts/task-07/learn-home-20260921/current',
+  output = 'artifacts/task-07/learn-refinement-20260921/current',
   webRoot = 'dist/web',
   mode = 'current',
 ] = process.argv.slice(2);
@@ -23,7 +24,26 @@ const checks = [],
   errors = [],
   externalAttempts = [],
   interceptedLinks = [],
-  measurements = [];
+  measurements = [],
+  reading = [];
+// A compact editorial capture set; all journeys still run their layout assertions.
+const captures = new Set([
+  'home-mobile-initial',
+  'home-desktop-initial',
+  'home-desktop-faq-default',
+  'home-mobile-faq-default',
+  'learn-desktop-initial',
+  'learn-mobile-initial',
+  'learn-desktop-full',
+  'learn-mobile-full',
+  'learn-mobile-lifecycle',
+  'learn-mobile-example',
+  'resources-mobile-primary',
+  'learn-mobile-math-open',
+  'learn-mobile-methodology-open',
+  'learn-desktop-math-open',
+  'learn-320-light',
+]);
 let context,
   page,
   requests,
@@ -99,7 +119,8 @@ async function shot(name, fullPage = false) {
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     name + ' page overflow',
   );
-  await page.screenshot({ path: resolve(folder, 'screenshots', name + '.png'), fullPage });
+  if (captures.has(name))
+    await page.screenshot({ path: resolve(folder, 'screenshots', name + '.png'), fullPage });
 }
 async function anchor(id) {
   await page.waitForFunction((id) => {
@@ -107,10 +128,15 @@ async function anchor(id) {
     if (!target) return false;
     const focus = target.tagName === 'DETAILS' ? target.querySelector('summary') : target;
     const box = target.getBoundingClientRect();
+    const nav = document.querySelector('.bottom-nav');
+    const bottom =
+      getComputedStyle(nav).display === 'none' ? innerHeight : nav.getBoundingClientRect().top;
+    const atPageEnd = Math.abs(scrollY + innerHeight - document.documentElement.scrollHeight) <= 2;
     return (
       document.activeElement === focus &&
       box.top >= 0 &&
-      box.top < 100 &&
+      (box.top < 100 || atPageEnd) &&
+      box.top + Math.min(box.height, 44) <= bottom &&
       (target.tagName !== 'DETAILS' || target.open)
     );
   }, id);
@@ -262,7 +288,8 @@ try {
           assert.equal(await page.locator('.learn-page h1').count(), 1);
           assert.equal(await page.locator('.learn-jumps a').count(), 3);
           assert.equal(await page.locator('.learn-page details[open]').count(), 0);
-          for (const c of concepts)
+          assert.equal(await page.locator('.learn-page details').count(), 8);
+          for (const c of concepts.filter((concept) => concept.id !== 'staking')) {
             assert.equal(
               await page
                 .locator('#' + c.anchor + ' > p')
@@ -270,6 +297,12 @@ try {
                 .textContent(),
               c.answer,
             );
+            assert.ok(await page.locator('#' + c.anchor).isVisible());
+            assert.equal(
+              await page.locator('#' + c.anchor).evaluate((el) => el.closest('details')),
+              null,
+            );
+          }
           const ids = await page.locator('[id]').evaluateAll((els) => els.map((e) => e.id));
           assert.equal(new Set(ids).size, ids.length, 'unique DOM anchors');
           for (const id of [
@@ -279,14 +312,73 @@ try {
             'math',
             'methodology',
             'resources',
+            'project-resources',
+            'stake-states',
+            'using-tools',
             ...concepts.map((c) => c.anchor),
           ])
             assert.ok(ids.includes(id));
-          assert.equal(await page.locator('.stake-lifecycle li').count(), 5);
+          assert.equal(await page.locator('.stake-lifecycle li').count(), 3);
+          assert.deepEqual(await page.locator('.stake-lifecycle strong').allTextContents(), [
+            'Choose & start',
+            'While it runs',
+            'End your stake',
+          ]);
+          const lifecycle = await page.locator('#staking-basics').innerText();
+          assert.match(lifecycle, /Payment isn't automatic/);
+          assert.match(
+            lifecycle,
+            /Ending early or too late can reduce your payout and starting HEX/,
+          );
+          assert.match(lifecycle, /does not add extra earning days/);
+          assert.match(
+            await page.locator('#staking').innerText(),
+            /higher rate means fewer T-Shares\. It is not an interest rate/,
+          );
+          assert.match(
+            await page.locator('.example-equation').innerText(),
+            /10 T-Shares × 6 HEX per T-Share ≈ 60 HEX/,
+          );
+          assert.match(
+            await page.locator('.learn-example').innerText(),
+            /before any end-of-stake penalties\. Example only—not a forecast/,
+          );
+          assert.equal(await page.locator('.learn-example a').getAttribute('href'), '#math');
+          assert.deepEqual(await page.locator('.learn-labels dt').allTextContents(), [
+            'Live',
+            'Indexed',
+            'HDS reported',
+            'Unavailable',
+          ]);
+          assert.match(
+            await page.locator('.learn-labels').innerText(),
+            /originally published by HEXDailyStats/,
+          );
+          assert.match(await page.locator('.learn-labels').innerText(), /does not mean zero/);
+          assert.match(
+            await page.locator('#data').innerText(),
+            /payout may still be waiting to be recorded/,
+          );
+          reading.push({ device, ...(await readingCopy(page)) });
+          assert.equal(reading.at(-1).bodyFontPx, '16px');
+          assert.ok(
+            await page
+              .locator('.learn-page p, .learn-labels dt')
+              .evaluateAll((elements) =>
+                elements.every((el) => parseFloat(getComputedStyle(el).fontSize) >= 16),
+              ),
+            'normal article copy and data labels remain at least 16px',
+          );
+          assert.ok(
+            !reading.at(-1).text.includes('Starting a stake burns'),
+            'technical mechanics remain optional',
+          );
           await shot('learn-' + device + '-initial');
           await shot('learn-' + device + '-full', true);
           await page.locator('.stake-lifecycle').scrollIntoViewIfNeeded();
           await shot('learn-' + device + '-lifecycle');
+          await page.locator('.learn-example').scrollIntoViewIfNeeded();
+          await shot('learn-' + device + '-example');
           await page
             .locator('#project-resources')
             .evaluate((el) => el.scrollIntoView({ block: 'start' }));
@@ -318,11 +410,14 @@ try {
               { capture: true },
             );
           });
+          await page.keyboard.press('Tab');
           for (const r of expected) {
             const link = page.locator(`.learn-page a[href="${r.href}"]`);
             assert.ok((await link.innerText()).includes(new URL(r.href).hostname));
             assert.ok((await link.innerText()).includes('↗'));
-            await link.click();
+            await link.focus();
+            assert.ok(await link.evaluate((el) => el.matches(':focus-visible')));
+            await page.keyboard.press('Enter');
             assert.equal(await page.evaluate(() => window.__externalClicks.at(-1)), r.href);
             interceptedLinks.push(r.href);
           }
@@ -333,9 +428,57 @@ try {
       );
     }
     await check(
+      'optional questions and visible next steps preserve their meanings and keyboard access',
+      async () => {
+        await open();
+        await page.goto(base + '/learn');
+        await page.locator('.learn-page').waitFor();
+        await page.keyboard.press('Tab');
+        for (const [id, meaning] of [
+          ['longer-stakes', /More shares do not guarantee a better dollar result/],
+          ['maturity-questions', /does not end itself or gain extra payout days/],
+          ['good-accounting', /does not remove penalties already incurred/],
+          ['stake-states', /Current.*means unended, not.*currently earning/s],
+          ['using-tools', /slippage and any spending allowance or stake duration/],
+          ['math', /bonuses share one floor; do not round them separately/],
+          ['methodology', /30-consecutive-completed-day mean/],
+          ['resources', /historical, not current instructions or forecasts/],
+        ]) {
+          const details = page.locator('#' + id);
+          const summary = details.locator(':scope > summary');
+          assert.equal(await details.evaluate((el) => el.open), false);
+          await summary.focus();
+          await page.keyboard.press('Enter');
+          assert.equal(await details.evaluate((el) => el.open), true);
+          assert.match(await details.innerText(), meaning);
+          await page.keyboard.press('Space');
+          assert.equal(await details.evaluate((el) => el.open), false);
+        }
+        for (const [selector, heading] of [
+          ['.learn-source-link', 'Stake Calculator'],
+          ['.learn-page-links a[href="/charts"]', 'Charts'],
+          ['.learn-page-links a[href="/search"]', 'Address Lookup'],
+          ['.learn-page-links a[href="/downloads"]', 'Downloads'],
+        ]) {
+          await page.goto(base + '/learn');
+          await page.locator(selector).click();
+          await page.getByRole('heading', { name: heading, exact: true }).waitFor();
+        }
+      },
+    );
+    await check(
       'cold lazy anchors, Home methodology link, same-route history and focus only on navigation',
       async () => {
-        for (const id of ['math', 'methodology', 'tshares', 'staking-basics', 'resources']) {
+        for (const id of [
+          'math',
+          'methodology',
+          'tshares',
+          'staking-basics',
+          'resources',
+          'protocol-context',
+          'share-mechanics',
+          'site-pages',
+        ]) {
           await open();
           await page.goto(base + '/learn#' + id);
           await anchor(id);
@@ -354,6 +497,12 @@ try {
               'native summary stays in tab order',
             );
           if (['math', 'methodology'].includes(id)) await shot('learn-mobile-' + id + '-open');
+          if (['protocol-context', 'share-mechanics', 'site-pages'].includes(id))
+            assert.equal(
+              await page.locator('#methodology').evaluate((el) => el.open),
+              true,
+              'nested target opens its enclosing disclosure',
+            );
           assert.equal(requests.length, 0);
         }
         await open(1440, 1000);
@@ -436,8 +585,8 @@ try {
           ['/search', 'Address Lookup'],
           ['/downloads', 'Downloads'],
         ]) {
-          await page.goto(base + '/learn#data');
-          await anchor('data');
+          await page.goto(base + '/learn#site-pages');
+          await anchor('site-pages');
           await page.locator(`.learn-destinations a[href="${href}"]`).click();
           await page.getByRole('heading', { name: heading, exact: true }).waitFor();
           assert.equal(new URL(page.url()).pathname, href);
@@ -468,6 +617,7 @@ try {
         externalAttempts,
         interceptedLinks,
         measurements,
+        reading,
         inventory,
         cleanup: 'Browser contexts, browser and task-owned loopback server closed in finally',
       },

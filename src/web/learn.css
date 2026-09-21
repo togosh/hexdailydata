@@ -1,11 +1,11 @@
 .learn-page {
-  max-width: 1060px;
+  max-width: 960px;
   margin: 0 auto;
   font-size: 1rem;
-  line-height: 1.7;
+  line-height: 1.55;
 }
 .learn-heading {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 .learn-heading h1 {
   margin-bottom: 0.35rem;
@@ -16,8 +16,8 @@
 .learn-jumps {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem 1.5rem;
-  margin-top: 1.25rem;
+  gap: 0.25rem 1.25rem;
+  margin-top: 0.75rem;
 }
 .learn-jumps a {
   min-height: 44px;
@@ -60,7 +60,7 @@
   list-style: none;
   counter-reset: step;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   padding: 1.25rem;
   margin: 1.5rem 0;
@@ -87,6 +87,45 @@
 .learn-example {
   background: var(--panel);
   padding: 1rem;
+  margin-top: 1.25rem;
+  max-width: 74ch;
+}
+.learn-example h3 {
+  margin-top: 0;
+}
+.learn-example p:last-child {
+  margin-bottom: 0;
+}
+.example-equation {
+  color: var(--ink);
+}
+.learn-labels {
+  max-width: 74ch;
+}
+.learn-labels > div {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.learn-labels dt {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+.learn-labels dd {
+  margin: 0;
+}
+.learn-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+}
+.learn-page-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .learn-disclosure {
   border-top: 1px solid var(--line);
@@ -99,6 +138,7 @@
   color: var(--ink);
 }
 .learn-glossary dt {
+  font-size: 1rem;
   font-weight: 650;
   margin-top: 1rem;
 }
@@ -156,12 +196,12 @@
   max-width: 74ch;
   overflow-wrap: anywhere;
   font-family: ui-monospace, monospace;
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 .learn-formula p:last-child {
   margin-bottom: 0;
 }
-@media (max-width: 900px) {
+@media (max-width: 760px) {
   .stake-lifecycle {
     grid-template-columns: 1fr;
   }
@@ -181,5 +221,9 @@
   .learn-page > section {
     margin-top: 1.25rem;
     padding-top: 1.25rem;
+  }
+  .learn-labels > div {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
   }
 }

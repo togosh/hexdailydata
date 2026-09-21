@@ -3,24 +3,24 @@
 export const resourceCheckDate = '2026-09-21';
 export const primaryResources = [
   {
-    label: 'HEX — project information',
+    label: 'HEX',
+    description: 'Project information.',
     href: 'https://hex.com/',
-    description: 'Project explanations and links to HEX tools.',
   },
   {
-    label: 'PulseChain — network information',
+    label: 'PulseChain',
+    description: 'Network information.',
     href: 'https://pulsechain.com/',
-    description: 'Project entry point for the network and its resources.',
   },
   {
     label: 'HEX interface',
+    description: 'Entry point for HEX tools.',
     href: 'https://go.hex.com/',
-    description: 'Project-published entry point for interacting with HEX.',
   },
   {
     label: 'PulseX',
+    description: 'Entry point for token swaps.',
     href: 'https://app.pulsex.com/',
-    description: 'Project-published entry point for token-swap interfaces on PulseChain.',
   },
 ] as const;
 export const deeperResources = [
