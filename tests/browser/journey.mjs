@@ -332,6 +332,23 @@ try {
         await go('/calculator');
         await page.getByRole('button', { name: 'Calculate shares & timing' }).waitFor();
         await page.waitForFunction(() => !document.querySelector('button.primary:disabled'));
+        const currentHome = await (await fetch(base + '/api/v2/home?chain=pulsechain')).json();
+        await page.waitForFunction(
+          (value) =>
+            document.querySelector('input[aria-label="Hypothetical future USD per HEX"]').value ===
+            value,
+          currentHome.live.price.value.usdPerHex,
+        );
+        assert.equal(await page.getByLabel('Constant daily payout assumption').inputValue(), '30');
+        assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).count(), 0);
+        await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
+        await page.locator('.usd-result .value').waitFor();
+        await page.getByLabel('Hypothetical future USD per HEX').fill('0');
+        await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
+        assert.equal(await page.locator('.usd-result dd').innerText(), '$0');
+        await page.getByLabel('Hypothetical future USD per HEX').fill('');
+        await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
+        assert.equal(await page.locator('.usd-result .value').count(), 0);
         await page.getByLabel('HEX amount', { exact: true }).fill('10000');
         await page.getByLabel('Whole days').fill('365');
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
@@ -348,9 +365,10 @@ try {
         await page.route('**/api/v2/calculator/inputs?*', (r) =>
           r.fulfill({ status: 503, contentType: 'application/json', body: '{}' }),
         );
-        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
         await page.getByText('Data is unavailable.', { exact: false }).waitFor();
         assert.equal(await page.getByLabel('HEX amount', { exact: true }).inputValue(), '20000');
+        assert.equal(await page.getByLabel('Hypothetical future USD per HEX').inputValue(), '0.01');
         await capture('calculator-outage');
         await page.unrouteAll();
       });
@@ -605,7 +623,7 @@ try {
           p.value = null;
           p.reason = 'missing_days';
         }
-        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
         await page.getByText('Last-known-rate scenario.', { exact: false }).waitFor();
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         await page
@@ -618,7 +636,11 @@ try {
         inputs.shareRate.asOf.blockTimestamp = new Date(beforeMidnight).toISOString();
         inputs.shareRate.observedAt = new Date(beforeMidnight).toISOString();
         await page.evaluate((t) => (window.__testNow = t), beforeMidnight);
-        await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+        const refreshedInputs = page.waitForResponse((r) =>
+          r.url().includes('/calculator/inputs?'),
+        );
+        await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+        await refreshedInputs;
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         await page.getByRole('status').filter({ hasText: 'maturity 2027-09-20' }).waitFor();
         await page.evaluate((t) => (window.__testNow = t), beforeMidnight + 61000);

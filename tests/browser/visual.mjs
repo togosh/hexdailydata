@@ -364,6 +364,19 @@ try {
         });
         await page.evaluate(() => scrollTo(0, 0));
         await capture(name + '-' + width + '-smoke');
+        if (name === 'calculator' && width === 390) {
+          const bottom = await page.locator('.bottom-nav').boundingBox();
+          const price = await page.locator('.future-price-row').boundingBox();
+          const usd = await page.locator('.usd-result').boundingBox();
+          assert.ok(
+            price.y + price.height <= (bottom?.y ?? 780),
+            'future price and action fit initial mobile viewport',
+          );
+          assert.ok(
+            usd.y + usd.height <= (bottom?.y ?? 780),
+            'future USD result fits initial mobile viewport',
+          );
+        }
         if (width === 390 || width === 960 || width === 1440) {
           await page.screenshot({
             path: resolve(folder, 'visual-' + name + '-' + width + '-full.png'),
