@@ -230,6 +230,7 @@ Unknown query keys are rejected. Lower/uppercase hexadecimal address input is no
 | Daily and markets `from`, `to` | Both required, inclusive real UTC dates; launch through day65535; ordered and at most366 days |
 | Markets `source` | Optional declared source identifier; at most4 separate sources, source then day order |
 | Stakes `address` | Optional exact address; stake ID ascending, no OFFSET |
+| Stakes `lifecycle` | Optional `open` (queued/active/mature-open), `good_accounted` (GA-unended), or `ended` (settled/cancelled); applied before keyset paging and bound into the cursor |
 | Stakes/holders/address `limit` | Default50, range1–100; live totals and returned page size stay separate |
 | Holders `order` | `liquid` (default) or `staker`; stored unique ordinal rank then address; ties were resolved by the daily ranking worker |
 | Indexed `cursor` | Signed version1, chain/filter/order/page-size/cutoff binding, 60s expiry from first page; changed sync revision/hash/rank identity returns409 |
@@ -253,6 +254,27 @@ for an unknown stake merely from SQL or a user-supplied owner. Known indexed lif
 remains available with a separately unavailable recent overlay. No whale enumeration
 or second provider allowance is used. Current balance and daily rank block cutoffs are
 separate. No historical holder snapshots are implied.
+
+The Address baseline's `staking` summary is read in the same SQL statement as its
+accepted `asOf` cutoff. `lockedHearts` includes unsettled and GA-unended principal;
+`goodAccountedHearts` isolates GA-unended principal. `accountedShares` includes
+queued/active/mature-open shares, excluding GA and ended/cancelled shares. Counts
+use the same lifecycle sets as the list filters; current count is open plus GA.
+`firstStakeDay` is the earliest retained start day, including ended/cancelled stakes.
+`nextMaturityDay` is the earliest unsettled maturity on or after `contractDay`;
+overdue stakes remain in Open but are not upcoming maturities. Null days mean no
+matching indexed stake, not a live absence claim. All API days remain zero-based;
+the page shows day+1 and UTC dates.
+
+`staking.activity` is the latest five retained Start/Good Accounting/End/cancellation
+events for that address's stakes, ordered by canonical block then log index. It
+preserves event origin across the fork and has the summary's accepted cutoff. This
+bounded summary is not a transfer/claim ledger or a whole-wallet activity history.
+These reads use the existing owner and lifecycle-event indexes; no new storage or
+provider requests are introduced. Live pages retain their own pinned cutoff and
+never supply the indexed totals, counts or next maturity. Search recents are at
+most five normalized address/stake strings in local browser storage, with Clear;
+they are not logged by the server.
 
 Home performs one compact data statement after connection setup; current/daily/sync
 and four metric records are bounded. Home does no provider work, file verification,

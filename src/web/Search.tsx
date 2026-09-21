@@ -1,18 +1,17 @@
-import { useRef, useState } from 'react';
+import { Address } from './Address.tsx';
+import { useState } from 'react';
 import type { z } from 'zod';
 import {
   StakesResponseSchema,
   HoldersResponseSchema,
-  AddressResultSchema,
   StakeResponseSchema,
   AddressSchema,
   StakeIdSchema,
 } from '../contracts/reads.ts';
 import { formatUnits } from '../domain/units.ts';
 import { endpoint, useResource, useClock } from './api.ts';
-import { dayLabel, dayDate, compactNumber, numberText } from './format.ts';
-import { Icon } from './visuals.tsx';
-import { Feedback, SearchForm, Table, Copy, Value, Metric } from './components.tsx';
+import { dayLabel, numberText } from './format.ts';
+import { Feedback, SearchForm, Table, Copy } from './components.tsx';
 
 const statusName = (s: string) =>
   ({
@@ -157,239 +156,6 @@ function Indexed({ address, order = 'stakes' }: { address?: string; order?: stri
     </section>
   );
 }
-function Address({ address }: { address: string }) {
-  const [cursor, setCursor] = useState<string>();
-  const pinned = useRef<string | null>(null);
-  const data = useResource(
-    endpoint('/addresses/' + address + (cursor ? '/stakes' : ''), { limit: 20, cursor }),
-    AddressResultSchema,
-  );
-  const now = useClock(),
-    d = data.data,
-    page = d?.live?.page;
-  const identity = page
-    ? page.asOf.blockHash + ':' + page.stakeCount + ':' + d?.live?.expiresAt
-    : null;
-  const conflict = !!(cursor && identity && identity !== pinned.current);
-  const expired = !!(d?.live && Date.parse(d.live.expiresAt) <= now);
-  const valid = !conflict && !expired && data.status !== 409;
-  const restart = () => {
-    pinned.current = null;
-    setCursor(undefined);
-    data.refresh();
-  };
-  return (
-    <div className="address-page">
-      <div className="page-heading">
-        <div>
-          <h1>Address Lookup</h1>
-          <p>Search an address or stake ID to view balances, stakes and dated ranks.</p>
-        </div>
-        <div className="address-feedback">
-          <Feedback {...data} refresh={restart} hasData={!!d} />
-        </div>
-      </div>
-      <div className="address-search">
-        <Icon name="search" />
-        <SearchForm />
-      </div>
-      <dl className="address-metrics">
-        <Metric
-          id="address-liquid"
-          icon="database"
-          title="Liquid HEX"
-          value={valid && d?.live ? hex(d.live.balanceHearts) : null}
-          display={compactNumber(valid && d?.live ? hex(d.live.balanceHearts) : null, 3)}
-          note="Current observed block"
-        />
-        <Metric
-          id="address-count"
-          icon="people"
-          title="Current stakes"
-          value={valid && page ? page.stakeCount : null}
-          note="Current observed block"
-        />
-        <Metric
-          id="address-accounted"
-          icon="pie"
-          title="Accounted staked HEX"
-          value={hex(d?.indexed?.accountedHearts)}
-          display={compactNumber(hex(d?.indexed?.accountedHearts), 3)}
-          note="Indexed; excludes good-accounted stakes"
-        />
-        <Metric
-          id="address-rank"
-          icon="chart"
-          title="Liquid rank"
-          value={d?.indexed?.rank?.liquid}
-          prefix="#"
-          note={
-            d?.indexed?.rankingDay == null
-              ? 'Rank date unavailable'
-              : dayLabel(d.indexed.rankingDay)
-          }
-        />
-      </dl>
-      <div className="address-layout">
-        <section className="panel address-stakes">
-          <h2>
-            <Icon name="database" /> Current stakes
-          </h2>
-          {!valid ? (
-            <p className="notice">
-              Observation changed or expired. Restart to read a new pinned page.
-            </p>
-          ) : d?.live ? (
-            <>
-              <p className="meta">
-                Provisional · block {page!.asOf.blockNumber} · source {page!.asOf.blockTimestamp} ·
-                collected {page!.observedAt}
-              </p>
-
-              <p>
-                Showing {page!.items.length} of {page!.stakeCount} current stakes · offset{' '}
-                {d.live.offset}.{' '}
-                {page!.enumerationComplete
-                  ? 'Enumeration complete at this observation.'
-                  : 'Partial page; whole-address stake totals and nearest maturity are not inferred.'}
-              </p>
-              <Table
-                title="Pinned current stake page"
-                headings={['Stake ID', 'Principal (HEX)', 'T-shares', 'Maturity (UTC)', 'State']}
-              >
-                {page!.items.map((s) => (
-                  <tr key={s.stakeId}>
-                    <td>
-                      <a href={'/stake/' + s.stakeId}>{s.stakeId}</a>
-                    </td>
-                    <td>
-                      <span title={hex(s.principalHearts)!}>
-                        {compactNumber(hex(s.principalHearts), 3)}
-                      </span>
-                    </td>
-                    <td>
-                      <span title={formatUnits(BigInt(s.stakeShares), 12)}>
-                        {compactNumber(formatUnits(BigInt(s.stakeShares), 12), 3)}
-                      </span>
-                    </td>
-                    <td>
-                      <span title={`Locks ${dayLabel(s.lockedDay)}`}>
-                        {dayDate(s.lockedDay + s.stakedDays)}
-                      </span>
-                      <small className="block">Day {s.lockedDay + s.stakedDays + 1}</small>
-                    </td>
-                    <td>
-                      <span className="address-state" title="State at the observed block">
-                        {s.unlockedDay ? 'Good accounted' : 'Current'}
-                      </span>
-                      {s.isAutoStake ? ' · auto-stake' : ''}
-                    </td>
-                  </tr>
-                ))}
-              </Table>
-              <button
-                disabled={!page!.nextCursor || data.loading}
-                onClick={() => {
-                  pinned.current = identity;
-                  setCursor(page!.nextCursor!);
-                }}
-              >
-                Next pinned page
-              </button>
-            </>
-          ) : (
-            <p>
-              Current balance and stakes unavailable
-              {d?.outcome === 'quota' ? ' — provider quota reached' : ''}. Indexed records below
-              have their own cutoff.
-            </p>
-          )}
-          {(!valid || cursor) && <button onClick={restart}>Restart current observation</button>}
-        </section>
-        <aside className="panel address-summary">
-          <h2>
-            <Icon name="person" /> Address Summary
-          </h2>
-          <dl className="fact-rows">
-            <div>
-              <dt>Address</dt>
-              <dd className="address-summary-id" title={address}>
-                {address.slice(0, 8)}...{address.slice(-6)}
-              </dd>
-            </div>
-            <div>
-              <dt>Current stake count</dt>
-              <dd>{valid && page ? numberText(page.stakeCount) : 'Unavailable'}</dd>
-            </div>
-            <div>
-              <dt>Liquid rank</dt>
-              <dd>
-                {d?.indexed?.rank?.liquid ? '#' + numberText(d.indexed.rank.liquid) : 'Unavailable'}
-              </dd>
-            </div>
-            <div>
-              <dt>Staker rank</dt>
-              <dd>
-                {d?.indexed?.rank?.staker ? '#' + numberText(d.indexed.rank.staker) : 'Unavailable'}
-              </dd>
-            </div>
-            <div>
-              <dt>Rank date</dt>
-              <dd>
-                {d?.indexed?.rankingDay == null ? 'Unavailable' : dayLabel(d.indexed.rankingDay)}
-              </dd>
-            </div>
-          </dl>
-          <Copy text={address} label="Copy address" />
-          <details className="address-source-details">
-            <summary>Full address &amp; source details</summary>
-            <p className="full-address">{address}</p>
-            {d?.indexed && (
-              <p className="meta">
-                Rank block {d.indexed.rank?.asOf.blockNumber ?? 'unavailable'}. Indexed block{' '}
-                {d.indexed.asOf.blockNumber} - {d.indexed.asOf.blockTimestamp} -{' '}
-                {d.indexed.finality}.
-              </p>
-            )}
-          </details>
-          {d?.indexed && (
-            <div className="address-baseline">
-              <h3>Accepted indexed baseline</h3>
-              <details>
-                <summary>Balances &amp; index cutoff</summary>
-                <dl className="fact-rows">
-                  <div>
-                    <dt>Indexed liquid HEX</dt>
-                    <dd>
-                      <Value value={hex(d.indexed.liquidHearts)} places={4} />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Indexed accounted HEX (excludes GA)</dt>
-                    <dd>
-                      <Value value={hex(d.indexed.accountedHearts)} places={4} />
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Indexed stake count</dt>
-                    <dd>{d.indexed.stakeCount ?? 'Unavailable'}</dd>
-                  </div>
-                </dl>
-                <p className="meta">
-                  Block {d.indexed.asOf.blockNumber} - {d.indexed.finality}
-                </p>
-              </details>
-            </div>
-          )}
-        </aside>
-      </div>
-      <details className="address-indexed">
-        <summary>Indexed stake records</summary>
-        <Indexed address={address} />
-      </details>
-    </div>
-  );
-}
 function Stake({ id }: { id: string }) {
   const data = useResource(endpoint('/stakes/' + id), StakeResponseSchema);
   const now = useClock(),
@@ -509,11 +275,13 @@ export default function Search({ path }: { path: string }) {
       <div className="page-heading">
         <div>
           <p className="eyebrow">Explore HEX on PulseChain</p>
-          <h1>Search &amp; rankings</h1>
+          <h1>Address Lookup</h1>
           <p>Look up an address or stake. Browse dated, accepted index records.</p>
         </div>
       </div>
-      <SearchForm />
+      <div className="address-search">
+        <SearchForm />
+      </div>
       <label className="view-picker">
         Browse
         <select aria-label="Browse" value={order} onChange={(e) => setOrder(e.target.value)}>

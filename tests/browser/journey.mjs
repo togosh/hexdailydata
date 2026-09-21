@@ -295,11 +295,15 @@ try {
         pinnedFirst = await (
           await fetch(base + '/api/v2/addresses/' + address + '?chain=pulsechain&limit=20')
         ).json();
+        await page.locator('.address-data-details > summary').click();
         await page.getByText('Showing 20 of 41 current stakes', { exact: false }).waitFor();
         for (const width of [390, 1440])
           await capture('address', width, width === 390 ? 844 : 1000);
         await page.getByRole('button', { name: 'Next pinned page' }).click();
-        await page.getByText(/offset 20/).waitFor();
+        await page
+          .locator('.address-data-details')
+          .getByText(/offset 20/)
+          .waitFor();
         await page.getByRole('button', { name: 'Next pinned page' }).click();
         await page.getByText('Showing 1 of 41 current stakes', { exact: false }).waitFor();
         const another = '0x' + '2'.padStart(40, '0');
@@ -323,7 +327,7 @@ try {
         await page.reload();
         await page.getByRole('heading', { name: 'Stake 1', exact: true }).waitFor();
         await page.goBack();
-        await page.getByRole('heading', { name: 'Search & rankings' }).waitFor();
+        await page.getByRole('heading', { name: 'Address Lookup' }).waitFor();
         await page.goForward();
         await page.getByRole('heading', { name: 'Stake 1', exact: true }).waitFor();
         await go('/search');
@@ -505,8 +509,9 @@ try {
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(data) }),
         );
         await go('/address/' + address);
+        await page.locator('.address-data-details > summary').click();
         await page.getByText(/provider quota reached/).waitFor();
-        await page.getByRole('heading', { name: 'Accepted indexed baseline' }).waitFor();
+        await page.getByRole('heading', { name: 'Address Summary' }).waitFor();
         await capture('address-quota');
         await page.unrouteAll();
         await page.route('**/api/v2/addresses/**', async (r) => {
@@ -520,10 +525,11 @@ try {
             });
         });
         await page.reload();
+        await page.locator('.address-data-details > summary').click();
         await page.getByRole('button', { name: 'Next pinned page' }).click();
         await page
           .getByText('Observation changed or expired. Restart to read a new pinned page.', {
-            exact: true,
+            exact: false,
           })
           .waitFor();
         assert.equal(
@@ -531,8 +537,11 @@ try {
           'Unavailable',
         );
         assert.equal(
-          await page.locator('[data-metric="address-count"] .value').innerText(),
-          'Unavailable',
+          await page
+            .locator('.address-freshness')
+            .innerText()
+            .then((t) => /LIVE.*expired/.test(t)),
+          true,
         );
         await capture('address-expired');
         await page.unrouteAll();

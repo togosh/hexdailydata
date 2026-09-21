@@ -5756,6 +5756,19 @@
               "maxLength": 42,
               "pattern": "^0x[0-9a-fA-F]{40}$"
             }
+          },
+          {
+            "name": "lifecycle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "good_accounted",
+                "ended"
+              ]
+            }
           }
         ],
         "responses": {
@@ -6377,6 +6390,19 @@
               "type": "string",
               "maxLength": 42,
               "pattern": "^0x[0-9a-fA-F]{40}$"
+            }
+          },
+          {
+            "name": "lifecycle",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "good_accounted",
+                "ended"
+              ]
             }
           }
         ],
@@ -7388,6 +7414,136 @@
                                 }
                               ]
                             },
+                            "staking": {
+                              "type": "object",
+                              "properties": {
+                                "contractDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "lockedHearts": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "goodAccountedHearts": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "accountedShares": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "openCount": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "goodAccountedCount": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "endedCount": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "firstStakeDay": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 65535
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "nextMaturityDay": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 65535
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "activity": {
+                                  "maxItems": 5,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "stakeId": {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "start",
+                                          "good_accounting",
+                                          "end",
+                                          "cancel"
+                                        ]
+                                      },
+                                      "originChainId": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                            "const": 1
+                                          },
+                                          {
+                                            "type": "number",
+                                            "const": 369
+                                          }
+                                        ]
+                                      },
+                                      "blockNumber": {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                      }
+                                    },
+                                    "required": [
+                                      "stakeId",
+                                      "kind",
+                                      "originChainId",
+                                      "blockNumber",
+                                      "at"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "contractDay",
+                                "lockedHearts",
+                                "goodAccountedHearts",
+                                "accountedShares",
+                                "openCount",
+                                "goodAccountedCount",
+                                "endedCount",
+                                "firstStakeDay",
+                                "nextMaturityDay",
+                                "activity"
+                              ],
+                              "additionalProperties": false
+                            },
                             "rankingDay": {
                               "anyOf": [
                                 {
@@ -7487,6 +7643,7 @@
                             "liquidHearts",
                             "accountedHearts",
                             "stakeCount",
+                            "staking",
                             "rankingDay",
                             "rank"
                           ],
@@ -8135,6 +8292,136 @@
                                 }
                               ]
                             },
+                            "staking": {
+                              "type": "object",
+                              "properties": {
+                                "contractDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 65535
+                                },
+                                "lockedHearts": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "goodAccountedHearts": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "accountedShares": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "openCount": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "goodAccountedCount": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "endedCount": {
+                                  "type": "string",
+                                  "maxLength": 78,
+                                  "pattern": "^(0|[1-9][0-9]*)$"
+                                },
+                                "firstStakeDay": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 65535
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "nextMaturityDay": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 65535
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "activity": {
+                                  "maxItems": 5,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "stakeId": {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "start",
+                                          "good_accounting",
+                                          "end",
+                                          "cancel"
+                                        ]
+                                      },
+                                      "originChainId": {
+                                        "anyOf": [
+                                          {
+                                            "type": "number",
+                                            "const": 1
+                                          },
+                                          {
+                                            "type": "number",
+                                            "const": 369
+                                          }
+                                        ]
+                                      },
+                                      "blockNumber": {
+                                        "type": "string",
+                                        "maxLength": 78,
+                                        "pattern": "^(0|[1-9][0-9]*)$"
+                                      },
+                                      "at": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                      }
+                                    },
+                                    "required": [
+                                      "stakeId",
+                                      "kind",
+                                      "originChainId",
+                                      "blockNumber",
+                                      "at"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": [
+                                "contractDay",
+                                "lockedHearts",
+                                "goodAccountedHearts",
+                                "accountedShares",
+                                "openCount",
+                                "goodAccountedCount",
+                                "endedCount",
+                                "firstStakeDay",
+                                "nextMaturityDay",
+                                "activity"
+                              ],
+                              "additionalProperties": false
+                            },
                             "rankingDay": {
                               "anyOf": [
                                 {
@@ -8234,6 +8521,7 @@
                             "liquidHearts",
                             "accountedHearts",
                             "stakeCount",
+                            "staking",
                             "rankingDay",
                             "rank"
                           ],

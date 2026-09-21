@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode, type FormEvent } from 'react';
 import { numberText } from './format.ts';
 import { Icon, type IconName } from './visuals.tsx';
+import { normalizeSearch, readSearches, rememberSearch, recentSearchKey } from './searches.ts';
 
 export function Value({
   value,
@@ -151,22 +152,35 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const id = useId();
   const [value, setValue] = useState(''),
     [error, setError] = useState('');
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const term = value.trim();
-    const address = /^0x[0-9a-fA-F]{40}$/.test(term);
-    const stake = /^(0|[1-9][0-9]{0,12})$/.test(term) && BigInt(term) < 1n << 40n;
-    if (!address && !stake) {
-      setError('Enter a 42-character address or a decimal stake ID below 1099511627776.');
-      return;
+  const [recent, setRecent] = useState<string[]>(() => {
+    try {
+      return readSearches(localStorage);
+    } catch {
+      return [];
+    }
+  });
+  const navigate = (term: string) => {
+    try {
+      setRecent(rememberSearch(localStorage, term));
+    } catch {
+      /* Search works without storage. */
     }
     window.history.pushState(
       null,
       '',
-      address ? '/address/' + term.toLowerCase() : '/stake/' + term,
+      term.startsWith('0x') ? '/address/' + term : '/stake/' + term,
     );
     window.dispatchEvent(new PopStateEvent('popstate'));
     setError('');
+  };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const term = normalizeSearch(value);
+    if (term === null) {
+      setError('Enter a 42-character address or a decimal stake ID below 1099511627776.');
+      return;
+    }
+    navigate(term);
   };
   return (
     <form className={'search ' + (compact ? 'compact' : '')} onSubmit={submit}>
@@ -195,6 +209,34 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p id={id + '-error'} role="alert">
           {error}
         </p>
+      )}
+      {!compact && recent.length > 0 && (
+        <details className="recent-searches">
+          <summary>
+            Recent searches <span>On this device</span>
+          </summary>
+          <div>
+            {recent.map((term) => (
+              <button type="button" key={term} title={term} onClick={() => navigate(term)}>
+                {term.startsWith('0x') ? term.slice(0, 8) + '…' + term.slice(-6) : '#' + term}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  localStorage.removeItem(recentSearchKey);
+                } catch {
+                  /* Clear the displayed history too. */
+                }
+                setRecent([]);
+                document.getElementById(id)?.focus();
+              }}
+            >
+              Clear recent searches
+            </button>
+          </div>
+        </details>
       )}
     </form>
   );

@@ -278,6 +278,28 @@ export const IndexedAddressSchema = z.strictObject({
   liquidHearts: UIntStringSchema.nullable(),
   accountedHearts: UIntStringSchema.nullable(),
   stakeCount: UIntStringSchema.nullable(),
+  staking: z.strictObject({
+    contractDay: ContractDaySchema,
+    lockedHearts: UIntStringSchema,
+    goodAccountedHearts: UIntStringSchema,
+    accountedShares: UIntStringSchema,
+    openCount: UIntStringSchema,
+    goodAccountedCount: UIntStringSchema,
+    endedCount: UIntStringSchema,
+    firstStakeDay: ContractDaySchema.nullable(),
+    nextMaturityDay: ContractDaySchema.nullable(),
+    activity: z
+      .array(
+        z.strictObject({
+          stakeId: UIntStringSchema,
+          kind: z.enum(['start', 'good_accounting', 'end', 'cancel']),
+          originChainId: z.union([z.literal(1), z.literal(369)]),
+          blockNumber: UIntStringSchema,
+          at: TimestampSchema,
+        }),
+      )
+      .max(5),
+  }),
   rankingDay: ContractDaySchema.nullable(),
   rank: z
     .strictObject({

@@ -35,7 +35,8 @@
     "test:ops": "node scripts/test-ops.mjs",
     "test:canary": "node scripts/test-canary.mjs",
     "test:history": "node scripts/test-history.mjs",
-    "test:web": "node scripts/test-web.mjs"
+    "test:web": "node scripts/test-web.mjs",
+    "test:address": "node scripts/test-address.mjs"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",

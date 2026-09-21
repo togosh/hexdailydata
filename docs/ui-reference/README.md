@@ -6,8 +6,10 @@ The owner's latest attached Address Lookup mockup supersedes
 Total Balance History, stake tabs, Recent Activity, and magenta callout boxes.
 The callouts are design annotations, not page content.
 
-The new image is visible in the conversation but its original bytes were not
-exposed as a local attachment. The older PNG is retained as a superseded archive;
-it has not been overwritten with a recreated image. Other page references remain
-unchanged. See [Address capability assessment](../address-mockup-capabilities.md)
-before implementing the new target's additional functionality.
+The original bytes are now supplied in the Address Redesign Packet and retained as
+`HEXDailyData_Address_Redesign.png`. The older PNG remains a superseded archive.
+Other page references are unchanged. The packet's
+[Address product decisions](../address-product-decisions.md) override illustrative
+features or figures that the data cannot support. The earlier
+[capability assessment](../address-mockup-capabilities.md) records the pre-redesign gaps.
+Actual browser captures remain separate; owner visual approval is pending.

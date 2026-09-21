@@ -35,7 +35,11 @@ const page = {
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: CursorSchema.optional(),
 };
-export const StakesQuery = ChainQuery.extend({ ...page, address: AddressSchema.optional() });
+export const StakesQuery = ChainQuery.extend({
+  ...page,
+  address: AddressSchema.optional(),
+  lifecycle: z.enum(['open', 'good_accounted', 'ended']).optional(),
+});
 export const HoldersQuery = ChainQuery.extend({
   ...page,
   order: z.enum(['liquid', 'staker']).default('liquid'),

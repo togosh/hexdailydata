@@ -20,11 +20,43 @@ export class SqlAddressBaseline implements AddressBaseline {
     const {
       rows: [row],
     } = await this.client.query(
-      `SELECT s.*,a.liquid_hearts,a.accounted_hearts,a.stake_count,r.liquid_rank,r.staker_rank,
+      `WITH owned AS MATERIALIZED (SELECT * FROM hdd.stakes WHERE chain_id=$1 AND address=$2)
+      SELECT s.*,c.contract_day,a.liquid_hearts,a.accounted_hearts,a.stake_count,r.liquid_rank,r.staker_rank,
+      totals.*,activity.items AS activity,
       d.block_number AS rank_block,d.block_hash AS rank_hash,d.block_time AS rank_time
-      FROM hdd.sync_state s LEFT JOIN hdd.accounts a ON a.chain_id=s.chain_id AND a.address=$2
+      FROM hdd.sync_state s JOIN hdd.current_state c USING(chain_id)
+      LEFT JOIN hdd.accounts a ON a.chain_id=s.chain_id AND a.address=$2
       LEFT JOIN hdd.account_ranks r ON r.chain_id=s.chain_id AND r.address=$2
       LEFT JOIN hdd.rank_state d ON d.chain_id=s.chain_id
+      CROSS JOIN LATERAL (
+        SELECT coalesce(sum(principal_hearts) FILTER(WHERE lifecycle IN('unsettled','good_accounted')),0)::text AS locked,
+        coalesce(sum(principal_hearts) FILTER(WHERE lifecycle='good_accounted'),0)::text AS ga_principal,
+        coalesce(sum(stake_shares) FILTER(WHERE lifecycle='unsettled'),0)::text AS shares,
+        count(*) FILTER(WHERE lifecycle='unsettled')::text AS open_count,
+        count(*) FILTER(WHERE lifecycle='good_accounted')::text AS ga_count,
+        count(*) FILTER(WHERE lifecycle IN('ended','cancelled'))::text AS ended_count,
+        min(start_day) AS first_day,
+        min(locked_day+staked_days) FILTER(WHERE lifecycle='unsettled' AND locked_day+staked_days>=c.contract_day) AS next_day
+        FROM owned
+      ) totals
+      CROSS JOIN LATERAL (
+        SELECT coalesce(jsonb_agg(item ORDER BY block_number DESC,log_index DESC),'[]'::jsonb) AS items FROM (
+          SELECT e.block_number,e.log_index,jsonb_build_object(
+            'stakeId',t.stake_id::text,'kind',CASE e.kind WHEN 'stake_start' THEN 'start'
+              WHEN 'good_accounting' THEN 'good_accounting' ELSE CASE WHEN t.lifecycle='cancelled' THEN 'cancel' ELSE 'end' END END,
+            'originChainId',e.origin_chain_id,'blockNumber',e.block_number::text,
+            'at',to_char(to_timestamp(e.block_time) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')) AS item
+          FROM owned t JOIN hdd.chains lineage ON lineage.chain_id=t.chain_id
+          CROSS JOIN LATERAL (VALUES
+            (t.origin_chain_id,t.start_block,'stake_start'),
+            (CASE WHEN t.chain_id=369 AND t.ga_block>lineage.parent_block THEN 369 ELSE 1 END,t.ga_block,'good_accounting'),
+            (CASE WHEN t.chain_id=369 AND t.end_block>lineage.parent_block THEN 369 ELSE 1 END,t.end_block,'stake_end')
+          ) ref(origin,block,kind)
+          JOIN hdd.events e ON e.origin_chain_id=ref.origin AND e.block_number=ref.block
+            AND e.stake_id=t.stake_id AND e.kind=ref.kind
+          ORDER BY e.block_number DESC,e.log_index DESC LIMIT 5
+        ) latest
+      ) activity
       WHERE s.chain_id=$1`,
       [chain, Buffer.from(address.slice(2), 'hex')],
     );
@@ -40,6 +72,18 @@ export class SqlAddressBaseline implements AddressBaseline {
       liquidHearts: row.liquid_hearts,
       accountedHearts: row.accounted_hearts,
       stakeCount: row.stake_count,
+      staking: {
+        contractDay: row.contract_day,
+        lockedHearts: row.locked,
+        goodAccountedHearts: row.ga_principal,
+        accountedShares: row.shares,
+        openCount: row.open_count,
+        goodAccountedCount: row.ga_count,
+        endedCount: row.ended_count,
+        firstStakeDay: row.first_day,
+        nextMaturityDay: row.next_day,
+        activity: row.activity,
+      },
       rankingDay: row.ranking_day,
       rank:
         row.rank_block === null

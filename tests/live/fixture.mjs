@@ -188,11 +188,12 @@ export function fixture({
       return (
         '0x' + word(call.params[1] === 'latest' ? (state.hint ?? count(address)) : count(address))
       );
-    if (sel === selectors.balanceOf) return '0x' + word(9007199254740993123n);
+    if (sel === selectors.balanceOf) return '0x' + word(state.balance ?? 9007199254740993123n);
     if (sel === s.stakeLists) {
       const i = Number(BigInt('0x' + args.slice(64)));
       if (i >= count(address)) return { error: { code: 3 } };
       const id = state.list?.[i] ?? BigInt(i + 1);
+      if (state.stakeRows) return '0x' + state.stakeRows[i].map(word).join('');
       return (
         '0x' + [id, 9007199254740993123n, 9007199254740993001n, 390, 365, 0, 0].map(word).join('')
       );

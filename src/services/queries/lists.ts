@@ -71,8 +71,17 @@ export function stakeRow(r: Record<string, any>) {
     penaltyHearts: r.penalty_hearts,
   });
 }
-export const stakesSql = (address: boolean) =>
-  `WITH selected AS MATERIALIZED (SELECT * FROM hdd.stakes WHERE chain_id=$1 AND stake_id>$2 ${address ? 'AND address=$4' : ''} ORDER BY stake_id LIMIT $3) ${stakeColumns}`;
+export const stakesSql = (address: boolean, lifecycle?: 'open' | 'good_accounted' | 'ended') => {
+  const filter =
+    lifecycle === 'open'
+      ? "AND lifecycle='unsettled'"
+      : lifecycle === 'good_accounted'
+        ? "AND lifecycle='good_accounted'"
+        : lifecycle === 'ended'
+          ? "AND lifecycle IN('ended','cancelled')"
+          : '';
+  return `WITH selected AS MATERIALIZED (SELECT * FROM hdd.stakes WHERE chain_id=$1 AND stake_id>$2 ${address ? 'AND address=$4' : ''} ${filter} ORDER BY stake_id LIMIT $3) ${stakeColumns}`;
+};
 export async function stakes(
   db: ReadDatabase,
   q: z.infer<typeof StakesQuery>,
@@ -80,7 +89,7 @@ export async function stakes(
   cursors: PageCursors,
   now: number,
 ) {
-  const binding = `stakes/${q.chain}/${q.address ?? ''}/${q.limit}`;
+  const binding = `stakes/${q.chain}/${q.address ?? ''}/${q.limit}/${q.lifecycle ?? ''}`;
   const cursor = cursors.decode(q.cursor, binding, now);
   return db.read(
     signal,
@@ -91,7 +100,7 @@ export async function stakes(
       if (cursor && cursor.identity !== identity) throw restart();
       const values: unknown[] = [chainId(q.chain), cursor?.key ?? '-1', q.limit + 1];
       if (q.address) values.push(Buffer.from(q.address.slice(2), 'hex'));
-      const { rows } = await c.query(stakesSql(Boolean(q.address)), values);
+      const { rows } = await c.query(stakesSql(Boolean(q.address), q.lifecycle), values);
       const page = rows.slice(0, q.limit);
       return StakesResponseSchema.parse({
         chain: q.chain,
