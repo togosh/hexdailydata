@@ -405,3 +405,17 @@ Entry JS/CSS grew3,690 uncompressed bytes; Learn stayed out of initial Home requ
 `artifacts/task-07/learn-home-20260921/`. Actual200%zoom remains untested;720px reflow
 tested. Owned browser/server resources closed. No Task09/live/canary/HDS/v1/push/deploy.
 Stop for owner visual review. Documentation-only status entry after reviewed source.
+
+Task07 Learn/Home plain-English refinement REVIEW_PASS; OWNER_VISUAL_CONTENT_APPROVAL_PENDING.
+Reviewed source `bbdb3f5f4dc8333122e6b752220be3a7f5119db3`, preserving base `b7ce487`.
+Authored shorter answers, three-step lifecycle, open core terms and compact data labels;
+normal Learn copy 1,168 to 463 words at 16px. Deeper math/glossary/reading unchanged;
+15 methodology paragraphs and 17 moved technical paragraphs retained. No API/math changes.
+Formatting, types/build, 19 focused tests and 10 compiled browser groups PASS.
+Independent `/root/learn_plain_review` PASS after its own 19 tests, 10 browser groups,
+source preservation checks and actual image inspection. No correction round.
+Home upper content pixels, geometry and requests unchanged; entry JS/CSS 610 bytes smaller.
+15 final captures, four fresh before captures, measurements, inventory and archives:
+`artifacts/task-07/learn-refinement-20260921/`. Synthetic offline only; actual zoom and
+screen reader untested. Stop for owner visual/content review. No Task09/live/v1/push/deploy.
+Documentation-only status entry after reviewed source.
