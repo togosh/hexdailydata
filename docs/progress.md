@@ -419,3 +419,20 @@ Home upper content pixels, geometry and requests unchanged; entry JS/CSS 610 byt
 `artifacts/task-07/learn-refinement-20260921/`. Synthetic offline only; actual zoom and
 screen reader untested. Stop for owner visual/content review. No Task09/live/v1/push/deploy.
 Documentation-only status entry after reviewed source.
+
+Task09 INDEPENDENT_IMPLEMENTATION_REVIEW_PASS; FULL_OFFLINE_ACCEPTANCE_BLOCKED.
+Owner accepts the first UI refinement including final Learn; all UI source and the
+applied Vite proxy correction are preserved. Reviewed code `52056e96bf4427bb2afd638403ffe89ee2406675`.
+Independent `/root/task09_review` PASS after one correction/recheck: fresh-copy unit
+temporary parents fixed; builder and reviewer each passed 115/115 in clean copies.
+Thirty million-row simulated days, compiled mixed traffic, exact replay/seed/HDS,
+backup/restore/process failures, fresh Windows dev/release and browser regressions
+are evidenced under `artifacts/task-09/20260921-rc1/` with original failures retained.
+Mixed 50-visitor reads all succeeded; current cold addresses delivered 4–5/minute vs 10
+target (33/100 complete). Owner/profile decision remains unanswered; no exception
+is inferred. Measured Home headline/chart p95 1.516/2.077 s; large-shape today estimate
+unavailable. DB/worker hit memory caps without OOM; no production-headroom claim.
+Valid full-scale seed, live/native initialization and production/platform gaps remain.
+No live probes/HDS download/canary/v1/existing DB/push/deployment. Tasks 10/11 pending;
+stop after 09. Next eligible work is the Task09 capacity decision. Status-only commit
+after reviewed code; report, compact evidence and source-only ZIP identify both.

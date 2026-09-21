@@ -115,7 +115,7 @@
         "tests/scale/",
         "docs/progress.md"
       ],
-      "status": "pending"
+      "status": "blocked"
     },
     {
       "id": "10",
