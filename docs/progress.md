@@ -390,3 +390,18 @@ read/UI witness, not Task09 or production scale.39 final Charts captures plus ac
 commands/reviewer evidence and ZIPs: `artifacts/task-07/charts-redesign/`.
 Owned resources removed. No live probes/canary/HDS download/v1/push/deployment/Task09.
 Stop for owner visual review. Documentation-only status entry after reviewed source.
+
+Task07 Learn HEX and Home FAQ follow-through REVIEW_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `c279d434919ffdc5edbe8adca5b6532d98f9d756`, preserving Charts base
+`d6798ddb7023211282742ea4e2815fb477eabe87` and the accepted Address/Home work.
+Five shared short answers below Home actions; lazy Learn article, retained methodology,
+curated resources and accessible deep links. No math/API/provider/dependency changes.
+Changed-file format, types/build,19 focused tests,9 compiled education browser groups
+and existing shell smoke PASS. Independent `/root/learn_home_review` PASS; independently
+reran19 tests and9 browser groups. Mobile initial pixels and desktop data/action pixels
+unchanged. Three cold local synthetic headline runs:139.5/119.3/133.5ms; not a p95 claim.
+Entry JS/CSS grew3,690 uncompressed bytes; Learn stayed out of initial Home requests.
+31 final desktop/mobile/narrow/light screenshots, commands, review and archives:
+`artifacts/task-07/learn-home-20260921/`. Actual200%zoom remains untested;720px reflow
+tested. Owned browser/server resources closed. No Task09/live/canary/HDS/v1/push/deploy.
+Stop for owner visual review. Documentation-only status entry after reviewed source.
