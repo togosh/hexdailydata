@@ -1747,3 +1747,185 @@ main:has(.home-page) {
     margin-top: 8px;
   }
 }
+
+/* Address composition keeps current pinned observations separate from indexed facts. */
+.address-page .page-heading h1 {
+  margin-top: 0;
+}
+.address-search .search {
+  max-width: none;
+  margin: 0;
+}
+.address-search .search > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.address-search .inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px;
+  gap: 12px;
+}
+.address-search input {
+  width: 100%;
+}
+.address-feedback .feedback {
+  margin: 8px 0;
+  min-height: 36px;
+}
+.address-feedback button {
+  min-height: 36px;
+  font-size: 0.75rem;
+  padding: 6px 12px;
+}
+.address-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.address-metrics .metric {
+  padding: 14px;
+}
+.address-metrics dd {
+  font-size: clamp(1.1rem, 2vw, 1.65rem);
+}
+.address-metrics .meta {
+  font-size: 0.7rem;
+  margin-top: 6px;
+}
+.address-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.address-layout > .panel {
+  margin: 0;
+  padding: 16px;
+  min-width: 0;
+  background: var(--surface);
+}
+.address-layout h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+.address-layout h2 .icon {
+  color: var(--accent);
+}
+.address-stakes > p {
+  font-size: 0.8rem;
+}
+.address-page .table-region {
+  max-height: 430px;
+  overflow: auto;
+}
+.address-page table {
+  font-size: 0.75rem;
+}
+.address-page th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--input);
+}
+.address-page td {
+  padding: 10px 8px;
+}
+.address-state {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 3px 5px;
+  color: var(--ink);
+}
+.address-summary .fact-rows {
+  padding: 0;
+}
+.address-summary .fact-rows > div {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.address-summary dt,
+.address-summary dd {
+  font-size: 0.78rem;
+}
+.address-summary .copy {
+  display: flex;
+  margin: 12px 0;
+}
+.address-summary .copy button {
+  width: 100%;
+}
+.address-summary .copy > span:empty {
+  display: none;
+}
+.address-source-details {
+  font-size: 0.75rem;
+}
+.address-baseline {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 12px;
+}
+.address-baseline h3 {
+  font-size: 0.85rem;
+}
+.address-indexed {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+}
+.address-indexed > summary {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.address-indexed > .panel {
+  margin: 12px 0 0;
+  padding: 12px;
+}
+@media (max-width: 760px) {
+  .address-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .address-summary {
+    grid-row: 1;
+  }
+  .address-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+@media (max-width: 600px) {
+  .address-page .page-heading {
+    margin-bottom: 12px;
+  }
+  .address-page .page-heading h1 {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+  }
+  .address-page .page-heading p {
+    font-size: 0.85rem;
+  }
+  .address-search .inline {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .address-metrics .metric {
+    padding: 10px;
+  }
+  .address-metrics dt {
+    font-size: 0.75rem;
+  }
+  .address-layout > .panel {
+    padding: 12px;
+  }
+  .address-page .table-region {
+    max-height: 380px;
+  }
+}

@@ -11,7 +11,8 @@ import {
 import { formatUnits } from '../domain/units.ts';
 import { endpoint, useResource, useClock } from './api.ts';
 import { dayLabel, numberText } from './format.ts';
-import { Feedback, SearchForm, Table, Copy, Value } from './components.tsx';
+import { Icon } from './visuals.tsx';
+import { Feedback, SearchForm, Table, Copy, Value, Metric } from './components.tsx';
 
 const statusName = (s: string) =>
   ({
@@ -178,135 +179,206 @@ function Address({ address }: { address: string }) {
     data.refresh();
   };
   return (
-    <>
+    <div className="address-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Address lookup</p>
-          <h1>Address overview</h1>
+          <h1>Address Lookup</h1>
+          <p>Search an address or stake ID to view balances, stakes and dated ranks.</p>
         </div>
       </div>
-      <p className="full-address">{address}</p>
-      <Copy text={address} label="Copy address" />
-      <SearchForm />
-      <Feedback {...data} refresh={restart} hasData={!!d} />
-      <section className="panel">
-        <h2>Current observation</h2>
-        {!valid ? (
-          <p className="notice">
-            Observation changed or expired. Restart to read a new pinned page.
-          </p>
-        ) : d?.live ? (
-          <>
-            <p className="meta">
-              Provisional · block {page!.asOf.blockNumber} · source {page!.asOf.blockTimestamp} ·
-              collected {page!.observedAt}
+      <div className="address-search">
+        <SearchForm />
+      </div>
+      <div className="address-feedback">
+        <Feedback {...data} refresh={restart} hasData={!!d} />
+      </div>
+      <dl className="address-metrics">
+        <Metric
+          id="address-liquid"
+          icon="database"
+          title="Liquid HEX"
+          value={valid && d?.live ? hex(d.live.balanceHearts) : null}
+          note="Current observed block"
+        />
+        <Metric
+          id="address-count"
+          icon="people"
+          title="Current stakes"
+          value={valid && page ? page.stakeCount : null}
+          note="Current observed block"
+        />
+        <Metric
+          id="address-accounted"
+          icon="pie"
+          title="Accounted staked HEX"
+          value={hex(d?.indexed?.accountedHearts)}
+          note="Indexed; excludes good-accounted stakes"
+        />
+        <Metric
+          id="address-rank"
+          icon="chart"
+          title="Liquid rank"
+          value={d?.indexed?.rank?.liquid}
+          prefix="#"
+          note={
+            d?.indexed?.rankingDay == null
+              ? 'Rank date unavailable'
+              : dayLabel(d.indexed.rankingDay)
+          }
+        />
+      </dl>
+      <div className="address-layout">
+        <section className="panel address-stakes">
+          <h2>
+            <Icon name="database" /> Current stakes
+          </h2>
+          {!valid ? (
+            <p className="notice">
+              Observation changed or expired. Restart to read a new pinned page.
             </p>
-            <dl className="summary-grid">
-              <div>
-                <dt>Liquid balance at this block</dt>
-                <dd>
-                  <Value value={hex(d.live.balanceHearts)} unit="HEX" />
-                </dd>
-              </div>
-              <div>
-                <dt>Live stake count at this block</dt>
-                <dd>{page!.stakeCount}</dd>
-              </div>
-            </dl>
+          ) : d?.live ? (
+            <>
+              <p className="meta">
+                Provisional · block {page!.asOf.blockNumber} · source {page!.asOf.blockTimestamp} ·
+                collected {page!.observedAt}
+              </p>
+
+              <p>
+                Showing {page!.items.length} of {page!.stakeCount} current stakes · offset{' '}
+                {d.live.offset}.{' '}
+                {page!.enumerationComplete
+                  ? 'Enumeration complete at this observation.'
+                  : 'Partial page; whole-address stake totals and nearest maturity are not inferred.'}
+              </p>
+              <Table
+                title="Pinned current stake page"
+                headings={[
+                  'Stake ID',
+                  'Principal (HEX)',
+                  'T-shares',
+                  'Lock / maturity (UTC)',
+                  'State',
+                ]}
+              >
+                {page!.items.map((s) => (
+                  <tr key={s.stakeId}>
+                    <td>
+                      <a href={'/stake/' + s.stakeId}>{s.stakeId}</a>
+                    </td>
+                    <td>{numberText(hex(s.principalHearts))}</td>
+                    <td>{numberText(formatUnits(BigInt(s.stakeShares), 12))}</td>
+                    <td>
+                      {dayLabel(s.lockedDay)}
+                      <br />
+                      {dayLabel(s.lockedDay + s.stakedDays)}
+                    </td>
+                    <td>
+                      <span className="address-state">
+                        {s.unlockedDay ? 'Good accounted' : 'Current at observed block'}
+                      </span>
+                      {s.isAutoStake ? ' · auto-stake' : ''}
+                    </td>
+                  </tr>
+                ))}
+              </Table>
+              <button
+                disabled={!page!.nextCursor || data.loading}
+                onClick={() => {
+                  pinned.current = identity;
+                  setCursor(page!.nextCursor!);
+                }}
+              >
+                Next pinned page
+              </button>
+            </>
+          ) : (
             <p>
-              Showing {page!.items.length} of {page!.stakeCount} current stakes · offset{' '}
-              {d.live.offset}.{' '}
-              {page!.enumerationComplete
-                ? 'Enumeration complete at this observation.'
-                : 'Partial page; whole-address stake totals and nearest maturity are not inferred.'}
-            </p>
-            <Table
-              title="Pinned current stake page"
-              headings={[
-                'Stake ID',
-                'Principal (HEX)',
-                'T-shares',
-                'Lock / maturity (UTC)',
-                'State',
-              ]}
-            >
-              {page!.items.map((s) => (
-                <tr key={s.stakeId}>
-                  <td>
-                    <a href={'/stake/' + s.stakeId}>{s.stakeId}</a>
-                  </td>
-                  <td>{numberText(hex(s.principalHearts))}</td>
-                  <td>{numberText(formatUnits(BigInt(s.stakeShares), 12))}</td>
-                  <td>
-                    {dayLabel(s.lockedDay)}
-                    <br />
-                    {dayLabel(s.lockedDay + s.stakedDays)}
-                  </td>
-                  <td>
-                    {s.unlockedDay ? 'Good accounted' : 'Current at observed block'}
-                    {s.isAutoStake ? ' · auto-stake' : ''}
-                  </td>
-                </tr>
-              ))}
-            </Table>
-            <button
-              disabled={!page!.nextCursor || data.loading}
-              onClick={() => {
-                pinned.current = identity;
-                setCursor(page!.nextCursor!);
-              }}
-            >
-              Next pinned page
-            </button>
-          </>
-        ) : (
-          <p>
-            Current balance and stakes unavailable
-            {d?.outcome === 'quota' ? ' — provider quota reached' : ''}. Indexed records below have
-            their own cutoff.
-          </p>
-        )}
-        {(!valid || cursor) && <button onClick={restart}>Restart current observation</button>}
-      </section>
-      {d?.indexed && (
-        <section className="panel">
-          <h2>Accepted indexed baseline</h2>
-          <p className="meta">
-            Block {d.indexed.asOf.blockNumber} · {d.indexed.asOf.blockTimestamp} ·{' '}
-            {d.indexed.finality}
-          </p>
-          <dl className="summary-grid">
-            <div>
-              <dt>Indexed liquid HEX</dt>
-              <dd>
-                <Value value={hex(d.indexed.liquidHearts)} />
-              </dd>
-            </div>
-            <div>
-              <dt>Indexed accounted HEX (excludes GA)</dt>
-              <dd>
-                <Value value={hex(d.indexed.accountedHearts)} />
-              </dd>
-            </div>
-            <div>
-              <dt>Indexed stake count</dt>
-              <dd>{d.indexed.stakeCount ?? 'Unavailable'}</dd>
-            </div>
-          </dl>
-          {d.indexed.rank && (
-            <p>
-              Liquid rank {d.indexed.rank.liquid ?? 'Unavailable'} · staker rank{' '}
-              {d.indexed.rank.staker ?? 'Unavailable'} ·{' '}
-              {d.indexed.rankingDay === null
-                ? 'rank date unavailable'
-                : dayLabel(d.indexed.rankingDay)}{' '}
-              · rank block {d.indexed.rank.asOf.blockNumber}
+              Current balance and stakes unavailable
+              {d?.outcome === 'quota' ? ' — provider quota reached' : ''}. Indexed records below
+              have their own cutoff.
             </p>
           )}
+          {(!valid || cursor) && <button onClick={restart}>Restart current observation</button>}
         </section>
-      )}
-      <Indexed address={address} />
-    </>
+        <aside className="panel address-summary">
+          <h2>
+            <Icon name="person" /> Address Summary
+          </h2>
+          <dl className="fact-rows">
+            <div>
+              <dt>Address</dt>
+              <dd className="address-summary-id" title={address}>
+                {address.slice(0, 8)}...{address.slice(-6)}
+              </dd>
+            </div>
+            <div>
+              <dt>Current stake count</dt>
+              <dd>{valid && page ? numberText(page.stakeCount) : 'Unavailable'}</dd>
+            </div>
+            <div>
+              <dt>Liquid rank</dt>
+              <dd>
+                {d?.indexed?.rank?.liquid ? '#' + numberText(d.indexed.rank.liquid) : 'Unavailable'}
+              </dd>
+            </div>
+            <div>
+              <dt>Staker rank</dt>
+              <dd>
+                {d?.indexed?.rank?.staker ? '#' + numberText(d.indexed.rank.staker) : 'Unavailable'}
+              </dd>
+            </div>
+            <div>
+              <dt>Rank date</dt>
+              <dd>
+                {d?.indexed?.rankingDay == null ? 'Unavailable' : dayLabel(d.indexed.rankingDay)}
+              </dd>
+            </div>
+          </dl>
+          <Copy text={address} label="Copy address" />
+          <details className="address-source-details">
+            <summary>Full address &amp; source details</summary>
+            <p className="full-address">{address}</p>
+            {d?.indexed && (
+              <p className="meta">
+                Rank block {d.indexed.rank?.asOf.blockNumber ?? 'unavailable'}. Indexed block{' '}
+                {d.indexed.asOf.blockNumber} - {d.indexed.asOf.blockTimestamp} -{' '}
+                {d.indexed.finality}.
+              </p>
+            )}
+          </details>
+          {d?.indexed && (
+            <div className="address-baseline">
+              <h3>Accepted indexed baseline</h3>
+              <dl className="fact-rows">
+                <div>
+                  <dt>Indexed liquid HEX</dt>
+                  <dd>
+                    <Value value={hex(d.indexed.liquidHearts)} places={4} />
+                  </dd>
+                </div>
+                <div>
+                  <dt>Indexed accounted HEX (excludes GA)</dt>
+                  <dd>
+                    <Value value={hex(d.indexed.accountedHearts)} places={4} />
+                  </dd>
+                </div>
+                <div>
+                  <dt>Indexed stake count</dt>
+                  <dd>{d.indexed.stakeCount ?? 'Unavailable'}</dd>
+                </div>
+              </dl>
+              <p className="meta">
+                Block {d.indexed.asOf.blockNumber} - {d.indexed.finality}
+              </p>
+            </div>
+          )}
+        </aside>
+      </div>
+      <details className="address-indexed">
+        <summary>Indexed stake records</summary>
+        <Indexed address={address} />
+      </details>
+    </div>
   );
 }
 function Stake({ id }: { id: string }) {
@@ -404,7 +476,7 @@ export default function Search({ path }: { path: string }) {
   if (path.startsWith('/address/')) {
     const address = AddressSchema.safeParse(path.slice(9));
     return address.success ? (
-      <Address address={address.data} />
+      <Address key={address.data} address={address.data} />
     ) : (
       <>
         <h1>Invalid address</h1>

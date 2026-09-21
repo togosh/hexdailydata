@@ -517,6 +517,14 @@ try {
             exact: true,
           })
           .waitFor();
+        assert.equal(
+          await page.locator('[data-metric="address-liquid"] .value').innerText(),
+          'Unavailable',
+        );
+        assert.equal(
+          await page.locator('[data-metric="address-count"] .value').innerText(),
+          'Unavailable',
+        );
         await capture('address-expired');
         await page.unrouteAll();
       });
