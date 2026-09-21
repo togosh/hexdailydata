@@ -274,6 +274,7 @@ export function Address({ address }: { address: string }) {
           id="address-maturity"
           icon="calendar"
           title="Next Maturity"
+          emptyLabel={staking ? 'None upcoming' : 'Unavailable'}
           value={next == null ? null : String(next + 1)}
           display={next == null ? 'None upcoming' : 'Day ' + (next + 1)}
           note={

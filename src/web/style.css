@@ -1751,10 +1751,21 @@ main:has(.home-page) {
 /* Address data profile: each observation retains its own cutoff. */
 .address-page .page-heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+.address-page .page-heading > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.address-feedback:has(.feedback > span:not(:empty)) {
+  flex-basis: 100%;
+}
+.address-feedback .feedback > span {
+  min-width: 0;
 }
 .address-page .page-heading h1 {
   font-size: 2rem;
@@ -1771,6 +1782,8 @@ main:has(.home-page) {
   display: none;
 }
 .address-feedback button {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 0.75rem;
   padding: 6px 12px;
 }

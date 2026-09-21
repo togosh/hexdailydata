@@ -67,6 +67,22 @@ async function keyboardClick(locator) {
   assert.equal(await locator.evaluate((e) => e === document.activeElement), true);
   await page.keyboard.press('Enter');
 }
+async function checkMobileFeedback(name) {
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.evaluate(() => scrollTo(0, 0));
+    const heading = await page.locator('.page-heading h1').boundingBox();
+    const feedback = await page.locator('.address-feedback').boundingBox();
+    assert.ok(feedback.y >= heading.y + heading.height, 'Feedback occupies its own row');
+    const labelLines = await page.locator('.address-feedback button').evaluate((button) => {
+      const range = document.createRange();
+      range.selectNodeContents(button);
+      return range.getClientRects().length;
+    });
+    assert.equal(labelLines, 1, 'Refresh label remains on one line');
+    await capture(name + '-' + width);
+  }
+}
 try {
   // Wait for the freshly started compiled test host.
   for (let n = 0; n < 120; n++) {
@@ -250,6 +266,7 @@ try {
         'Unavailable',
       );
       await capture('address-stale-retry');
+      await checkMobileFeedback('address-stale-retry');
       await page.route('**/api/v2/stakes?**', (r) =>
         r.fulfill({ status: 503, json: { error: { code: 'source_unavailable' } } }),
       );
@@ -265,6 +282,20 @@ try {
         );
       assert.equal(await page.locator('.stake-card').count(), 0);
       await capture('address-unavailable');
+      await checkMobileFeedback('address-unavailable');
+      await page.unroute('**/api/v2/addresses/**');
+      await page.unroute('**/api/v2/stakes?**');
+    });
+    await test('complete ended-only index shows known no-upcoming maturity distinctly from unavailable index', async () => {
+      await page.goto(base + '/address/0x' + '2'.padStart(40, '0'));
+      await page.getByRole('button', { name: 'Open 0', exact: true }).waitFor();
+      assert.equal(
+        await page.locator('[data-metric="address-maturity"] .value').innerText(),
+        'None upcoming',
+      );
+      await page.getByText('No open stakes at this indexed cutoff.', { exact: true }).waitFor();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await capture('address-none-upcoming');
     });
   } else {
     await test('separate extreme-number and long-ID wrapping journey', async () => {

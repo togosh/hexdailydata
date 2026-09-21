@@ -39,6 +39,7 @@ export function Metric({
   note,
   id,
   display,
+  emptyLabel,
   icon = 'chart',
 }: {
   title: string;
@@ -48,6 +49,7 @@ export function Metric({
   note?: ReactNode;
   id?: string;
   display?: string;
+  emptyLabel?: string;
   icon?: IconName;
 }) {
   return (
@@ -57,7 +59,9 @@ export function Metric({
         {title}
       </dt>
       <dd>
-        {value != null && display !== undefined ? (
+        {value == null && emptyLabel !== undefined ? (
+          <span className="value">{emptyLabel}</span>
+        ) : value != null && display !== undefined ? (
           <span className="value" title={(prefix ?? '') + value + (unit ? ' ' + unit : '')}>
             {prefix}
             {display}
