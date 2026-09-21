@@ -666,10 +666,14 @@ summary {
   font-variant-numeric: tabular-nums;
 }
 .download-details {
-  padding: 4px 0;
-  background: transparent;
-  border-color: transparent;
-  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--input);
+  border-color: var(--accent);
+  color: var(--ink);
   font-size: 0.75rem;
 }
 .download-card .button {
@@ -722,7 +726,7 @@ summary {
     font-size: 0.75rem;
   }
   .download-details {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
   }
 }
 .glossary {

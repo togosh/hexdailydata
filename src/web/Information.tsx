@@ -68,7 +68,7 @@ export function Downloads() {
                       aria-label={`${descriptions[name][0]} units and coverage`}
                       onClick={() => setSelected(name)}
                     >
-                      Units &amp; coverage
+                      Units &amp; coverage <span aria-hidden="true">&rsaquo;</span>
                     </button>
                   </div>
                   <a
