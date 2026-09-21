@@ -449,7 +449,9 @@ try {
         assert.equal(retired.status, 410);
         assert.match(retired.headers.get('content-type'), /json/);
         await go('/learn');
-        await page.getByRole('heading', { name: 'Stake status glossary' }).waitFor();
+        await page.getByRole('heading', { name: 'Learn HEX', exact: true }).waitFor();
+        await page.locator('#stake-states summary').click();
+        await page.getByText('Good Accounted (GA)', { exact: true }).waitFor();
         await go('/status');
         await page.getByText(/1227 records · 1218 admitted/).waitFor();
       });
