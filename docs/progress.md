@@ -350,3 +350,15 @@ reused; only style/decorative markup changed. Independent `/root/home_panels_rev
 Downloads-only updated/open desktop/mobile captures and evidence:
 `artifacts/task-07/downloads-details-button-20260920/`. No v1/live/push/deploy/Task09.
 Stop for owner review. Documentation-only status entry after reviewed source.
+
+Task07 Address reference layout VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `ba2419576548e0eb66359a67665723df39f87a5c`: full-width search, four
+supported metrics, compact stakes table and adjacent Address Summary; summary-first
+mobile. Current/indexed and partial-page boundaries preserved; new-address search
+resets pinned pagination. Types/build/format, full native browser suite at f9ee7a5,
+final affected visual checks at reviewed source PASS. Independent
+`/root/home_panels_review` PASS with exact-value/expiry probe. Address-only desktop,
+half-desktop and initial/full mobile captures, commands and review in
+`artifacts/task-07/address-layout-20260920/`. Chrome/synthetic; resources cleaned.
+No backend/other page bodies/v1/live providers/push/deploy/Task09. Stop for owner
+visual review. Documentation-only status entry after reviewed source.
