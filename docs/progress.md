@@ -362,3 +362,16 @@ half-desktop and initial/full mobile captures, commands and review in
 `artifacts/task-07/address-layout-20260920/`. Chrome/synthetic; resources cleaned.
 No backend/other page bodies/v1/live providers/push/deploy/Task09. Stop for owner
 visual review. Documentation-only status entry after reviewed source.
+
+Task07 bounded Address/Search redesign REVIEW_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `b492d1a58bab301afa6477299191ab00805a224a`, preserving base `0d8064a`.
+Complete indexed principal including GA, accounted shares, lifecycle counts/filters,
+first stake/upcoming maturity and five-event lifecycle summary; compact desktop,
+mobile cards, local recents, copy and independent live/indexed disclosures.
+Affected formatting/types/OpenAPI/build and28 tests PASS; compiled offline run8:
+five SQL/API groups, nine ordinary browser groups and one separate extreme group PASS.
+Independent `/root/address_redesign_review` PASS after one correction/recheck round.
+Evidence/source ZIPs and1440x1000/390x844/scrolled captures:
+`artifacts/task-07/address-redesign/`. Chrome/synthetic only; owned resources removed.
+Stop for owner visual review. No Task09, live/canary, v1 runtime/data, push or deployment.
+Documentation-only status entry after reviewed source.
