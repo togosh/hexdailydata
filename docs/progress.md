@@ -302,3 +302,17 @@ negative probes. Chrome only. Full mobile/scroll,960half-desktop and1440captures
 commands/reviewer evidence: `artifacts/task-07/calculator-compact-20260920/`.
 Owned resources cleaned. No live providers, v1 execution, push/deploy or Task09.
 Stop for owner visual review. Documentation-only status entry after reviewed code.
+
+Task07 Calculator panel/details refinement VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `1ad4e1e0b75b22b51b3123e8f95c95f006962b51` matches both panel heights,
+removes the scenario badge, and combines supporting content in one default-closed
+Details & assumptions section. Summary retains input/data/stale status cues. Arithmetic
+and price defaults unchanged. Types/build/format, full browser journeys and final7visual
+groups PASS; independent `/root/home_panels_review` PASS with keyboard/error/recovery
+probe. Equal heights checked320/390/960/1440; mobile first-view fit preserved.
+Owner now requests screenshots ONLY for affected pages. Capture is opt-in through
+HDD_V2_SCREENSHOT_PAGES (calculator for this change); checks still cover existing routes.
+Final11screenshots are Calculator-only, including full mobile/desktop and open details.
+Evidence: `artifacts/task-07/calculator-details-20260920/`. Chrome/synthetic only; owned
+resources cleaned. No v1/live providers/push/deploy/Task09. Stop for owner visual review.
+Documentation-only status entry after reviewed source.
