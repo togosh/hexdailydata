@@ -225,6 +225,9 @@ async function run() {
     setControl({ head: 537, label: 'mixed-prime', started: Date.now(), epoch: Date.now() });
     await runner(['tests/integration/worker.mjs', 'once'], 'mixed-prime');
     await sample('mixed-prime');
+    publication = JSON.parse(readFileSync(join(evidence, 'mixed-prime.json'), 'utf8')).bundles.find(
+      (b) => b.slot === 'current',
+    );
   }
   for (let day = 1; day <= cycles; day++) {
     // Grace is real elapsed time; no publication timestamp is rewritten to accelerate it.
@@ -350,7 +353,22 @@ async function run() {
       (async () => {
         await runner(['tests/integration/queries.mjs'], 'mixed-queries');
         await pause(Math.max(0, state.started + 120000 - Date.now()));
-        await compose(['run', '--rm', '-T', 'operator', 'exports'], 'mixed-forced-export');
+        try {
+          await compose(['run', '--rm', '-T', 'operator', 'exports'], 'mixed-forced-export');
+        } catch (error) {
+          // The real scheduler may win this race. Keep the refusal receipt and require
+          // a different published bundle below; a busy response alone proves no work.
+          if (
+            !/^mixed-forced-export exit=1: (Export builder already active\.|Publication paused for prior bundle grace\.|Publication paused for active prior readers\.)\s*$/.test(
+              error.message,
+            )
+          )
+            throw error;
+          writeFileSync(
+            join(evidence, 'export-contention.json'),
+            JSON.stringify({ expectedRefusal: error.message }),
+          );
+        }
       })(),
     ]);
     const mixedFailure = mixedResults.find((r) => r.status === 'rejected');
@@ -406,6 +424,15 @@ async function run() {
     assert.ok(
       BigInt(retained.cursor.block_number) > 536n,
       'Mixed worker committed forward progress',
+    );
+    const current = retained.bundles.find((b) => b.slot === 'current');
+    assert.ok(
+      current?.status === 'available' && current.id !== publication.id,
+      'Mixed scheduling published real new files',
+    );
+    assert.ok(
+      retained.bundles.length <= 2 && retained.files.length <= 2,
+      'Mixed idle retention remains bounded',
     );
   }
   writeFileSync(
