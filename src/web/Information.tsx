@@ -102,7 +102,7 @@ export function Downloads() {
         )
       )}
       <p>
-        <a href="/learn">Read the methodology ↗</a>
+        <a href="/learn#methodology">Read the methodology ↗</a>
       </p>
       {bundle && file && (
         <Dialog
@@ -140,121 +140,6 @@ export function Downloads() {
         </Dialog>
       )}
     </div>
-  );
-}
-export function Learn() {
-  return (
-    <>
-      <p className="eyebrow">A little context goes a long way</p>
-      <h1>Learn &amp; methodology</h1>
-      <div className="learn-grid">
-        <section className="panel">
-          <h2>Three different kinds of data</h2>
-          <p>
-            <strong>Native daily history</strong> follows accepted protocol records. PulseChain
-            includes common Ethereum-era native history; inherited stake origins and original dates
-            remain visible.
-          </p>
-          <p>
-            <strong>Current observations</strong> are provisional readings at a source block. A
-            successful refresh does not make an old source new. Observations are fresh through 120
-            seconds, last-known through 30 minutes, then unavailable. Live address pages expire
-            sooner under their own pinned cursor.
-          </p>
-          <p>
-            <strong>HDS reported history</strong> is an attributed HEXDailyStats archive,
-            independently selectable in Charts. It does not supply Home’s current price, raw share
-            rate or calculator presets. Record dates are not proven market-close times.
-          </p>
-        </section>
-        <section className="panel">
-          <h2>Amounts, shares &amp; days</h2>
-          <p>
-            1 HEX = 100,000,000 hearts. 1 T-share = 1,000,000,000,000 shares. T-share rate is HEX
-            per T-share before bonuses, never an APY.
-          </p>
-          <p>
-            Raw integers and published decimal tokens are preserved. Compact Home values may be
-            truncated; their full received value is in the title. Chart tables retain full published
-            precision. Approximate chart coordinates never feed calculations.
-          </p>
-          <p>
-            Contract days start at 00:00 UTC on December 3, 2019. Display days add one. Ordinary
-            stakes lock next day, with the launch lock floor preserved, and mature after their whole
-            staked duration.
-          </p>
-        </section>
-        <section className="panel">
-          <h2>Supply &amp; duration</h2>
-          <p>
-            Percentage staked uses locked principal divided by circulating plus locked HEX. Locked
-            principal includes good-accounted stakes. Native principal-weighted original duration
-            excludes good-accounted and ended stakes and is shown in days.
-          </p>
-          <p>
-            HDS duration is reported in 365-day years. HDS total HEX is circulating plus locked, not
-            ERC20 totalSupply. Current holders differ from historical-ever holders. Do not combine
-            those series without their definitions.
-          </p>
-        </section>
-        <section className="panel">
-          <h2>Payout &amp; calculator assumptions</h2>
-          <p>
-            Home's Stake APY estimates use a 10,000 HEX stake, the current raw share rate and the
-            arithmetic mean payout per T-share over 30 consecutive completed days, ending at the
-            latest indexed completed payout, held constant. Penalties included in those daily
-            payouts remain included. Missing or pending days make the average unavailable. Terms are
-            365, 1825 and 3650 days. The calculator's exact amount/duration bonuses and share
-            issuance floors apply. APY is (ending HEX / starting HEX) raised to 1 / years, minus 1,
-            expressed as a percentage. It annualizes a payout at maturity; rewards do not compound
-            daily. Future payouts, penalties and USD prices are not predicted. An expired share rate
-            or unavailable history makes the estimates unavailable.
-          </p>
-          <p>
-            A completed payout belongs to its actual materialized day. Today’s payout is an estimate
-            and cannot become final merely through polling. Missing ledger rounds remain pending.
-          </p>
-          <p>
-            The calculator applies the ordinary new-stake amount and duration bonus with one
-            combined integer floor, then floors share issuance at the raw rate. Its optional payout
-            scenario holds the exact selected 1/30/365-day mean of daily payout ratios constant. No
-            compounding, future yield or USD price is promised.
-          </p>
-        </section>
-      </div>
-      <section className="panel">
-        <h2>Stake status glossary</h2>
-        <dl className="glossary">
-          <dt>Queued</dt>
-          <dd>Created but not yet locked for payout.</dd>
-          <dt>Open</dt>
-          <dd>Locked and not ended or good-accounted.</dd>
-          <dt>Mature, open</dt>
-          <dd>Term completed; still open. Maturity is not automatic settlement.</dd>
-          <dt>Good accounted (GA)</dt>
-          <dd>Payout accounting was performed; principal remains locked until stake end.</dd>
-          <dt>Ended</dt>
-          <dd>Stake has settled; recorded payout and penalty remain historical.</dd>
-          <dt>Cancelled</dt>
-          <dd>Ended before locking. It is not an ordinary completed-term payout.</dd>
-        </dl>
-      </section>
-      <section className="panel">
-        <h2>Coverage is explicit</h2>
-        <p>
-          Missing prices and dates break chart lines. HDS same-date rows remain separate by
-          sourceDay. Reference prices contain only admitted post-fork PulseChain observations, with
-          no Ethereum price seam. Native index coverage, archive coverage, market coverage and
-          download availability are independent.
-        </p>
-        <p>
-          Rank is dated. A live page is a bounded observation, not proof that every stake was
-          fetched. Provider unavailability or index lag never establishes absence.
-        </p>
-        <a href="/status">Inspect data status ↗</a> ·{' '}
-        <a href="/api/v2/status?chain=pulsechain">Current API metadata</a>
-      </section>
-    </>
   );
 }
 export function Status() {

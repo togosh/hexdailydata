@@ -1,0 +1,139 @@
+{
+  "description": "SYNTHETIC offline Home presentation fixture, retained from accepted Home UI tests. No current chain values. Ancillary APIs unavailable.",
+  "at": 1789819200000,
+  "home": {
+    "schemaVersion": 1,
+    "chain": "pulsechain",
+    "mode": "production",
+    "daily": {
+      "dateUtc": "2026-09-18",
+      "contractDay": 2481,
+      "displayDay": 2482,
+      "asOf": {
+        "chainId": 369,
+        "blockNumber": "100",
+        "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000100",
+        "blockTimestamp": null
+      },
+      "stakedPercent": "92.25984386",
+      "weightedStakeLengthDays": "3562.99056603",
+      "circulatingHex": "52200000000",
+      "stakedHex": "622205000000",
+      "holderCount": "60",
+      "stakerCount": "54"
+    },
+    "current": {
+      "dateUtc": "2026-09-19",
+      "contractDay": 2482,
+      "displayDay": 2483,
+      "asOf": {
+        "chainId": 369,
+        "blockNumber": "100",
+        "blockHash": "0x0000000000000000000000000000000000000000000000000000000000000100",
+        "blockTimestamp": "2026-09-19T12:00:00.000Z"
+      },
+      "stakedPercent": "92.25984386",
+      "weightedStakeLengthDays": "3562.99056603",
+      "circulatingHex": "52200000000",
+      "stakedHex": "622205000000",
+      "holderCount": "60",
+      "stakerCount": "54",
+      "finality": "confirmed",
+      "activity": {
+        "newStakes": "0",
+        "endedStakes": "0",
+        "netHolders": "0",
+        "netStakers": "0",
+        "netLockedHex": "0",
+        "penaltiesHex": "0"
+      }
+    },
+    "live": {
+      "price": {
+        "finality": "provisional",
+        "method": "allowlisted-reserve-ratio",
+        "notes": [
+          "Fixed $1 anchor; reserve mark is not a trade or redemption quote.",
+          "Provider correlation: unknown.",
+          "Pool 0 reserve update seconds: 1789819110."
+        ],
+        "status": "fresh",
+        "value": {
+          "usdPerHex": "0.003876",
+          "valuation": "peg_assumed",
+          "kind": "spot_estimate"
+        },
+        "asOf": {
+          "chainId": 369,
+          "blockNumber": "179928049",
+          "blockHash": "0x000000000000000000000000000000000000000000000000000000000ab97bf1",
+          "blockTimestamp": "2026-09-19T11:59:09.000Z"
+        },
+        "observedAt": "2026-09-19T11:59:40.800Z"
+      },
+      "shareRate": {
+        "finality": "provisional",
+        "method": "globalInfo",
+        "notes": [],
+        "status": "fresh",
+        "value": {
+          "rawShareRate": "466866",
+          "hexPerTShareBeforeBonuses": "46686.6"
+        },
+        "asOf": {
+          "chainId": 369,
+          "blockNumber": "179928049",
+          "blockHash": "0x000000000000000000000000000000000000000000000000000000000ab97bf1",
+          "blockTimestamp": "2026-09-19T11:59:09.000Z"
+        },
+        "observedAt": "2026-09-19T11:59:19.800Z"
+      },
+      "latestCompletedPayout": {
+        "finality": "provisional",
+        "method": "dailyDataRange",
+        "notes": ["Materialized ledger; observation is provisional until canonical acceptance."],
+        "status": "fresh",
+        "value": {
+          "contractDay": 2481,
+          "displayDay": 2482,
+          "hexPerTShare": "1.65399999",
+          "payoutHearts": "2183729506967738",
+          "stakeShares": "13202717696298295470",
+          "kind": "completed"
+        },
+        "asOf": {
+          "chainId": 369,
+          "blockNumber": "179928049",
+          "blockHash": "0x000000000000000000000000000000000000000000000000000000000ab97bf1",
+          "blockTimestamp": "2026-09-19T11:59:09.000Z"
+        },
+        "observedAt": "2026-09-19T11:59:30.300Z"
+      },
+      "todayPayoutEstimate": {
+        "finality": "provisional",
+        "method": "post-claim-1",
+        "notes": ["Excludes future transactions and penalties."],
+        "status": "fresh",
+        "value": {
+          "contractDay": 2482,
+          "displayDay": 2483,
+          "hexPerTShare": "5.08524461",
+          "payoutHearts": "6713904902682202",
+          "stakeShares": "13202717696298295470",
+          "kind": "current_day_estimate"
+        },
+        "asOf": {
+          "chainId": 369,
+          "blockNumber": "179928049",
+          "blockHash": "0x000000000000000000000000000000000000000000000000000000000ab97bf1",
+          "blockTimestamp": "2026-09-19T11:59:09.000Z"
+        },
+        "observedAt": "2026-09-19T11:59:19.800Z"
+      }
+    },
+    "sync": {
+      "state": "syncing",
+      "message": null
+    }
+  }
+}

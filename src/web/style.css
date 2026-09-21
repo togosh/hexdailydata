@@ -1432,6 +1432,44 @@ main:has(.home-page) {
   font-size: 0.75rem;
   margin-top: 2px;
 }
+
+.home-faq {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 2rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+  margin-top: 2rem;
+}
+.home-faq h2 {
+  margin-bottom: 0.3rem;
+}
+.home-faq p {
+  max-width: 70ch;
+  color: var(--muted);
+}
+.home-faq .home-faq-subtitle {
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.home-faq details {
+  border-bottom: 1px solid var(--line);
+}
+.home-faq summary {
+  padding: 0.9rem 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+.home-faq details p {
+  padding: 0 0 0.75rem;
+  margin: 0;
+}
+@media (max-width: 760px) {
+  .home-faq {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
 .home-footnote {
   font-size: 0.75rem;
   color: var(--muted);
