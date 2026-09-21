@@ -343,6 +343,33 @@ try {
         assert.equal(await page.getByRole('button', { name: 'Refresh', exact: true }).count(), 0);
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         await page.locator('.usd-result .value').waitFor();
+        for (const missing of [true, false]) {
+          const withoutPrice = structuredClone(currentHome);
+          if (missing) withoutPrice.live.price.status = 'unavailable';
+          else {
+            withoutPrice.live.price.asOf.blockTimestamp = new Date(at - 1801000).toISOString();
+            withoutPrice.live.price.observedAt = new Date(at - 1801000).toISOString();
+          }
+          await page.route('**/api/v2/home?*', (r) =>
+            r.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify(withoutPrice),
+            }),
+          );
+          const updated = page.waitForResponse((r) => r.url().includes('/home?'));
+          await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+          await updated;
+          await page.waitForFunction(
+            () =>
+              document.querySelector('input[aria-label="Hypothetical future USD per HEX"]')
+                .value === '',
+          );
+          await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
+          await page.locator('.share-result .value').waitFor();
+          assert.equal(await page.locator('.usd-result .value').count(), 0);
+          await page.unroute('**/api/v2/home?*');
+        }
         await page.getByLabel('Hypothetical future USD per HEX').fill('0');
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         assert.equal(await page.locator('.usd-result dd').innerText(), '$0');
@@ -439,6 +466,10 @@ try {
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(stale) }),
         );
         await page.reload();
+        await page
+          .locator('[data-metric="rate"] dd')
+          .filter({ hasText: /12,345.6/ })
+          .waitFor();
         assert.match(await page.locator('[data-metric="rate"] dd').innerText(), /12,345.6/);
         await capture('home-stale');
         const refreshed = page.waitForResponse((r) => r.url().includes('/api/v2/home?'));
