@@ -234,6 +234,48 @@ try {
     });
   }
   if (mode === 'both') {
+    await test('long history keeps isolated points at absent/duplicate date boundaries without joining gaps', async () => {
+      const response = await (await fetch(base + '/api/v2/charts/archive')).json();
+      for (const boundary of ['absent', 'duplicate']) {
+        await open();
+        const original = structuredClone(response);
+        original.items = original.items.slice(-100).map((row, i) => ({
+          ...row,
+          values: row.values.map((value, column) =>
+            column === 0 ? (i === 40 ? '0.005' : '0.001') : value,
+          ),
+        }));
+        const isolated = original.items[40];
+        if (boundary === 'absent')
+          original.items = original.items.filter((_, i) => i !== 39 && i !== 41);
+        else {
+          original.items[38].date = original.items[39].date;
+          original.items[42].date = original.items[41].date;
+        }
+        assert.ok(original.items.length >= 80);
+        await page.route('**/api/v2/charts/archive?*', (r) =>
+          r.fulfill({ contentType: 'application/json', json: original }),
+        );
+        await dashboard();
+        const price = page.locator('[data-chart="price"]');
+        const marker = price
+          .locator('circle')
+          .filter({ has: page.locator('title', { hasText: isolated.date + ' · 0.005' }) });
+        assert.equal(
+          await marker.count(),
+          1,
+          boundary + ': isolated valid high point remains visible',
+        );
+        assert.equal(await marker.getAttribute('cy'), '20');
+        const lines = await price.locator('path').first().getAttribute('d');
+        assert.ok(!lines.includes(',20'), 'no interpolated line crosses either boundary');
+        if (boundary === 'absent') {
+          await shot('isolated-date-gap-mobile');
+          await page.setViewportSize({ width: 1440, height: 1000 });
+          await shot('isolated-date-gap-desktop');
+        }
+      }
+    });
     await test('expired current price does not replace history; failed refresh is recoverable and missing metric stays unavailable', async () => {
       const home = await (await fetch(base + '/api/v2/home')).json();
       assert.equal(home.live.price.status, 'unavailable');

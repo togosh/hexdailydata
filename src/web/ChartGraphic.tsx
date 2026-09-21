@@ -82,6 +82,10 @@ export default function ChartGraphic({
               ) : set.length < 80 ||
                 set[i - 1]?.y == null ||
                 set[i + 1]?.y == null ||
+                counts.get(set[i - 1]!.date)! > 1 ||
+                counts.get(set[i + 1]!.date)! > 1 ||
+                Date.parse(p.date) - Date.parse(set[i - 1]!.date) !== 86400000 ||
+                Date.parse(set[i + 1]!.date) - Date.parse(p.date) !== 86400000 ||
                 counts.get(p.date)! > 1 ? (
                 <circle key={p.key} cx={x(p.x)} cy={y(p.y)} r="1.7" fill="currentColor">
                   <title>
