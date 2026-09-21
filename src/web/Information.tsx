@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { Dialog, Icon } from './visuals.tsx';
+import { formatUnits } from '../domain/units.ts';
 import { StatusResponseSchema } from '../contracts/api.ts';
 import { DownloadsResponseSchema } from '../contracts/reads.ts';
 import { reportedHistoryResponseSchema } from '../contracts/history.ts';
@@ -6,22 +9,34 @@ import { Feedback, Table } from './components.tsx';
 import { dayLabel, today, numberText, observationState } from './format.ts';
 
 const descriptions = {
-  daily: ['Daily statistics', 'Native daily supply, staking and materialized or pending payouts.'],
-  stakes: ['Stakes', 'Accepted indexed stake records, original timing and lifecycle.'],
-  holders: ['Holders', 'Current indexed liquid and accounted balances with dated ranks.'],
-  maturities: ['Maturities', 'Open future maturities grouped by protocol day.'],
-  markets: ['Markets', 'Qualified, separately sourced market observations and interval coverage.'],
-};
+  daily: ['Daily statistics', 'Native daily supply, staking and payouts.', 'chart'],
+  stakes: ['Stakes', 'Indexed stakes, timing and lifecycle.', 'database'],
+  holders: ['Holders', 'Liquid and accounted staked balances.', 'people'],
+  maturities: ['Maturities', 'Open stakes by future maturity day.', 'calendar'],
+  markets: ['Markets', 'Qualified market observations and coverage.', 'price'],
+} as const;
+function downloadSize(raw: string) {
+  const bytes = BigInt(raw);
+  for (const [divisor, unit] of [
+    [1000000000n, 'GB'],
+    [1000000n, 'MB'],
+    [1000n, 'KB'],
+  ] as const) {
+    if (bytes >= divisor) return `${formatUnits((bytes * 10n) / divisor, 1)} ${unit}`;
+  }
+  return `${raw} bytes`;
+}
 export function Downloads() {
   const data = useResource(endpoint('/downloads'), DownloadsResponseSchema);
   const bundle = data.data?.bundles.find((b) => b.slot === 'current');
+  const [selected, setSelected] = useState<string>();
+  const file = bundle?.files.find((item) => item.dataset === selected);
   return (
-    <>
+    <div className="downloads-page">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">Take the data with you</p>
           <h1>Downloads</h1>
-          <p>Five standard CSV files. Exact amounts, clear units and a fixed cutoff.</p>
+          <p>Grab the core HEX datasets in one tap.</p>
         </div>
       </div>
       {data.loading && <p role="status">Loading downloads...</p>}
@@ -29,54 +44,44 @@ export function Downloads() {
       {bundle ? (
         <>
           <div className="download-grid">
-            {bundle.files.map((file) => (
-              <section className="panel download-card" key={file.dataset}>
-                <span className="file-icon" aria-hidden="true">
-                  ↓
-                </span>
-                <h2>{descriptions[file.dataset][0]} CSV</h2>
-                <p>{descriptions[file.dataset][1]}</p>
-                <p className="download-count">
-                  {numberText(file.rows)} rows · {numberText(file.bytes)} bytes
-                </p>
-                <a
-                  className="button primary"
-                  download
-                  href={`/api/v2/downloads/${bundle.id}/${file.dataset}`}
-                >
-                  Download {file.dataset} CSV
-                </a>
-                <details>
-                  <summary>Units &amp; coverage</summary>
-                  <p>
-                    Snapshot block {bundle.currentIndex.blockNumber}; revision{' '}
-                    {bundle.currentIndex.revision}. Origin chains:{' '}
-                    {bundle.origins
-                      .map((o) => `${o.chainId} (${o.fromBlock}–${o.toBlock})`)
-                      .join(', ') || 'not recorded'}
-                    .
-                  </p>
-                  {file.dataset === 'markets' && (
-                    <p>
-                      {bundle.markets
-                        .map(
-                          (m) =>
-                            `${m.source}: ${m.method}, ${m.qualification}, observed intervals only, day ${m.fromDay + 1}–${m.throughDay === null ? 'pending' : m.throughDay + 1}`,
-                        )
-                        .join('; ') || 'No market coverage.'}
+            {(['stakes', 'holders', 'daily', 'maturities', 'markets'] as const).map((name) => {
+              const item = bundle.files.find((entry) => entry.dataset === name)!;
+              return (
+                <section className="panel download-card" key={name}>
+                  <div className="download-card-header">
+                    <Icon name={descriptions[name][2]} />
+                    <div>
+                      <h2>{descriptions[name][0]} CSV</h2>
+                      <p>{descriptions[name][1]}</p>
+                    </div>
+                  </div>
+                  <div className="download-meta">
+                    <p className="download-count">
+                      {numberText(item.rows)} rows &middot;{' '}
+                      <span title={`${numberText(item.bytes)} bytes`}>
+                        {downloadSize(item.bytes)}
+                      </span>
                     </p>
-                  )}
-                  <Table title={`${file.dataset} column units`} headings={['Column', 'Unit']}>
-                    {file.columns.map((c) => (
-                      <tr key={c.name}>
-                        <td>{c.name}</td>
-                        <td>{c.unit}</td>
-                      </tr>
-                    ))}
-                  </Table>
-                </details>
-              </section>
-            ))}
+                    <button
+                      className="download-details"
+                      aria-haspopup="dialog"
+                      aria-label={`${descriptions[name][0]} units and coverage`}
+                      onClick={() => setSelected(name)}
+                    >
+                      Units &amp; coverage
+                    </button>
+                  </div>
+                  <a
+                    className="button primary"
+                    download
+                    aria-label={`Download ${name} CSV`}
+                    href={`/api/v2/downloads/${bundle.id}/${name}`}
+                  >
+                    <Icon name="download" /> Download CSV
+                  </a>
+                </section>
+              );
+            })}
           </div>
         </>
       ) : (
@@ -99,7 +104,42 @@ export function Downloads() {
       <p>
         <a href="/learn">Read the methodology ↗</a>
       </p>
-    </>
+      {bundle && file && (
+        <Dialog
+          title={`${descriptions[file.dataset][0]} CSV - Units & coverage`}
+          onClose={() => setSelected(undefined)}
+        >
+          <p className="meta">
+            {numberText(file.rows)} rows &middot; {numberText(file.bytes)} bytes
+          </p>
+          <p>
+            Snapshot block {bundle.currentIndex.blockNumber}; revision{' '}
+            {bundle.currentIndex.revision}. Origin chains:{' '}
+            {bundle.origins.map((o) => `${o.chainId} (${o.fromBlock}–${o.toBlock})`).join(', ') ||
+              'not recorded'}
+            .
+          </p>
+          {file.dataset === 'markets' && (
+            <p>
+              {bundle.markets
+                .map(
+                  (m) =>
+                    `${m.source}: ${m.method}, ${m.qualification}, observed intervals only, day ${m.fromDay + 1}–${m.throughDay === null ? 'pending' : m.throughDay + 1}`,
+                )
+                .join('; ') || 'No market coverage.'}
+            </p>
+          )}
+          <Table title={`${file.dataset} column units`} headings={['Column', 'Unit']}>
+            {file.columns.map((c) => (
+              <tr key={c.name}>
+                <td>{c.name}</td>
+                <td>{c.unit}</td>
+              </tr>
+            ))}
+          </Table>
+        </Dialog>
+      )}
+    </div>
   );
 }
 export function Learn() {

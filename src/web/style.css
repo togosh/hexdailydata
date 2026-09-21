@@ -617,26 +617,108 @@ summary {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
-.download-card {
-  position: relative;
-  margin-bottom: 0;
+.downloads-page .page-heading h1 {
+  margin-top: 0;
 }
 .download-grid {
   margin-bottom: 20px;
+  align-items: start;
 }
-.download-card .button {
-  display: block;
-  margin-bottom: 10px;
+.download-card {
+  margin: 0;
+  padding: 20px;
+  background: var(--surface);
 }
-.file-icon {
-  float: right;
+.download-card-header {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.download-card-header > .icon {
+  width: 40px;
+  height: 40px;
   color: var(--accent);
-  font-size: 2rem;
-  line-height: 1;
+}
+.download-card-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.2rem;
+}
+.download-card-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.download-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 10px 0;
 }
 .download-count {
+  margin: 0;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
-  color: var(--ink);
+}
+.download-details {
+  padding: 4px 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.download-card .button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+.download-card .button .icon {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 600px) {
+  .downloads-page .page-heading {
+    margin-bottom: 16px;
+  }
+  .downloads-page .page-heading h1 {
+    margin-bottom: 4px;
+    font-size: 1.65rem;
+  }
+  .downloads-page .page-heading p {
+    font-size: 0.85rem;
+  }
+  .download-grid {
+    gap: 12px;
+  }
+  .download-card {
+    padding: 12px;
+  }
+  .download-card-header {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .download-card-header > .icon {
+    width: 30px;
+    height: 30px;
+  }
+  .download-card-header h2 {
+    font-size: 1rem;
+  }
+  .download-card-header p {
+    font-size: 0.75rem;
+  }
+  .download-meta {
+    margin: 2px 0 6px;
+  }
+  .download-count {
+    font-size: 0.75rem;
+  }
+  .download-details {
+    font-size: 0.7rem;
+  }
 }
 .glossary {
   display: grid;

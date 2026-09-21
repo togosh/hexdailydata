@@ -371,6 +371,23 @@ try {
         });
         await page.evaluate(() => scrollTo(0, 0));
         await capture(name + '-' + width + '-smoke');
+        if (name === 'downloads') {
+          assert.equal(await page.locator('.download-card').count(), 5);
+          assert.equal(await page.locator('a[download]').count(), 5);
+          const trigger = page.getByRole('button', { name: 'Daily statistics units and coverage' });
+          const before = await page.locator('.download-grid').boundingBox();
+          await trigger.click();
+          const dialog = page.getByRole('dialog');
+          await dialog.getByRole('table').waitFor();
+          const bounds = await dialog.boundingBox();
+          assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= width + 1);
+          assert.equal(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth), true);
+          assert.equal((await page.locator('.download-grid').boundingBox()).height, before.height);
+          if (width === 390 || width === 1440) await capture('downloads-units-open-' + width);
+          await page.keyboard.press('Escape');
+          assert.equal(await trigger.evaluate((node) => node === document.activeElement), true);
+          await page.evaluate(() => scrollTo(0, 0));
+        }
         if (name === 'calculator') {
           const stake = await page.locator('.stake-inputs').boundingBox();
           const scenario = await page.locator('.scenario-panel').boundingBox();
