@@ -379,8 +379,6 @@ try {
           else assert.ok(summary.x > stakes.x, 'desktop summary beside stakes');
           const region = page.locator('.address-stakes .table-region');
           assert.ok((await region.boundingBox()).height <= 430);
-          await page.getByRole('button', { name: 'Copy address', exact: true }).click();
-          await page.getByText('Copied', { exact: true }).waitFor();
           await page.evaluate(() => scrollTo(0, 0));
         }
         if (name === 'downloads') {
@@ -461,6 +459,10 @@ try {
             await page.getByRole('button', { name: 'Use dark mode' }).click();
           }
         }
+      }
+      if (name === 'address') {
+        await page.getByRole('button', { name: 'Copy address', exact: true }).click();
+        await page.getByText('Copied', { exact: true }).waitFor();
       }
       await page.getByRole('button', { name: 'Use light mode' }).click();
       await page.waitForFunction(() => document.documentElement.dataset.theme === 'light');

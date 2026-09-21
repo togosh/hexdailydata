@@ -1855,8 +1855,14 @@ main:has(.home-page) {
   font-size: 0.78rem;
 }
 .address-summary .copy {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
   margin: 12px 0;
+}
+.address-summary .copy > span {
+  text-align: center;
+  font-size: 0.75rem;
 }
 .address-summary .copy button {
   width: 100%;
