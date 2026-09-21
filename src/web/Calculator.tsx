@@ -191,7 +191,6 @@ export default function Calculator() {
             <h2 id="scenario-title">
               <Icon name="chart" /> Future Value Scenario
             </h2>
-            <span className="scenario-badge">Not a prediction</span>
           </div>
           <div className="calculator-panel-body">
             <section className="scenario-results" aria-labelledby="payout-result-title">
@@ -247,138 +246,141 @@ export default function Calculator() {
             </div>
           </div>
         </section>
-        <div className="calculator-notes">
-          <p role="status">{input.error ?? (input.loading ? 'Loading...' : '')}</p>
-          {fields.futureMode === 'current' && (
+        {shown && (
+          <p className="sr-only" role="status">
+            Calculated {formatUnits(shown.quote.stakeShares, 12)} T-shares; maturity{' '}
+            {dayLabel(shown.quote.maturityDay)}.
+          </p>
+        )}
+        <details className="calculator-notes" id="calculator-assumptions">
+          <summary>
+            Details &amp; assumptions
+            {error
+              ? ' - Check inputs'
+              : input.error || state === 'unavailable'
+                ? ' - Data unavailable'
+                : state === 'stale'
+                  ? ' - Last-known rate'
+                  : ''}
+          </summary>
+          <div className="calculator-notes-body">
+            <p role="status">{input.error ?? (input.loading ? 'Loading...' : '')}</p>
+            {fields.futureMode === 'current' && (
+              <p className="calculator-hint">
+                {future
+                  ? 'Future price defaults to the current HEX price.'
+                  : 'Current HEX price unavailable. Enter a future price to calculate USD value.'}
+              </p>
+            )}
+            {state === 'stale' && (
+              <p className="notice">
+                Last-known-rate scenario. The current contract rate is not confirmed.
+              </p>
+            )}
+            {state === 'unavailable' && (
+              <p className="notice">
+                Share rate unavailable or expired. Your inputs are preserved; refresh when a
+                qualified observation is available.
+              </p>
+            )}
+            <div className="calculator-details">
+              <h3>Calculation details</h3>
+              <p className="meta">
+                {observationLabel(rate, now, state)}
+                {rate?.asOf && <> · block {rate.asOf.blockNumber}</>}
+              </p>
+              <p>
+                New stakes lock the next contract day. Maturity does not end or pay a stake
+                automatically.
+              </p>
+              {shown && (
+                <>
+                  <dl className="fact-rows calculator-exact">
+                    <div>
+                      <dt>Exact T-shares</dt>
+                      <dd>{formatUnits(shown.quote.stakeShares, 12)}</dd>
+                    </div>
+                    <div>
+                      <dt>Lock begins (UTC)</dt>
+                      <dd>{dayLabel(shown.quote.lockedDay)}</dd>
+                    </div>
+                    <div>
+                      <dt>Bonus hearts (shares only)</dt>
+                      <dd>{numberText(shown.quote.bonusHearts.toString())}</dd>
+                    </div>
+                  </dl>
+                  <p className="meta">
+                    Raw share rate {rate?.value?.rawShareRate}. Transaction assumed on{' '}
+                    {dayLabel(shown.quote.transactionDay)}. Timing invalidates at UTC midnight.
+                  </p>
+                  <Copy label="Copy exact shares" text={shown.quote.stakeShares.toString()} />
+                </>
+              )}
+            </div>
+            <div className="scenario-fields calculator-details">
+              <label>
+                Constant daily payout assumption
+                <select
+                  aria-label="Constant daily payout assumption"
+                  value={fields.preset}
+                  onChange={(e) => change('preset', e.target.value)}
+                >
+                  <option value="">Shares &amp; maturity only</option>
+                  {input.data?.presets.map((p) => (
+                    <option key={p.window} value={p.window} disabled={p.status !== 'available'}>
+                      {p.window}-day mean{' '}
+                      {p.status === 'available'
+                        ? `· through ${dayLabel(p.toDay!)}`
+                        : '· unavailable'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <p className="calculator-hint">
-              {future
-                ? 'Future price defaults to the current HEX price.'
-                : 'Current HEX price unavailable. Enter a future price to calculate USD value.'}
+              {fields.preset
+                ? `${fields.preset}-day payout assumption`
+                : 'Shares & maturity only. Choose a payout assumption to explore rewards.'}
             </p>
-          )}
-          {shown ? (
-            <p className="sr-only" role="status">
-              Calculated {formatUnits(shown.quote.stakeShares, 12)} T-shares; maturity{' '}
-              {dayLabel(shown.quote.maturityDay)}.
-            </p>
-          ) : (
-            <p className="calculator-hint">
-              Choose your inputs, then calculate. Changes require a new calculation.
-            </p>
-          )}
-          {state === 'stale' && (
-            <p className="notice">
-              Last-known-rate scenario. The current contract rate is not confirmed.
-            </p>
-          )}
-          {state === 'unavailable' && (
-            <p className="notice">
-              Share rate unavailable or expired. Your inputs are preserved; refresh when a qualified
-              observation is available.
-            </p>
-          )}
-          <details className="calculator-details">
-            <summary>Calculation details</summary>
-            <p className="meta">
-              {observationLabel(rate, now, state)}
-              {rate?.asOf && <> · block {rate.asOf.blockNumber}</>}
-            </p>
-            <p>
-              New stakes lock the next contract day. Maturity does not end or pay a stake
-              automatically.
-            </p>
-            {shown && (
-              <>
+            {error && (
+              <p id="calculator-error" role="alert">
+                {error}
+              </p>
+            )}
+            {shown?.scenarioReason && <p className="notice">{shown.scenarioReason}</p>}
+            <div className="calculator-details">
+              <h3>Scenario details</h3>
+              <p>
+                Bonuses increase shares, not principal. Historical payout averages are held constant
+                without compounding; rewards and future USD values are hypothetical. Early or late
+                ending penalties are not modeled.
+              </p>
+              {shown?.scenario && (
                 <dl className="fact-rows calculator-exact">
                   <div>
-                    <dt>Exact T-shares</dt>
-                    <dd>{formatUnits(shown.quote.stakeShares, 12)}</dd>
+                    <dt>Rewards (HEX)</dt>
+                    <dd>{numberText(displayRatio(shown.scenario.rewardHex, 8))}</dd>
                   </div>
                   <div>
-                    <dt>Lock begins (UTC)</dt>
-                    <dd>{dayLabel(shown.quote.lockedDay)}</dd>
+                    <dt>Principal + rewards (HEX)</dt>
+                    <dd>{numberText(displayRatio(shown.scenario.totalHex, 8))}</dd>
                   </div>
-                  <div>
-                    <dt>Bonus hearts (shares only)</dt>
-                    <dd>{numberText(shown.quote.bonusHearts.toString())}</dd>
-                  </div>
+                  {shown.scenario.usd && (
+                    <div>
+                      <dt>Future USD value</dt>
+                      <dd>${numberText(displayRatio(shown.scenario.usd, 8))}</dd>
+                    </div>
+                  )}
                 </dl>
-                <p className="meta">
-                  Raw share rate {rate?.value?.rawShareRate}. Transaction assumed on{' '}
-                  {dayLabel(shown.quote.transactionDay)}. Timing invalidates at UTC midnight.
-                </p>
-                <Copy label="Copy exact shares" text={shown.quote.stakeShares.toString()} />
-              </>
-            )}
-          </details>
-          <details className="scenario-fields calculator-details">
-            <summary>Optional payout &amp; future USD scenario</summary>
-            <label>
-              Constant daily payout assumption
-              <select
-                aria-label="Constant daily payout assumption"
-                value={fields.preset}
-                onChange={(e) => change('preset', e.target.value)}
-              >
-                <option value="">Shares &amp; maturity only</option>
-                {input.data?.presets.map((p) => (
-                  <option key={p.window} value={p.window} disabled={p.status !== 'available'}>
-                    {p.window}-day mean{' '}
-                    {p.status === 'available' ? `· through ${dayLabel(p.toDay!)}` : '· unavailable'}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p>
-              Exact mean of daily payout ratios, held constant throughout the stake. No compounding.
-            </p>
-          </details>
-          <p className="calculator-hint">
-            {fields.preset
-              ? `${fields.preset}-day payout assumption`
-              : 'Shares & maturity only. Choose a payout assumption to explore rewards.'}
-          </p>
-          {error && (
-            <p id="calculator-error" role="alert">
-              {error}
-            </p>
-          )}
-          {shown?.scenarioReason && <p className="notice">{shown.scenarioReason}</p>}
-          <details className="calculator-details" id="calculator-assumptions">
-            <summary>Assumptions &amp; exact results</summary>
-            <p>
-              Bonuses increase the shares issued, not your principal. Actual issuance depends on the
-              share rate and transaction day.
-            </p>
-            <p>
-              Historical payout means are dated observations, not forecasts. Rewards and future USD
-              values are hypothetical. Early or late ending penalties are not modeled.
-            </p>
-            {shown?.scenario && (
-              <dl className="fact-rows calculator-exact">
-                <div>
-                  <dt>Rewards (HEX)</dt>
-                  <dd>{numberText(displayRatio(shown.scenario.rewardHex, 8))}</dd>
-                </div>
-                <div>
-                  <dt>Principal + rewards (HEX)</dt>
-                  <dd>{numberText(displayRatio(shown.scenario.totalHex, 8))}</dd>
-                </div>
-                {shown.scenario.usd && (
-                  <div>
-                    <dt>Future USD value</dt>
-                    <dd>${numberText(displayRatio(shown.scenario.usd, 8))}</dd>
-                  </div>
-                )}
-              </dl>
-            )}
-            <p>
-              Scenario details truncate to 8 decimals; calculations retain exact ratios. Blank
-              future price means no USD result; zero is valid.
-            </p>
-            <a href="/learn">Calculation &amp; source notes ↗</a>
-          </details>
-        </div>
+              )}
+              <p>
+                Scenario details truncate to 8 decimals; calculations retain exact ratios. Blank
+                future price means no USD result; zero is valid.
+              </p>
+              <a href="/learn">Calculation &amp; source notes ↗</a>
+            </div>
+          </div>
+        </details>
       </form>
     </div>
   );

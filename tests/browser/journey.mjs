@@ -83,6 +83,7 @@ try {
       assert.equal(await page.locator('[data-metric="price"] dd').innerText(), 'Unavailable');
       await capture('home');
       await go('/calculator');
+      await page.locator('.calculator-notes > summary').click();
       await page.getByText('Share rate unavailable or expired.', { exact: false }).waitFor();
       await page.getByLabel('HEX amount', { exact: true }).fill('123456.00000001');
       await page.reload();
@@ -383,7 +384,7 @@ try {
         await page.getByLabel('Whole days').fill('365');
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         await page.getByTitle('0.972011620873', { exact: true }).waitFor();
-        await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
+        await page.locator('.calculator-notes > summary').click();
         await page.getByLabel('Constant daily payout assumption').selectOption('30');
         await page.getByLabel('Hypothetical future USD per HEX').fill('0.01');
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
@@ -644,6 +645,7 @@ try {
           r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(inputs) }),
         );
         await go('/calculator');
+        await page.locator('.calculator-notes > summary').click();
         await page.getByText('Last-known-rate scenario.', { exact: false }).waitFor();
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         await page.getByRole('status').filter({ hasText: 'Calculated' }).waitFor();

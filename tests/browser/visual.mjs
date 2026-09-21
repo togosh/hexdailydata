@@ -350,9 +350,9 @@ try {
         await page.waitForFunction(() => !document.querySelector('button.primary:disabled'));
         await page.getByLabel('HEX amount', { exact: true }).fill('10000');
         await page.getByLabel('Whole days').fill('3650');
-        await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
+        await page.locator('.calculator-notes > summary').click();
         await page.getByLabel('Constant daily payout assumption').selectOption('30');
-        await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
+        await page.locator('.calculator-notes > summary').click();
         const currentPrice = await (await fetch(base + '/api/v2/home?chain=pulsechain')).json();
         await page.waitForFunction(
           (value) =>
@@ -370,6 +370,17 @@ try {
         });
         await page.evaluate(() => scrollTo(0, 0));
         await capture(name + '-' + width + '-smoke');
+        if (name === 'calculator') {
+          const stake = await page.locator('.stake-inputs').boundingBox();
+          const scenario = await page.locator('.scenario-panel').boundingBox();
+          assert.ok(
+            Math.abs(stake.height - scenario.height) < 1,
+            'calculator panels have equal height',
+          );
+          assert.equal(await page.locator('.calculator-page details').count(), 1);
+          assert.equal(await page.locator('.calculator-notes').getAttribute('open'), null);
+          assert.equal(await page.getByText('Not a prediction', { exact: true }).count(), 0);
+        }
         if (name === 'calculator' && width === 390) {
           const bottom = await page.locator('.bottom-nav').boundingBox();
           const price = await page.locator('.future-price-row').boundingBox();
@@ -403,6 +414,16 @@ try {
                 break;
             }
             await page.evaluate(() => scrollTo(0, 0));
+            if (name === 'calculator') {
+              await page.locator('.calculator-notes > summary').click();
+              await page.getByLabel('Constant daily payout assumption').waitFor();
+              await page.screenshot({
+                path: resolve(folder, 'visual-calculator-390-details-open.png'),
+                fullPage: true,
+              });
+              await page.locator('.calculator-notes > summary').click();
+              await page.evaluate(() => scrollTo(0, 0));
+            }
           }
           if (width === 960 && name === 'home') {
             await page.getByRole('button', { name: 'Use light mode' }).click();
