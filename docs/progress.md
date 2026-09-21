@@ -340,3 +340,13 @@ probe. Only Downloads screenshots, with clean owner views in
 modal captures in parent evidence directory. Chrome/synthetic only; resources cleaned.
 No other page bodies, v1/live providers/push/deploy/Task09. Stop for owner visual review.
 Documentation-only status entry after reviewed source.
+
+Task07 Downloads detail-button visibility VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `0b2fdf10026afd2cf24a52dd54bdd1fe00bfbb66` gives Units & coverage an
+accent outline, contrasting background, readable mobile text and decorative chevron.
+Types/build/format and compiled offline UI checks pass at320/390/960/1440, including
+44px targets, dialogs, focus and320dark/light200%text. Prior a5f1e6c CSV/backend evidence
+reused; only style/decorative markup changed. Independent `/root/home_panels_review` PASS.
+Downloads-only updated/open desktop/mobile captures and evidence:
+`artifacts/task-07/downloads-details-button-20260920/`. No v1/live/push/deploy/Task09.
+Stop for owner review. Documentation-only status entry after reviewed source.
