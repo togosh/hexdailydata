@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { packArchive, readArchive, lines } from '../../src/worker/bootstrap/archive.ts';
 
 const signal = new AbortController().signal;
 test('seed tar accepts exact regular members; rejects traversal/link/duplicate/extra/missing/truncated/bomb', async () => {
-  const root = resolve('artifacts/task-03'),
-    dir = await mkdtemp(join(root, 'archive-test-'));
+  const root = resolve('artifacts/task-03');
+  await mkdir(root, { recursive: true });
+  const dir = await mkdtemp(join(root, 'archive-test-'));
   assert.ok(dir.startsWith(root + '\\') || dir.startsWith(root + '/'));
   try {
     const path = join(dir, 'valid.gz');

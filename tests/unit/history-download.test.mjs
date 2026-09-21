@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { download } from '../../scripts/history-download.mjs';
@@ -9,6 +9,7 @@ import { parseInput } from '../../src/worker/history/input.ts';
 import { rawRow } from '../history/fixture.mjs';
 
 test('one bounded downloader: raw local HTTP redirect, overflow, truncation, timeout and rejected data witnesses', async () => {
+  await mkdir(resolve('artifacts'), { recursive: true });
   const root = await mkdtemp(resolve('artifacts/history-download-'));
   try {
     for (const mode of [
