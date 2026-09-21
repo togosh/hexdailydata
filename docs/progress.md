@@ -375,3 +375,18 @@ Evidence/source ZIPs and1440x1000/390x844/scrolled captures:
 `artifacts/task-07/address-redesign/`. Chrome/synthetic only; owned resources removed.
 Stop for owner visual review. No Task09, live/canary, v1 runtime/data, push or deployment.
 Documentation-only status entry after reviewed source.
+
+Task07 Charts redesign REVIEW_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `7399071035d53d02a53ebf33bd92158a2e32defc`, preserving Address base
+`b1a46d096a94a3a42b8351a08f89c3a642dde668`. Frozen13-chart dashboard, six categories,
+source-aware ranges and preserved exact drill-downs; three bounded read APIs share
+archive/native series and indexed maturity aggregates. No storage/provider/CSV change.
+Build/types/format/OpenAPI,30 focused units and compiled shell PASS;16 affected units
+rerun after correction. Final isolated run5:23 SQL/API groups,14 browser groups PASS.
+Independent `/root/charts_redesign_review` PASS after one correction/recheck round for
+isolated observations at missing/duplicate-date boundaries. Cold mobile11-sample
+headline/chart p95:1,874.1ms; two initial API requests,400,470 JSON bytes. Synthetic
+read/UI witness, not Task09 or production scale.39 final Charts captures plus actual
+commands/reviewer evidence and ZIPs: `artifacts/task-07/charts-redesign/`.
+Owned resources removed. No live probes/canary/HDS download/v1/push/deployment/Task09.
+Stop for owner visual review. Documentation-only status entry after reviewed source.
