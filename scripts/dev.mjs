@@ -1,4 +1,24 @@
 import { spawn } from 'node:child_process';
+import net from 'node:net';
+
+// The API watch process stays alive after a failed child start. Refuse fixed-port
+// conflicts before launching either server so Vite cannot proxy to someone else's API.
+for (const port of [4320, 4321]) {
+  const probe = net.createServer();
+  try {
+    await new Promise((resolve, reject) => {
+      probe.once('error', reject);
+      probe.listen({ host: '127.0.0.1', port, exclusive: true }, resolve);
+    });
+  } catch (error) {
+    console.error(`Development startup refused: localhost:${port} is unavailable (${error.code}).`);
+    process.exitCode = 1;
+    break;
+  } finally {
+    if (probe.listening) await new Promise((resolve) => probe.close(resolve));
+  }
+}
+if (process.exitCode) process.exit(process.exitCode);
 
 // Direct child processes keep Ctrl+C cleanup portable without a shell/process tree.
 const children = [

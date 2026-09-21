@@ -307,6 +307,8 @@ npm start
 The local shell is at4320 and has no DB by default. `npm run dev` runs API4320/Vite4321;
 no `.env` is loaded automatically. `npm run doctor` uses the compiled operator and
 returns3 for an unconfigured DB. Linux containers provide the supported durable path.
+Vite proxies `/api/v2` and `/health`; `/api.ts` is a browser module. A native-data503
+does not prevent the Home shell or the direct `/learn` page from rendering.
 
 From a fresh **source-only** directory, the following documented witness creates new
 isolated environments, runs the exact startup/operator path above, injects a visibly
@@ -331,6 +333,10 @@ material. Keep failed runs as actual evidence, not just the successful receipts.
 Affected checks: `npm run format:check`, `npm run typecheck`, `npm test`, `npm run build`,
 `npm run openapi:check`, `npm run test:sync`, `npm run test:daily`, `npm run test:api`.
 Existing focused switches/evidence are described in [testing.md](docs/testing.md).
-The whole-product Task09 scale/traffic suite and all live/canary/cost qualification remain
-separate. See [product](docs/product.md), [data](docs/data.md), [interfaces](docs/interfaces.md),
+`npm run test:integrated` runs the offline Task09 volume/rollover/mixed-traffic witness.
+It uses new disposable resources, existing compiled operators and synthetic transports;
+allow roughly an hour for30physical publications and their real reader grace periods.
+Its raw evidence requires interpretation alongside the smaller correctness/recovery
+suites; successful execution alone is not a release or live-provider qualification.
+See [product](docs/product.md), [data](docs/data.md), [interfaces](docs/interfaces.md),
 [live](docs/live.md), [operations](docs/operations.md) and [progress](docs/progress.md).

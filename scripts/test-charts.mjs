@@ -2,10 +2,10 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, appendFileSync, existsSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
-const root = resolve('artifacts/task-07');
-const evidence = resolve(process.env.HDD_V2_WEB_EVIDENCE ?? `${root}/web-${Date.now()}`);
+const root = resolve('artifacts');
+const evidence = resolve(process.env.HDD_V2_WEB_EVIDENCE ?? `${root}/task-07/web-${Date.now()}`);
 if (relative(root, evidence).startsWith('..') || isAbsolute(relative(root, evidence)))
-  throw new Error('New Task07 evidence required.');
+  throw new Error('New task-owned evidence required.');
 if (existsSync(evidence)) throw new Error('Refusing to overwrite existing browser evidence.');
 mkdirSync(evidence, { recursive: true });
 const project = 'hexdailydata-v2-web-' + randomUUID().slice(0, 8);

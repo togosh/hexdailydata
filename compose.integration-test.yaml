@@ -1,0 +1,16 @@
+# Offline Task09 composition. Normal localhost ingress; provider transport stays internal.
+services:
+  api:
+    command: [node, tests/integration/api.mjs]
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./src:/app/src:ro
+      - ${HDD_V2_OPERATOR_INPUT}:/input:ro
+      - ${HDD_V2_OPS_EVIDENCE}:/evidence
+  worker:
+    command: [node, tests/integration/worker.mjs, watch]
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./src:/app/src:ro
+      - ${HDD_V2_OPERATOR_INPUT}:/input:ro
+      - ${HDD_V2_OPS_EVIDENCE}:/evidence

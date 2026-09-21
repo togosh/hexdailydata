@@ -308,12 +308,13 @@ export async function runWorker(
                 },
               ),
           ) as [Source, Source];
-          return new SyncEngine(
+          activeSync = new SyncEngine(
             writer,
             reader!,
             sources,
             resolve(process.env.HDD_V2_STORAGE_PATH!),
           );
+          return activeSync;
         }
         const backups = new BackupSchedule();
         await runWorkerLifecycle(
@@ -352,7 +353,7 @@ export async function runWorker(
               if (command === 'rebuild') await sync.audit(signal);
             }
             console.log(JSON.stringify({ progress: sync.progress, budget: budget.counters }));
-            if (command !== 'watch') await daily.tick(signal);
+            if (command !== 'watch') await daily.tick(signal, budget.clock.now());
           },
           new MetricsJob(realClock, (s) => metrics.tick(s)),
           signal,

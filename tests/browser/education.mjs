@@ -13,7 +13,7 @@ const [
   webRoot = 'dist/web',
   mode = 'current',
 ] = process.argv.slice(2);
-assert.match(output.replaceAll('\\', '/'), /^artifacts\/task-07\/[a-z0-9_/-]+$/);
+assert.match(output.replaceAll('\\', '/'), /^artifacts\/task-(07|09)\/[a-z0-9_/-]+$/);
 const folder = resolve(output);
 mkdirSync(resolve(folder, 'screenshots'), { recursive: true });
 const fixture = JSON.parse(readFileSync('tests/browser/education-fixture.json', 'utf8'));

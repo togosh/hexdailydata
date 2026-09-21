@@ -44,7 +44,7 @@ export function memoryCooldown() {
     },
   };
 }
-export function fixture({ last = 364, holdersPerBlock = 0 } = {}) {
+export function fixture({ last = 364, holdersPerBlock = 0, startDay = 0, mutateBlock } = {}) {
   const observedSources = [];
   const headers = new Map(),
     logs = new Map(),
@@ -55,7 +55,7 @@ export function fixture({ last = 364, holdersPerBlock = 0 } = {}) {
   let supply = 0n,
     locked = 0n;
   for (let number = 100; number <= last; number++) {
-    const day = Math.floor((number - 100) / 8),
+    const day = startDay + Math.floor((number - 100) / 8),
       timestamp = 1575331200n + BigInt(day) * 86400n + BigInt((number - 100) % 8) * 10800n + 1n;
     const h = {
       number: String(number),
@@ -144,6 +144,7 @@ export function fixture({ last = 364, holdersPerBlock = 0 } = {}) {
         transfer(A, owner, 1);
       }
     }
+    mutateBlock?.({ number, day, transfer, start, end });
     const txs = events.length || number === 100 ? [hash(number * 100)] : [];
     headers.set(number, { ...h, transactions: txs });
     logs.set(number, events);

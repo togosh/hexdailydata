@@ -8,11 +8,23 @@ import {
   appendFileSync,
   copyFileSync,
   chmodSync,
+  existsSync,
 } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, relative, isAbsolute } from 'node:path';
 import net from 'node:net';
 
-const evidence = resolve('artifacts/task-pulsechain-history/sql-' + randomUUID().slice(0, 8));
+const evidence = resolve(
+  process.env.HDD_V2_HISTORY_EVIDENCE ??
+    'artifacts/task-pulsechain-history/sql-' + randomUUID().slice(0, 8),
+);
+const evidenceRelative = relative(resolve('artifacts'), evidence);
+assert.ok(
+  evidenceRelative &&
+    !evidenceRelative.startsWith('..') &&
+    !isAbsolute(evidenceRelative) &&
+    !existsSync(evidence),
+  'New task-owned evidence required',
+);
 mkdirSync(evidence, { recursive: true });
 const environments = [];
 let serial = 0;
@@ -117,7 +129,8 @@ async function transfer(d, files) {
     for (const [from, to] of files)
       await execute('docker', ['cp', id + ':' + from, to], { label: 'copy-task-artifact' });
   } finally {
-    await execute('docker', ['rm', '-f', id], { label: 'remove-owned-helper' });
+    await execute('docker', ['stop', '--timeout', '10', id], { label: 'stop-owned-helper' });
+    await execute('docker', ['rm', id], { label: 'remove-owned-helper' });
   }
 }
 async function backup(d, name) {
@@ -341,5 +354,6 @@ try {
       await host(d, 'destroy', config(d).project);
     } catch (e) {
       appendFileSync(join(evidence, 'cleanup.log'), e.message + '\n');
+      process.exitCode = 1;
     }
 }

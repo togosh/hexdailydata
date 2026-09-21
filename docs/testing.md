@@ -1,5 +1,33 @@
 # Acceptance and measurement
 
+The Task09 sequence is `npm run test:integrated`, with a new directory selected by
+`HDD_V2_INTEGRATED_EVIDENCE` inside `artifacts/task-09/` (a unique default is provided).
+It reuses the sync/live fixtures, normal compiled release/operator commands and bounded
+operations helper. DB1.25CPU/2.5GiB plus API, worker and at most one helper at.25CPU/.5GiB
+each remain within2CPU/4GiB; browser/load generation, build and control are outside.
+Use `node scripts/test-integrated.mjs --model-only` for the small raw replay witness,
+or `--cycles=1 --mixed-smoke` for an explicitly incomplete setup/transport smoke.
+Only the default30cycles runs full rollover, publication and ten-minute mixed traffic.
+Use `--cycles=0 --mixed-only` for a focused mixed-load recheck on a newly built large
+shape with actual raw forward replay; it does not repeat the thirty-day retention proof.
+No live opt-in, provider credentials or HDS download is used. A retained, receipt-checked
+HDS input is reused when present; otherwise the archive fixture is labeled synthetic.
+
+The large SQL shape has reconciled current aggregates and actual forward raw replay,
+but does not have valid historical raw provenance for a full-scale seed audit. The
+small sync/history/operations suites own semantic seed and backup recovery. Preserve
+this distinction when reporting timings. Worker samples include actual dispatch lanes,
+file overlap and cgroup peaks; browser samples use fresh documents and disclosed SQL
+warmth. Target misses and incomplete values remain visible in the final report.
+
+Existing `test:ops`, history and lifecycle harnesses accept respectively
+`HDD_V2_OPS_EVIDENCE`, `HDD_V2_HISTORY_EVIDENCE` and `HDD_V2_LIFECYCLE_EVIDENCE`; use new
+directories inside `artifacts/`. Keep failed runs and use a fresh path for retries.
+For the actual Windows Vite witness, launch `npm run dev` in a disposable source-only
+copy named `HEXDailyData-v2-Task09-*`, then run
+`node tests/browser/development.mjs <copy-path> artifacts/task-09/<new-run>` from the
+builder checkout. Its reversible HMR edit is confined to that copy.
+
 Tests protect product behavior, not a growing bureaucracy of source seals. Unit tests
 are cheap and local; integration uses real PostgreSQL in fresh v2-only containers.
 No host legacy database, source module execution, old scheduler, or broad old verify.

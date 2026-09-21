@@ -8,16 +8,21 @@ import {
   writeFileSync,
   appendFileSync,
   copyFileSync,
+  existsSync,
 } from 'node:fs';
-import { resolve, join } from 'node:path';
+import { resolve, join, relative, isAbsolute } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import net from 'node:net';
 
 const scale = process.argv.includes('--scale');
 const smoke = process.argv.includes('--smoke');
 const evidence = resolve(
-  'artifacts/task-08/' + (scale ? 'scale-' : 'ops-') + randomUUID().slice(0, 8),
+  process.env.HDD_V2_OPS_EVIDENCE ??
+    'artifacts/task-08/' + (scale ? 'scale-' : 'ops-') + randomUUID().slice(0, 8),
 );
+const evidenceRelative = relative(resolve('artifacts'), evidence);
+if (evidenceRelative.startsWith('..') || isAbsolute(evidenceRelative) || existsSync(evidence))
+  throw new Error('Use a new evidence directory inside repository artifacts.');
 mkdirSync(evidence, { recursive: true });
 chmodSync(evidence, 0o770);
 console.log(
@@ -256,7 +261,10 @@ try {
         ],
         { label: 'copy-seed' },
       );
-    await execute('docker', ['rm', '-f', backupContainer], { label: 'remove-transfer-helper' });
+    await execute('docker', ['stop', '--timeout', '10', backupContainer], {
+      label: 'stop-transfer-helper',
+    });
+    await execute('docker', ['rm', backupContainer], { label: 'remove-transfer-helper' });
     await execute('docker', ['stats', '--no-stream', '--format', '{{json .}}', container], {
       label: 'resource-milestone',
     });

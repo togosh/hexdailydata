@@ -42,7 +42,7 @@ try {
     memory: readFileSync('/sys/fs/cgroup/memory.max', 'utf8').trim(),
   });
   const migrator = await db('migrator');
-  await test('accepted migrations 1/2 upgrade to 3 with repeated checksum check', async () => {
+  await test('accepted migrations 1/2 upgrade to schema5 with repeated checksum check', async () => {
     await migrate(migrator, await initialMigration(), [
       readFileSync('migrations/0002_recovery.sql', 'utf8'),
     ]);
@@ -58,7 +58,7 @@ try {
       (await migrator.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows.map(
         (x) => x.version,
       ),
-      [1, 2, 3, 4],
+      [1, 2, 3, 4, 5],
     );
   });
   const api = await db('api'),

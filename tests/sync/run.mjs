@@ -124,7 +124,7 @@ async function snapshot({ semantic = false } = {}) {
 }
 try {
   const migrator = await db('migrator');
-  await test('fresh/repeated schema3 plus ordered schema1 upgrade preserves ledger', async () => {
+  await test('fresh/repeated schema5 plus ordered schema1 upgrade preserves ledger', async () => {
     if (phase === 'build') await migrate(migrator, await initialMigration());
     await migrateCurrent(migrator);
     await migrateCurrent(migrator);
@@ -132,7 +132,7 @@ try {
       (await migrator.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows.map(
         (r) => r.version,
       ),
-      [1, 2, 3, 4],
+      [1, 2, 3, 4, 5],
     );
   });
   api = await db('api');

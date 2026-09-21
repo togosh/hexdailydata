@@ -1,11 +1,29 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs';
-import { resolve, join } from 'node:path';
+import {
+  chmodSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  appendFileSync,
+  existsSync,
+} from 'node:fs';
+import { resolve, join, relative, isAbsolute } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
-const root = resolve('artifacts/task-08/lifecycle-' + randomUUID().slice(0, 8)),
+const root = resolve(
+    process.env.HDD_V2_LIFECYCLE_EVIDENCE ??
+      'artifacts/task-08/lifecycle-' + randomUUID().slice(0, 8),
+  ),
   directory = join(root, 'new environment');
+const evidenceRelative = relative(resolve('artifacts'), root);
+assert.ok(
+  evidenceRelative &&
+    !evidenceRelative.startsWith('..') &&
+    !isAbsolute(evidenceRelative) &&
+    !existsSync(root),
+  'New task-owned evidence required',
+);
 mkdirSync(root, { recursive: true });
 chmodSync(root, 0o770);
 writeFileSync(join(root, '.dockerignore'), '*\n!Dockerfile.*\n');

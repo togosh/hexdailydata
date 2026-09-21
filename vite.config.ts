@@ -9,6 +9,9 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 4321,
     strictPort: true,
-    proxy: { '/api': 'http://127.0.0.1:4320', '/health': 'http://127.0.0.1:4320' },
+    proxy: {
+      '/api/v2': 'http://127.0.0.1:4320',
+      '/health': 'http://127.0.0.1:4320',
+    },
   },
 });
