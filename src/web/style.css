@@ -624,8 +624,10 @@ summary {
   margin-bottom: 20px;
   align-items: start;
 }
-.download-card {
+.download-grid > .download-card {
   margin: 0;
+}
+.download-card {
   padding: 20px;
   background: var(--surface);
 }
@@ -650,6 +652,7 @@ summary {
   font-size: 0.9rem;
 }
 .download-meta {
+  padding-left: 58px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -676,6 +679,7 @@ summary {
   justify-content: center;
 }
 .download-card .button .icon {
+  color: inherit;
   width: 20px;
   height: 20px;
 }
@@ -711,6 +715,7 @@ summary {
     font-size: 0.75rem;
   }
   .download-meta {
+    padding-left: 42px;
     margin: 2px 0 6px;
   }
   .download-count {
