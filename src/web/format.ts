@@ -4,7 +4,8 @@ import type { Observation } from '../contracts/api.ts';
 
 /** Expand an admitted decimal token without passing its significant digits through Number. */
 export function decimal(token: string): string {
-  if (token.length > 320 || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(token))
+  // Same-record HDS decimal products can expand two admitted exponent tokens.
+  if (token.length > 4096 || !/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d{1,3})?$/.test(token))
     throw new Error('Invalid decimal.');
   const negative = token.startsWith('-');
   const [mantissa = '', exponent = '0'] = token.replace(/^-/, '').toLowerCase().split('e');

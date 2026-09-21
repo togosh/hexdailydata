@@ -3,11 +3,11 @@ import type { z } from 'zod';
 import { DailyResponseSchema } from '../contracts/reads.ts';
 import { metricDefinitions, type Metric as ArchiveMetric } from '../contracts/history.ts';
 import { displayRatio, hexPerTShareBeforeBonuses } from '../domain/units.ts';
-import { endpoint, request, RequestError, useResource } from './api.ts';
-import { dateShift, today, numberText } from './format.ts';
+import { endpoint, RequestError, useResource } from './api.ts';
+import { dateShift, today, numberText, multiplyDecimals } from './format.ts';
 import { Feedback, Table } from './components.tsx';
 import { Icon } from './visuals.tsx';
-import { loadArchive, validRange, plot, type Point } from './history.ts';
+import { loadArchive, loadNative, validRange, plot, type Point } from './history.ts';
 
 type Daily = z.infer<typeof DailyResponseSchema>;
 const nativeMetrics = {
@@ -19,6 +19,9 @@ const nativeMetrics = {
   locked: ['Locked principal (includes GA)', 'HEX'],
   holders: ['Current holders', 'addresses'],
   stakers: ['Current stakers', 'addresses'],
+  starts: ['New stakes', 'stakes/day'],
+  ends: ['Ended stakes', 'stakes/day'],
+  penalties: ['Daily penalties', 'HEX'],
 } as const;
 type NativeMetric = keyof typeof nativeMetrics;
 function nativePoints(data: Daily, metric: NativeMetric): Point[] {
@@ -40,7 +43,13 @@ function nativePoints(data: Daily, metric: NativeMetric): Point[] {
                   ? r.stakedHex
                   : metric === 'holders'
                     ? r.holderCount
-                    : r.stakerCount,
+                    : metric === 'starts'
+                      ? r.activity.newStakes
+                      : metric === 'ends'
+                        ? r.activity.endedStakes
+                        : metric === 'penalties'
+                          ? r.activity.penaltiesHex
+                          : r.stakerCount,
     detail: `Contract day ${r.contractDay} / display ${r.displayDay} · ${r.originChainId === 1 ? 'inherited Ethereum origin' : 'PulseChain origin'} · block ${r.asOf.blockNumber}`,
     status: metric === 'payout' ? r.payout.status : 'native daily',
   }));
@@ -51,16 +60,22 @@ export function Chart({
   unit,
   compact = false,
   controls,
+  schedule = false,
 }: {
   points: Point[];
   title: string;
   unit: string;
   compact?: boolean;
   controls?: ReactNode;
+  schedule?: boolean;
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [points]);
-  const graph = plot(points);
+  const graph = plot(
+    schedule && points.length
+      ? [...points, { ...points[0]!, key: 'baseline', value: '0' }]
+      : points,
+  );
   return (
     <div data-testid="history-chart" data-ready={points.some((p) => p.value !== null)}>
       <div className="section-heading">
@@ -88,16 +103,32 @@ export function Chart({
             <text x="65" y="225" textAnchor="end">
               {graph.minLabel}
             </text>
-            <path d={graph.lines.join(' ')} className="series" />
+            {!schedule && <path d={graph.lines.join(' ')} className="series" />}
             {graph.coordinates
+              .slice(0, points.length)
               .filter((p) => p.y !== null)
-              .map((p) => (
-                <circle key={p.key} cx={p.x} cy={p.y!} r="2.5">
-                  <title>
-                    {p.date} · {p.value} {unit} · {p.detail}
-                  </title>
-                </circle>
-              ))}
+              .map((p) =>
+                schedule ? (
+                  <rect
+                    key={p.key}
+                    x={p.x - 2}
+                    y={p.y!}
+                    width="4"
+                    height={220 - p.y!}
+                    fill="var(--accent)"
+                  >
+                    <title>
+                      {p.date} · {p.value} {unit} · {p.detail}
+                    </title>
+                  </rect>
+                ) : (
+                  <circle key={p.key} cx={p.x} cy={p.y!} r="2.5">
+                    <title>
+                      {p.date} · {p.value} {unit} · {p.detail}
+                    </title>
+                  </circle>
+                ),
+              )}
             <text x="70" y="255">
               {points[0]?.date}
             </text>
@@ -107,8 +138,9 @@ export function Chart({
           </svg>
           {!compact && (
             <p className="meta">
-              Missing dates and unavailable values break the line. Same-date records remain separate
-              markers and rows.
+              {schedule
+                ? 'Only scheduled dates are listed. Other dates have no upcoming stakes at this indexed block.'
+                : 'Missing dates and unavailable values break the line. Same-date records remain separate markers and rows.'}
             </p>
           )}
         </>
@@ -208,6 +240,21 @@ function initial(): Selection {
     metric: 'price',
     all: false,
   };
+  const params = new URLSearchParams(location.search);
+  if (params.has('metric')) {
+    const source = params.get('source') === 'native' ? 'native' : 'hds';
+    const from = params.get('from') ?? defaults.from,
+      to = params.get('to') ?? defaults.to;
+    // Full dashboard ranges use bounded exact API windows with a stable revision.
+    const valid = validRange(from, to, 10000);
+    return {
+      source,
+      metric: params.get('metric') ?? 'price',
+      from: valid ? from : defaults.from,
+      to: valid ? to : defaults.to,
+      all: valid && !validRange(from, to),
+    };
+  }
   try {
     const stored = JSON.parse(sessionStorage.getItem('history-selection') ?? 'null');
     if (
@@ -253,11 +300,7 @@ export default function History() {
           const result = await loadArchive(selection.from, selection.to, controller.signal);
           if (active) setArchive(result);
         } else {
-          const result = await request(
-            endpoint('/daily', { from: selection.from, to: selection.to }),
-            DailyResponseSchema,
-            controller.signal,
-          );
+          const result = await loadNative(selection.from, selection.to, controller.signal);
           if (active) setNative(result);
         }
       } catch (e) {
@@ -285,31 +328,50 @@ export default function History() {
   }, [selection]);
   const hds = selection.source === 'hds';
   const metric = hds
-    ? selection.metric === 'price' || selection.metric in metricDefinitions
+    ? selection.metric === 'price' ||
+      selection.metric === 'cost' ||
+      selection.metric in metricDefinitions
       ? selection.metric
       : 'price'
     : selection.metric in nativeMetrics
       ? selection.metric
       : 'payout';
   const unit = hds
-    ? metric === 'price'
-      ? 'USD/HEX'
-      : metricDefinitions[metric as ArchiveMetric].unit
+    ? metric === 'cost'
+      ? 'USD/T-share'
+      : metric === 'price'
+        ? 'USD/HEX'
+        : metricDefinitions[metric as ArchiveMetric].unit
     : nativeMetrics[metric as NativeMetric][1];
   const title = hds
-    ? metric === 'price'
-      ? 'HDS reference price'
-      : metricDefinitions[metric as ArchiveMetric].meaning
+    ? metric === 'cost'
+      ? 'T-Share Cost USD · derived HDS'
+      : metric === 'price'
+        ? 'HDS reference price'
+        : metricDefinitions[metric as ArchiveMetric].meaning
     : nativeMetrics[metric as NativeMetric][0];
   const points: Point[] = hds
     ? (archive?.rows ?? []).map((r) => {
-        const v = metric === 'price' ? r.referencePriceUsd : r.metrics[metric as ArchiveMetric];
+        const cost =
+          metric === 'cost'
+            ? multiplyDecimals(r.metrics.tshareRateHEX.value, r.referencePriceUsd.value)
+            : null;
+        const v =
+          metric === 'cost'
+            ? {
+                value: cost,
+                availability: cost === null ? 'unavailable input' : 'derived',
+                published: null,
+              }
+            : metric === 'price'
+              ? r.referencePriceUsd
+              : r.metrics[metric as ArchiveMetric];
         return {
           key: String(r.sourceDay),
           date: r.sourceRecordDateUtc,
           value: v.value,
           status: v.availability,
-          detail: `HDS sourceDay ${r.sourceDay} · ${r.sourceDate} · ${r.dateRelationship}${v.published !== null && v.value === null ? ' · excluded published token ' + v.published : ''}`,
+          detail: `HDS sourceDay ${r.sourceDay} · ${r.sourceDate} · ${r.dateRelationship}${v.published !== null && v.value === null ? ' · excluded published token ' + v.published : ''}${metric === 'cost' ? ` · share rate ${r.metrics.tshareRateHEX.value ?? 'unavailable'} × reference USD price ${r.referencePriceUsd.value ?? 'unavailable'} (${r.referencePriceUsd.availability})` : ''}`,
         };
       })
     : native
@@ -319,6 +381,7 @@ export default function History() {
     <>
       <div className="page-heading">
         <div>
+          <a href="/charts">← All charts</a>
           <p className="eyebrow">Explore the record</p>
           <h1>Charts &amp; daily history</h1>
         </div>
@@ -354,6 +417,7 @@ export default function History() {
             {hds ? (
               <>
                 <option value="price">HDS reference price</option>
+                <option value="cost">T-Share Cost USD (same-record HDS inputs)</option>
                 {Object.entries(metricDefinitions).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v.meaning} ({v.unit})

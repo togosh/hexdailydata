@@ -6,6 +6,1302 @@
     "description": "Runtime Zod definitions. Cross-field day/chain/ratio/cursor/coverage refinements are additionally enforced in runtime tests; transforms normalize addresses. No production qualification implied."
   },
   "paths": {
+    "/api/v2/charts/archive": {
+      "get": {
+        "operationId": "archiveCharts",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "pulsechain",
+              "type": "string",
+              "const": "pulsechain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated response; availability and cutoffs are component-specific.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "pulsechain"
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "hexdailystats"
+                    },
+                    "revision": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "metadata": {
+                      "type": "object",
+                      "properties": {
+                        "selection": {
+                          "type": "object",
+                          "properties": {
+                            "source": {
+                              "type": "string",
+                              "const": "hexdailystats"
+                            },
+                            "chainId": {
+                              "type": "number",
+                              "const": 369
+                            },
+                            "mappingVersion": {
+                              "type": "string",
+                              "const": "hds-pulsechain-record-date-1"
+                            },
+                            "sha256": {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "fromSourceDay": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "toSourceDay": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 65535
+                            },
+                            "fromDate": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "toDate": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "excludeSourceDays": {
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceDay": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 5,
+                                    "maxLength": 160
+                                  }
+                                },
+                                "required": [
+                                  "sourceDay",
+                                  "reason"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "excludePriceSourceDays": {
+                              "maxItems": 100,
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "sourceDay": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 65535
+                                  },
+                                  "reason": {
+                                    "type": "string",
+                                    "minLength": 5,
+                                    "maxLength": 160
+                                  }
+                                },
+                                "required": [
+                                  "sourceDay",
+                                  "reason"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "provenance": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "bounded-public-download",
+                                    "supplied-snapshot",
+                                    "synthetic-fixture"
+                                  ]
+                                },
+                                "chainId": {
+                                  "type": "number",
+                                  "const": 369
+                                },
+                                "acquiredAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                },
+                                "statement": {
+                                  "type": "string",
+                                  "minLength": 20,
+                                  "maxLength": 1024
+                                },
+                                "url": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "enum": [
+                                        "https://hexdailystats.com/fulldatapulsechain",
+                                        "https://hexstats.today/fulldatapulsechain"
+                                      ]
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "chainId",
+                                "acquiredAt",
+                                "statement",
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "source",
+                            "chainId",
+                            "mappingVersion",
+                            "sha256",
+                            "fromSourceDay",
+                            "toSourceDay",
+                            "fromDate",
+                            "toDate",
+                            "excludeSourceDays",
+                            "excludePriceSourceDays",
+                            "provenance"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "records": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 10000
+                            },
+                            "prices": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "firstRecordDateUtc": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "lastRecordDateUtc": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "firstAvailablePrice": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "sourceDay": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 65535
+                                    },
+                                    "sourceRecordDateUtc": {
+                                      "type": "string",
+                                      "format": "date",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                    },
+                                    "sourceDate": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                                    }
+                                  },
+                                  "required": [
+                                    "sourceDay",
+                                    "sourceRecordDateUtc",
+                                    "sourceDate"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "records",
+                            "prices",
+                            "firstRecordDateUtc",
+                            "lastRecordDateUtc",
+                            "firstAvailablePrice"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "dateBasis": {
+                          "type": "string",
+                          "const": "sourceRecordDateUtc"
+                        },
+                        "priceKind": {
+                          "type": "string",
+                          "const": "source_reported_daily_reference"
+                        },
+                        "marketPeriod": {
+                          "type": "string",
+                          "const": "unproved"
+                        },
+                        "contentSha256": {
+                          "type": "string",
+                          "pattern": "^[0-9a-f]{64}$"
+                        }
+                      },
+                      "required": [
+                        "selection",
+                        "summary",
+                        "dateBasis",
+                        "priceKind",
+                        "marketPeriod",
+                        "contentSha256"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "items": {
+                      "maxItems": 10000,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 65535
+                          },
+                          "date": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "values": {
+                            "minItems": 11,
+                            "maxItems": 11,
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 160,
+                                  "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "day",
+                          "date",
+                          "values"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "chain",
+                    "source",
+                    "revision",
+                    "metadata",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Available identity and unchanged representation. No body."
+          },
+          "400": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "archiveChartsHead",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "pulsechain",
+              "type": "string",
+              "const": "pulsechain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated response; availability and cutoffs are component-specific."
+          },
+          "304": {
+            "description": "Available identity and unchanged representation. No body."
+          },
+          "400": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "429": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "503": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          }
+        }
+      }
+    },
+    "/api/v2/charts/native": {
+      "get": {
+        "operationId": "nativeCharts",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "pulsechain",
+              "type": "string",
+              "const": "pulsechain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated response; availability and cutoffs are component-specific.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "pulsechain"
+                    },
+                    "source": {
+                      "type": "string",
+                      "const": "native"
+                    },
+                    "cutoff": {
+                      "type": "object",
+                      "properties": {
+                        "asOf": {
+                          "type": "object",
+                          "properties": {
+                            "chainId": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "const": 1
+                                },
+                                {
+                                  "type": "number",
+                                  "const": 369
+                                }
+                              ]
+                            },
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 78,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "blockHash": {
+                              "type": "string",
+                              "pattern": "^0x[0-9a-f]{64}$"
+                            },
+                            "blockTimestamp": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                            }
+                          },
+                          "required": [
+                            "chainId",
+                            "blockNumber",
+                            "blockHash",
+                            "blockTimestamp"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "revision": {
+                          "type": "string",
+                          "maxLength": 78,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "finality": {
+                          "type": "string",
+                          "enum": [
+                            "finalized",
+                            "confirmed",
+                            "provisional"
+                          ]
+                        },
+                        "contractDay": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": [
+                        "asOf",
+                        "revision",
+                        "finality",
+                        "contractDay"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    },
+                    "items": {
+                      "maxItems": 10000,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 65535
+                          },
+                          "date": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "values": {
+                            "minItems": 11,
+                            "maxItems": 11,
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 160,
+                                  "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d{1,3})?$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "originChainId": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "const": 1
+                              },
+                              {
+                                "type": "number",
+                                "const": 369
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "day",
+                          "date",
+                          "values",
+                          "originChainId"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "chain",
+                    "source",
+                    "cutoff",
+                    "truncated",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Available identity and unchanged representation. No body."
+          },
+          "400": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "nativeChartsHead",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "pulsechain",
+              "type": "string",
+              "const": "pulsechain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated response; availability and cutoffs are component-specific."
+          },
+          "304": {
+            "description": "Available identity and unchanged representation. No body."
+          },
+          "400": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "429": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "503": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          }
+        }
+      }
+    },
+    "/api/v2/charts/maturities": {
+      "get": {
+        "operationId": "maturities",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "pulsechain",
+              "type": "string",
+              "const": "pulsechain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated response; availability and cutoffs are component-specific.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "chain": {
+                      "type": "string",
+                      "const": "pulsechain"
+                    },
+                    "cutoff": {
+                      "type": "object",
+                      "properties": {
+                        "asOf": {
+                          "type": "object",
+                          "properties": {
+                            "chainId": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "const": 1
+                                },
+                                {
+                                  "type": "number",
+                                  "const": 369
+                                }
+                              ]
+                            },
+                            "blockNumber": {
+                              "type": "string",
+                              "maxLength": 78,
+                              "pattern": "^(0|[1-9][0-9]*)$"
+                            },
+                            "blockHash": {
+                              "type": "string",
+                              "pattern": "^0x[0-9a-f]{64}$"
+                            },
+                            "blockTimestamp": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                            }
+                          },
+                          "required": [
+                            "chainId",
+                            "blockNumber",
+                            "blockHash",
+                            "blockTimestamp"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "revision": {
+                          "type": "string",
+                          "maxLength": 78,
+                          "pattern": "^(0|[1-9][0-9]*)$"
+                        },
+                        "finality": {
+                          "type": "string",
+                          "enum": [
+                            "finalized",
+                            "confirmed",
+                            "provisional"
+                          ]
+                        },
+                        "contractDay": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 65535
+                        }
+                      },
+                      "required": [
+                        "asOf",
+                        "revision",
+                        "finality",
+                        "contractDay"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "items": {
+                      "maxItems": 5556,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "day": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 65535
+                          },
+                          "date": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "principalHearts": {
+                            "type": "string",
+                            "maxLength": 78,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "stakeShares": {
+                            "type": "string",
+                            "maxLength": 78,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          },
+                          "count": {
+                            "type": "string",
+                            "maxLength": 78,
+                            "pattern": "^(0|[1-9][0-9]*)$"
+                          }
+                        },
+                        "required": [
+                          "day",
+                          "date",
+                          "principalHearts",
+                          "stakeShares",
+                          "count"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "chain",
+                    "cutoff",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Available identity and unchanged representation. No body."
+          },
+          "400": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Sanitized error. See interfaces.md for route semantics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "message": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "maxLength": 128
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "operationId": "maturitiesHead",
+        "parameters": [
+          {
+            "name": "chain",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "pulsechain",
+              "type": "string",
+              "const": "pulsechain"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Validated response; availability and cutoffs are component-specific."
+          },
+          "304": {
+            "description": "Available identity and unchanged representation. No body."
+          },
+          "400": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "405": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "429": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          },
+          "503": {
+            "description": "Sanitized error. See interfaces.md for route semantics."
+          }
+        }
+      }
+    },
     "/health/live": {
       "get": {
         "operationId": "live",
@@ -3035,6 +4331,32 @@
                                 "maxLength": 78,
                                 "pattern": "^(0|[1-9][0-9]*)$"
                               },
+                              "activity": {
+                                "type": "object",
+                                "properties": {
+                                  "newStakes": {
+                                    "type": "string",
+                                    "maxLength": 78,
+                                    "pattern": "^(0|[1-9][0-9]*)$"
+                                  },
+                                  "endedStakes": {
+                                    "type": "string",
+                                    "maxLength": 78,
+                                    "pattern": "^(0|[1-9][0-9]*)$"
+                                  },
+                                  "penaltiesHex": {
+                                    "type": "string",
+                                    "maxLength": 120,
+                                    "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]{1,36})?$"
+                                  }
+                                },
+                                "required": [
+                                  "newStakes",
+                                  "endedStakes",
+                                  "penaltiesHex"
+                                ],
+                                "additionalProperties": false
+                              },
                               "payout": {
                                 "type": "object",
                                 "properties": {
@@ -3131,6 +4453,7 @@
                               "circulatingHearts",
                               "lockedHearts",
                               "rawShareRate",
+                              "activity",
                               "payout"
                             ],
                             "additionalProperties": false

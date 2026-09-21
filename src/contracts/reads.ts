@@ -95,6 +95,11 @@ export const DailyRowSchema = DailyHeadlineSchema.safeExtend({
   circulatingHearts: UIntStringSchema,
   lockedHearts: UIntStringSchema,
   rawShareRate: UIntStringSchema,
+  activity: z.strictObject({
+    newStakes: UIntStringSchema,
+    endedStakes: UIntStringSchema,
+    penaltiesHex: DecimalStringSchema,
+  }),
   payout: z.strictObject({
     status: z.enum(['pending', 'materialized']),
     payoutHearts: UIntStringSchema.nullable(),

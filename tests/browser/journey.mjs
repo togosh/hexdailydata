@@ -101,7 +101,7 @@ try {
       await capture('downloads-unavailable');
     });
     await test(`${scenario}: independent HDS archive browser-to-compiled-API/SQL`, async () => {
-      await go('/charts');
+      await go('/charts/detail');
       if (scenario === 'empty') {
         await page.getByText('Data is unavailable.', { exact: false }).waitFor();
         await capture('charts-empty');
@@ -418,7 +418,7 @@ try {
         await page.unrouteAll();
       });
       await test('source-selectable real native+HDS charts and streaming verified download', async () => {
-        await go('/charts');
+        await go('/charts/detail');
         await page.getByLabel('Source', { exact: true }).selectOption('native');
         await page.getByRole('heading', { name: 'Completed payout', exact: true }).waitFor();
         assert.ok((await page.locator('svg circle').count()) > 0);
@@ -603,7 +603,7 @@ try {
         }
       });
       await test('revision restart, cancellation, delayed payout and inconclusive stake errors', async () => {
-        await go('/charts');
+        await go('/charts/detail');
         await page.getByLabel('Source', { exact: true }).selectOption('hds');
         await page.getByRole('button', { name: 'Load all available HDS records' }).waitFor();
         await page.route('**/api/v2/daily?*', async (r) => {
@@ -622,7 +622,7 @@ try {
           await pause(500);
           await r.abort().catch(() => {});
         });
-        await go('/charts');
+        await go('/charts/detail');
         await page
           .getByRole('navigation', { name: 'Mobile destinations' })
           .getByRole('link', { name: 'Home', exact: true })

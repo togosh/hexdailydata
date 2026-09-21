@@ -20,6 +20,12 @@ import {
   DownloadsResponseSchema,
 } from '../contracts/reads.ts';
 import { reportedHistoryResponseSchema } from '../contracts/history.ts';
+import {
+  ChartsQuery,
+  ArchiveChartsSchema,
+  NativeChartsSchema,
+  MaturitiesSchema,
+} from '../contracts/charts.ts';
 const none = z.strictObject({});
 const address = z.strictObject({ address: AddressSchema });
 export const jsonRevalidation = new Set([
@@ -30,8 +36,32 @@ export const jsonRevalidation = new Set([
   'holders',
   'calculator',
   'downloads',
+  'archiveCharts',
+  'nativeCharts',
+  'maturities',
 ]);
 export const routes = [
+  {
+    id: 'archiveCharts',
+    path: '/api/v2/charts/archive',
+    query: ChartsQuery,
+    params: none,
+    response: ArchiveChartsSchema,
+  },
+  {
+    id: 'nativeCharts',
+    path: '/api/v2/charts/native',
+    query: ChartsQuery,
+    params: none,
+    response: NativeChartsSchema,
+  },
+  {
+    id: 'maturities',
+    path: '/api/v2/charts/maturities',
+    query: ChartsQuery,
+    params: none,
+    response: MaturitiesSchema,
+  },
   {
     id: 'live',
     path: '/health/live',

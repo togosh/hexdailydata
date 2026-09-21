@@ -4,6 +4,8 @@ import { SearchForm } from './components.tsx';
 import { Dialog, HexMark, Icon, type IconName } from './visuals.tsx';
 import './style.css';
 const History = lazy(() => import('./History.tsx'));
+const Charts = lazy(() => import('./Charts.tsx'));
+const MaturityDetail = lazy(() => import('./MaturityDetail.tsx'));
 const Calculator = lazy(() => import('./Calculator.tsx'));
 const Search = lazy(() => import('./Search.tsx'));
 const Downloads = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Downloads })));
@@ -81,7 +83,12 @@ export default function App() {
   useEffect(() => {
     document.title = `${path === '/' ? 'Home' : path.split('/')[1]} · HEXDailyData`;
   }, [path]);
-  const active = path.startsWith('/address/') || path.startsWith('/stake/') ? '/search' : path;
+  const active =
+    path.startsWith('/address/') || path.startsWith('/stake/')
+      ? '/search'
+      : path.startsWith('/charts')
+        ? '/charts'
+        : path;
   return (
     <>
       <a className="skip" href="#content">
@@ -147,6 +154,10 @@ export default function App() {
           {path === '/' ? (
             <Home />
           ) : path === '/charts' ? (
+            <Charts />
+          ) : path === '/charts/maturities' ? (
+            <MaturityDetail />
+          ) : path === '/charts/detail' ? (
             <History />
           ) : path === '/calculator' ? (
             <Calculator />

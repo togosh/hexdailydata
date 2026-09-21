@@ -57,6 +57,11 @@ export function dailyRow(r: Record<string, any>) {
     circulatingHearts: r.circulating_hearts,
     lockedHearts: r.locked_hearts,
     rawShareRate: r.raw_share_rate,
+    activity: {
+      newStakes: r.starts,
+      endedStakes: r.ends,
+      penaltiesHex: formatUnits(BigInt(r.penalty_hearts), 8),
+    },
     payout: {
       status: r.payout_status,
       payoutHearts: r.payout_hearts,

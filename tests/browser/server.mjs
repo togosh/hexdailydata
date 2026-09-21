@@ -6,10 +6,10 @@ import { AddressService } from '../../dist/services/live/address.js';
 import { fixture, CODE_HASH } from '../live/fixture.mjs';
 assert.equal(process.env.HDD_V2_ALLOW_LIVE_RPC, 'false');
 const scenario = process.env.HDD_V2_WEB_SCENARIO;
-assert.ok(['empty', 'native', 'scale', 'address'].includes(scenario));
+assert.ok(['empty', 'native', 'scale', 'address', 'charts'].includes(scenario));
 const at = Date.parse('2026-09-19T12:00:00.000Z');
 const deps = await openDependencies();
-if (scenario !== 'empty') {
+if (scenario !== 'empty' && scenario !== 'charts') {
   const raw = fixture();
   raw.clock.time = at - 30000;
   raw.state.count = 41;

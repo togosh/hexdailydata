@@ -6,6 +6,9 @@ New public base path `/api/v2`. No legacy compatibility is required. JSON fields
 camelCase; CSV fields use snake_case and unit suffixes. Integer magnitudes, block
 numbers and stake IDs are decimal strings; decimals are non-exponent strings. Day
 numbers are bounded integers and use explicit `contractDay`/`displayDay` names.
+
+Task07 adds the bounded read-only chart batch/maturity routes documented in
+[charts.md](charts.md), and native daily `activity` fields from existing accepted state.
 Empty CSV cell means unavailable; zero means measured zero. UTC timestamps use ISO8601.
 Exception: the explicitly source-reported HDS variant preserves exact published numeric
 tokens as strings, including exponent notation; it does not claim canonical precision.

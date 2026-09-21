@@ -9,6 +9,7 @@ import { type ApiDependencies, sqlBaseline } from './dependencies.ts';
 import { PageCursors } from '../services/queries/cursor.ts';
 import { home, status, chainId } from '../services/queries/home.ts';
 import { daily, markets, calculator } from '../services/queries/history.ts';
+import { archiveCharts, nativeCharts, maturities } from '../services/queries/charts.ts';
 import { stakes, holders, indexedStake } from '../services/queries/lists.ts';
 import { AddressSchema, StakeIdSchema } from '../contracts/reads.ts';
 
@@ -174,6 +175,15 @@ export function createApp(
         case 'daily':
           body = await daily(db(), q, signal);
           break;
+        case 'archiveCharts':
+          body = await archiveCharts(db(), signal);
+          break;
+        case 'nativeCharts':
+          body = await nativeCharts(db(), signal, now());
+          break;
+        case 'maturities':
+          body = await maturities(db(), signal);
+          break;
         case 'markets':
           body = await markets(db(), q, signal);
           break;
@@ -303,6 +313,8 @@ export function createApp(
     app.register(fastifyStatic, { root: options.webRoot, index: ['index.html'], dotfiles: 'deny' });
     for (const path of [
       '/charts',
+      '/charts/detail',
+      '/charts/maturities',
       '/search',
       '/calculator',
       '/downloads',

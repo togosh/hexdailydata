@@ -6,8 +6,40 @@ import {
 } from '../contracts/history.ts';
 import { endpoint, request, RequestError } from './api.ts';
 import { dateShift, decimal } from './format.ts';
+import { DailyResponseSchema } from '../contracts/reads.ts';
 
 export type Archive = z.infer<typeof reportedHistoryResponseSchema>;
+/** Exact native windows share a cutoff; discard a moving index instead of splicing revisions. */
+export async function loadNative(from: string, to: string, signal: AbortSignal, get = request) {
+  if (!validRange(from, to, historyLimit)) throw new Error('Invalid native range.');
+  let result: z.infer<typeof DailyResponseSchema> | undefined;
+  for (let start = from; start <= to; start = dateShift(start, 366)) {
+    const end = dateShift(start, 365) < to ? dateShift(start, 365) : to;
+    const page = await get(
+      endpoint('/daily', { from: start, to: end }),
+      DailyResponseSchema,
+      signal,
+    );
+    if (!result) result = page;
+    else {
+      if (JSON.stringify(page.cutoff) !== JSON.stringify(result.cutoff))
+        throw new RequestError(409);
+      result = {
+        ...result,
+        items: [...result.items, ...page.items],
+        coverage: {
+          fromDay: result.coverage.fromDay,
+          toDay: page.coverage.toDay,
+          expected: result.coverage.expected + page.coverage.expected,
+          count: result.coverage.count + page.coverage.count,
+          missingDays: [...result.coverage.missingDays, ...page.coverage.missingDays],
+        },
+      };
+    }
+  }
+  signal.throwIfAborted();
+  return result!;
+}
 export function validRange(from: string, to: string, maximum = 366) {
   return (
     /^\d{4}-\d{2}-\d{2}$/.test(from) &&
