@@ -436,3 +436,20 @@ Valid full-scale seed, live/native initialization and production/platform gaps r
 No live probes/HDS download/canary/v1/existing DB/push/deployment. Tasks 10/11 pending;
 stop after 09. Next eligible work is the Task09 capacity decision. Status-only commit
 after reviewed code; report, compact evidence and source-only ZIP identify both.
+
+Task09 capacity follow-through IMPLEMENTATION_PASS; CAPACITY_PASS; OFFLINE_ACCEPTANCE_PASS.
+Owner-approved offline profile implemented; accepted UI/Learn and Vite work preserved.
+Reviewed code `15aa0da853783865c2753333fa05e0fe016a364c`, base `53deab0`;
+large runtime `ea9b2c4` differs only by the later test cohort/timer correction.
+One separate read-only `/root/task09_review` PASS, no blockers or correction round.
+Healthy ten-minute run: 100/100 distinct exact fresh complete addresses, ten per declared
+cohort and actual completion minute; p95/max 5.149/5.551s. Original 1ms-early arrival
+and 11/9 wall-arrival buckets remain recorded; independent audit accepts fixed cohorts.
+All four metrics fresh; 50 visitors, native progress and streamed export overlap.
+Cold mobile headline/chart p95 1.581/2.151s. Fresh committed copy 121/121 tests and
+format/types/build/OpenAPI PASS; affected SQL/process/browser and strict no-due PASS.
+DB/worker hit unchanged memory caps without OOM; no spare-headroom claim.
+Evidence/report/review: `artifacts/task-09/20260921-capacity1/`; prior evidence retained.
+Live admission, full valid historical seed/rebuild, production and platform gaps remain
+unqualified. Tasks 10/11 pending; no live/canary/HDS/v1/existing DB/push/deployment.
+Stop for planner review. Documentation/status-only commit after frozen reviewed code.

@@ -115,7 +115,7 @@
         "tests/scale/",
         "docs/progress.md"
       ],
-      "status": "blocked"
+      "status": "passed"
     },
     {
       "id": "10",
