@@ -1,3 +1,4 @@
+import { screenshot } from './screenshots.mjs';
 import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -48,7 +49,7 @@ async function test(name, fn) {
 async function capture(name, width = 390, height = 844) {
   await page.setViewportSize({ width, height });
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: resolve(folder, `${scenario}-${name}-${width}.png`) });
+  await screenshot(page, { path: resolve(folder, `${scenario}-${name}-${width}.png`) });
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
     true,
@@ -783,7 +784,7 @@ try {
   );
 } catch (e) {
   if (page && !page.isClosed())
-    await page.screenshot({ path: resolve(folder, scenario + '-failure.png') }).catch(() => {});
+    await screenshot(page, { path: resolve(folder, scenario + '-failure.png') }).catch(() => {});
   writeFileSync(
     resolve(evidence, `${scenario}-failure.json`),
     JSON.stringify({ message: e.stack, checks, errors, traffic }, null, 2),

@@ -1,3 +1,4 @@
+import { screenshot } from './screenshots.mjs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -84,7 +85,7 @@ async function capture(name) {
     true,
     name + ' no horizontal page overflow',
   );
-  await page.screenshot({ path: resolve(folder, 'visual-' + name + '.png') });
+  await screenshot(page, { path: resolve(folder, 'visual-' + name + '.png') });
 }
 async function refreshHome() {
   const response = page.waitForResponse((r) => r.url().includes('/api/v2/home?'));
@@ -169,10 +170,10 @@ try {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     await capture('home-390');
-    await page.screenshot({ path: resolve(folder, 'visual-home-390-full.png'), fullPage: true });
+    await screenshot(page, { path: resolve(folder, 'visual-home-390-full.png'), fullPage: true });
     await page.setViewportSize({ width: 1440, height: 1000 });
     await capture('home-1440');
-    await page.screenshot({ path: resolve(folder, 'visual-home-1440-full.png'), fullPage: true });
+    await screenshot(page, { path: resolve(folder, 'visual-home-1440-full.png'), fullPage: true });
     const chart = await page.locator('.home-chart').boundingBox(),
       facts = await page.locator('.home-facts').boundingBox();
     assert.equal(chart.y, facts.y);
@@ -251,7 +252,7 @@ try {
       );
       await capture('home-' + width + '-light');
       if (width === 390)
-        await page.screenshot({
+        await screenshot(page, {
           path: resolve(folder, 'visual-home-390-light-full.png'),
           fullPage: true,
         });
@@ -395,7 +396,7 @@ try {
           );
         }
         if (width === 390 || width === 960 || width === 1440) {
-          await page.screenshot({
+          await screenshot(page, {
             path: resolve(folder, 'visual-' + name + '-' + width + '-full.png'),
             fullPage: true,
           });
@@ -403,7 +404,7 @@ try {
             const total = await page.evaluate(() => document.documentElement.scrollHeight);
             for (let y = 0, part = 1; y < total; y += 724, part++) {
               await page.evaluate((top) => scrollTo(0, top), y);
-              await page.screenshot({
+              await screenshot(page, {
                 path: resolve(folder, `visual-${name}-390-scroll-${part}.png`),
               });
               if (
@@ -417,7 +418,7 @@ try {
             if (name === 'calculator') {
               await page.locator('.calculator-notes > summary').click();
               await page.getByLabel('Constant daily payout assumption').waitFor();
-              await page.screenshot({
+              await screenshot(page, {
                 path: resolve(folder, 'visual-calculator-390-details-open.png'),
                 fullPage: true,
               });
@@ -668,7 +669,7 @@ try {
   assert.deepEqual(errors, []);
 } catch (e) {
   errors.push(e.stack);
-  await page?.screenshot({ path: resolve(folder, 'visual-failure.png') }).catch(() => {});
+  await screenshot(page, { path: resolve(folder, 'visual-failure.png') }).catch(() => {});
   throw e;
 } finally {
   const p95 = (key) =>
