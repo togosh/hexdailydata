@@ -327,3 +327,16 @@ Downloads, including full mobile,960half-desktop and1440desktop; evidence:
 `artifacts/task-07/downloads-cleanup-20260920/`. Chrome/synthetic only; owned resources
 cleaned. No v1/live providers/other page bodies/push/deploy/Task09. Stop for owner review.
 Documentation-only status entry after reviewed source.
+
+Task07 Downloads reference cards VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `a5f1e6ccca75399255af6510976e6926a24c65d6` follows Download02 reference
+composition using Home theme: compact icon-led cards, readable file sizes, full-width
+CSV buttons and all5existing datasets. No Explore/more-datasets control. Units/coverage
+uses shared dialog so cards never expand; exact bytes/metadata/download paths retained.
+Types/build/format, full native CSV/browser journey and final7visual groups PASS.
+Independent `/root/home_panels_review` PASS, including320/390dialog200%text/scroll/focus
+probe. Only Downloads screenshots, with clean owner views in
+`artifacts/task-07/downloads-cards-20260920/owner-screenshots/`; full commands/review/
+modal captures in parent evidence directory. Chrome/synthetic only; resources cleaned.
+No other page bodies, v1/live providers/push/deploy/Task09. Stop for owner visual review.
+Documentation-only status entry after reviewed source.
