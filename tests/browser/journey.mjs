@@ -345,8 +345,11 @@ try {
         await page.locator('.usd-result .value').waitFor();
         for (const missing of [true, false]) {
           const withoutPrice = structuredClone(currentHome);
-          if (missing) withoutPrice.live.price.status = 'unavailable';
-          else {
+          if (missing) {
+            withoutPrice.live.price.status = 'unavailable';
+            withoutPrice.live.price.value = null;
+            withoutPrice.live.price.reason = 'test_missing_price';
+          } else {
             withoutPrice.live.price.asOf.blockTimestamp = new Date(at - 1801000).toISOString();
             withoutPrice.live.price.observedAt = new Date(at - 1801000).toISOString();
           }
