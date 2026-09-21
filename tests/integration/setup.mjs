@@ -32,10 +32,12 @@ try {
       String(baseBlock),
     );
     await reserve('/exports');
-    // The same generate_series shape and widths as tests/api/fixture.mjs, appended
-    // to a replay witness with distinct identities. It has no historical raw seed proof.
+    // Lifecycle/cardinality shape is unchanged. Monetary totals are explicitly
+    // synthetic, with one precision case, and have no historical raw seed proof.
     await worker.query(`INSERT INTO hdd.accounts SELECT 369,decode(lpad(to_hex(1000000+i),40,'0'),'hex'),
-      900719925474099300000000::numeric+i,0,0,296,296 FROM generate_series(1,500000) i`);
+      CASE WHEN i=1 THEN 900719925474099312345::numeric
+        ELSE 1000000000000::numeric+i*100000003::numeric END,
+      0,0,296,296 FROM generate_series(1,500000) i`);
     await worker.query(
       `INSERT INTO hdd.stakes(chain_id,stake_id,address,origin_chain_id,start_block,start_log,start_day,
       locked_day,staked_days,principal_hearts,stake_shares,is_auto_stake,lifecycle,ga_day,ga_block,end_day,end_block,payout_hearts,penalty_hearts,last_block)
@@ -139,6 +141,12 @@ try {
       )
     ).rows[0];
     const expected = m.f.states.get(Number(cursor.block_number));
+    if (Number(cursor.block_number) > 536) {
+      assert.equal(state.circulating_hearts, '901633645423948312402060');
+      assert.equal(state.locked_hearts, '480030000000016000');
+      assert.equal(state.active_shares, '1750210024504908000');
+      assert.equal(state.queued_shares, '0');
+    }
     for (const [column, key] of [
       ['circulating_hearts', 'supply'],
       ['locked_hearts', 'locked'],
@@ -163,8 +171,15 @@ try {
       )
     ).rows;
     const metrics = (
-      await worker.query('SELECT metric,observation FROM hdd.live_metrics ORDER BY metric')
+      await worker.query('SELECT metric,observation,inputs FROM hdd.live_metrics ORDER BY metric')
     ).rows;
+    if (control().capacity && Number(cursor.block_number) > 536) {
+      const today = metrics.find((r) => r.metric === 'todayPayoutEstimate');
+      assert.equal(today.inputs.current.totalSupply, '901633645423948312402060');
+      assert.equal(today.inputs.current.lockedHearts, '480030000000016000');
+      assert.equal(today.observation.value.payoutHearts, '89760392869430730732');
+      assert.equal(today.observation.value.stakeShares, '1750210024504908000');
+    }
     const markets = (
       await worker.query(
         'SELECT source,contract_day,observation FROM hdd.market_daily WHERE chain_id=369 ORDER BY source,contract_day',

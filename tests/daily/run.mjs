@@ -989,6 +989,83 @@ try {
       await daily.exports.startup(signal);
       await daily.tick(signal, Number(chain.plain(540).timestamp) * 1000, true);
       assert.equal(daily.status.exports, 1);
+      // Real grace expiry, no forced publication or active readers. The repeated
+      // normal tick must only inspect bounded metadata, not rebuild native/rank/files.
+      await pause(61000);
+      const noDueSnapshot = async () => ({
+        native: (
+          await api.query(
+            'SELECT chain_id,stake_id,xmin::text FROM hdd.stakes ORDER BY chain_id,stake_id',
+          )
+        ).rows,
+        ranks: (await api.query('SELECT *,xmin::text FROM hdd.rank_state ORDER BY chain_id')).rows,
+        accountRanks: (
+          await api.query('SELECT *,xmin::text FROM hdd.account_ranks ORDER BY chain_id,address')
+        ).rows,
+        accounts: (
+          await api.query('SELECT *,xmin::text FROM hdd.accounts ORDER BY chain_id,address')
+        ).rows,
+        cursor: (await api.query('SELECT * FROM hdd.sync_state ORDER BY chain_id')).rows,
+        bundles: (
+          await api.query(
+            'SELECT id,slot,status,manifest,xmin::text FROM hdd.export_bundles ORDER BY id',
+          )
+        ).rows,
+        files: await Promise.all(
+          (await readdir('/exports'))
+            .filter((n) => uuid.test(n))
+            .sort()
+            .map(async (id) => ({
+              id,
+              files: await Promise.all(
+                (await readdir('/exports/' + id)).sort().map(async (name) => {
+                  const s = await stat('/exports/' + id + '/' + name);
+                  return { name, size: s.size, mtime: s.mtimeMs, ino: s.ino };
+                }),
+              ),
+            })),
+        ),
+      });
+      const beforeNoDue = await noDueSnapshot(),
+        noDueQueries = [];
+      const observedDaily = daily,
+        previousConnect = daily.connect,
+        previousStatus = { ...daily.status };
+      observedDaily.connect = async () => {
+        const c = await previousConnect(),
+          query = c.query.bind(c);
+        c.query = (...args) => {
+          noDueQueries.push(typeof args[0] === 'string' ? args[0] : args[0].text);
+          return query(...args);
+        };
+        return c;
+      };
+      const noDueStart = performance.now();
+      await observedDaily.tick(signal, Number(chain.plain(540).timestamp) * 1000);
+      assert.deepEqual(await noDueSnapshot(), beforeNoDue);
+      assert.deepEqual(observedDaily.status, {
+        ...previousStatus,
+        ticks: previousStatus.ticks + 1,
+        marketError: null,
+        exportError: null,
+      });
+      assert.ok(noDueQueries.length < 60, 'Bounded operational SQL');
+      assert.ok(
+        noDueQueries.every(
+          (q) =>
+            !/(COPY|rank\(\)|dense_rank|UPDATE hdd\.(accounts|stakes)|INSERT INTO hdd\.export_bundles)/i.test(
+              q,
+            ),
+        ),
+      );
+      measurements.strictNoDue = {
+        status: { ...observedDaily.status },
+        graceWaitMilliseconds: 61000,
+        elapsedMs: performance.now() - noDueStart,
+        queries: [...noDueQueries],
+        before: beforeNoDue,
+      };
+      observedDaily.connect = previousConnect;
       await daily.tick(signal, Number(chain.plain(540).timestamp) * 1000);
       assert.equal(daily.status.exports, 1, 'unchanged cutoffs must not repeat a full export');
       measurements.daily = daily.status;

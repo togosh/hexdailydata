@@ -22,13 +22,13 @@ import {
 
 export function assertWork(attempts, roleFor) {
   const sorted = [...attempts].sort((a, b) => a.at - b.at);
-  for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i].at - sorted[i - 1].at >= 2000);
+  for (let i = 1; i < sorted.length; i++) assert.ok(sorted[i].at - sorted[i - 1].at >= 1300);
   for (const end of sorted) {
     const window = sorted.filter((x) => x.at > end.at - 60000 && x.at <= end.at);
-    assert.ok(window.length <= 30);
+    assert.ok(window.length <= 42);
     assert.ok(window.reduce((n, x) => n + x.calls, 0) <= 900);
     for (const [lane, http, logical] of [
-      ['address', 12, 360],
+      ['address', 24, 360],
       ['metrics', 6, 180],
       ['sync', 12, 360],
     ]) {
@@ -161,7 +161,7 @@ test('address request reservations charge retries/aliases, hard physical and log
   const clock = new SequentialClock(),
     store = cooldown(),
     budget = new ProviderBudget('api', store, clock);
-  clock.time = Math.ceil((clock.time + 60000) / 10500) * 10500;
+  clock.time = Math.ceil((clock.time + 60000) / 9800) * 9800;
   const request = await budget.addressRequest(clock.now() + 10000, 1, signal);
   let attempts = 0;
   const transport = async (body) => {
@@ -195,7 +195,7 @@ test('address request reservations charge retries/aliases, hard physical and log
   );
   request.close();
   assert.equal(attempts, 2);
-  clock.time = Math.ceil((clock.time + 60000) / 10500) * 10500;
+  clock.time = Math.ceil((clock.time + 60000) / 9800) * 9800;
   const capped = await budget.addressRequest(clock.now() + 10000, 1, signal);
   for (let i = 0; i < 4; i++) capped.charge(1);
   assert.throws(() => capped.charge(1), /cap/);
@@ -207,7 +207,7 @@ test('address request reservations charge retries/aliases, hard physical and log
 });
 test('429 retries preserve bytes and charges, fail within original request deadline; same account cooldown blocks alias', async () => {
   const f = fixture();
-  f.clock.time = Math.ceil((f.clock.time + 60000) / 10500) * 10500;
+  f.clock.time = Math.ceil((f.clock.time + 60000) / 9800) * 9800;
   const rpc = f.rpc('api', f.api),
     service = new AddressService(rpc, CODE_HASH, emptyBaseline);
   f.state.fail = () => 429;
@@ -222,7 +222,7 @@ test('429 retries preserve bytes and charges, fail within original request deadl
 
 test('public deadline includes delayed ID lookup; baseline timeout and dispatched cancellation use real wall time', async () => {
   const f = fixture();
-  f.clock.time = Math.ceil((f.clock.time + 60000) / 10500) * 10500;
+  f.clock.time = Math.ceil((f.clock.time + 60000) / 9800) * 9800;
   const rpc = f.rpc('api', f.api);
   const baseline = {
     async address() {
@@ -244,7 +244,7 @@ test('public deadline includes delayed ID lookup; baseline timeout and dispatche
   const r = await hanging.get(A, signal, 3, undefined, f.clock.now() + 25);
   assert.equal(r.outcome, 'quota');
   assert.ok(performance.now() - start < 1000);
-  f.clock.time = Math.ceil(f.clock.now() / 10500) * 10500;
+  f.clock.time = Math.ceil(f.clock.now() / 9800) * 9800;
   const stop = new AbortController();
   f.state.delay = (s) =>
     new Promise((resolve, reject) =>

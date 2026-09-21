@@ -279,9 +279,14 @@ and sync share the worker. All endpoints sharing an account/quota use the same q
 group; failover, retries, discovery and batching cannot reset charges. Unknown quota
 sharing is grouped conservatively. No Redis, public queue service or unbounded fanout.
 
-The starter ceiling is 30 HTTP attempts / 900 logical RPC calls per rolling minute:
-address 12/360, metrics 6/180, sync (including reconciliation/market backfill) 12/360.
-These are conservative defaults, NOT measured provider capacity or a throughput promise.
+The approved Task09 offline candidate is 42 HTTP attempts / 900 logical RPC calls per
+rolling minute: address 24/360, metrics 6/180, sync (including reconciliation/market
+backfill) 12/360. Seven 1400ms epoch slots follow address, sync, address, metrics,
+address, sync, address. The 100ms tolerance leaves a 1300ms minimum dispatch separation;
+rolling ceilings still bind when calendar opportunities exceed those shares.
+Actual upstream cadence/terms/capability are NOT_ADMITTED/NOT_MEASURED. A source requiring
+2000ms spacing is incompatible until separately admitted. These offline defaults do
+not enable live access or promise provider throughput; existing live approvals are not retargeted.
 Task03's source profile may set measured values within explicitly approved limits and
 cost, with lane sums no greater than the declared total. A canary's aggregate session
 caps additionally apply and cannot be multiplied by the number of lanes/processes.

@@ -304,3 +304,44 @@ Missing original bytes fail the real-archive proof explicitly. Normal production
 startup has no synthetic scenario switch; test-only server and setup live under tests.
 Run outputs use new artifacts/task-07/web-* directories; automatic teardown targets
 only that run's Compose project. Original evidence and blocked cleanup stay untouched.
+
+## Task09 approved capacity follow-through
+
+The offline profile is42HTTP/900logical per rolling60s, lanes address24/360,
+metrics6/180 and sync12/360. The1400ms A,S,A,M,A,S,A epoch calendar has100ms
+tolerance and1300ms minimum dispatch separation. Literal boundary tests retain
+whole-job4HTTP/128logical reservation, original10s deadline and all protected limits.
+`node tests/live/process.mjs artifacts/task-09/<new-owned-directory>` runs real
+separate API/worker budget processes, shared persistent cooldown, real60s startup
+and restart quarantine; synthetic work makes no network connection.
+
+After build, `node tests/integration/payout.mjs` checks corrected large integer inputs
+through the compiled raw decoder, PriceReader and MetricsService using virtual time.
+`HDD_V2_INTEGRATED_EVIDENCE=artifacts/task-09/<new-run>` and
+`node scripts/test-integrated.mjs --cycles=0 --mixed-only --capacity` select the
+existing large mixed harness. `--capacity-smoke` stops after all-four-metric readiness
+and is explicitly not capacity acceptance. Every invocation owns a fresh SQL fixture.
+
+Capacity readiness includes startup/quarantine. The following ten real minutes have
+100 distinct12000..12099 addresses every6s (20 zero-list,80 two-entry),50 paced
+visitors, compiled API/worker, SQL, raw forward sync, publication and11 fresh mobile
+documents. Arrival and completion buckets are separate; only exact, fresh, complete
+current responses within the original10s count. A150s stagnant-source phase, recovery
+and heavy pages follow with the same budgets. All four payouts/metrics are checked
+against independent integer expectations; current payout remains provisional.
+
+Application containers have only the internal Docker network. A byte-only localhost
+docker-exec relay makes that network reachable to the Windows host browser without
+an external application route; its in-container endpoint shares the API cgroup.
+DB1.25CPU/2.5GiB plus API/worker/at most one helper each.25CPU/.5GiB is the combined
+2CPU/4GiB envelope. Build/browser/load/control run outside it, with no product compute.
+Small inherited SQL suites retain their separately reported2CPU/4GiB allocations.
+
+The functional daily suite includes a real61s grace expiry followed by normal no-due
+work on the same service, cursor, day and inputs, checking native/rank/bundle/file
+identity and bounded metadata queries. The offline canary regression proves2500
+session HTTP wins over42x60=2520; it does not run a live canary. Historical30-day and
+backup measurements keep their original source/fixture identities and are not new
+timing or space claims for the corrected monetary distribution. Full historical raw
+provenance, large valid seed/rebuild, other platforms and live upstream admission
+remain separately owned qualifications. Task10 never starts from a capacity result.

@@ -18,7 +18,7 @@
   },
   "provider": {
     "maximumConcurrentHttp": 2,
-    "defaultMinimumDispatchMilliseconds": 2000,
+    "defaultMinimumDispatchMilliseconds": 1300,
     "maximumResponseBytes": 16777216,
     "requestTimeoutSeconds": 15,
     "maximumRetriesPerRequest": 3,
@@ -29,11 +29,11 @@
     "maximumQueuedHttpPerProcess": 8,
     "aggregateBudget": {
       "windowSeconds": 60,
-      "httpAttempts": 30,
+      "httpAttempts": 42,
       "logicalRpcCalls": 900,
       "lanes": {
         "address": {
-          "httpAttempts": 12,
+          "httpAttempts": 24,
           "logicalRpcCalls": 360
         },
         "metrics": {

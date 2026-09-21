@@ -124,6 +124,17 @@ test('provider lane quotas and concurrency fit one whole-application budget', ()
   const { provider, addressReads, liveCanary } = read('config/limits.json');
   const budget = provider.aggregateBudget;
   assert.equal(budget.windowSeconds, 60);
+  assert.deepEqual(budget, {
+    windowSeconds: 60,
+    httpAttempts: 42,
+    logicalRpcCalls: 900,
+    lanes: {
+      address: { httpAttempts: 24, logicalRpcCalls: 360 },
+      metrics: { httpAttempts: 6, logicalRpcCalls: 180 },
+      sync: { httpAttempts: 12, logicalRpcCalls: 360 },
+    },
+  });
+  assert.equal(provider.defaultMinimumDispatchMilliseconds, 1300);
   assert.deepEqual(Object.keys(budget.lanes), ['address', 'metrics', 'sync']);
   for (const field of ['httpAttempts', 'logicalRpcCalls']) {
     const values = Object.values(budget.lanes).map((lane) => lane[field]);
@@ -135,6 +146,33 @@ test('provider lane quotas and concurrency fit one whole-application budget', ()
     provider.maximumConcurrentHttp,
   );
   assert.equal(provider.maximumQueuedHttpPerProcess, 8);
+  assert.deepEqual(addressReads, {
+    freshSeconds: 60,
+    pageSize: 100,
+    maximumPageSize: 100,
+    maximumInflight: 2,
+    cacheBytes: 67108864,
+    requestTimeoutSeconds: 10,
+    maximumHttpAttemptsPerRequest: 4,
+    maximumLogicalRpcCallsPerRequest: 128,
+  });
+  assert.deepEqual(liveCanary, {
+    maximumMinutes: 60,
+    maximumHttpRequests: 2500,
+    maximumLogicalRpcCalls: 20000,
+    maximumResponseBytes: 536870912,
+  });
+  for (const [key, value] of Object.entries({
+    maximumConcurrentHttp: 2,
+    maximumResponseBytes: 16777216,
+    requestTimeoutSeconds: 15,
+    maximumRetriesPerRequest: 3,
+    honorRetryAfter: true,
+    requireConfiguredEndpoints: true,
+    apiMaximumConcurrentHttp: 1,
+    workerMaximumConcurrentHttp: 1,
+  }))
+    assert.equal(provider[key], value, key);
   assert.equal(addressReads.maximumHttpAttemptsPerRequest, 4);
   assert.equal(addressReads.maximumLogicalRpcCallsPerRequest, 128);
   assert.equal(liveCanary.maximumHttpRequests, 2500);

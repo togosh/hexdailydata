@@ -295,6 +295,22 @@ try {
       await s.close();
     }
     {
+      // Literal whole-session ceiling wins over42*60=2520. This is synthetic
+      // transport/virtual time and never opens a provider connection.
+      const { s } = await session({
+        http: 2500,
+        logical: 20000,
+        bytes: 536870912,
+        responseBytes: 16777216,
+      });
+      const t = s.transport(1, raw);
+      for (let i = 0; i < 2500; i++) await consume(t);
+      await assert.rejects(consume(t), /cap/);
+      assert.equal(s.state.http, 2500);
+      assert.equal(s.state.observedBytes, 5000);
+      await s.close();
+    }
+    {
       const { s, clock } = await session({ milliseconds: 100 });
       clock.time = 1099;
       await consume(s.transport(1, raw));

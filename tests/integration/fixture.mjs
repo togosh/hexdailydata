@@ -11,6 +11,7 @@ import {
 } from '../sync/fixture.mjs';
 import { fixture as liveFixture, profile as priceProfile, ANCHOR } from '../live/fixture.mjs';
 import { realClock, ProviderBudget } from '../../dist/providers/budget.js';
+import { RpcClient } from '../../dist/providers/rpc.js';
 import { readFileSync } from 'node:fs';
 
 export { A, B, C, CONTRACT, CODE, CODE_HASH, hash };
@@ -19,7 +20,10 @@ export const finalBlock = baseBlock + 30 * 8;
 export const bulkAddress = (i) => '0x' + (1000000n + BigInt(i)).toString(16).padStart(40, '0');
 export const principal = (i) => 100000000000n + BigInt(i % 10000) * 100000000n;
 export const shares = (i) => 1000000000000n + BigInt(i % 10000) * 300000007n;
-export const liquid = (i) => 900719925474099300000000n + BigInt(i);
+// Ordinary varying balances plus ONE >2^53 precision case. Repeating the old
+// extreme balance 500k times made the synthetic daily payout exceed uint72.
+export const liquid = (i) =>
+  i === 1 ? 900719925474099312345n : 1000000000000n + BigInt(i) * 100000003n;
 export const isOpen = (i) => i % 10 >= 3;
 export const owner = (i) => (i <= 10000 ? 1 : ((i - 1) % 500000) + 1);
 export function control() {
@@ -35,18 +39,46 @@ export function clockFor(c) {
 // Observe dispatch inside the actual scheduler; preserve its work, callbacks and decisions.
 export function meterBudget() {
   const dispatches = [],
-    budgets = new Set();
+    budgets = new Set(),
+    clients = new Set();
+  const calls = RpcClient.prototype.calls;
+  RpcClient.prototype.calls = function (...args) {
+    clients.add(this);
+    return calls.apply(this, args);
+  };
+  let inflight = 0,
+    inflightPeak = 0;
   const run = ProviderBudget.prototype.run;
   ProviderBudget.prototype.run = function (lane, logical, deadline, signal, work, onDispatch) {
     budgets.add(this);
-    return run.call(this, lane, logical, deadline, signal, work, () => {
-      dispatches.push({ at: this.clock.now(), lane, logical });
-      onDispatch?.();
-    });
+    let row;
+    return run.call(
+      this,
+      lane,
+      logical,
+      deadline,
+      signal,
+      async () => {
+        inflightPeak = Math.max(inflightPeak, ++inflight);
+        try {
+          return await work();
+        } finally {
+          inflight--;
+          row.ended = this.clock.now();
+        }
+      },
+      () => {
+        row = { at: this.clock.now(), lane, logical };
+        dispatches.push(row);
+        onDispatch?.();
+      },
+    );
   };
   return () => ({
     dispatches,
+    inflightPeak,
     counters: [...budgets].map((b) => ({ role: b.role, ...b.counters })),
+    rpc: [...clients].map((r) => ({ id: r.id, ...r.counters })),
   });
 }
 export function model(c, withBulk = true) {
@@ -79,7 +111,11 @@ export function model(c, withBulk = true) {
       else earning += shares(i) * 100n;
     }
   }
-  const supply = 500000n * 900719925474099300000000n + (500000n * 500001n) / 2n;
+  const supply =
+    500000n * 1000000000000n +
+    (100000003n * 500000n * 500001n) / 2n +
+    900719925474099312345n -
+    (1000000000000n + 100000003n);
   const fixed = { ...f.states.get(finalBlock) };
   for (const [n, h] of f.headers) {
     if (n > finalBlock) {

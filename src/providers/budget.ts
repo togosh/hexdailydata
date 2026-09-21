@@ -38,11 +38,17 @@ interface Job<T> {
 }
 const allocations = limits.provider.aggregateBudget.lanes;
 // Disjoint epoch slots enforce spacing across ONE API + ONE worker, even on a shared
-// account. 100ms dispatch tolerance + 2100ms slots leaves at least 2000ms separation.
-const slots: Lane[] = ['address', 'sync', 'address', 'metrics', 'sync'];
-const slotMs = 2100,
-  tolerance = 100,
-  windowMs = 60_000;
+// account. The configured minimum plus tolerance defines the slot width: a late
+// dispatch in one slot is still at least that minimum before the next slot starts.
+const tolerance = 100;
+export const providerCalendar = {
+  slots: ['address', 'sync', 'address', 'metrics', 'address', 'sync', 'address'] as readonly Lane[],
+  toleranceMilliseconds: tolerance,
+  slotMilliseconds: limits.provider.defaultMinimumDispatchMilliseconds + tolerance,
+};
+const slots = providerCalendar.slots,
+  slotMs = providerCalendar.slotMilliseconds,
+  windowMs = limits.provider.aggregateBudget.windowSeconds * 1000;
 export class ProviderBudget {
   private reserved = { http: 0, logical: 0 };
   private queue: Job<unknown>[] = [];

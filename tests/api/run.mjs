@@ -493,7 +493,7 @@ try {
     for (const count of [0, 1, 100, 101, 10000]) {
       const live = fixture();
       live.state.count = count;
-      live.clock.time = Math.ceil((live.clock.time + 60000) / 10500) * 10500;
+      live.clock.time = Math.ceil((live.clock.time + 60000) / 9800) * 9800;
       const rpc = live.rpc('api', live.api),
         service = new AddressService(rpc, CODE_HASH, sqlBaseline(reads));
       const host = await serve({ dependencies: { db: reads, addresses: service } });
@@ -514,7 +514,7 @@ try {
         let useful = 1,
           denied = 0;
         for (let n = 2; n <= 10; n++) {
-          live.clock.time = Math.ceil(live.clock.now() / 10500) * 10500;
+          live.clock.time = Math.ceil(live.clock.now() / 9800) * 9800;
           const res = await fetch(host.url + '/api/v2/addresses/' + addr(100 + n) + '?limit=100');
           const body = await res.json();
           if (body.live) useful++;
@@ -806,7 +806,7 @@ try {
     const mixedStore = new SqlMetricStore(metricsClient);
     const raw = fixture({ clock: new ManualClock() });
     mixedClock = raw.clock;
-    mixedClock.time = Math.ceil((clock + 60000) / 10500) * 10500;
+    mixedClock.time = Math.ceil((clock + 60000) / 9800) * 9800;
     raw.state.count = 100;
     raw.state.delay = (s) => pause(10, undefined, { signal: s });
     raw.state.change = (rows, calls) =>

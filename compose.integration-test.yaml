@@ -1,7 +1,10 @@
-# Offline Task09 composition. Normal localhost ingress; provider transport stays internal.
+# Offline Task09: all application sockets remain on the internal network.
+# Host browser ingress is a byte-only docker-exec pipe (tests/integration/ingress.mjs).
 services:
   api:
-    command: [node, tests/integration/api.mjs]
+    command: [node, '${HDD_V2_INTEGRATION_API_ENTRY:-tests/integration/api.mjs}']
+    networks: !override [private]
+    ports: !reset []
     volumes:
       - ./tests:/app/tests:ro
       - ./src:/app/src:ro

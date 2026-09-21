@@ -100,11 +100,15 @@ assemble a complete list. No total principal or nearest maturity is inferred fro
 Requests reserve4 HTTP/128 logical maximum before discovery; actual dispatch consumes
 that reservation and completion releases unused capacity. Dispatch after cancellation
 is not refunded. The queue-inclusive provider deadline is10s. Conservative admission
-can reject earlier than theoretical lane capacity; it never raises12/360 address,
-6/180 metrics or12/360 sync. API and worker retain disjoint2100ms slots and one HTTP
+can reject earlier than theoretical lane capacity; it never raises24/360 address,
+6/180 metrics or12/360 sync. The approved offline profile uses disjoint1400ms slots,
+100ms tolerance and1300ms minimum separation, with42/900 aggregate rolling ceilings.
+API and worker retain one HTTP
 in flight per process. Identical callers share work without multiplying quota; the
 last departing caller aborts it. Cache values are cloned, age limited and byte bounded.
 The SQL baseline has its own date and is retained when live work fails.
+Live access remains disabled. This cadence is NOT_ADMITTED/NOT_MEASURED for actual
+upstreams; a source requiring2000ms spacing is incompatible pending separate admission.
 
 ## Storage and later work
 

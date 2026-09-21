@@ -111,8 +111,13 @@ is reported honestly. Neither counter is an exact network/kernel bound: fetch/TL
 may have received additional bytes. The headroom is conservative, not a network guarantee.
 
 Default upper ceilings remain60min/2500HTTP/20000logical/512MiB; reduce them when adequate.
-The30HTTP/900logical rolling-minute total and address12/360,metrics6/180,sync12/360 shares
-are unchanged. All code/header/constructor/fork/ledger/price/discovery/retry/split/final
+The Task09 offline candidate uses42HTTP/900logical rolling-minute total and
+address24/360,metrics6/180,sync12/360 shares. Its1400ms slots/100ms tolerance enforce
+1300ms minimum dispatch separation; upstream cadence/terms/capability remain
+NOT_ADMITTED/NOT_MEASURED. A2000ms upstream spacing requirement is incompatible until
+separately admitted. Live opt-ins, old approval identities and spent sessions remain
+unchanged; the2500HTTP whole-session ceiling still wins over42×60=2520 nominal attempts.
+All code/header/constructor/fork/ledger/price/discovery/retry/split/final
 audit requests count. Alias/account-group labels never create more quota. A cap is terminal.
 Cancellation/failure can resume only the same session before its original deadline with
 remaining credit. Completed phases stay completed. Interrupted replay reads the actual SQL

@@ -72,7 +72,14 @@ const head = () => {
   const elapsed = Date.now() - c.started;
   // Successful requests see a frozen source from3:00 through5:10. Resume before
   // the separate heavy-page phase so it measures actual100-item observations too.
-  const sourceElapsed = elapsed < 310000 ? Math.min(180000, elapsed) : elapsed;
+  const phase = control();
+  const sourceElapsed = c.capacity
+    ? phase.freezeAt === undefined
+      ? elapsed
+      : Math.min(phase.freezeAt - c.started, elapsed)
+    : elapsed < 310000
+      ? Math.min(180000, elapsed)
+      : elapsed;
   return finalBlock + 1 + Math.floor(sourceElapsed / 3000);
 };
 async function response(body, signal, id, chain = 369) {
@@ -80,13 +87,26 @@ async function response(body, signal, id, chain = 369) {
     start = performance.now();
   const bytes = await m.raw(body, signal, head(), chain);
   const calls = JSON.parse(body);
+  const answers = JSON.parse(bytes);
+  const addressCall = calls.find(
+    (r) =>
+      r.method === 'eth_call' &&
+      ['0x33060d90', '0x70a08231', '0x2607443b'].includes(r.params[0]?.data?.slice(0, 10)),
+  );
   requests.push({
     at,
     id,
+    address: addressCall ? '0x' + addressCall.params[0].data.slice(34, 74) : null,
     logical: calls.length,
     methods: calls.map((r) => r.method),
     bytes: bytes.length,
     ms: performance.now() - start,
+    inputs: calls.flatMap((r, i) =>
+      r.method === 'eth_call' &&
+      ['0xf04b5fa0', '0x18160ddd', '0x5c9302c9'].includes(r.params[0]?.data?.slice(0, 10))
+        ? [{ call: r, result: answers[i].result }]
+        : [],
+    ),
   });
   return {
     status: 200,

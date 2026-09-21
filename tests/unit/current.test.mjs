@@ -12,6 +12,36 @@ const base = {
   nextStakeShares: 50n,
   stakePenalty: 77n,
 };
+test('large synthetic integer oracle preserves pending penalty and next-share treatment', () => {
+  const input = {
+    ...base,
+    totalSupply: 901633645423948312402060n,
+    lockedHearts: 480030000000016000n,
+    stakeShares: 1750210024504908000n,
+    nextStakeShares: 9007199254740993n,
+    stakePenalty: 77n,
+  };
+  assert.deepEqual(estimateCurrentPayout(input), {
+    status: 'available',
+    contractDay: 400,
+    payoutHearts: 89760392869430730809n,
+    stakeShares: 1750210024504908000n,
+    pendingRounds: 0,
+    firstPendingPayout: null,
+  });
+  assert.deepEqual(estimateCurrentPayout({ ...input, dailyDataCount: 398 }), {
+    status: 'available',
+    contractDay: 400,
+    payoutHearts: 89760392869430730732n,
+    stakeShares: 1759217223759648993n,
+    pendingRounds: 2,
+    firstPendingPayout: 89760392869430730809n,
+  });
+  assert.equal(
+    estimateCurrentPayout({ ...input, totalSupply: 500000n * 900719925474099300000000n }).reason,
+    'unsafe_inputs',
+  );
+});
 test('post-claim literal vectors: no pending, first pending penalty, next shares and multiple rounds without compounding', () => {
   assert.deepEqual(estimateCurrentPayout(base), {
     status: 'available',

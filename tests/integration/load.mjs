@@ -1,22 +1,24 @@
 // Host browser/load generation only. SQL/ranking/decoding/export work stays in containers.
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import { chromium, firefox, webkit } from 'playwright';
+import { checkHome, checkAddress, payoutInputs, payoutOracle } from './oracle.mjs';
 const [base, evidence] = process.argv.slice(2);
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
 const control = JSON.parse(
   readFileSync(join(evidence, 'source environment/input/control.json'), 'utf8'),
 );
-const start = Date.now(),
-  duration = 600000,
+let start = Date.now();
+const duration = 600000,
   rows = [],
   browsers = [],
   errors = [],
   agents = [];
 const visitorPacingMs = 4000;
+let visitorsRunning = true;
 const connections = [];
 const connectionTimer = setInterval(
   () =>
@@ -87,7 +89,18 @@ async function request(path, agent, kind, timeout = 15000) {
             current: !!body?.live && Date.parse(body.live.expiresAt) > clock(),
             items: body?.live?.page.items.length ?? 0,
             complete: body?.live?.page.enumerationComplete ?? false,
+            live: body?.live ?? null,
+            reason: body?.reason,
           });
+        if (kind === 'address-cold' && body?.live) {
+          try {
+            const i = Number(BigInt(path.split('?')[0].split('/').at(-1)) - 1000000n);
+            row.correct = checkAddress(body.live, i, control.startDay, clock());
+          } catch (e) {
+            row.correct = false;
+            row.validationError = e.message;
+          }
+        }
         rows.push(row);
         resolve(body);
       });
@@ -98,6 +111,63 @@ async function request(path, agent, kind, timeout = 15000) {
       resolve(null);
     });
   });
+}
+const preparationStartedAt = Date.now();
+let ready = false,
+  readinessWaitMs = 0;
+if (control.capacity) {
+  writeFileSync(
+    join(evidence, 'cohort.json'),
+    JSON.stringify(
+      {
+        definedAt: Date.now(),
+        indices: [12000, 12099],
+        addresses: Array.from({ length: 100 }, (_, i) => bulkAddress(12000 + i)),
+        zeroList: 20,
+        twoEntry: 80,
+        periodMilliseconds: 6000,
+        arrivalMinutes: 10,
+        requests: 100,
+        inputs: payoutInputs,
+        expected: payoutOracle(payoutInputs, 0),
+      },
+      null,
+      2,
+    ),
+  );
+  for (let i = 0; i < 210; i++) {
+    const home = await request('/api/v2/home', undefined, 'capacity-readiness');
+    if (home && Object.values(home.live).every((v) => v.status === 'fresh')) {
+      checkHome(home, control.startDay, clock());
+      ready = true;
+      writeFileSync(join(evidence, 'ready-home.json'), JSON.stringify(home, null, 2));
+      break;
+    }
+    await pause(1000);
+  }
+  readinessWaitMs = Date.now() - preparationStartedAt;
+  writeFileSync(
+    join(evidence, 'readiness.json'),
+    JSON.stringify(
+      { preparationStartedAt, serviceStartedAt: control.started, readinessWaitMs, ready, rows },
+      null,
+      2,
+    ),
+  );
+  assert.ok(ready, 'All four exact current metrics must become eligible before healthy capacity');
+  if (control.capacitySmoke) {
+    clearInterval(connectionTimer);
+    process.exit(0);
+  }
+  start = Date.now();
+  writeFileSync(
+    join(evidence, 'phases.json'),
+    JSON.stringify(
+      { preparationStartedAt, healthyStartedAt: start, healthyEndsAt: start + duration },
+      null,
+      2,
+    ),
+  );
 }
 const routes = [
   '/api/v2/home',
@@ -112,7 +182,7 @@ const visitors = Array.from({ length: 50 }, (_, i) =>
     const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
     agents.push(agent);
     await pause(i * 100);
-    for (let turn = 0; Date.now() - start < duration; turn++) {
+    for (let turn = 0; control.capacity ? visitorsRunning : Date.now() - start < duration; turn++) {
       const began = Date.now();
       await request(routes[(i + turn) % routes.length], agent, 'visitor-' + i);
       await pause(Math.max(0, visitorPacingMs - (Date.now() - began)));
@@ -127,7 +197,7 @@ const addresses = (async () => {
   const pending = [];
   for (let i = 0; i < duration / 6000; i++) {
     await pause(Math.max(0, start + i * 6000 - Date.now()));
-    // Distinct ordinary 0/1/2-stake accounts; deadline overlaps are counted, never hidden.
+    // Predeclared12000..12099:20 zero-list and80 two-entry ordinary accounts.
     pending.push(
       request('/api/v2/addresses/' + bulkAddress(12000 + i) + '?limit=100', agent, 'address-cold'),
     );
@@ -182,20 +252,20 @@ const browserRun = (async () => {
   mkdirSync(join(evidence, 'screenshots'), { recursive: true });
   try {
     // Readiness wait is disclosed, outside individual fresh-document navigation timing.
-    let ready = false;
-    for (let i = 0; i < 150; i++) {
+    for (let i = 0; !ready && i < 150; i++) {
       const h = await request('/api/v2/home', undefined, 'browser-readiness');
       if (
         h?.live?.price.status === 'fresh' &&
         h.live.shareRate.status === 'fresh' &&
-        h.live.latestCompletedPayout.status === 'fresh'
+        h.live.latestCompletedPayout.status === 'fresh' &&
+        h.live.todayPayoutEstimate.status === 'fresh'
       ) {
         ready = true;
         break;
       }
       await pause(1000);
     }
-    const readinessWaitMs = Date.now() - start;
+    if (!control.capacity) readinessWaitMs = Date.now() - start;
     for (let i = 0; i < 11; i++) {
       const context = await browser.newContext({
         viewport: { width: 390, height: 844 },
@@ -253,7 +323,12 @@ const browserRun = (async () => {
         connectionType: 'cellular4g',
       });
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+      const homeResponse = page.waitForResponse(
+        (r) => r.url().includes('/api/v2/home') && r.status() === 200,
+      );
       await page.goto(base);
+      const home = await (await homeResponse).json();
+      if (control.capacity) checkHome(home, control.startDay, clock());
       try {
         await page.waitForFunction(
           () => window.__paint.headlines && window.__paint.chart,
@@ -268,11 +343,15 @@ const browserRun = (async () => {
         values: [...document.querySelectorAll('[data-metric] dd')].map((e) => e.textContent),
         circles: document.querySelectorAll('[data-testid="history-chart"] svg circle').length,
       }));
+      sample.home = home;
       samples.push(sample);
       writeFileSync(join(evidence, `cold-${i + 1}.json`), JSON.stringify(sample, null, 2));
       if (i === 0) await page.screenshot({ path: join(evidence, 'screenshots/cold-home.png') });
       await context.close();
     }
+    // UI heavy lookup belongs to the later separate pagination phase.
+    if (control.capacity)
+      await Promise.all([addresses, pause(Math.max(0, start + duration - Date.now()))]);
     const context = await browser.newContext({
         viewport: { width: 390, height: 844 },
         reducedMotion: 'reduce',
@@ -373,9 +452,128 @@ const browserRun = (async () => {
   }
 })();
 try {
-  const outcomes = await Promise.allSettled([...visitors, addresses, browserRun, slowReader]);
+  const outcomes = await Promise.allSettled([
+    ...(control.capacity ? [] : visitors),
+    addresses,
+    browserRun,
+    slowReader,
+  ]);
   const failed = outcomes.find((r) => r.status === 'rejected');
   if (failed) throw failed.reason;
+  if (control.capacity) {
+    const cold = rows.filter((r) => r.kind === 'address-cold');
+    const category = (r) =>
+      r.error
+        ? 'error'
+        : r.status !== 200
+          ? 'refusal'
+          : r.live && !r.current
+            ? 'expired'
+            : r.live && r.correct && r.complete && r.ms <= 10000
+              ? 'complete'
+              : r.live
+                ? 'partial'
+                : r.indexed
+                  ? 'indexed'
+                  : 'unavailable';
+    const cohorts = Array.from({ length: 10 }, (_, minute) => ({
+      minute,
+      rows: cold.filter((r) => Math.floor((r.startedAt - start) / 60000) === minute),
+    }));
+    const receipt = {
+      startedAt: start,
+      endedAt: start + duration,
+      requests: cold.length,
+      successes: cold.filter((r) => category(r) === 'complete').length,
+      maximumLatencyMs: Math.max(...cold.map((r) => r.ms)),
+      arrivalCohorts: cohorts.map((c) => ({
+        minute: c.minute,
+        requests: c.rows.length,
+        successes: c.rows.filter((r) => category(r) === 'complete').length,
+      })),
+      completionBuckets: Array.from({ length: 11 }, (_, minute) => ({
+        minute,
+        complete: cold.filter(
+          (r) => category(r) === 'complete' && Math.floor((r.at - start) / 60000) === minute,
+        ).length,
+      })),
+      categories: Object.fromEntries(
+        ['complete', 'partial', 'indexed', 'refusal', 'expired', 'unavailable', 'error'].map(
+          (k) => [k, cold.filter((r) => category(r) === k).length],
+        ),
+      ),
+      rows: cold,
+    };
+    receipt.verdict =
+      receipt.successes === 100 && cohorts.every((c) => c.rows.length === 10) ? 'PASS' : 'BLOCKED';
+    writeFileSync(join(evidence, 'capacity.json'), JSON.stringify(receipt, null, 2));
+    const healthyHomes = rows.filter(
+      (r) => r.freshness && r.startedAt >= start && r.startedAt < start + duration,
+    );
+    const progression = Object.fromEntries(
+      ['price', 'shareRate', 'latestCompletedPayout', 'todayPayoutEstimate'].map((key) => {
+        const observations = healthyHomes
+          .map((r) => r.freshness.metrics[key])
+          .filter((r) => r?.asOf);
+        return [
+          key,
+          {
+            sourceBlocks: [...new Set(observations.map((r) => r.asOf.blockNumber))],
+            statuses: observations.reduce(
+              (n, r) => ((n[r.status] = (n[r.status] ?? 0) + 1), n),
+              {},
+            ),
+          },
+        ];
+      }),
+    );
+    writeFileSync(join(evidence, 'healthy-metrics.json'), JSON.stringify(progression, null, 2));
+    assert.ok(
+      Object.values(progression).every((v) => v.sourceBlocks.length > 1),
+      'All four actual observations progress during load',
+    );
+    const phasePath = join(evidence, 'source environment/input/control.json');
+    const change = (values) => {
+      Object.assign(control, values);
+      writeFileSync(phasePath + '.tmp', JSON.stringify(control));
+      renameSync(phasePath + '.tmp', phasePath);
+    };
+    change({ freezeAt: Date.now() });
+    const faultStartedAt = Date.now();
+    for (let i = 0; i < 30; i++) {
+      await request('/api/v2/home', undefined, 'fault-frozen-home');
+      await pause(5000);
+    }
+    change({ freezeAt: undefined });
+    const stale = rows
+      .filter((r) => r.kind === 'fault-frozen-home')
+      .some((r) => Object.values(r.freshness?.metrics ?? {}).every((v) => v.status !== 'fresh'));
+    assert.ok(stale, 'Successfully fetched stagnant source becomes stale');
+    let recovered = false;
+    for (let i = 0; i < 24; i++) {
+      const h = await request('/api/v2/home', undefined, 'fault-recovery-home');
+      if (
+        h &&
+        Object.values(h.live).every((v) => v.status === 'fresh') &&
+        Date.parse(h.live.todayPayoutEstimate.asOf.blockTimestamp) >
+          control.epoch + faultStartedAt - control.started
+      ) {
+        checkHome(h, control.startDay, clock());
+        recovered = true;
+        break;
+      }
+      await pause(5000);
+    }
+    writeFileSync(
+      join(evidence, 'fault-phases.json'),
+      JSON.stringify(
+        { faultStartedAt, frozenMilliseconds: 150000, recovered, endedAt: Date.now() },
+        null,
+        2,
+      ),
+    );
+    assert.ok(recovered, 'All four observations recover from declared source stall');
+  }
   await pause(12000);
   const agent = new http.Agent({ keepAlive: false, maxSockets: 1 });
   agents.push(agent);
@@ -392,6 +590,8 @@ try {
     cursor = result?.live?.page.nextCursor ?? cursor;
     await pause(10000);
   }
+  visitorsRunning = false;
+  await Promise.all(visitors);
   const otherBrowsers = [];
   for (const [name, engine] of [
     ['firefox', firefox],
@@ -440,6 +640,8 @@ try {
     ),
   );
 } finally {
+  visitorsRunning = false;
+  writeFileSync(join(evidence, 'request-rows.json'), JSON.stringify(rows, null, 2));
   clearInterval(connectionTimer);
   for (const agent of agents) agent.destroy();
 }

@@ -14,11 +14,16 @@ import {
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import net from 'node:net';
+import { ingress } from '../tests/integration/ingress.mjs';
 
 const cycles = Number(process.argv.find((a) => a.startsWith('--cycles='))?.split('=')[1] ?? 30);
 const modelOnly = process.argv.includes('--model-only');
 const mixedSmoke = process.argv.includes('--mixed-smoke');
 const mixedOnly = process.argv.includes('--mixed-only');
+const capacity = process.argv.includes('--capacity');
+const capacitySmoke = process.argv.includes('--capacity-smoke');
+assert.ok(!capacity || mixedOnly, 'Capacity selector requires mixed-only');
+assert.ok(!capacitySmoke || capacity, 'Capacity smoke requires capacity selector');
 assert.ok(!mixedSmoke || cycles === 1, 'Mixed smoke uses --cycles=1');
 assert.ok(!mixedOnly || (cycles === 0 && !mixedSmoke && !modelOnly), 'Mixed-only uses --cycles=0');
 assert.ok(
@@ -59,7 +64,8 @@ for (const name of [
 env.HDD_V2_ALLOW_LIVE_RPC = 'false';
 let serial = 0,
   configuration,
-  monitor;
+  monitor,
+  closeIngress;
 const commands = [],
   readSamples = [];
 async function execute(binary, args, label, timeout = 900000) {
@@ -138,8 +144,12 @@ async function run() {
     HDD_V2_OPS_EVIDENCE: evidence,
   });
   await host('provision');
-  await host('release');
-  await compose(['stop', 'worker'], 'standby-stopped');
+  env.HDD_V2_INTEGRATION_API_ENTRY = 'dist/api/main.js';
+  await compose(['up', '-d', '--wait', 'api'], 'offline-api-start', [
+    '-f',
+    'compose.integration-test.yaml',
+  ]);
+  closeIngress = await ingress((await compose(['ps', '-q', 'api'], 'api-id')).trim(), port);
   const base = 'http://127.0.0.1:' + port;
   const status = await (await fetch(base + '/api/v2/status')).json();
   assert.equal(status.state, 'uninitialized');
@@ -293,6 +303,8 @@ async function run() {
   }
   if (cycles === 30 || mixedSmoke || mixedOnly) {
     clearInterval(monitor);
+    await closeIngress();
+    closeIngress = undefined;
     await compose(['stop', 'api'], 'base-api-stopped');
     const lastWorker = JSON.parse(
       readFileSync(
@@ -312,12 +324,32 @@ async function run() {
       started: Date.now(),
       // Continue after the preceding virtual quota window; never rewind persistent cooldown time.
       epoch: lastWorker.virtualNow + 60001,
+      capacity,
+      capacitySmoke,
     });
+    env.HDD_V2_INTEGRATION_API_ENTRY = 'tests/integration/api.mjs';
     await compose(['up', '-d', '--wait', 'api', 'worker'], 'mixed-start', [
       '-f',
       'compose.integration-test.yaml',
     ]);
+    closeIngress = await ingress((await compose(['ps', '-q', 'api'], 'mixed-api-id')).trim(), port);
     const ids = (await compose(['ps', '-q'], 'runtime-ids')).trim().split(/\s+/);
+    const network = JSON.parse(
+      await execute(
+        'docker',
+        ['network', 'inspect', configuration.project + '_private'],
+        'runtime-network',
+      ),
+    )[0];
+    assert.equal(network.Internal, true);
+    const runtime = JSON.parse(await execute('docker', ['inspect', ...ids], 'runtime-inspect'));
+    assert.ok(
+      runtime.every((c) =>
+        Object.keys(c.NetworkSettings.Networks).every(
+          (n) => n === configuration.project + '_private',
+        ),
+      ),
+    );
     await execute(
       'docker',
       [
@@ -343,16 +375,40 @@ async function run() {
       ]);
       return;
     }
+    if (capacitySmoke) {
+      await execute(
+        process.execPath,
+        ['tests/integration/load.mjs', base, evidence],
+        'capacity-readiness-only',
+        300000,
+      );
+      await closeIngress();
+      closeIngress = undefined;
+      await compose(['stop', 'api', 'worker'], 'capacity-smoke-stop', [
+        '-f',
+        'compose.integration-test.yaml',
+      ]);
+      await sample('capacity-smoke');
+      writeFileSync(
+        join(evidence, 'result.json'),
+        JSON.stringify({ status: 'READINESS_ONLY_NOT_CAPACITY', cycles }),
+      );
+      return;
+    }
     const mixedResults = await Promise.allSettled([
       execute(
         process.execPath,
         ['tests/integration/load.mjs', base, evidence],
         'mixed-load',
-        900000,
+        1200000,
       ),
       (async () => {
         await runner(['tests/integration/queries.mjs'], 'mixed-queries');
-        await pause(Math.max(0, state.started + 120000 - Date.now()));
+        if (capacity) {
+          while (!existsSync(join(evidence, 'phases.json'))) await pause(1000);
+          const phases = JSON.parse(readFileSync(join(evidence, 'phases.json'), 'utf8'));
+          await pause(Math.max(0, phases.healthyStartedAt + 120000 - Date.now()));
+        } else await pause(Math.max(0, state.started + 120000 - Date.now()));
         try {
           await compose(['run', '--rm', '-T', 'operator', 'exports'], 'mixed-forced-export');
         } catch (error) {
@@ -374,17 +430,80 @@ async function run() {
     const mixedFailure = mixedResults.find((r) => r.status === 'rejected');
     if (mixedFailure) throw mixedFailure.reason;
     await compose(['logs', '--no-color', '--tail', '60', 'worker'], 'mixed-worker-progress');
+    await closeIngress();
+    closeIngress = undefined;
     await compose(['stop', 'api', 'worker'], 'mixed-stop', ['-f', 'compose.integration-test.yaml']);
     const workerEvidence = JSON.parse(readFileSync(join(evidence, 'worker-mixed.json'), 'utf8'));
     const apiEvidence = JSON.parse(readFileSync(join(evidence, 'api-mixed.json'), 'utf8'));
+    if (capacity) {
+      const path = join(evidence, 'capacity.json'),
+        result = JSON.parse(readFileSync(path, 'utf8'));
+      for (const row of result.rows) {
+        const raw = workerEvidence.requests.filter(
+          (r) => r.id === 'api' && r.address === row.path.split('/').at(-1),
+        );
+        row.work = {
+          http: raw.length,
+          logical: raw.reduce((n, r) => n + r.logical, 0),
+          bytes: raw.reduce((n, r) => n + r.bytes, 0),
+        };
+        assert.ok(row.work.http <= 4 && row.work.logical <= 128);
+      }
+      writeFileSync(path, JSON.stringify(result, null, 2));
+    }
     const dispatches = [
       ...workerEvidence.budget.dispatches,
       ...apiEvidence.dispatch.dispatches,
     ].sort((a, b) => a.at - b.at);
+    const rpc = [...workerEvidence.budget.rpc, ...apiEvidence.dispatch.rpc];
+    let activeHttp = 0,
+      combinedInflightPeak = Math.max(
+        workerEvidence.budget.inflightPeak,
+        apiEvidence.dispatch.inflightPeak,
+      );
+    for (const event of dispatches
+      .filter((r) => r.ended > r.at)
+      .flatMap((r) => [
+        { at: r.at, delta: 1 },
+        { at: r.ended, delta: -1 },
+      ])
+      .sort((a, b) => a.at - b.at || a.delta - b.delta)) {
+      activeHttp += event.delta;
+      combinedInflightPeak = Math.max(combinedInflightPeak, activeHttp);
+    }
+    assert.ok(combinedInflightPeak <= 2);
+    const rawBytes = workerEvidence.requests.reduce((n, r) => n + r.bytes, 0);
+    assert.equal(
+      rpc.reduce((n, r) => n + r.bytes, 0),
+      rawBytes,
+      'Decoded RPC bytes reconcile with raw transports',
+    );
+    assert.equal(
+      rpc.reduce((n, r) => n + r.requests, 0),
+      dispatches.length,
+    );
+    writeFileSync(
+      join(evidence, 'transport-summary.json'),
+      JSON.stringify(
+        {
+          rawBytes,
+          rpc,
+          minimumSpacing: Math.min(...dispatches.slice(1).map((r, i) => r.at - dispatches[i].at)),
+          inflight: {
+            api: apiEvidence.dispatch.inflightPeak,
+            worker: workerEvidence.budget.inflightPeak,
+            combinedUpperBound: 2,
+            combinedObservedPeak: combinedInflightPeak,
+          },
+        },
+        null,
+        2,
+      ),
+    );
     const peaks = {};
     for (const [lane, http, logical] of [
-      ['all', 30, 900],
-      ['address', 12, 360],
+      ['all', 42, 900],
+      ['address', 24, 360],
       ['metrics', 6, 180],
       ['sync', 12, 360],
     ]) {
@@ -408,6 +527,7 @@ async function run() {
       };
     }
     for (const meter of [workerEvidence.budget, apiEvidence.dispatch]) {
+      assert.equal(meter.inflightPeak, 1);
       assert.equal(
         meter.dispatches.length,
         meter.counters.reduce((n, c) => n + c.attempts, 0),
@@ -419,6 +539,19 @@ async function run() {
       assert.ok(meter.counters.every((c) => c.queuePeak <= 8));
     }
     writeFileSync(join(evidence, 'budget-summary.json'), JSON.stringify(peaks, null, 2));
+    assert.ok(
+      dispatches.slice(1).every((row, i) => row.at - dispatches[i].at >= 1300),
+      'Combined actual spacing',
+    );
+    assert.equal(
+      workerEvidence.requests.length,
+      dispatches.length,
+      'Raw transport reconciles all physical charges',
+    );
+    assert.equal(
+      workerEvidence.requests.reduce((n, r) => n + r.logical, 0),
+      dispatches.reduce((n, r) => n + r.logical, 0),
+    );
     await sample('retained');
     const retained = JSON.parse(readFileSync(join(evidence, 'retained.json'), 'utf8'));
     assert.ok(
@@ -464,6 +597,7 @@ try {
   process.exitCode = 1;
 } finally {
   clearInterval(monitor);
+  if (closeIngress) await closeIngress();
   writeFileSync(join(evidence, 'home-during-cycles.json'), JSON.stringify(readSamples, null, 2));
   if (configuration)
     try {

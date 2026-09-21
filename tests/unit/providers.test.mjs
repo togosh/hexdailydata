@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ProviderBudget } from '../../src/providers/budget.ts';
+import { ProviderBudget, providerCalendar } from '../../src/providers/budget.ts';
 import { RpcClient, validateCall } from '../../src/providers/rpc.ts';
+import { cooldownFiles } from '../../src/providers/cooldown.ts';
+import { mkdir, mkdtemp, writeFile, unlink, rmdir } from 'node:fs/promises';
+import { resolve, join } from 'node:path';
 import { decodeLog, topics, selectors, word } from '../../src/providers/abi.ts';
 import {
   fixture,
@@ -16,6 +19,115 @@ import {
 } from '../sync/fixture.mjs';
 
 const signal = new AbortController().signal;
+
+test('approved calendar stays coherent; rolling HTTP ceilings bind despite spare slots at different epochs', async () => {
+  assert.deepEqual(providerCalendar, {
+    slots: ['address', 'sync', 'address', 'metrics', 'address', 'sync', 'address'],
+    toleranceMilliseconds: 100,
+    slotMilliseconds: 1400,
+  });
+  for (const offset of [0, 99, 101, 1399, 9801]) {
+    for (const [lane, cap] of [
+      ['address', 24],
+      ['metrics', 6],
+      ['sync', 12],
+    ]) {
+      const clock = new FakeClock();
+      clock.time = offset;
+      const budget = new ProviderBudget(
+        lane === 'address' ? 'api' : 'worker',
+        memoryCooldown(),
+        clock,
+      );
+      const trace = [];
+      for (let i = 0; i < cap * 3; i++)
+        await budget.run(lane, 1, clock.now() + 180000, signal, async () =>
+          trace.push(clock.now()),
+        );
+      assert.ok(trace[0] >= offset + 60000);
+      let peak = 0;
+      for (const end of trace) {
+        const count = trace.filter((at) => at > end - 60000 && at <= end).length;
+        peak = Math.max(peak, count);
+        assert.ok(count <= cap);
+      }
+      assert.equal(peak, cap, 'literal rolling ceiling actually exercised');
+      for (const at of trace) {
+        assert.equal(
+          ['address', 'sync', 'address', 'metrics', 'address', 'sync', 'address'][
+            Math.floor(at / 1400) % 7
+          ],
+          lane,
+        );
+        assert.ok(at % 1400 <= 100);
+      }
+    }
+  }
+});
+
+test('a late wake misses its slot; tolerance and original deadline never extend for lag', async () => {
+  for (const lag of [100, 101, 1500]) {
+    const clock = new FakeClock();
+    let first = true;
+    clock.sleep = async (ms, stop) => {
+      stop.throwIfAborted();
+      clock.time += ms + (first ? lag : 0);
+      first = false;
+    };
+    const budget = new ProviderBudget('api', memoryCooldown(), clock);
+    clock.time = 68599; // First address slot at68600, after the real quarantine interval.
+    const trace = [];
+    await budget.run('address', 1, 80000, signal, async () => trace.push(clock.now()));
+    assert.equal(trace[0], lag === 100 ? 68700 : 71400);
+  }
+  const clock = new FakeClock();
+  const budget = new ProviderBudget('api', memoryCooldown(), clock);
+  clock.time = 68599;
+  clock.sleep = async (ms) => {
+    clock.time += ms + 1000;
+  };
+  await assert.rejects(
+    budget.run('address', 1, 68650, signal, async () => assert.fail('late dispatch')),
+    /deadline/,
+  );
+  assert.equal(budget.counters.attempts, 0);
+});
+
+test('reservation rolling boundary is exclusive at sixty seconds and releases only unused work', async () => {
+  const clock = new FakeClock();
+  const budget = new ProviderBudget('api', memoryCooldown(), clock);
+  await budget.run('address', 233, 180000, signal, async () => {});
+  const dispatchedAt = clock.now();
+  clock.time = dispatchedAt + 59999;
+  await assert.rejects(budget.addressRequest(clock.now() + 10000, 2, signal), /quota/);
+  clock.time = dispatchedAt + 60000;
+  const reservation = await budget.addressRequest(clock.now() + 10000, 2, signal);
+  reservation.close();
+  reservation.close();
+  const cancelled = new AbortController();
+  cancelled.abort(new Error('cancelled before reservation'));
+  await assert.rejects(
+    budget.addressRequest(clock.now() + 10000, 2, cancelled.signal),
+    /cancelled/,
+  );
+  const next = await budget.addressRequest(clock.now() + 10000, 2, signal);
+  await budget
+    .run(
+      'address',
+      1,
+      next.deadline,
+      signal,
+      async () => {
+        throw Error('dispatched failure');
+      },
+      () => next.charge(1),
+    )
+    .catch((error) => assert.match(error.message, /dispatched failure/));
+  next.close();
+  assert.equal(next.counters.http, 1);
+  assert.equal(budget.counters.attempts, 2);
+  assert.equal(budget.counters.logical, 234);
+});
 test('ABI literal signatures and raw integer layout, strict padding/boolean/time affinity', () => {
   assert.equal(selectors.globalInfo, '0xf04b5fa0');
   assert.equal(selectors.dailyDataRange, '0x6a210a0e');
@@ -116,13 +228,13 @@ test('fixed non-borrowing role lanes bound rolling physical/logical work, aliase
   }
   assert.ok(dispatched[0].at >= 60000);
   for (let i = 1; i < dispatched.length; i++)
-    assert.ok(dispatched[i].at - dispatched[i - 1].at >= 2000);
+    assert.ok(dispatched[i].at - dispatched[i - 1].at >= 1300);
   for (const end of dispatched) {
     const window = dispatched.filter((x) => x.at > end.at - 60000 && x.at <= end.at);
-    assert.ok(window.length <= 30);
+    assert.ok(window.length <= 42);
     assert.ok(window.reduce((n, x) => n + x.logical, 0) <= 900);
     for (const [lane, http, rpc] of [
-      ['address', 12, 360],
+      ['address', 24, 360],
       ['sync', 12, 360],
       ['metrics', 6, 180],
     ]) {
@@ -255,6 +367,30 @@ test('filtered logs reject wrong identities and oversized payloads without histo
     );
     await assert.rejects(() => source.events([chain.plain(101)], signal));
     assert.equal(source.rpc.counters.methods.eth_getTransactionReceipt ?? 0, 0);
+  }
+});
+test('missing cooldown starts in quarantine; malformed role state fails closed before dispatch', async () => {
+  const root = resolve('artifacts/task-09');
+  await mkdir(root, { recursive: true });
+  const directory = await mkdtemp(join(root, 'cooldown-unit-'));
+  try {
+    const store = await cooldownFiles(directory, 'api'),
+      clock = new FakeClock();
+    const api = new ProviderBudget('api', store, clock);
+    await assert.rejects(api.addressRequest(10000, 1, signal), /deadline/);
+    assert.equal(api.counters.attempts, 0);
+    await writeFile(join(directory, 'api.json'), 'corrupt');
+    const worker = new ProviderBudget('worker', await cooldownFiles(directory, 'worker'), clock);
+    await assert.rejects(
+      worker.run('sync', 1, 200000, signal, async () => assert.fail('Corrupt state dispatched')),
+      /persisted/,
+    );
+    assert.equal(worker.counters.attempts, 0);
+  } finally {
+    await unlink(join(directory, 'api.json')).catch((e) => {
+      if (e.code !== 'ENOENT') throw e;
+    });
+    await rmdir(directory);
   }
 });
 test('metrics arriving during asynchronous cooldown read precede undispatched sync', async () => {

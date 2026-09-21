@@ -36,7 +36,7 @@ function setup(options = {}) {
 }
 function addressSetup(options = {}) {
   const f = fixture(options);
-  f.clock.time = Math.ceil((f.clock.time + 60000) / 10500) * 10500;
+  f.clock.time = Math.ceil((f.clock.time + 60000) / 9800) * 9800;
   const rpc = f.rpc('api', f.api),
     service = new AddressService(rpc, CODE_HASH, emptyBaseline);
   return { f, rpc, service };
@@ -316,18 +316,18 @@ test('swap deletion, unindexed starts, hint races, partial ID lookup and dated i
     ['3', '4'],
   );
   assert.equal((await service.stake('999', signal)).outcome, 'indexing');
-  f.clock.time = Math.ceil((f.clock.now() + 60001) / 10500) * 10500;
+  f.clock.time = Math.ceil((f.clock.now() + 60001) / 9800) * 9800;
   f.state.hint = 1;
   const partial = await service.get(B, signal);
   assert.equal(partial.outcome, 'partial');
   assert.equal(partial.live.page.items.length, 1);
   assert.ok(partial.live.page.nextCursor);
-  f.clock.time = Math.ceil((f.clock.now() + 60001) / 10500) * 10500;
+  f.clock.time = Math.ceil((f.clock.now() + 60001) / 9800) * 9800;
   f.state.hint = 3;
   const shrunk = await service.get(B, signal);
   assert.equal(shrunk.outcome, 'available');
   assert.equal(shrunk.live.page.items.length, 2);
-  f.clock.time = Math.ceil((f.clock.now() + 60001) / 10500) * 10500;
+  f.clock.time = Math.ceil((f.clock.now() + 60001) / 9800) * 9800;
   f.state.count = 10000;
   f.state.hint = null;
   f.state.list = null;
@@ -353,7 +353,7 @@ test('byte cache eviction and separation; coalesced callers share work, one/last
   assert.equal(r.outcome, 'available');
   assert.equal(rpc.counters.requests, 2);
   assert.equal(service.counters.coalesced, 1);
-  f.clock.time = Math.ceil(f.clock.now() / 10500) * 10500;
+  f.clock.time = Math.ceil(f.clock.now() / 9800) * 9800;
   const last = new AbortController();
   f.state.delay = async (s) =>
     new Promise((resolve, reject) =>
@@ -380,7 +380,7 @@ test('deadline/startup/cooldown admission and ten full pages report useful work 
   let success = 0,
     quota = 0;
   for (let i = 0; i < 10; i++) {
-    f.clock.time = Math.ceil(f.clock.now() / 10500) * 10500;
+    f.clock.time = Math.ceil(f.clock.now() / 9800) * 9800;
     const r = await service.get(addr(100 + i), signal);
     if (r.live) success++;
     else if (r.outcome === 'quota') quota++;
