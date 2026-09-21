@@ -316,3 +316,14 @@ Final11screenshots are Calculator-only, including full mobile/desktop and open d
 Evidence: `artifacts/task-07/calculator-details-20260920/`. Chrome/synthetic only; owned
 resources cleaned. No v1/live providers/push/deploy/Task09. Stop for owner visual review.
 Documentation-only status entry after reviewed source.
+
+Task07 Downloads cleanup VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `802a68ec1fc5e316c89ff98839fcbfaea4db9c05` removes Downloads Refresh,
+red catalog notice and Made for reuse copy, retaining a standalone methodology link.
+Download links, units/coverage and loading/error states remain. Types/build/format,
+full browser journeys including CSV streaming/integrity, and7visual groups PASS.
+Independent `/root/home_panels_review` PASS for markup-only change. Screenshots only
+Downloads, including full mobile,960half-desktop and1440desktop; evidence:
+`artifacts/task-07/downloads-cleanup-20260920/`. Chrome/synthetic only; owned resources
+cleaned. No v1/live providers/other page bodies/push/deploy/Task09. Stop for owner review.
+Documentation-only status entry after reviewed source.
