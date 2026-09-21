@@ -1,5 +1,13 @@
 // Independent integer oracle. No estimator, fixture generator, SQL or production imports.
 import assert from 'node:assert/strict';
+// Cohorts are fixed by the address schedule declared BEFORE the run. Keep actual
+// millisecond arrival buckets separately: OS timers can straddle a minute boundary.
+export function ordinaryArrivalCohort(path) {
+  assert.match(path, /^\/api\/v2\/addresses\/0x[0-9a-f]{40}$/);
+  const index = Number(BigInt(path.split('/').at(-1)) - 1012000n);
+  assert.ok(index >= 0 && index < 100, 'Address outside the predeclared ordinary cohort');
+  return Math.floor(index / 10);
+}
 export const payoutInputs = {
   totalSupply: '901633645423948312402060',
   lockedHearts: '480030000000016000',

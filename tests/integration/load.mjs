@@ -5,7 +5,13 @@ import { readFileSync, writeFileSync, mkdirSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import { chromium, firefox, webkit } from 'playwright';
-import { checkHome, checkAddress, payoutInputs, payoutOracle } from './oracle.mjs';
+import {
+  checkHome,
+  checkAddress,
+  payoutInputs,
+  payoutOracle,
+  ordinaryArrivalCohort,
+} from './oracle.mjs';
 const [base, evidence] = process.argv.slice(2);
 assert.match(base, /^http:\/\/127\.0\.0\.1:\d+$/);
 const control = JSON.parse(
@@ -107,7 +113,14 @@ async function request(path, agent, kind, timeout = 15000) {
     });
     req.setTimeout(timeout, () => req.destroy(new Error('load timeout')));
     req.on('error', (e) => {
-      rows.push({ kind, startedAt, at: Date.now(), ms: performance.now() - at, error: e.message });
+      rows.push({
+        kind,
+        path: path.split('?')[0],
+        startedAt,
+        at: Date.now(),
+        ms: performance.now() - at,
+        error: e.message,
+      });
       resolve(null);
     });
   });
@@ -196,7 +209,8 @@ const addresses = (async () => {
   agents.push(agent);
   const pending = [];
   for (let i = 0; i < duration / 6000; i++) {
-    await pause(Math.max(0, start + i * 6000 - Date.now()));
+    const due = start + i * 6000;
+    while (Date.now() < due) await pause(due - Date.now());
     // Predeclared12000..12099:20 zero-list and80 two-entry ordinary accounts.
     pending.push(
       request('/api/v2/addresses/' + bulkAddress(12000 + i) + '?limit=100', agent, 'address-cold'),
@@ -478,7 +492,7 @@ try {
                   : 'unavailable';
     const cohorts = Array.from({ length: 10 }, (_, minute) => ({
       minute,
-      rows: cold.filter((r) => Math.floor((r.startedAt - start) / 60000) === minute),
+      rows: cold.filter((r) => ordinaryArrivalCohort(r.path) === minute),
     }));
     const receipt = {
       startedAt: start,
@@ -486,6 +500,11 @@ try {
       requests: cold.length,
       successes: cold.filter((r) => category(r) === 'complete').length,
       maximumLatencyMs: Math.max(...cold.map((r) => r.ms)),
+      arrivalCohortBasis: 'Predeclared cohort.json address order at six-second cadence',
+      actualArrivalBuckets: Array.from({ length: 10 }, (_, minute) => ({
+        minute,
+        requests: cold.filter((r) => Math.floor((r.startedAt - start) / 60000) === minute).length,
+      })),
       arrivalCohorts: cohorts.map((c) => ({
         minute: c.minute,
         requests: c.rows.length,
@@ -505,7 +524,11 @@ try {
       rows: cold,
     };
     receipt.verdict =
-      receipt.successes === 100 && cohorts.every((c) => c.rows.length === 10) ? 'PASS' : 'BLOCKED';
+      receipt.successes === 100 &&
+      new Set(cold.map((r) => r.path)).size === 100 &&
+      cohorts.every((c) => c.rows.length === 10)
+        ? 'PASS'
+        : 'BLOCKED';
     writeFileSync(join(evidence, 'capacity.json'), JSON.stringify(receipt, null, 2));
     const healthyHomes = rows.filter(
       (r) => r.freshness && r.startedAt >= start && r.startedAt < start + duration,
