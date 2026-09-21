@@ -353,7 +353,13 @@ try {
         await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
         await page.getByLabel('Constant daily payout assumption').selectOption('30');
         await page.getByText('Optional payout & future USD scenario', { exact: true }).click();
-        await page.getByLabel('Hypothetical future USD per HEX').fill('0.01');
+        const currentPrice = await (await fetch(base + '/api/v2/home?chain=pulsechain')).json();
+        await page.waitForFunction(
+          (value) =>
+            document.querySelector('input[aria-label="Hypothetical future USD per HEX"]').value ===
+            value,
+          currentPrice.live.price.value.usdPerHex,
+        );
         await page.getByRole('button', { name: 'Calculate shares & timing' }).click();
         await page.locator('.share-result .value').waitFor();
       }
