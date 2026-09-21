@@ -120,7 +120,9 @@ const visitors = Array.from({ length: 50 }, (_, i) =>
   })(),
 );
 const addresses = (async () => {
-  const agent = new http.Agent({ keepAlive: true, maxSockets: 2 });
+  // These six-second cold lookups exceed the server's five-second keepalive.
+  // Use fresh connections; only the fifty visitor sessions stay connected.
+  const agent = new http.Agent({ keepAlive: false, maxSockets: 2 });
   agents.push(agent);
   const pending = [];
   for (let i = 0; i < duration / 6000; i++) {
@@ -375,7 +377,7 @@ try {
   const failed = outcomes.find((r) => r.status === 'rejected');
   if (failed) throw failed.reason;
   await pause(12000);
-  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+  const agent = new http.Agent({ keepAlive: false, maxSockets: 1 });
   agents.push(agent);
   let cursor;
   for (let i = 0; i < 6; i++) {
