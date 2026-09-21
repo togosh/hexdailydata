@@ -24,15 +24,10 @@ export function Downloads() {
           <p>Five standard CSV files. Exact amounts, clear units and a fixed cutoff.</p>
         </div>
       </div>
-      <Feedback {...data} />
+      {data.loading && <p role="status">Loading downloads...</p>}
+      {data.error && <p role="alert">{data.error}</p>}
       {bundle ? (
         <>
-          <p className="notice">
-            Verified catalog · created {bundle.createdAt} · index block{' '}
-            {bundle.currentIndex.blockNumber} ({bundle.currentIndex.finality}). Native daily through{' '}
-            {bundle.dailyCutoff === null ? 'unavailable' : dayLabel(bundle.dailyCutoff)}. Ranks{' '}
-            {bundle.ranking ? dayLabel(bundle.ranking.day) : 'unavailable'}.
-          </p>
           <div className="download-grid">
             {bundle.files.map((file) => (
               <section className="panel download-card" key={file.dataset}>
@@ -92,7 +87,7 @@ export function Downloads() {
               {data.data?.status === 'rebuilding'
                 ? 'The standard bundle is rebuilding or has not been published.'
                 : 'A verified current catalog is not available.'}{' '}
-              Refresh manually when it is ready.
+              Reload this page when it is ready.
             </p>
             <p>
               Reported archive history remains separately accessible in <a href="/charts">Charts</a>
@@ -101,18 +96,9 @@ export function Downloads() {
           </section>
         )
       )}
-      <section className="panel">
-        <h2>Made for reuse</h2>
-        <p>
-          CSV links stream directly from this server. Files retain their immutable bundle identity.
-          If a link has retired, return here and refresh the catalog.
-        </p>
-        <p>
-          Raw token amounts use integer hearts (10⁸ per HEX), shares (10¹² per T-share), or the
-          explicitly listed units. Rounded ratios are presentation values.
-        </p>
+      <p>
         <a href="/learn">Read the methodology ↗</a>
-      </section>
+      </p>
     </>
   );
 }
