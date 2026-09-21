@@ -289,3 +289,16 @@ Firefox/WebKit unavailable. Separate `/root/home_panels_review` PASS, including 
 Evidence/screenshots: `artifacts/task-07/calculator-visual-20260920/`. Owned resources
 cleaned. No live providers, v1 execution, other page-body redesign, push/deploy or Task09.
 Stop for owner Calculator visual review. Documentation-only status entry.
+
+Task07 compact Calculator VISUAL_PASS; OWNER_VISUAL_APPROVAL_PENDING.
+Reviewed source `ac7efe48bcadd1ea1a31564260ceb69b64711509` removes date/Refresh/help
+text, places results before future price and explanations below both panels. Primary
+controls/results fit390x844 above mobile nav. New sessions use30-day payout mean and
+eligible current HEX price by default; custom/zero/blank inputs stay preserved, missing
+or expired current price omits USD. Existing exact calculations and manual action remain.
+Types/build/format,15units, full native browser journeys and final7visual groups PASS;
+independent `/root/home_panels_review` PASS with delayed-price/custom-persistence/stale
+negative probes. Chrome only. Full mobile/scroll,960half-desktop and1440captures plus
+commands/reviewer evidence: `artifacts/task-07/calculator-compact-20260920/`.
+Owned resources cleaned. No live providers, v1 execution, push/deploy or Task09.
+Stop for owner visual review. Documentation-only status entry after reviewed code.
