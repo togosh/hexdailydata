@@ -10,7 +10,7 @@ import {
 } from '../contracts/reads.ts';
 import { formatUnits } from '../domain/units.ts';
 import { endpoint, useResource, useClock } from './api.ts';
-import { dayLabel, numberText } from './format.ts';
+import { dayLabel, dayDate, compactNumber, numberText } from './format.ts';
 import { Icon } from './visuals.tsx';
 import { Feedback, SearchForm, Table, Copy, Value, Metric } from './components.tsx';
 
@@ -185,12 +185,13 @@ function Address({ address }: { address: string }) {
           <h1>Address Lookup</h1>
           <p>Search an address or stake ID to view balances, stakes and dated ranks.</p>
         </div>
+        <div className="address-feedback">
+          <Feedback {...data} refresh={restart} hasData={!!d} />
+        </div>
       </div>
       <div className="address-search">
+        <Icon name="search" />
         <SearchForm />
-      </div>
-      <div className="address-feedback">
-        <Feedback {...data} refresh={restart} hasData={!!d} />
       </div>
       <dl className="address-metrics">
         <Metric
@@ -198,6 +199,7 @@ function Address({ address }: { address: string }) {
           icon="database"
           title="Liquid HEX"
           value={valid && d?.live ? hex(d.live.balanceHearts) : null}
+          display={compactNumber(valid && d?.live ? hex(d.live.balanceHearts) : null, 3)}
           note="Current observed block"
         />
         <Metric
@@ -212,6 +214,7 @@ function Address({ address }: { address: string }) {
           icon="pie"
           title="Accounted staked HEX"
           value={hex(d?.indexed?.accountedHearts)}
+          display={compactNumber(hex(d?.indexed?.accountedHearts), 3)}
           note="Indexed; excludes good-accounted stakes"
         />
         <Metric
@@ -252,29 +255,32 @@ function Address({ address }: { address: string }) {
               </p>
               <Table
                 title="Pinned current stake page"
-                headings={[
-                  'Stake ID',
-                  'Principal (HEX)',
-                  'T-shares',
-                  'Lock / maturity (UTC)',
-                  'State',
-                ]}
+                headings={['Stake ID', 'Principal (HEX)', 'T-shares', 'Maturity (UTC)', 'State']}
               >
                 {page!.items.map((s) => (
                   <tr key={s.stakeId}>
                     <td>
                       <a href={'/stake/' + s.stakeId}>{s.stakeId}</a>
                     </td>
-                    <td>{numberText(hex(s.principalHearts))}</td>
-                    <td>{numberText(formatUnits(BigInt(s.stakeShares), 12))}</td>
                     <td>
-                      {dayLabel(s.lockedDay)}
-                      <br />
-                      {dayLabel(s.lockedDay + s.stakedDays)}
+                      <span title={hex(s.principalHearts)!}>
+                        {compactNumber(hex(s.principalHearts), 3)}
+                      </span>
                     </td>
                     <td>
-                      <span className="address-state">
-                        {s.unlockedDay ? 'Good accounted' : 'Current at observed block'}
+                      <span title={formatUnits(BigInt(s.stakeShares), 12)}>
+                        {compactNumber(formatUnits(BigInt(s.stakeShares), 12), 3)}
+                      </span>
+                    </td>
+                    <td>
+                      <span title={`Locks ${dayLabel(s.lockedDay)}`}>
+                        {dayDate(s.lockedDay + s.stakedDays)}
+                      </span>
+                      <small className="block">Day {s.lockedDay + s.stakedDays + 1}</small>
+                    </td>
+                    <td>
+                      <span className="address-state" title="State at the observed block">
+                        {s.unlockedDay ? 'Good accounted' : 'Current'}
                       </span>
                       {s.isAutoStake ? ' · auto-stake' : ''}
                     </td>
@@ -349,27 +355,30 @@ function Address({ address }: { address: string }) {
           {d?.indexed && (
             <div className="address-baseline">
               <h3>Accepted indexed baseline</h3>
-              <dl className="fact-rows">
-                <div>
-                  <dt>Indexed liquid HEX</dt>
-                  <dd>
-                    <Value value={hex(d.indexed.liquidHearts)} places={4} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Indexed accounted HEX (excludes GA)</dt>
-                  <dd>
-                    <Value value={hex(d.indexed.accountedHearts)} places={4} />
-                  </dd>
-                </div>
-                <div>
-                  <dt>Indexed stake count</dt>
-                  <dd>{d.indexed.stakeCount ?? 'Unavailable'}</dd>
-                </div>
-              </dl>
-              <p className="meta">
-                Block {d.indexed.asOf.blockNumber} - {d.indexed.finality}
-              </p>
+              <details>
+                <summary>Balances &amp; index cutoff</summary>
+                <dl className="fact-rows">
+                  <div>
+                    <dt>Indexed liquid HEX</dt>
+                    <dd>
+                      <Value value={hex(d.indexed.liquidHearts)} places={4} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Indexed accounted HEX (excludes GA)</dt>
+                    <dd>
+                      <Value value={hex(d.indexed.accountedHearts)} places={4} />
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Indexed stake count</dt>
+                    <dd>{d.indexed.stakeCount ?? 'Unavailable'}</dd>
+                  </div>
+                </dl>
+                <p className="meta">
+                  Block {d.indexed.asOf.blockNumber} - {d.indexed.finality}
+                </p>
+              </details>
             </div>
           )}
         </aside>

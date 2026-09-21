@@ -302,6 +302,15 @@ try {
         await page.getByText(/offset 20/).waitFor();
         await page.getByRole('button', { name: 'Next pinned page' }).click();
         await page.getByText('Showing 1 of 41 current stakes', { exact: false }).waitFor();
+        const another = '0x' + '2'.padStart(40, '0');
+        const newAddress = page.waitForRequest((r) =>
+          r.url().includes('/api/v2/addresses/' + another),
+        );
+        await page.getByLabel('Address or stake ID', { exact: true }).fill(another);
+        await page.getByRole('button', { name: 'Search', exact: true }).click();
+        const initialAddressRequest = new URL((await newAddress).url());
+        assert.equal(initialAddressRequest.pathname, '/api/v2/addresses/' + another);
+        assert.equal(initialAddressRequest.searchParams.has('cursor'), false);
         await go('/search');
         await page.locator('tbody tr').first().waitFor();
         await page.getByLabel('Address or stake ID', { exact: true }).fill('9007199254740993');
