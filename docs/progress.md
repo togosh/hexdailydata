@@ -469,3 +469,18 @@ Task09 accepted; exact live declarations, real seed/history, duration/cost, live
 full Task10 remain pending (docs/sync.md). All prior spent sessions/private canary preserved.
 No live/discovery/real import/rebuild/v1/UI/Task11/push/deploy. Stop for planner review.
 Documentation/status-only commit after the reviewed source.
+
+Task10 native-prefix canary: OFFLINE_IMPLEMENTATION / LIVE_CONSTRUCTOR /
+PREFIX_COVERAGE / SQL_AUDIT / RESOURCE_ACCOUNTING PASS in the approved single run.
+Reviewed code `5700835e9a36325f1488f59ed4cd8cde0cd3537f`; separate read-only
+`/root/prefix_review` PASS after one deadline correction. Final 19 compiled/raw/SQL
+canary groups and 29 focused tests passed. Image `sha256:5922dde165dc51d67d608c98d3e1488670bf95fb4e60b605311f39b6ad3653a0`.
+Origin1/network369 constructor9041184 -> exact9042207 in four commits; full prefix
+audit passed with zero addresses/events. Nonempty LIVE replay NOT_EXERCISED; day0,
+dailyCount1, rawRate100000 and zero supply were observed, with no payout fabrication.
+One invocation:640731ms,110HTTP/128logical,1134810 observed bytes, no retries/uncertainty.
+New instance `d309b435-1626-49e0-a1f8-0b6b65c7221d`; no369 chain/cursor/current rows.
+Only new stopped containers removed; new DB/spent volumes/private environment retained.
+Report/evidence: `artifacts/task-10/native-prefix/`. Full Task10 PENDING; no native fork,
+full replay/seed/rebuild/UI/v1/existing DB/Task11/push/deployment. Prior sessions preserved.
+Stop for planner review. This entry is a status-only commit after the reviewed code.
