@@ -500,3 +500,15 @@ retained; only new stopped containers removed. Prior databases/sessions untouche
 Report/result/evidence: `artifacts/task-10/nonempty-prefix/`. Full Task10 PENDING;
 Task11 unstarted. No post-stop fix/retry, rebuild, fork, UI, v1, HDS, push or deployment.
 Stop for planner review. This entry is a status-only commit after the reviewed code.
+
+Task10 RPC diagnostics correction: RPC_DIAGNOSTICS_OFFLINE_PASS. Reviewed code
+`e8400d30ac225d71d78d9b772d6d1e8bbcb4f68a`; baseline b9cbd2ff preserved.
+One bounded sanitized rejection record survives RPC/prefix/cleanup/final save and
+retry scheduling refusal; acceptance, classifiers and numerical limits unchanged.
+38 focused tests, 24 compiled canary/SQL groups, types/build/format PASS. Separate
+read-only `/root/diagnostic_review` PASS after one correction; independent envelope,
+retry-loss and private SQL persistence probes. Exact evidence/report under
+`artifacts/task-10/rpc-diagnostics/`. Zero provider requests or prior session/DB access.
+The lost157-byte live response remains unavailable. Task09 accepted; Task10 PENDING;
+prior live STOPPED_INCOMPLETE unchanged. No rerun/resume, rebuild, v1/HDS, Task11,
+push or deployment. Stop for planner review. This is a status-only final entry.
