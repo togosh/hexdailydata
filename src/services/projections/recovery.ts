@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { query } from '../../db/measure.ts';
+import { validateSourceHistory } from './provenance.ts';
 
 const rewindTables: Record<string, string[]> = {
   accounts: ['chain_id', 'address'],
@@ -70,4 +71,8 @@ export async function restoreCursor(
     WHERE chain_id=$1`,
     [chain, previous, revision, floor],
   );
+  // Low-level SQL fixtures without acquisition history remain nonportable. Acquired
+  // state must keep its origin/boundary digest across every restored cursor.
+  if ((await query(client, 'SELECT 1 FROM hdd.source_history WHERE chain_id=$1', [chain])).rowCount)
+    await validateSourceHistory(client, chain);
 }

@@ -95,7 +95,8 @@ independent. Local CSV includes each value, original numeric token and availabil
 source/day/date basis/revision/units. New output files are exclusive; failure is an error and
 may retain an incomplete local output for diagnosis. It never replaces an existing file.
 
-Seeds require valid native state and use format4/schema5 with independent archive validation.
+Seeds require valid native state and use format5/schema5 with independent archive validation
+and the transport/origin binding described in sync.md.
 Schema5 encrypted backups can restore archive-only or native-plus-archive state into a new
 empty target. Native seed import refuses a nonempty archive-only target. Archive rows are not
 part of native undo and survive forward sync/rewind. Old seed/backup schema formats are refused;

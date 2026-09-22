@@ -197,6 +197,8 @@ export function fixture({ last = 364, holdersPerBlock = 0, startDay = 0, mutateB
       const s = states.get(Number(h.number));
       const data = p[0].data,
         selector = data.slice(0, 10);
+      if (selector === '0x5c9302c9')
+        return '0x' + word((BigInt(h.timestamp) - 1575331200n) / 86400n);
       if (selector === '0x18160ddd') return '0x' + word(s.supply);
       if (selector === '0xf04b5fa0')
         return (

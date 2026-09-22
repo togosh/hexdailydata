@@ -10,7 +10,9 @@ if (relativeEvidence.startsWith('..') || isAbsolute(relativeEvidence))
 mkdirSync(evidence, { recursive: true });
 let failure;
 const phases = process.env.HDD_V2_SYNC_TEST_PHASE
-  ? [process.env.HDD_V2_SYNC_TEST_PHASE]
+  ? process.env.HDD_V2_SYNC_TEST_PHASE === 'shared'
+    ? ['shared-control', 'shared-build', 'shared-import']
+    : [process.env.HDD_V2_SYNC_TEST_PHASE]
   : ['build', 'early-import', 'import', 'unpruned', 'sparse-build', 'sparse-import', 'busy'];
 if (
   phases.some(
@@ -23,6 +25,9 @@ if (
         'sparse-build',
         'sparse-import',
         'busy',
+        'shared-control',
+        'shared-build',
+        'shared-import',
       ].includes(p),
   )
 )
@@ -40,6 +45,7 @@ for (const phase of phases) {
   for (const role of ['ADMIN', 'API', 'WORKER', 'MIGRATOR'])
     env[`HDD_V2_${role}_PASSWORD`] = randomBytes(24).toString('hex');
   const compose = ['compose', '-p', project, '-f', 'compose.sql.yaml', '-f', 'compose.sync.yaml'];
+  if (phase.startsWith('shared-')) compose.push('-f', 'compose.canary-test.yaml');
   function docker(args, timeout = 60000) {
     const r = spawnSync('docker', args, {
       env,
@@ -69,6 +75,23 @@ for (const phase of phases) {
       ]),
     );
     console.log(docker([...compose, 'exec', '-T', 'db', 'df', '-Pk', '/var/lib/postgresql/data']));
+    if (phase.startsWith('shared-'))
+      console.log(
+        docker([
+          ...compose,
+          'run',
+          '--rm',
+          '-T',
+          '--user',
+          '0:0',
+          '--cap-add',
+          'CHOWN',
+          'runner',
+          'chown',
+          '1000:1000',
+          '/canary-test',
+        ]),
+      );
     const output = docker(
       [
         ...compose,
@@ -77,9 +100,11 @@ for (const phase of phases) {
         '-T',
         'runner',
         'node',
-        phase.startsWith('sparse-') || phase === 'busy'
-          ? 'tests/sync/acquisition.mjs'
-          : 'tests/sync/run.mjs',
+        phase.startsWith('shared-')
+          ? 'tests/sync/shared-history.mjs'
+          : phase.startsWith('sparse-') || phase === 'busy'
+            ? 'tests/sync/acquisition.mjs'
+            : 'tests/sync/run.mjs',
       ],
       900000,
     );

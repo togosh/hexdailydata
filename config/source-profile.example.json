@@ -1,0 +1,17 @@
+{
+  "commonHistory": "pulsechain",
+  "contract": null,
+  "codeHash": null,
+  "policy": null,
+  "ethereum": [
+    { "id": "common-a", "operator": null, "accountGroup": "physical-a", "endpointEnv": "HDD_V2_PROVIDER_PULSE_A" },
+    { "id": "common-b", "operator": null, "accountGroup": "physical-b", "endpointEnv": "HDD_V2_PROVIDER_PULSE_B" }
+  ],
+  "pulsechain": [
+    { "id": "native-a", "operator": null, "accountGroup": "physical-a", "endpointEnv": "HDD_V2_PROVIDER_PULSE_A" },
+    { "id": "native-b", "operator": null, "accountGroup": "physical-b", "endpointEnv": "HDD_V2_PROVIDER_PULSE_B" }
+  ],
+  "constructor": { "checkpoint": null, "transactionHash": null, "balances": null },
+  "fork": { "parent": null, "entry": null },
+  "target": null
+}

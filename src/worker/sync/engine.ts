@@ -16,6 +16,9 @@ import {
   type Batch,
 } from '../../services/projections/input.ts';
 import { reconcile } from '../../services/projections/initialize.ts';
+import { validateSourceHistory } from '../../services/projections/provenance.ts';
+import { sourceHistorySchema, assertEventRange } from '../../providers/binding.ts';
+import { digest } from '../../services/projections/input.ts';
 import { totalColumns } from '../../services/projections/reduce.ts';
 import limits from '../../../config/limits.json' with { type: 'json' };
 
@@ -66,12 +69,14 @@ export class SyncEngine {
     this.storagePath = storagePath;
     this.hooks = hooks;
     const [a, b] = sources;
+    sourceHistorySchema.parse({ binding: a.binding, providers: [a.identity, b.identity] });
     if (
-      a.rpc.chain !== writer.chainId ||
-      b.rpc.chain !== writer.chainId ||
+      a.originChainId !== writer.chainId ||
+      b.originChainId !== writer.chainId ||
+      digest(a.binding) !== digest(b.binding) ||
       a.rpc.contract !== b.rpc.contract ||
       a.rpc.id === b.rpc.id ||
-      (a.rpc.operator !== null && a.rpc.operator === b.rpc.operator) ||
+      (a.rpc.operator !== null && a.rpc.operator.toLowerCase() === b.rpc.operator?.toLowerCase()) ||
       JSON.stringify(a.policy) !== JSON.stringify(b.policy)
     )
       throw new Error('Incompatible source pair.');
@@ -91,6 +96,13 @@ export class SyncEngine {
     signal: AbortSignal,
   ) {
     hash.parse(transactionHash);
+    const binding = this.sources[0].binding;
+    if (
+      binding.common &&
+      (digest(checkpoint) !== digest(binding.common.constructor) ||
+        transactionHash !== binding.common.transactionHash)
+    )
+      throw new Error('Constructor differs from source binding.');
     const values = [];
     for (const source of this.sources) {
       await source.verify(checkpoint, signal);
@@ -164,10 +176,23 @@ export class SyncEngine {
         startHash: checkpoint.hash,
         startTime: checkpoint.timestamp,
         finalityPolicy: this.sources[0].policy.finality,
+        binding,
+        providers: [this.sources[0].identity, this.sources[1].identity],
       },
     );
   }
   async fork(parent: Header, entry: Header, signal: AbortSignal) {
+    const binding = this.sources[0].binding;
+    if (binding.common) {
+      if (
+        digest(parent) !== digest(binding.common.parent) ||
+        digest(entry) !== digest(binding.common.entry)
+      )
+        throw new Error('Fork differs from source binding.');
+      const inherited = await validateSourceHistory(this.reader, 1);
+      if (digest(inherited.binding.common) !== digest(binding.common))
+        throw new Error('Inherited source binding mismatch.');
+    }
     const {
       rows: [current],
     } = await this.reader.query('SELECT * FROM hdd.current_state WHERE chain_id=1');
@@ -209,6 +234,8 @@ export class SyncEngine {
         startHash: entry.hash,
         startTime: entry.timestamp,
         finalityPolicy: this.sources[0].policy.finality,
+        binding,
+        providers: [this.sources[0].identity, this.sources[1].identity],
       },
     );
   }
@@ -232,6 +259,7 @@ export class SyncEngine {
     }
   }
   async audit(signal: AbortSignal) {
+    await this.verifyStored(signal);
     const start = performance.now(),
       s = await this.cursor();
     if (!s) throw new Error('Chain not initialized.');
@@ -290,32 +318,35 @@ export class SyncEngine {
     }
     throw new Error('Reorg beyond retained/configured window; explicit repair required.');
   }
+  async verifyStored(signal: AbortSignal) {
+    if (this.verified) return;
+    const s = await this.cursor();
+    if (!s) throw new Error('Chain not initialized.');
+    await validateSourceHistory(this.reader, this.writer.chainId, this.sources[0].binding);
+    const {
+      rows: [history],
+    } = await this.reader.query(
+      'SELECT finality_policy FROM hdd.source_history WHERE chain_id=$1',
+      [this.writer.chainId],
+    );
+    if (
+      digest(history.finality_policy) !== digest(this.sources[0].policy.finality) ||
+      s.finality !== this.sources[0].policy.finality.mode
+    )
+      throw new Error('Stored chain/profile finality mismatch.');
+    for (const source of this.sources)
+      await source.verify(plainHeader(await source.header(s.block_number, signal, true)), signal);
+    this.verified = true;
+  }
   async once(signal: AbortSignal, stopAt?: Header) {
     try {
       this.progress.phase = 'acquiring';
+      if (stopAt) assertEventRange(this.sources[0].binding, stopAt.number);
       let s = await this.cursor();
       if (!s) throw new Error('Initialize explicitly or import a seed before sync.');
+      await this.verifyStored(signal);
       await this.recover(s, signal);
       s = await this.cursor();
-      if (!this.verified) {
-        const {
-          rows: [chain],
-        } = await this.reader.query('SELECT * FROM hdd.chains WHERE chain_id=$1', [
-          this.writer.chainId,
-        ]);
-        if (
-          hex(chain.code_hash) !== this.sources[0].policy.codeHash ||
-          hex(chain.contract_address) !== this.sources[0].rpc.contract ||
-          s.finality !== this.sources[0].policy.finality.mode
-        )
-          throw new Error('Stored chain/profile mismatch.');
-        for (const source of this.sources)
-          await source.verify(
-            plainHeader(await source.header(s.block_number, signal, true)),
-            signal,
-          );
-        this.verified = true;
-      }
       const targets = await Promise.all(this.sources.map((source) => source.target(signal)));
       const min = targets.reduce((a, b) => (BigInt(a.number) < BigInt(b.number) ? a : b));
       const target = stopAt ?? min;

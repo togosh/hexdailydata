@@ -345,3 +345,24 @@ backup measurements keep their original source/fixture identities and are not ne
 timing or space claims for the corrected monetary distribution. Full historical raw
 provenance, large valid seed/rebuild, other platforms and live upstream admission
 remain separately owned qualifications. Task10 never starts from a capacity result.
+
+## Offline shared-history transport follow-through
+
+After build, set `HDD_V2_SYNC_TEST_PHASE=shared` and
+`HDD_V2_SYNC_EVIDENCE=artifacts/task-10/shared-history/<new-run>` then run
+`node scripts/test-sync.mjs`. Three new internal PostgreSQL projects execute compiled
+worker direct control, shared369-to1 rebuild/recovery, and seed import/forward. They
+share only task-owned evidence files; every DB/volume has a new run-scoped name.
+The synthetic raw fixture's lifecycle and exact large amounts remain independent
+expected assertions. SQL comparison normalizes only the declared network binding,
+its digests, the common endpoint aliases and physical tuple-byte counters. Events,
+amounts, origins, day/payout state, schedules and raw before-images remain exact.
+
+`tests/unit/shared-history.test.mjs` exercises malformed/large-integer declarations,
+honest network IDs, origin decoding and pre-dispatch parent fences. The existing
+`test:canary` adds compiled shared replay with reused endpoints, logical range isolation,
+old approval rejection, no-head rejection and aggregate raw-call accounting. Its optional
+`HDD_V2_CANARY_EVIDENCE` must remain under artifacts. The small SQL test invokes the same
+compact binding/checkpoint validator used by backup restore, plus actual seed streaming
+and every retained seed rollback. It does not repeat encrypted large-backup timings,
+Task09 scale/browser/load measurements, or perform real RPC qualification.

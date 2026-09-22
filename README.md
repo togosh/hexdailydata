@@ -129,6 +129,15 @@ Later authorized use needs an explicit reviewed Compose override for profile mou
 secrets/environment and worker egress; never add a public fallback or reuse old secrets.
 Ordinary source operation then uses durable progress across days without per-day grants.
 
+Source profiles may explicitly set `commonHistory:"pulsechain"` to acquire origin1
+constructor-to-parent history over network369. Both source tuples may reference the
+same two physical PulseChain endpoints; native metrics/addresses remain369. The exact
+constructor/parent/entry declarations are mandatory and remain unconfigured live.
+See [the binding and remaining qualification](docs/sync.md#shared-history-transport-binding)
+and the intentionally incomplete `config/source-profile.example.json`. Portable seeds
+now require format5/schema5; older format4 seeds lack the required binding provenance.
+This offline implementation does not authorize live source work.
+
 ## PulseChain reported history — isolated local input
 
 `history` is a separate source-reported archive. It does not initialize native chains,

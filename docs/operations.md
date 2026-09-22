@@ -50,6 +50,14 @@ The schema is `src/operator/canary-plan.ts`; `config/canary.example.json` intent
 lacks live inputs. Check only parses local files: no SQL or transport construction.
 Prepare requires a new empty schema5 destination; it does not grant live permission.
 
+Plan version2 includes the normalized shared-history mode in its digest; version1
+plans/approvals cannot authorize changed transport meaning. Existing private plans and
+spent sessions must be retained, not rewritten or reset. Range `chain` keys continue
+to authorize the logical phase: origin1 ranges and its constructor receipt remain
+origin1 permissions even when the serving network is369. Replay requires explicit
+head-observation permission; no-head replay plans fail local check. Source acquisition
+also enforces its constructor..parent fence. See [sync.md](sync.md#shared-history-transport-binding).
+
 The immutable plan contains session UUID, reviewed source commit, release image SHA256,
 new host project/DB UUID, normalized storage/quota roots and `<storage>/canary.json`;
 the existing source profile (contract/code/constructor transaction, checkpoint and

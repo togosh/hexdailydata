@@ -3,7 +3,7 @@ import { performance } from 'node:perf_hooks';
 import { realClock, ProviderBudget, type Clock } from '../providers/budget.ts';
 import { cooldownFiles } from '../providers/cooldown.ts';
 import { httpTransport, RpcClient, type Transport } from '../providers/rpc.ts';
-import { Source } from '../providers/source.ts';
+import { profileSources } from '../worker/sync/profile.ts';
 import { CanonicalWriter, type FaultHooks } from '../services/projections/writer.ts';
 import { SyncEngine } from '../worker/sync/engine.ts';
 import { emptyTarget } from '../worker/bootstrap/seed.ts';
@@ -134,14 +134,7 @@ export async function runCanary(
           ),
       ) as [RpcClient, RpcClient];
     const pair = (chain: 1 | 369) =>
-      rpcPair(chain).map(
-        (rpc) =>
-          new Source(rpc, {
-            codeHash: plan.profile.codeHash,
-            finality: plan.profile.policy,
-            completeness: 'filtered-ranges',
-          }),
-      ) as [Source, Source];
+      profileSources(plan.profile, chain, (s) => transports.get(s.id)!, workerBudget);
     const reader = await db();
     progressTimer = setInterval(
       () => console.log(JSON.stringify({ event: 'canary_progress', ...session!.state })),
@@ -166,7 +159,12 @@ export async function runCanary(
         }
         if (JSON.stringify(observed[0]) !== JSON.stringify(observed[1]))
           throw new Error('Canary pinned state disagreement.');
-        result = { verifiedBoundary: phase.at, code: 'source-verified', stateAgreement: true };
+        result = {
+          verifiedBoundary: phase.at,
+          code: 'source-verified',
+          stateAgreement: true,
+          sources: pair(phase.chain).map((s) => ({ ...s.identity, binding: s.binding })),
+        };
       } else if (phase.kind === 'probe') {
         const acquired = [];
         for (const source of pair(phase.chain)) {

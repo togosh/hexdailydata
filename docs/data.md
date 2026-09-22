@@ -190,7 +190,7 @@ Only `pricePulseX` can supply the daily reference; UV/ETH/BTC/derived ROI fields
 excluded. Record coverage and price coverage are separate. See [history.md](history.md)
 for the mapping, source limitations and first-supported-period interpretation.
 
-Current logical seeds use format4/schema5 and include both archive tables, even when
+Current logical seeds use format5/schema5 and include both archive tables, even when
 empty, with separate normalization/selection validation. Older formats fail explicitly.
 A valid native checkpoint is still required for seed export; a raw HDS file or archive-only
 DB cannot become a native seed. A nonempty archive-only target rejects native seed import.

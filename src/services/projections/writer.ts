@@ -6,6 +6,14 @@ import { validateBatch, bytes, hex, digest, type Batch } from './input.ts';
 import { readCurrent, saveCurrent, closeDay, applyEvent, applyPayout } from './reduce.ts';
 import { initializeConstructor, initializeFork } from './initialize.ts';
 import { restoreCheckpoint, restoreCursor } from './recovery.ts';
+import { validateSourceHistory } from './provenance.ts';
+import {
+  sourceHistorySchema,
+  assertEventRange,
+  assertDeclaredHeader,
+  type SourceBinding,
+  type SourceIdentity,
+} from '../../providers/binding.ts';
 
 const ownedConnections = new WeakSet<pg.Client>();
 export interface FaultHooks {
@@ -85,7 +93,14 @@ export class CanonicalWriter {
       { id: string; operator: string | null; value: unknown },
       { id: string; operator: string | null; value: unknown },
     ],
-    history?: { startBlock: string; startHash: string; startTime: string; finalityPolicy: unknown },
+    history?: {
+      startBlock: string;
+      startHash: string;
+      startTime: string;
+      finalityPolicy: unknown;
+      binding: SourceBinding;
+      providers: [SourceIdentity, SourceIdentity];
+    },
   ) {
     const [a, b] = sources;
     if (
@@ -98,6 +113,17 @@ export class CanonicalWriter {
       throw new Error('Initialization source disagreement/identity.');
     if ((kind === 'constructor' && this.chainId !== 1) || (kind === 'fork' && this.chainId !== 369))
       throw new Error('Wrong initialization chain.');
+    const metadata = history
+      ? sourceHistorySchema.parse({ binding: history.binding, providers: history.providers })
+      : null;
+    if (
+      metadata &&
+      (metadata.binding.originChainId !== this.chainId ||
+        metadata.providers.some(
+          (p, i) => p.id !== sources[i]!.id || p.operator !== sources[i]!.operator,
+        ))
+    )
+      throw new Error('Initialization binding identity mismatch.');
     return this.transaction(async () => {
       const { rows } = await measuredQuery(
         this.client,
@@ -116,7 +142,7 @@ export class CanonicalWriter {
             history.startBlock,
             bytes(history.startHash),
             history.startTime,
-            JSON.stringify(sources.map((s) => ({ id: s.id, operator: s.operator }))),
+            JSON.stringify(metadata),
             JSON.stringify(history.finalityPolicy),
           ],
         );
@@ -128,9 +154,11 @@ export class CanonicalWriter {
           JSON.stringify({
             sources: sources.map((s) => ({ id: s.id, operator: s.operator })),
             stateDigest: digest(a.value),
+            ...(metadata ? { bindingDigest: digest(metadata.binding) } : {}),
           }),
         ],
       );
+      if (metadata) await validateSourceHistory(this.client, this.chainId, metadata.binding);
     });
   }
   async commit(input: unknown, hooks: FaultHooks = {}) {
@@ -151,6 +179,30 @@ export class CanonicalWriter {
           [this.chainId],
         );
         if (!sync) throw new Error('Chain not initialized.');
+        const {
+          rows: [history],
+        } = await measuredQuery(
+          this.client,
+          'SELECT sources FROM hdd.source_history WHERE chain_id=$1',
+          [this.chainId],
+        );
+        if (history) {
+          const { binding } = sourceHistorySchema.parse(history.sources);
+          if (
+            binding.originChainId !== this.chainId ||
+            binding.contract !== batch.contract ||
+            sync.acceptance.bindingDigest !== digest(binding)
+          )
+            throw new Error('Commit source binding mismatch.');
+          assertEventRange(binding, batch.range.fromBlock, batch.range.toBlock);
+          for (const source of batch.sources)
+            for (const h of [
+              source.previous,
+              ...source.headers,
+              ...(source.next ? [source.next] : []),
+            ])
+              assertDeclaredHeader(binding, h);
+        }
         const {
           rows: [receipt],
         } = await measuredQuery(
@@ -293,7 +345,12 @@ export class CanonicalWriter {
             bytes(last.hash),
             last.timestamp,
             revision,
-            JSON.stringify(acceptance),
+            JSON.stringify({
+              ...acceptance,
+              ...(history
+                ? { bindingDigest: digest(sourceHistorySchema.parse(history.sources).binding) }
+                : {}),
+            }),
             batch.expected.blockNumber,
             bytes(batch.expected.blockHash),
             batch.expected.revision,

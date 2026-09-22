@@ -78,6 +78,7 @@ test('seed format and source policy reject unsupported historical metadata expli
   const { manifestSchema } = await import('../../src/worker/bootstrap/manifest.ts');
   const { policySchema } = await import('../../src/providers/source.ts');
   assert.equal(manifestSchema.shape.formatVersion.safeParse(1).success, false);
-  assert.equal(manifestSchema.shape.formatVersion.parse(4), 4);
+  assert.equal(manifestSchema.shape.formatVersion.safeParse(4).success, false);
+  assert.equal(manifestSchema.shape.formatVersion.parse(5), 5);
   assert.equal(policySchema.shape.completeness.safeParse('receipts').success, false);
 });

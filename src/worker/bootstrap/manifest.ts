@@ -28,7 +28,7 @@ export const tables = {
 export type Table = keyof typeof tables;
 export const tableNames = Object.keys(tables) as Table[];
 export const manifestSchema = z.strictObject({
-  formatVersion: z.literal(4),
+  formatVersion: z.literal(5),
   schemaVersion: z.literal(5),
   calculationVersion: z.literal('hex-native-1'),
   createdAt: z.iso.datetime(),

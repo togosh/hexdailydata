@@ -13,7 +13,7 @@ export function plan(root, overrides = {}) {
     endpointEnv: `HDD_V2_PROVIDER_${chain}_${n}`,
   });
   return canaryPlanSchema.parse({
-    version: 1,
+    version: 2,
     session: randomUUID(),
     release,
     reviewedCommit: 'b'.repeat(40),
@@ -110,7 +110,11 @@ export function rawFixture(p, clock = new FakeClock(), rangeFailure = false) {
     [369, p.profile.pulsechain],
   ])
     for (const s of pair) {
-      const transport = f.source(chain, s.id, clock).rpc.transport;
+      const transport = f.source(
+        chain === 1 && p.profile.commonHistory === 'pulsechain' ? 369 : chain,
+        s.id,
+        clock,
+      ).rpc.transport;
       transports.set('https://' + s.id + '.invalid', async (body, signal) => {
         raw.http++;
         raw.logical += JSON.parse(body).length;

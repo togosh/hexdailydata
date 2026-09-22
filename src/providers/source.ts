@@ -17,6 +17,14 @@ import {
   dailyWords,
 } from './abi.ts';
 import { RpcClient, RangeError } from './rpc.ts';
+import {
+  bindingSchema,
+  assertEventRange,
+  assertObservation,
+  assertDeclaredHeader,
+  type SourceBinding,
+  type SourceIdentity,
+} from './binding.ts';
 
 export const policySchema = z.strictObject({
   codeHash: hash,
@@ -44,17 +52,48 @@ export class Source {
     observationsPeak: 0,
   };
   readonly rpc: RpcClient;
-  constructor(rpc: RpcClient, policy: unknown) {
+  readonly binding: SourceBinding;
+  readonly identity: SourceIdentity;
+  get originChainId() {
+    return this.binding.originChainId;
+  }
+  constructor(rpc: RpcClient, policy: unknown, binding?: unknown, identity?: SourceIdentity) {
     this.rpc = rpc;
     this.policy = policySchema.parse(policy);
+    this.binding = bindingSchema.parse(
+      binding ?? {
+        version: 1,
+        networkChainId: rpc.chain,
+        originChainId: rpc.chain,
+        contract: rpc.contract,
+        codeHash: this.policy.codeHash,
+        common: null,
+      },
+    );
+    if (
+      this.binding.networkChainId !== rpc.chain ||
+      this.binding.contract !== rpc.contract ||
+      this.binding.codeHash !== this.policy.codeHash
+    )
+      throw new Error('Source transport/code binding mismatch.');
+    this.identity = identity ?? {
+      id: rpc.id,
+      operator: rpc.operator,
+      accountGroup: null,
+      endpointAlias: null,
+    };
+    if (this.identity.id !== rpc.id || this.identity.operator !== rpc.operator)
+      throw new Error('Source identity mismatch.');
   }
   invalidateAfter(number: string) {
     for (const n of this.headers.keys()) if (BigInt(n) > BigInt(number)) this.headers.delete(n);
   }
   async header(number: string, signal: AbortSignal, refresh = false) {
+    assertObservation(this.binding, number);
     if (!refresh && this.headers.has(number)) return this.headers.get(number)!;
     const h = decodeHeader(await this.rpc.call('eth_getBlockByNumber', [q(number), false], signal));
     if (h.number !== number) throw new Error('Header number mismatch.');
+    assertDeclaredHeader(this.binding, plainHeader(h));
     this.headers.set(number, plainHeader(h));
     while (this.headers.size > 2049) this.headers.delete(this.headers.keys().next().value!);
     this.counters.headersPeak = Math.max(this.counters.headersPeak, this.headers.size);
@@ -62,6 +101,8 @@ export class Source {
   }
   /** Select actual observations without allocating an entry per skipped block. */
   private async plan(expected: Batch['expected'], to: string, signal: AbortSignal) {
+    assertObservation(this.binding, expected.blockNumber);
+    assertEventRange(this.binding, (BigInt(expected.blockNumber) + 1n).toString(), to);
     const observations = new Map<string, Header>();
     const observe = async (number: string) => {
       if (observations.has(number)) return observations.get(number)!;
@@ -105,6 +146,7 @@ export class Source {
     return { previous, first, last, next, observations };
   }
   async verify(at: Header, signal: AbortSignal) {
+    assertDeclaredHeader(this.binding, at);
     const [chain, code] = await this.rpc.calls(
       [
         { method: 'eth_chainId', params: [] },
@@ -136,12 +178,16 @@ export class Source {
         signal,
       ),
     );
-    if (finality.mode === 'finalized') return plainHeader(tip);
-    const n = BigInt(tip.number) - BigInt(finality.confirmations);
+    const n =
+      BigInt(tip.number) - (finality.mode === 'confirmed' ? BigInt(finality.confirmations) : 0n);
     if (n < 0n) throw new Error('Insufficient confirmation depth.');
-    return plainHeader(await this.header(n.toString(), signal, true));
+    // Head discovery remains honest, charged transport work. It cannot expand origin1.
+    const parent = this.originChainId === 1 ? this.binding.common?.parent : undefined;
+    const target = parent && n > BigInt(parent.number) ? parent.number : n.toString();
+    return plainHeader(await this.header(target, signal, true));
   }
   async callsAt(calls: { data: string }[], h: Header, signal: AbortSignal) {
+    assertDeclaredHeader(this.binding, h);
     const results: unknown[] = [];
     for (let i = 0; i < calls.length; i += 30)
       results.push(
@@ -179,8 +225,11 @@ export class Source {
     ).map((v, i) => ({ address: addresses[i]!, hearts: words(v, 1)[0]!.toString() }));
   }
   async events(headers: Header[], signal: AbortSignal): Promise<Event[]> {
+    if (!headers.length) throw new Error('Event headers required.');
     const first = headers[0]!,
       last = headers.at(-1)!;
+    assertEventRange(this.binding, first.number, last.number);
+    for (const h of headers) assertDeclaredHeader(this.binding, h);
     const response = await this.rpc.call(
       'eth_getLogs',
       [
@@ -212,6 +261,7 @@ export class Source {
       for (let i = 0; i < group.length; i++) {
         const h = decodeHeader(values[i]);
         if (h.number !== group[i]) throw new Error('Event header number mismatch.');
+        assertDeclaredHeader(this.binding, plainHeader(h));
         const prior = headers.find((v) => v.number === h.number);
         if (prior && JSON.stringify(prior) !== JSON.stringify(plainHeader(h)))
           throw new RangeError('Event boundary header disagreement.');
@@ -224,7 +274,7 @@ export class Source {
         if (!h) continue;
         if (h.transactions[Number(BigInt(input.transactionIndex))] !== input.transactionHash)
           throw new Error('Event transaction/header identity mismatch.');
-        logs.push(decodeLog(input, this.rpc.chain, this.rpc.contract, h));
+        logs.push(decodeLog(input, this.originChainId, this.rpc.contract, h));
       }
       this.counters.decodeMs += performance.now() - start;
       decoded.clear();

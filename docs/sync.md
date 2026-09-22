@@ -1,6 +1,8 @@
 # Task03 acquisition and recovery contract
 
-Current follow-through: logical seed format4/schema5 adds optional source-reported
+Current format: logical seed format5/schema5 requires versioned transport/origin
+bindings and checkpoint binding digests; formats1–4 are rejected. The format4 history
+below describes the prior addition of optional source-reported
 PulseChain history tables and separate archive validation. A valid native checkpoint
 is still mandatory; raw daily JSON and archive-only state cannot seed balances/cursors.
 The prior format evolution below is retained as implementation history. Schema5
@@ -114,6 +116,56 @@ export_bundles empty. Disposable live metrics and file publication status are ex
 The Task05 data mapping describes rank/market invalidation; rewind never rewrites
 independently sourced venue history. Export and seed snapshots share the existing
 prune lock. No provider method, canary allowance or deployment permission changed.
+
+## Shared-history transport binding
+
+The source profile's `commonHistory` is `ethereum` (the direct default) or explicit
+`pulsechain`. The internal `ethereum` tuple names the origin1 source pair, not necessarily
+an Ethereum network endpoint. In PulseChain mode both RPC clients honestly verify369,
+while the same decoder/writer records inherited events as origin1. Native events,
+metrics and addresses still use369. There is no independent post-fork eHEX stream.
+
+Both modes normalize the existing constructor checkpoint/transaction, contract/code
+and exact parent/entry declarations into one version1 binding. Header integers are
+decimal strings; entry must be parent+1, linked by hash and increasing timestamp.
+Source events, day search, adaptive ranges and writer commits fence origin1 to
+constructor..parent inclusive. Native acquisition starts at entry; observing the
+inherited parent for fork verification/recovery does not consume it as a native event.
+The ordinary finality observation is still required and charged; its target is capped
+at parent for origin1. A declared fixed target does not prove finality.
+
+`source_history.sources` now contains `{binding,providers}`. Provider entries retain
+ID, operator (null means unknown correlation), accountGroup and endpointAlias (the
+environment variable name, never its secret URL). Same physical endpoints may be reused
+sequentially in both phases; two phases do not create four independent upstreams or
+extra quota. Worker and canary use the same small source factory and existing budgets.
+
+Initialization and each acceptance checkpoint retain a binding digest. Resume/repair
+checks the current compact provenance before recovery; seed format5 and restore audit
+both the current binding and retained checkpoint digests. Constructor/start, contract,
+fork, current and retained boundary identities must agree. Seed import still audits
+every retained rollback, raw/decoded events, exact SQL totals and full lifecycle state.
+No migrations or per-event profile copies were added. Missing/unsupported bindings are
+rejected; old portable formats are not upgraded by guessing provenance. Low-level SQL
+projection fixtures without acquired history are not portable native seeds.
+
+## Remaining native qualification
+
+The shared-history adapter capability is implemented offline. Exact live constructor,
+common-parent and first-native header/code declarations remain missing; public null
+identities remain NOT_CONFIGURED. The supplied latest 38-call sample returned168 logs
+and matching selected older logs/hash-pinned state. It did not establish complete
+prefix equivalence, constructor/fork identity, full event-header witnesses or a starting
+state; its18 saved decoded observations are regression inputs, not a native seed.
+Block10000255 is only a sample endpoint, never an inferred constructor or fork.
+
+The smallest subsequent real step needs owner-supplied exact declarations and separate
+approval of a bounded two-source369 identity/constructor-receipt/parent/entry check,
+including any head/finality observations needed by replay. No new plan or allowance is
+created here. Spent sessions and the unused private canary configuration remain intact.
+Task09 remains accepted;42HTTP/900logical is still NOT_ADMITTED live. Full Task10,
+real seed/history equality, actual rebuild duration (14-day ceiling), cost and production
+qualification remain pending. Stop for planner review; no Task11 or live work follows.
 
 ## Current qualification work ledger
 

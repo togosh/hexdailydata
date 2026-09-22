@@ -42,7 +42,7 @@ const phase = z.discriminatedUnion('kind', [
 ]);
 export const canaryPlanSchema = z
   .strictObject({
-    version: z.literal(1),
+    version: z.literal(2),
     session: z.uuid(),
     release: z.string().regex(/^sha256:[0-9a-f]{64}$/),
     reviewedCommit: z.string().regex(/^[0-9a-f]{40}$/),
@@ -153,6 +153,8 @@ export const canaryPlanSchema = z
       )
         bad('Probe range invalid.');
       if (ph.kind === 'replay') {
+        if (!p.allowHeadObservation)
+          bad('Replay finality requires separately permitted head observation.');
         if (
           !p.ranges.some(
             (r) =>

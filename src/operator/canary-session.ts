@@ -208,6 +208,7 @@ export class CanarySession {
   }
   /** All chains/aliases share this serialized gate, including both role budgets. */
   transport(chain: 1 | 369, transport: Transport): Transport {
+    // chain is the authorized logical phase, not eth_chainId of the serving network.
     return async (body, signal) => {
       const previous = this.tail;
       let unlock!: () => void;

@@ -14,9 +14,8 @@ import { CanonicalWriter } from '../services/projections/writer.ts';
 import { ProviderBudget } from '../providers/budget.ts';
 import { cooldownFiles } from '../providers/cooldown.ts';
 import { httpTransport, RpcClient } from '../providers/rpc.ts';
-import { Source } from '../providers/source.ts';
 import { SyncEngine } from './sync/engine.ts';
-import { profileSchema } from './sync/profile.ts';
+import { profileSchema, profileSources } from './sync/profile.ts';
 import { exportSeed, importSeed } from './bootstrap/seed.ts';
 import { PriceReader, priceTargets } from '../services/live/price.ts';
 import { MetricsService } from './metrics/service.ts';
@@ -289,25 +288,12 @@ export async function runWorker(
         async function engine(chain: 1 | 369) {
           client = await workerConnection();
           writer = await CanonicalWriter.acquire(client, chain);
-          const inputs = chain === 1 ? profile.ethereum : profile.pulsechain;
-          const sources = inputs.map(
-            (s) =>
-              new Source(
-                new RpcClient(
-                  s.id,
-                  s.operator,
-                  chain,
-                  profile.contract,
-                  transports.get(s.endpointEnv)!,
-                  budget,
-                ),
-                {
-                  codeHash: profile.codeHash,
-                  finality: profile.policy,
-                  completeness: 'filtered-ranges',
-                },
-              ),
-          ) as [Source, Source];
+          const sources = profileSources(
+            profile,
+            chain,
+            (s) => transports.get(s.endpointEnv)!,
+            budget,
+          );
           activeSync = new SyncEngine(
             writer,
             reader!,
@@ -338,6 +324,7 @@ export async function runWorker(
             } else sync = await engine(369);
 
             if (command === 'repair-range') {
+              await sync.verifyStored(signal);
               const block = args[1],
                 s = await sync.cursor();
               if (!block || !s) throw new Error('Explicit retained repair checkpoint required.');

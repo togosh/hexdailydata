@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { SyncEngine } from '../../src/worker/sync/engine.ts';
 import { CanonicalWriter } from '../../src/services/projections/writer.ts';
+import { Source } from '../../src/providers/source.ts';
 import { hash } from './fixture.mjs';
 
 export async function recoveryCases({
@@ -101,9 +102,23 @@ export async function recoveryCases({
     reorg(356, 20000);
     const frozen = await snapshot();
     sync = new SyncEngine(writer, reader, pair(369), '/evidence');
-    await assert.rejects(() => sync.once(signal, chain.plain(362)), /Finalized/);
+    await assert.rejects(() => sync.once(signal, chain.plain(362)), /finality mismatch/);
     assert.deepEqual(await snapshot(), frozen);
+    // A coherent finalized profile must still reject a changed accepted checkpoint.
+    await worker.query(
+      `UPDATE hdd.source_history SET finality_policy='{"mode":"finalized"}' WHERE chain_id=369`,
+    );
+    const finalizedSources = pair(369).map(
+      (s) => new Source(s.rpc, { ...s.policy, finality: { mode: 'finalized' } }, s.binding),
+    );
+    sync = new SyncEngine(writer, reader, finalizedSources, '/evidence');
+    const finalized = await snapshot();
+    await assert.rejects(() => sync.once(signal, chain.plain(362)), /Finalized/);
+    assert.deepEqual(await snapshot(), finalized);
     await worker.query("UPDATE hdd.sync_state SET finality='confirmed' WHERE chain_id=369");
+    await worker.query('UPDATE hdd.source_history SET finality_policy=$1 WHERE chain_id=369', [
+      JSON.stringify(pair(369)[0].policy.finality),
+    ]);
     reorg(181, 30000);
     const beyond = await snapshot();
     sync = new SyncEngine(writer, reader, pair(369), '/evidence');

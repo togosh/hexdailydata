@@ -9,6 +9,7 @@ import { from as copyFrom } from 'pg-copy-streams';
 import { z } from 'zod';
 import { connect, databaseConfig } from '../db/connect.ts';
 import { reconcile } from '../services/projections/initialize.ts';
+import { validateSourceCheckpoints } from '../services/projections/provenance.ts';
 import { validateDailyState } from '../worker/daily/validate.ts';
 import { validateHistory } from '../worker/history/store.ts';
 import { tableNames } from '../worker/bootstrap/manifest.ts';
@@ -512,6 +513,7 @@ export async function restore(
     if (JSON.stringify(await cutoff(c)) !== JSON.stringify(manifest.cutoffs))
       throw new Error('Restored cutoff differs from snapshot.');
     phase = 'audit';
+    await validateSourceCheckpoints(c);
     for (const r of (await c.query('SELECT chain_id FROM hdd.chains ORDER BY chain_id')).rows)
       await reconcile(c, r.chain_id);
     await validateDailyState(c, signal);

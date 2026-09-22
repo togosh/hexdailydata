@@ -15,6 +15,10 @@ import { policySchema } from '../../providers/source.ts';
 import { diskReserve } from '../sync/engine.ts';
 import { validateDailyState } from '../daily/validate.ts';
 import { validateHistory } from '../history/store.ts';
+import {
+  validateSourceHistory,
+  validateSourceCheckpoints,
+} from '../../services/projections/provenance.ts';
 
 export async function fileHash(path: string, signal: AbortSignal) {
   const digest = createHash('sha256');
@@ -91,7 +95,7 @@ async function descriptor(client: pg.Client): Promise<Omit<Manifest, 'files' | '
       'No claim of complete live market history; per-source intervals and gaps are in market_daily.',
   });
   return {
-    formatVersion: 4,
+    formatVersion: 5,
     schemaVersion: 5,
     calculationVersion: 'hex-native-1',
     chainId: last.chain_id,
@@ -379,6 +383,7 @@ export async function validateState(
   recoveryChain: number | null = null,
 ) {
   if (recoveryChain === null) {
+    await validateSourceCheckpoints(client);
     await validateDailyState(client, signal);
     await validateHistory(client, signal);
   }
@@ -393,6 +398,7 @@ export async function validateState(
     throw new Error('Invalid common/native lineage.');
   for (const chain of chains) {
     signal.throwIfAborted();
+    await validateSourceHistory(client, chain.chain_id);
     await reconcile(client, chain.chain_id);
     const {
       rows: [check],
@@ -456,15 +462,7 @@ export async function validateState(
         throw new Error('Seed range/checkpoint coverage mismatch.');
     }
     const policy = policySchema.shape.finality.parse(check.finality_policy);
-    if (
-      policy.mode !== check.finality ||
-      !Array.isArray(check.sources) ||
-      check.sources.length !== 2 ||
-      check.sources[0].id === check.sources[1].id ||
-      (check.sources[0].operator !== null &&
-        check.sources[0].operator === check.sources[1].operator)
-    )
-      throw new Error('Seed source/finality inconsistency.');
+    if (policy.mode !== check.finality) throw new Error('Seed source/finality inconsistency.');
     const syncColumns = await columns(client, 'sync_state');
     const {
       rows: [tail],

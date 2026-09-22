@@ -1,11 +1,16 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, relative, isAbsolute } from 'node:path';
 
 const id = randomUUID().slice(0, 8),
   project = `hexdailydata-v2-canary-${id}`;
-const evidence = resolve(`artifacts/task-03/early-canary/run-${id}`);
+const evidence = resolve(
+  process.env.HDD_V2_CANARY_EVIDENCE ?? `artifacts/task-03/early-canary/run-${id}`,
+);
+const relativeEvidence = relative(resolve('artifacts'), evidence);
+if (relativeEvidence.startsWith('..') || isAbsolute(relativeEvidence))
+  throw Error('Canary test evidence must remain in artifacts.');
 mkdirSync(evidence, { recursive: true });
 const env = {
   ...process.env,

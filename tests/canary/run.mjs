@@ -8,13 +8,19 @@ import { connect, databaseConfig } from '../../dist/db/connect.js';
 import { migrateCurrent } from '../../dist/db/migrate.js';
 import { runCanary } from '../../dist/operator/canary.js';
 import { CanarySession } from '../../dist/operator/canary-session.js';
-import { checkCanary, canaryAuthority, canaryPlanSchema } from '../../dist/operator/canary-plan.js';
+import {
+  checkCanary,
+  canaryAuthority,
+  canaryPlanSchema,
+  planDigest,
+} from '../../dist/operator/canary-plan.js';
 import { maintenanceLease } from '../../dist/operator/lease.js';
 import { RpcClient } from '../../dist/providers/rpc.js';
 import { ProviderBudget } from '../../dist/providers/budget.js';
 import { Source } from '../../dist/providers/source.js';
 import { CanonicalWriter } from '../../dist/services/projections/writer.js';
 import { SyncEngine } from '../../dist/worker/sync/engine.js';
+import { profileSources } from '../../dist/worker/sync/profile.js';
 import { MetricsService } from '../../dist/worker/metrics/service.js';
 import { SqlMetricStore } from '../../dist/worker/metrics/store.js';
 import { AddressService } from '../../dist/services/live/address.js';
@@ -23,6 +29,7 @@ import { PriceReader, priceTargets } from '../../dist/services/live/price.js';
 import { tables } from '../../dist/worker/bootstrap/manifest.js';
 import { plan, inputs, environment, rawFixture } from './fixture.mjs';
 import { FakeClock, memoryCooldown } from '../sync/fixture.mjs';
+import { sharedProfile } from '../sync/shared-profile.mjs';
 import * as live from '../live/fixture.mjs';
 
 globalThis.fetch = () => {
@@ -137,23 +144,11 @@ async function control(p, targets = null) {
       const c = await connect(databaseConfig('worker'));
       const w = await CanonicalWriter.acquire(c, chain);
       try {
-        const pair = (chain === 1 ? p.profile.ethereum : p.profile.pulsechain).map(
-          (s) =>
-            new Source(
-              new RpcClient(
-                s.id,
-                s.operator,
-                chain,
-                p.profile.contract,
-                f.transport('https://' + s.id + '.invalid'),
-                budget,
-              ),
-              {
-                codeHash: p.profile.codeHash,
-                finality: p.profile.policy,
-                completeness: 'filtered-ranges',
-              },
-            ),
+        const pair = profileSources(
+          p.profile,
+          chain,
+          (s) => f.transport('https://' + s.id + '.invalid'),
+          budget,
         );
         const engine = new SyncEngine(w, reader, pair, p.storagePath);
         if (chain === 1)
@@ -189,6 +184,111 @@ try {
   } finally {
     await migration.end();
   }
+  await test('shared transport compiled canary replay charges reused aliases and preserves logical range authorization', async () => {
+    const p = await fresh({
+      profile: sharedProfile(),
+      ranges: [
+        { chain: 1, from: '100', to: '180' },
+        { chain: 369, from: '180', to: '220' },
+      ],
+    });
+    const f = rawFixture(p, new FakeClock(), true);
+    f.clock.time = Date.now();
+    const options = { env: environment(p), clock: f.clock, transport: f.transport };
+    await runCanary(['prepare', p.storagePath + '/plan.json'], signal, options);
+    const result = await runCanary(
+      ['run', p.storagePath + '/plan.json', p.storagePath + '/approval.json'],
+      signal,
+      options,
+    );
+    assert.equal(result.status, 'complete', JSON.stringify(result));
+    assert.ok(result.results[0].result[0].splits > 0);
+    assert.equal(result.http, f.raw.http);
+    assert.equal(result.logical, f.raw.logical);
+    assert.equal(result.observedBytes, f.raw.bytes);
+    const c = await connect(databaseConfig('worker'));
+    try {
+      const rows = (
+        await c.query('SELECT chain_id,sources FROM hdd.source_history ORDER BY chain_id')
+      ).rows;
+      assert.deepEqual(
+        rows.map((r) => [r.sources.binding.networkChainId, r.sources.binding.originChainId]),
+        [
+          [369, 1],
+          [369, 369],
+        ],
+      );
+      assert.equal(
+        rows[0].sources.providers[0].endpointAlias,
+        rows[1].sources.providers[0].endpointAlias,
+      );
+      assert.equal(
+        (
+          await c.query(
+            'SELECT count(*) FROM hdd.events WHERE origin_chain_id=369 AND block_number=181',
+          )
+        ).rows[0].count,
+        '1',
+      );
+    } finally {
+      await c.end();
+    }
+    results.push({ name: 'shared canary raw counters', status: 'MEASURED_OFFLINE', raw: f.raw });
+    await reset();
+    const old = { ...p, version: 1 };
+    assert.equal(checkCanary(old).state, 'NOT_CONFIGURED');
+    const changed = canaryPlanSchema.parse({
+      ...p,
+      profile: { ...p.profile, commonHistory: 'ethereum' },
+    });
+    assert.notEqual(planDigest(changed), planDigest(p));
+    assert.throws(
+      () =>
+        canaryAuthority(
+          changed,
+          {
+            session: p.session,
+            planDigest: planDigest(p),
+            release: p.release,
+            instance: p.instance,
+            decision: 'owner-approved-bounded-canary',
+          },
+          environment(changed),
+        ),
+      /approval/,
+    );
+    assert.equal(checkCanary({ ...p, allowHeadObservation: false }).state, 'NOT_CONFIGURED');
+    const bounded = await fresh({
+      profile: sharedProfile(),
+      ranges: p.ranges,
+      allowHeadObservation: false,
+      phases: [
+        {
+          kind: 'capabilities',
+          purpose: 'Offline no-head boundary fixture',
+          chain: 1,
+          at: p.profile.fork.parent,
+        },
+      ],
+    });
+    const s = await CanarySession.prepare(bounded, f.clock);
+    await s.start(false);
+    let dispatched = 0;
+    const guard = s.transport(1, async () => {
+      dispatched++;
+      throw Error('forbidden');
+    });
+    for (const call of [
+      { method: 'eth_getBlockByNumber', params: ['latest', false] },
+      { method: 'eth_getBlockByNumber', params: ['0xb5', false] },
+      { method: 'eth_getCode', params: [p.profile.contract, '0xb5'] },
+      { method: 'eth_getLogs', params: [{ fromBlock: '0xb4', toBlock: '0xb5' }] },
+    ])
+      await assert.rejects(guard(JSON.stringify([call]), signal), /outside/);
+    assert.equal(dispatched, 0);
+    assert.equal(s.state.http, 0);
+    await s.close();
+  });
   await test('compiled help/check and authority/configuration negatives construct zero transports', async () => {
     const p = await fresh();
     let constructed = 0;
