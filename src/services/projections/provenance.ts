@@ -5,7 +5,22 @@ import {
   assertEventRange,
   type SourceBinding,
 } from '../../providers/binding.ts';
-import { digest, hex } from './input.ts';
+import { digest, hex, hash, integer } from './input.ts';
+
+function assertSourceCursor(
+  binding: SourceBinding,
+  number: string,
+  blockHash: string,
+  time: string,
+) {
+  assertObservation(binding, number);
+  hash.parse(blockHash);
+  integer.parse(time);
+  if (binding.common)
+    for (const h of [binding.common.constructor, binding.common.parent, binding.common.entry])
+      if (number === h.number && (blockHash !== h.hash || time !== h.timestamp))
+        throw new Error('Source binding checkpoint mismatch.');
+}
 
 /** Compact boundary checks shared by resume, portable state and checkpoint restore. */
 export async function validateSourceHistory(
@@ -34,7 +49,7 @@ export async function validateSourceHistory(
     (expected && digest(expected) !== digest(binding))
   )
     throw new Error('Stored source binding mismatch.');
-  assertObservation(binding, row.block_number);
+  assertSourceCursor(binding, row.block_number, hex(row.block_hash), row.block_time);
   if (row.acceptance.range)
     assertEventRange(binding, row.acceptance.range.fromBlock, row.acceptance.range.toBlock);
   const common = binding.common;
@@ -47,11 +62,6 @@ export async function validateSourceHistory(
     )
       throw new Error('Source binding start mismatch.');
     for (const h of [common.constructor, common.parent, common.entry]) {
-      if (
-        row.block_number === h.number &&
-        (hex(row.block_hash) !== h.hash || row.block_time !== h.timestamp)
-      )
-        throw new Error('Source binding checkpoint mismatch.');
       const {
         rows: [retained],
       } = await client.query('SELECT * FROM hdd.blocks_recent WHERE chain_id=$1 AND number=$2', [
@@ -95,7 +105,8 @@ export async function validateSourceCheckpoints(client: pg.Client) {
     const { binding } = await validateSourceHistory(client, chain);
     const { rows } = await client.query(
       `SELECT previous_sync->>'chain_id' AS chain_id,
-      previous_sync->>'block_number' AS block_number,previous_sync->'acceptance' AS acceptance
+      previous_sync->>'block_number' AS block_number,previous_sync->>'block_hash' AS block_hash,
+      previous_sync->>'block_time' AS block_time,previous_sync->'acceptance' AS acceptance
       FROM hdd.checkpoints_recent WHERE chain_id=$1 ORDER BY block_number LIMIT 4097`,
       [chain],
     );
@@ -106,7 +117,15 @@ export async function validateSourceCheckpoints(client: pg.Client) {
         previous.acceptance?.bindingDigest !== digest(binding)
       )
         throw new Error('Retained source binding mismatch.');
-      assertObservation(binding, String(previous.block_number));
+      // JSONB BYTEA uses PostgreSQL \\x; validate before converting to the RPC form.
+      if (typeof previous.block_hash !== 'string' || !/^\\x[0-9a-f]{64}$/.test(previous.block_hash))
+        throw new Error('Malformed retained source checkpoint identity.');
+      assertSourceCursor(
+        binding,
+        previous.block_number,
+        '0x' + previous.block_hash.slice(2),
+        previous.block_time,
+      );
       if (previous.acceptance.range)
         assertEventRange(
           binding,

@@ -184,7 +184,11 @@ export class Source {
     // Head discovery remains honest, charged transport work. It cannot expand origin1.
     const parent = this.originChainId === 1 ? this.binding.common?.parent : undefined;
     const target = parent && n > BigInt(parent.number) ? parent.number : n.toString();
-    return plainHeader(await this.header(target, signal, true));
+    const observed = plainHeader(await this.header(target, signal, true));
+    // A numbered refresh cannot replace the identity actually reported as finalized.
+    if (target === tip.number && JSON.stringify(observed) !== JSON.stringify(plainHeader(tip)))
+      throw new Error('Finality target identity disagreement.');
+    return observed;
   }
   async callsAt(calls: { data: string }[], h: Header, signal: AbortSignal) {
     assertDeclaredHeader(this.binding, h);

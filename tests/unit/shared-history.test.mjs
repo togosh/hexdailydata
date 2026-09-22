@@ -135,3 +135,43 @@ test('out-of-range returned log fails before decoding; known duplicate operators
   );
   assert.equal(valid.pair[0].rpc.budget, valid.pair[1].rpc.budget);
 });
+test('finalized target retains exact observed identity for native and common sources', async () => {
+  for (const origin of [1, 369]) {
+    for (const change of [null, 'hash', 'timestamp', 'parentHash']) {
+      const f = fixture({ last: 220 }),
+        clock = new FakeClock(),
+        budget = new ProviderBudget('worker', memoryCooldown(), clock);
+      f.setHead(origin === 1 ? 180 : 188);
+      const profile = profileSchema.parse({ ...sharedProfile(), policy: { mode: 'finalized' } });
+      const [source] = profileSources(
+        profile,
+        origin,
+        (s) =>
+          f.source(
+            369,
+            s.id,
+            clock,
+            (rows, calls) =>
+              rows.map((r, i) => {
+                if (!change || calls[i].params[0] !== 'finalized') return r;
+                return {
+                  ...r,
+                  result: { ...r.result, [change]: change === 'timestamp' ? '0x1' : hash(999) },
+                };
+              }),
+            budget,
+          ).rpc.transport,
+        budget,
+      );
+      if (change)
+        await assert.rejects(source.target(signal), /Finality target identity disagreement/);
+      else {
+        assert.deepEqual(await source.target(signal), f.plain(origin === 1 ? 180 : 188));
+        if (origin === 1) {
+          f.setHead(220);
+          assert.deepEqual(await source.target(signal), f.plain(180));
+        }
+      }
+    }
+  }
+});

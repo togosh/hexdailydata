@@ -265,6 +265,33 @@ async function corruptSeed(edit) {
   );
   return path;
 }
+async function checkRetainedIdentity(chain, number) {
+  await validateSourceCheckpoints(reader);
+  for (const [field, value, error] of [
+    ['block_hash', '\\x' + hash(999).slice(2), /Source binding checkpoint mismatch/],
+    [
+      'block_time',
+      (BigInt(f.plain(number).timestamp) + 1n).toString(),
+      /Source binding checkpoint mismatch/,
+    ],
+    ['block_hash', 'invalid', /Malformed retained source checkpoint/],
+    ['block_time', null, /Invalid input/],
+  ]) {
+    await reader.query('BEGIN');
+    try {
+      const changed = await reader.query(
+        `UPDATE hdd.checkpoints_recent SET previous_sync=jsonb_set(previous_sync,ARRAY[$3::text],$4::jsonb)
+        WHERE chain_id=$1 AND previous_sync->>'block_number'=$2`,
+        [chain, String(number), field, JSON.stringify(value)],
+      );
+      assert.equal(changed.rowCount, 1, `retained ${chain}:${number}`);
+      await assert.rejects(validateSourceCheckpoints(reader), error);
+    } finally {
+      await reader.query('ROLLBACK');
+    }
+    await validateSourceCheckpoints(reader);
+  }
+}
 try {
   await migrateCurrent(await db('migrator'));
   reader = await db();
@@ -312,7 +339,29 @@ try {
       );
     });
   } else {
-    await test('compiled worker constructor/common/fork/native rebuild with injected honest networks', async () => {
+    await test('compiled constructor and first commit retain a valid cursor; restore rejects its hash/time contradictions', async () => {
+      const commonWriter = await CanonicalWriter.acquire(await db(), 1);
+      try {
+        const sources = profileSources(
+          profile,
+          1,
+          (s) => transport(process.env[s.endpointEnv]),
+          budget,
+        );
+        const common = new SyncEngine(commonWriter, reader, sources, root);
+        await common.initializeConstructor(
+          profile.constructor.checkpoint,
+          profile.constructor.transactionHash,
+          profile.constructor.balances,
+          signal,
+        );
+        await common.once(signal, f.plain(101));
+        await checkRetainedIdentity(1, 100);
+      } finally {
+        await commonWriter.close();
+      }
+    });
+    await test('compiled worker resumes constructor through common/fork/native rebuild with injected honest networks', async () => {
       assert.equal(await runWorker(['rebuild'], { transport, clock }), undefined);
       await expectedState();
       if (mode === 'pulsechain') {
@@ -513,6 +562,63 @@ try {
         await reader.query('ROLLBACK');
       }
       await validateSourceCheckpoints(reader);
+    });
+    await test('restore checks retained inherited parent and entry hashes/times plus malformed identities', async () => {
+      await checkRetainedIdentity(369, 180);
+      await checkRetainedIdentity(369, 181);
+    });
+    await writer.close();
+    writer = undefined;
+    await test('compiled worker and explicit stop reject contradictory finalized identity without mutation; coherent finalized forward passes', async () => {
+      // This disposable DB now tests the finalized policy, as in recoveryCases.
+      const finalized = profileSchema.parse({ ...profile, policy: { mode: 'finalized' } });
+      await reader.query("UPDATE hdd.sync_state SET finality='finalized' WHERE chain_id=369");
+      await reader.query(
+        `UPDATE hdd.source_history SET finality_policy='{"mode":"finalized"}' WHERE chain_id=369`,
+      );
+      await writeFile(process.env.HDD_V2_SOURCE_PROFILE, JSON.stringify(finalized));
+      const before = await snapshot();
+      const disagree = (rows, calls) =>
+        rows.map((r, i) =>
+          calls[i].method === 'eth_getBlockByNumber' && calls[i].params[0] === 'finalized'
+            ? { ...r, result: { ...r.result, hash: hash(999) } }
+            : r,
+        );
+      const badTransports = new Map(
+        finalized.pulsechain.map((s) => [
+          process.env[s.endpointEnv],
+          f.source(369, s.id, clock, disagree, budget).rpc.transport,
+        ]),
+      );
+      const refused = await runWorker(['once'], {
+        clock,
+        transport: (endpoint) => {
+          assert.ok(badTransports.has(endpoint));
+          return badTransports.get(endpoint);
+        },
+      });
+      assert.ok(refused instanceof Error);
+      assert.match(refused.message, /Finality target identity disagreement/);
+      assert.equal(process.exitCode, 1);
+      process.exitCode = 0; // The compiled CLI failure above was the expected witness.
+      assert.deepEqual(await snapshot(), before);
+      writer = await CanonicalWriter.acquire(await db(), 369);
+      await assert.rejects(
+        (await engine(finalized, {}, disagree)).once(signal, f.plain(197)),
+        /Finality target identity disagreement/,
+      );
+      assert.deepEqual(await snapshot(), before);
+      await writer.close();
+      writer = undefined;
+      assert.equal(await runWorker(['once'], { transport, clock }), undefined);
+      const current = (
+        await reader.query(
+          'SELECT block_number,block_hash,finality FROM hdd.sync_state WHERE chain_id=369',
+        )
+      ).rows[0];
+      assert.equal(current.block_number, '197');
+      assert.equal('0x' + current.block_hash.toString('hex'), hash(197));
+      assert.equal(current.finality, 'finalized');
     });
   }
   console.log(
