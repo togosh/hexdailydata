@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import fs from 'node:fs/promises';
+import { syncBuiltinESMExports } from 'node:module';
 import { setTimeout as pause } from 'node:timers/promises';
 import pg from 'pg';
 import { connect, databaseConfig } from '../../dist/db/connect.js';
@@ -94,6 +96,7 @@ export async function pinnedAuditTests({ root, test, reset }) {
     ];
     change?.(value);
     const p = canaryPlanSchema.parse(value);
+    await fs.mkdir(p.storagePath, { recursive: true });
     await inputs(p);
     return p;
   }
@@ -223,6 +226,76 @@ export async function pinnedAuditTests({ root, test, reset }) {
           expected.migrations[4].sha256,
         ]),
       );
+    }
+    assert.equal((await readTarget()).canonical.digest, expected.canonical.digest);
+  });
+  await test('pinned disk reserve refuses low storage/quota and depletion after preparation before dispatch', async () => {
+    const lowRoot = '/dev/shm/pinned-audit-' + randomUUID();
+    await fs.mkdir(lowRoot);
+    const lowDisk = await fs.statfs(lowRoot, { bigint: true });
+    assert(lowDisk.bavail * lowDisk.bsize < 8n * 1024n ** 3n);
+    for (const rootKey of ['storagePath', 'quotaPath']) {
+      const p = await fresh((q) => {
+        q[rootKey] = lowRoot + '/' + randomUUID();
+        q.sessionPath = q.storagePath + '/canary.json';
+      });
+      let constructed = 0;
+      await assert.rejects(
+        execute(p, 'prepare', {
+          transport: () => {
+            constructed++;
+            throw Error('Forbidden provider construction');
+          },
+        }),
+        /8GiB AND 20% reserve/,
+      );
+      assert.equal(constructed, 0);
+
+      const ready = await fresh((q) => {
+        q.phases[0].priorDispatchFloor = clock.now() + 70000;
+      });
+      await execute(ready, 'prepare');
+      const statfs = fs.statfs;
+      let depletedAt,
+        checkedAt,
+        sends = 0;
+      // Inject only the filesystem observation. The compiled SQL/session/transport
+      // guard still runs; no provider call or canonical mutation is simulated away.
+      fs.statfs = async (path, ...args) => {
+        if (depletedAt !== undefined && path === ready[rootKey]) {
+          checkedAt = clock.now();
+          return lowDisk;
+        }
+        return statfs(path, ...args);
+      };
+      syncBuiltinESMExports();
+      try {
+        const result = await execute(ready, 'run', {
+          sessionHooks: {
+            beforeDispatch: async () => {
+              depletedAt = clock.now();
+            },
+          },
+          transport: () => async () => {
+            sends++;
+            throw Error('Forbidden dispatch');
+          },
+        });
+        assert.equal(result.status, 'stopped');
+        assert.match(result.reason, /8GiB AND 20% reserve/);
+        assert.equal(result.terminal, true);
+        assert.equal(result.pending, false);
+        assert.equal(result.audit.unchanged, true);
+        assert.equal(sends, 0);
+        assert(checkedAt > depletedAt, 'Reserve checked after startup/cadence wait');
+        assert.equal(result.http, 1);
+        assert.equal(result.chargedBytes, 8388608);
+        assert.equal(result.observedBytes, 0);
+        assert.equal(result.deadline, result.start + ready.caps.milliseconds);
+      } finally {
+        fs.statfs = statfs;
+        syncBuiltinESMExports();
+      }
     }
     assert.equal((await readTarget()).canonical.digest, expected.canonical.digest);
   });

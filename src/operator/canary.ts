@@ -28,7 +28,7 @@ import {
   canonicalEvidence,
   runPinnedAudit,
 } from './canary-audit.ts';
-import { atomicJson } from './files.ts';
+import { atomicJson, reserve } from './files.ts';
 
 export const canaryHelp =
   'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths, except explicit pinned-audit retained read-only admission. One-shot common-prefix/pinned-audit cannot resume. Run/resume require separate owner approval, session opt-in and live opt-in. No providers by default.';
@@ -118,6 +118,10 @@ export async function runCanary(
   };
   const invocationSignal = activeSignal;
   invocationSignal.addEventListener('abort', cancelSql, { once: true });
+  async function auditReserve() {
+    await reserve(plan.storagePath);
+    await reserve(plan.quotaPath);
+  }
   async function db(role: 'api' | 'worker' = 'worker') {
     const c = await connect(databaseConfig(role, env), { signal: activeSignal });
     clients.push(c);
@@ -135,6 +139,7 @@ export async function runCanary(
       if (session.state.start !== null || session.state.status !== 'prepared')
         throw Error('Pinned audit session already spent.');
     }
+    if (audit) await auditReserve();
     const owner = await db();
     if (
       (await owner.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows
@@ -203,6 +208,7 @@ export async function runCanary(
                   inventory: admitted!.inventory,
                   guard: async () => {
                     activeSignal.throwIfAborted();
+                    await auditReserve();
                     const state = (
                       await auditReader!.query(
                         "SELECT current_setting('transaction_read_only') AS readonly,current_setting('transaction_isolation') AS isolation",
@@ -491,6 +497,7 @@ export async function runCanary(
       await cleanup(() => c.end());
     }
     await cleanup(async () => options.cleanupHook?.());
+    if (audit && ownsExecution) await cleanup(auditReserve);
     if (oneShot) {
       // A spent common-prefix session cannot run/resume again. Publish completion
       // only after SQL clients and the filesystem leases have actually closed.
