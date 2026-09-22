@@ -542,3 +542,20 @@ Only task containers removed; retained DB and new spent state preserved. Old sta
 volumes never opened; original stopped first-day replay result remains unchanged.
 The linked replay and audit evidence complete this first-day milestone; full Task10
 remains PENDING and Task11 unstarted. Stop for planner review. Status-only final entry.
+
+Task10 checkpoint continuation: CHECKPOINT_CONTINUATION_OFFLINE_PASS. Reviewed code
+`e281d0c603fc56ee3cbf53ee3029b485e732934b`; baseline `64e62730` preserved.
+Explicit common-continue re-admits populated S, ends its admission snapshot, uses the
+existing fixed-stop engine/writer, and audits all resulting accounts in paired batches
+of ten. Separate new grants never resume/reset spent allowance. Builder25 focused
+tests,7 continuation SQL groups,11 pinned-audit regression groups, types/build/format
+PASS. Separate read-only `/root/byte_review` PASS without corrections; independently
+ran25 network-isolated tests,7 fresh SQL groups and exact arithmetic/accounting checks.
+Synthetic355/revision2 to1380/revision8 matches control, including queued activation,
+10-heart payouts, inherited/zero/new accounts and all15 accounts/source. Interrupted483
+remains accepted and a distinct TEST grant reachesT; audit failures preserve replay.
+Actual report/result/source binding and compact evidence: `artifacts/task-10/checkpoint-continuation/`.
+Zero real provider requests or retained DB/private credential/spent-volume access.
+All new disposable SQL projects cleaned; prior databases/sessions untouched. No live
+grant or continuation, rebuild, seed, UI, v1, Task11, push or deployment. Task09 remains
+accepted; full Task10 PENDING. Stop for planner review. Status-only final entry.
