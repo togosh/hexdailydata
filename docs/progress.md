@@ -512,3 +512,18 @@ retry-loss and private SQL persistence probes. Exact evidence/report under
 The lost157-byte live response remains unavailable. Task09 accepted; Task10 PENDING;
 prior live STOPPED_INCOMPLETE unchanged. No rerun/resume, rebuild, v1/HDS, Task11,
 push or deployment. Stop for planner review. This is a status-only final entry.
+
+Task10 byte-aware logs: BYTE_AWARE_LOG_SPLITTING_OFFLINE_PASS. Reviewed code
+`afdaaaef928e9d9d4e341d4e6196bd84f96af8aa`; baseline `17c97af` preserved.
+Common-prefix clients use a 2 MiB local threshold with the existing range splitter;
+4 MiB hard cap, conservative 8 MiB incomplete charge and terminal guards remain.
+Compiled two-source SQL control/source A/source B/row cases match exactly in semantic
+state: 20 events, five stakes and five closed fixture days, pending payouts retained.
+Seven terminal cases preserve prior SQL with zero subsequent dispatches. Builder:
+29 focused tests, 15 compiled SQL/canary groups, types/build/format PASS. Separate
+read-only `/root/byte_review` PASS without corrections: independent compile, 16 stream
+tests and three fresh private-SQL groups; scoped cleanup exit 0. Report/result and
+compact actual evidence: `artifacts/task-10/byte-aware-logs/`. Zero provider requests;
+no old database/spent-state access or modification. Prior live results remain unchanged.
+Task09 accepted; full Task10 PENDING; Task11 unstarted. No rebuild, fork initialization,
+HDS, v1, UI, push or deployment. Stop for planner review. Documentation-only final entry.
