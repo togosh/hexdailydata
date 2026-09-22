@@ -183,6 +183,13 @@ export class Source {
     if (n < 0n) throw new Error('Insufficient confirmation depth.');
     // Head discovery remains honest, charged transport work. It cannot expand origin1.
     const parent = this.originChainId === 1 ? this.binding.common?.parent : undefined;
+    if (parent && n > BigInt(parent.number) && finality.mode === 'finalized') {
+      const identity = plainHeader(
+        decodeHeader(await this.rpc.call('eth_getBlockByNumber', [q(tip.number), false], signal)),
+      );
+      if (JSON.stringify(identity) !== JSON.stringify(plainHeader(tip)))
+        throw new Error('Finality target identity disagreement.');
+    }
     const target = parent && n > BigInt(parent.number) ? parent.number : n.toString();
     const observed = plainHeader(await this.header(target, signal, true));
     // A numbered refresh cannot replace the identity actually reported as finalized.

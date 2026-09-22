@@ -138,6 +138,25 @@ crashes and new PostgreSQL. Virtual quota time is not provider throughput. All a
 live identity/coverage/cost/full-history qualification remains NOT_RUN. Unchanged scale
 evidence may be reused by its reviewed source commit, with limits explicitly retained.
 
+The explicit `common-prefix` canary phase is a single, non-resumable origin1 interval
+of at most1024 blocks, separate from the unchanged profile fork/native target. Its
+numeric `through` header is resolved and corroborated inside the session, followed by
+constructor verification, `once(stopAt)` and the full prefix address audit. Only the
+declared parent and bounded finalized/numeric identity headers are exceptions to the
+prefix range; they cannot authorize code, logs or state. The plan binds the two public
+PulseChain URLs and sync-only12HTTP/360logical per rolling minute,2100ms physical-start
+spacing and60s quarantine. Ordinary global42/900 quotas remain unchanged.
+
+For an independently reviewed, owner-approved new environment, use the compiled
+`canary check` and provider-disabled `prepare` first. Invoke exactly once with
+`node scripts/operator/canary-once.mjs <environment> <operator-only-override>`.
+The wrapper reads `input/plan.json` and `input/approval.json`, exclusively creates
+`invocation.json`, and carries its original start into the operator. It never resumes
+or resets that receipt. `invocation-result.json` records actual host elapsed and any
+deadline shutdown; an overrun cannot pass. Keep the operator/SQL volumes after stopping
+for evidence. No full replay, native initialization or production readiness follows
+from a prefix result.
+
 ## Cost target (planning envelope, not a vendor quote)
 
 Owner maximum is **$50–60/month total** before monetization. Suggested allocation:

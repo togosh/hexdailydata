@@ -17,6 +17,9 @@ import { maintenanceLease } from './lease.ts';
 import { operatorError } from './errors.ts';
 import { CanarySession } from './canary-session.ts';
 import { canaryAuthority, canaryPlanSchema, checkCanary, readCanaryJson } from './canary-plan.ts';
+import { prefixPhase } from './canary-prefix.ts';
+import { plainHeader } from '../providers/abi.ts';
+import type { SessionHooks } from './canary-session.ts';
 
 export const canaryHelp =
   'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths. Run/resume require separate owner approval, session opt-in and live opt-in. No providers by default.';
@@ -28,8 +31,11 @@ export async function runCanary(
     clock?: Clock;
     transport?: (endpoint: string) => Transport;
     hooks?: FaultHooks;
+    sessionHooks?: SessionHooks;
+    cleanupHook?: () => Promise<void>;
   } = {},
 ) {
+  let invocationStart = (options.clock ?? realClock).now();
   const [command, planPath, approvalPath] = args;
   if (command === 'help' || command === '--help' || !command) return { help: canaryHelp };
   if (!['check', 'prepare', 'status', 'run', 'resume'].includes(command) || !planPath)
@@ -39,6 +45,14 @@ export async function runCanary(
   const plan = canaryPlanSchema.parse(input),
     env = options.env ?? process.env,
     clock = options.clock ?? realClock;
+  const prefix = prefixPhase(plan);
+  if (prefix && command === 'run' && !options.transport) {
+    const supplied = Number(env.HDD_V2_CANARY_INVOKED_AT);
+    if (!Number.isSafeInteger(supplied) || supplied <= 0 || supplied > invocationStart)
+      throw new Error('Common prefix requires the canary-once host invocation clock.');
+    invocationStart = supplied;
+  }
+  if (prefix && command === 'resume') throw new Error('Common prefix resume is not authorized.');
   // No external transport is constructed before ALL local and destination guards.
   if (
     env.HDD_V2_PROJECT !== plan.project ||
@@ -55,16 +69,40 @@ export async function runCanary(
       const urls = pair.map((p) => env[p.endpointEnv]);
       if (urls.some((u) => !u) || urls[0] === urls[1])
         throw new Error('Canary endpoints missing or duplicated.');
+      if (prefix && urls.some((url, i) => url !== prefix.endpoints[i]))
+        throw new Error('Common prefix endpoint URL mismatch.');
     }
   }
   const controller = new AbortController();
   let activeSignal = AbortSignal.any([signal, controller.signal]);
-  const release = await maintenanceLease([plan.storagePath, plan.quotaPath], activeSignal);
+  let release: (() => Promise<void>) | undefined;
+  const deadline = invocationStart + plan.caps.milliseconds;
+  const invocationTimer =
+    prefix && command === 'run'
+      ? setTimeout(
+          () => controller.abort(new Error('Canary invocation elapsed cap reached.')),
+          Math.max(0, deadline - clock.now()),
+        )
+      : undefined;
   const clients: Awaited<ReturnType<typeof connect>>[] = [];
   let session: CanarySession | undefined;
   const writers = new Map<1 | 369, CanonicalWriter>();
   const writerClients = new Map<1 | 369, Awaited<ReturnType<typeof connect>>>();
   let progressTimer: NodeJS.Timeout | undefined;
+  let primary: string | undefined;
+  let completed = false;
+  let ownsExecution = false;
+  const secondary: string[] = [];
+  const sourcePairs = new Map<1 | 369, ReturnType<typeof profileSources>>();
+  const failure = (error: unknown) => {
+    const detail = operatorError(error);
+    return /https?:\/\//i.test(detail) ? 'Canary provider transport failed.' : detail;
+  };
+  const cancelSql = () => {
+    for (const c of clients) void c.end().catch((e) => secondary.push(failure(e)));
+  };
+  const invocationSignal = activeSignal;
+  invocationSignal.addEventListener('abort', cancelSql, { once: true });
   async function db() {
     const c = await connect(databaseConfig('worker', env), { signal: activeSignal });
     clients.push(c);
@@ -73,6 +111,7 @@ export async function runCanary(
     return c;
   }
   try {
+    release = await maintenanceLease([plan.storagePath, plan.quotaPath], activeSignal);
     if (command === 'status') return (await CanarySession.load(plan, clock)).state;
     const owner = await db();
     if (
@@ -102,9 +141,12 @@ export async function runCanary(
       session = await CanarySession.prepare(plan, clock);
       return session.state;
     }
-    session = await CanarySession.load(plan, clock);
+    session = await CanarySession.load(plan, clock, options.sessionHooks);
     if (command === 'run') await emptyTarget(owner);
-    await session.start(command === 'resume');
+    if (session.state.status === 'complete' || (prefix && session.state.start !== null))
+      throw new Error('Canary already complete or spent.');
+    ownsExecution = true;
+    await session.start(command === 'resume', prefix ? invocationStart : clock.now());
     activeSignal = AbortSignal.any([activeSignal, session.controller.signal]);
     const cooldown = await cooldownFiles(plan.quotaPath, 'worker');
     const workerBudget = new ProviderBudget('worker', cooldown, clock);
@@ -113,12 +155,18 @@ export async function runCanary(
     for (const [chain, pair] of [
       [1, plan.profile.ethereum],
       [369, plan.profile.pulsechain],
-    ] as const)
+    ] as const) {
+      if (prefix && chain === 369) continue;
       for (const source of pair)
         transports.set(
           source.id,
-          session.transport(chain, (options.transport ?? httpTransport)(env[source.endpointEnv]!)),
+          session.transport(
+            chain,
+            (options.transport ?? httpTransport)(env[source.endpointEnv]!),
+            source.id,
+          ),
         );
+    }
     const price = plan.price ? new PriceReader(plan.price, plan.profile.contract) : null;
     const rpcPair = (chain: 1 | 369, budget = workerBudget) =>
       (chain === 1 ? plan.profile.ethereum : plan.profile.pulsechain).map(
@@ -133,8 +181,14 @@ export async function runCanary(
             chain === 369 && price ? priceTargets(price.profile) : undefined,
           ),
       ) as [RpcClient, RpcClient];
-    const pair = (chain: 1 | 369) =>
-      profileSources(plan.profile, chain, (s) => transports.get(s.id)!, workerBudget);
+    const pair = (chain: 1 | 369) => {
+      if (!sourcePairs.has(chain))
+        sourcePairs.set(
+          chain,
+          profileSources(plan.profile, chain, (s) => transports.get(s.id)!, workerBudget),
+        );
+      return sourcePairs.get(chain)!;
+    };
     const reader = await db();
     progressTimer = setInterval(
       () => console.log(JSON.stringify({ event: 'canary_progress', ...session!.state })),
@@ -191,6 +245,49 @@ export async function runCanary(
           completeInterval: acquired[0]!.headers.at(-1)!.number === phase.to,
           events: acquired[0]!.events.length,
         };
+      } else if (phase.kind === 'common-prefix') {
+        const sources = pair(1);
+        const stops = [];
+        for (const source of sources)
+          stops.push(plainHeader(await source.header(phase.through, activeSignal, true)));
+        if (JSON.stringify(stops[0]) !== JSON.stringify(stops[1]))
+          throw new Error('Common prefix stop header disagreement.');
+        const stopAt = stops[0]!;
+        for (const source of sources) await source.verify(stopAt, activeSignal);
+        session.state.prefix!.stopHeader = stopAt;
+        await session.save();
+        const engine = new SyncEngine(
+          writers.get(1)!,
+          reader,
+          sources,
+          plan.storagePath,
+          options.hooks,
+        );
+        const constructor = await engine.initializeConstructor(
+          plan.profile.constructor.checkpoint,
+          plan.profile.constructor.transactionHash,
+          plan.profile.constructor.balances,
+          activeSignal,
+        );
+        console.log(
+          JSON.stringify({
+            event: 'canary_constructor',
+            constructor,
+            cursor: await engine.cursor(),
+          }),
+        );
+        await engine.once(activeSignal, stopAt);
+        const cursor = await engine.cursor();
+        if (
+          !cursor ||
+          cursor.block_number !== stopAt.number ||
+          '0x' + cursor.block_hash.toString('hex') !== stopAt.hash
+        )
+          throw new Error('Common prefix did not reach exact stop.');
+        await engine.audit(activeSignal);
+        if ((await reader.query('SELECT chain_id FROM hdd.chains WHERE chain_id=369')).rows.length)
+          throw new Error('Common prefix unexpectedly initialized native state.');
+        result = { stopAt, audit: 'all-prefix-addresses', progress: engine.progress };
       } else if (phase.kind === 'replay') {
         const progress = [];
         for (const chain of [1, 369] as const) {
@@ -260,31 +357,97 @@ export async function runCanary(
         result,
       });
     }
-    await session.finish('complete', 'Bounded phases complete; no full feasibility claim.');
+    completed = true;
     return session.state;
   } catch (error) {
-    if (session && session.state.start !== null && session.state.status !== 'complete') {
-      const detail = operatorError(error);
-      const reason = session.controller.signal.aborted
-        ? String(session.controller.signal.reason?.message)
-        : signal.aborted
-          ? 'Canary cancelled.'
-          : /https?:\/\//i.test(detail)
-            ? 'Canary provider transport failed.'
-            : detail;
-      await session.finish('stopped', reason);
+    primary = failure(error);
+    if (
+      ownsExecution &&
+      session &&
+      session.state.start !== null &&
+      session.state.status !== 'complete'
+    ) {
+      session.state.reason = primary.slice(0, 160);
       return session.state;
     }
     throw error;
   } finally {
     if (progressTimer) clearInterval(progressTimer);
-    await session?.close();
+    const cleanup = async (work: () => Promise<unknown>) => {
+      try {
+        await work();
+      } catch (e) {
+        secondary.push(failure(e));
+      }
+    };
+    await cleanup(async () => session?.close());
     for (const c of clients) c.removeAllListeners('end');
-    for (const writer of writers.values()) await writer.close().catch(() => {});
+    for (const writer of writers.values()) await cleanup(() => writer.close());
     for (const c of clients) {
       c.removeAllListeners('end');
-      await c.end().catch(() => {});
+      await cleanup(() => c.end());
     }
-    await release();
+    await cleanup(async () => options.cleanupHook?.());
+    if (prefix) {
+      // A spent common-prefix session cannot run/resume again. Publish completion
+      // only after SQL clients and the filesystem leases have actually closed.
+      await cleanup(async () => release?.());
+      release = undefined;
+    }
+    if (ownsExecution && session?.state.start !== null && session) {
+      if (prefix && (clock.now() >= deadline || controller.signal.aborted || signal.aborted))
+        primary ??= failure(
+          controller.signal.reason ??
+            signal.reason ??
+            new Error('Canary invocation elapsed cap reached.'),
+        );
+      if (session.state.prefix) {
+        secondary.unshift(...session.state.prefix.secondary);
+        session.state.prefix.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
+        session.state.prefix.accounting = [...sourcePairs.values()].flat().map((s) => ({
+          source: s.identity,
+          rpc: s.rpc.counters,
+          sourceCounters: s.counters,
+          budget: s.rpc.budget.counters,
+        }));
+      }
+      await cleanup(() =>
+        session!.finish(
+          completed && !primary && !secondary.length ? 'complete' : 'stopped',
+          primary ?? secondary[0] ?? 'Bounded phases complete; no full feasibility claim.',
+        ),
+      );
+    }
+    await cleanup(async () => release?.());
+    if (
+      session?.state.start !== null &&
+      session &&
+      ownsExecution &&
+      (secondary.length || (prefix && clock.now() >= deadline))
+    ) {
+      session.state.status = 'stopped';
+      session.state.reason = (
+        primary ??
+        secondary[0] ??
+        'Canary invocation elapsed cap reached during release.'
+      ).slice(0, 160);
+      if (session.state.prefix)
+        session.state.prefix.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
+      try {
+        await session.save();
+      } catch (e) {
+        console.error(
+          JSON.stringify({
+            event: 'canary_finalization_failed',
+            primary,
+            secondary,
+            error: failure(e),
+          }),
+        );
+      }
+    }
+    if (invocationTimer) clearTimeout(invocationTimer);
+    invocationSignal.removeEventListener('abort', cancelSql);
+    if (secondary.length && !session) throw new Error(secondary.join('; '));
   }
 }

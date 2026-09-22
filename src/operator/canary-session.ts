@@ -5,6 +5,9 @@ import { atomicJson, safePath } from './files.ts';
 import { canaryPlanSchema, planDigest, readCanaryJson, type CanaryPlan } from './canary-plan.ts';
 import { realClock, type Clock } from '../providers/budget.ts';
 import type { Transport, RpcCall } from '../providers/rpc.ts';
+import { PrefixScope, prefixPhase } from './canary-prefix.ts';
+import { headerSchema } from '../services/projections/input.ts';
+import { operatorError } from './errors.ts';
 
 const integer = z.number().int().nonnegative().safe();
 const stateSchema = z.strictObject({
@@ -26,6 +29,14 @@ const stateSchema = z.strictObject({
   reason: z.string().max(160),
   terminal: z.boolean(),
   results: z.array(z.unknown()).max(12),
+  prefix: z
+    .strictObject({
+      stopHeader: headerSchema.nullable(),
+      ended: integer.nullable(),
+      secondary: z.array(z.string().max(240)).max(16),
+      accounting: z.unknown().optional(),
+    })
+    .optional(),
 });
 export type CanaryState = z.infer<typeof stateSchema>;
 export class CanaryStop extends Error {}
@@ -33,6 +44,7 @@ export interface SessionHooks {
   /** Offline crash witnesses only; no environment/CLI mechanism enables these hooks. */
   beforeDispatch?: () => Promise<void>;
   beforeSettlement?: () => Promise<void>;
+  beforeFinalSave?: () => Promise<void>;
 }
 const checksum = (value: unknown) =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -47,6 +59,8 @@ export class CanarySession {
   private poisoned = false;
   readonly controller = new AbortController();
   private timer: NodeJS.Timeout | undefined;
+  private starts: { at: number; logical: number }[] = [];
+  private lastStart = 0;
   private constructor(
     readonly plan: CanaryPlan,
     readonly state: CanaryState,
@@ -82,6 +96,7 @@ export class CanarySession {
       reason: 'NOT_RUN',
       terminal: false,
       results: [],
+      ...(prefixPhase(plan) ? { prefix: { stopHeader: null, ended: null, secondary: [] } } : {}),
     };
     const session = new CanarySession(plan, state, clock, hooks);
     await session.save();
@@ -138,7 +153,7 @@ export class CanarySession {
     } catch {
       this.poisoned = true;
       this.stop('Canary persistence uncertain.');
-      throw this.controller.signal.reason;
+      throw new CanaryStop('Canary persistence uncertain.');
     }
   }
   check(logical = 0) {
@@ -165,12 +180,14 @@ export class CanarySession {
     this.state.terminal = true;
     this.controller.abort(new CanaryStop(reason));
   }
-  async start(resume: boolean) {
+  async start(resume: boolean, invocationStart = this.time()) {
+    if (prefixPhase(this.plan) && resume)
+      throw new Error('Common prefix resume is not authorized.');
     if (resume ? this.state.start === null : this.state.start !== null)
       throw new Error('Use run for prepared sessions; resume requires retained started state.');
     if (this.state.status === 'complete') throw new Error('Canary already complete.');
     if (this.state.start === null) {
-      this.state.start = this.time();
+      this.state.start = invocationStart;
       this.state.deadline = this.state.start + this.plan.caps.milliseconds;
     }
     if (this.state.pending) {
@@ -192,9 +209,23 @@ export class CanarySession {
     // drain the shared transport before publishing the final state; its last
     // reservation/settlement must never race this atomic file replacement.
     await this.close();
+    if (this.state.prefix) {
+      await this.hooks.beforeFinalSave?.();
+      if (this.time() >= this.state.deadline! || this.state.terminal || this.poisoned) {
+        status = 'stopped';
+        reason = this.state.reason || 'Canary deadline or finalization failure.';
+      }
+      this.state.terminal = true; // This grant can never resume, even on ordinary failure.
+      this.state.prefix.ended = this.time();
+    }
     this.state.status = status;
     this.state.reason = reason.slice(0, 160);
     await this.save();
+    if (this.state.prefix && this.time() >= this.state.deadline! && status === 'complete') {
+      this.state.status = 'stopped';
+      this.state.reason = 'Canary elapsed cap reached during final save.';
+      await this.save();
+    }
   }
   async completed(result: unknown) {
     this.state.results.push(result);
@@ -207,7 +238,9 @@ export class CanarySession {
     await this.tail;
   }
   /** All chains/aliases share this serialized gate, including both role budgets. */
-  transport(chain: 1 | 369, transport: Transport): Transport {
+  transport(chain: 1 | 369, transport: Transport, source = String(chain)): Transport {
+    const phase = prefixPhase(this.plan);
+    const scope = phase ? new PrefixScope(this.plan, phase, source) : null;
     // chain is the authorized logical phase, not eth_chainId of the serving network.
     return async (body, signal) => {
       const previous = this.tail;
@@ -220,6 +253,8 @@ export class CanarySession {
       let reserved = 0,
         observed = 0,
         finished = false;
+      let dispatchAt: number | null = null;
+      const chunks: Buffer[] = [];
       const aborter = new AbortController();
       const active = AbortSignal.any([combined, aborter.signal]);
       const settle = async (complete: boolean) => {
@@ -233,15 +268,47 @@ export class CanarySession {
             this.state.pending = false;
             if (!complete) this.state.uncertainAttempts++;
             await this.save();
+            if (phase)
+              console.log(
+                JSON.stringify({
+                  event: 'canary_attempt',
+                  source,
+                  dispatchAt,
+                  ended: this.time(),
+                  observedBytes: observed,
+                  complete,
+                  calls: JSON.parse(body).map((c: RpcCall) =>
+                    c.method === 'eth_call'
+                      ? (c.params[0] as { data: string }).data.slice(0, 10)
+                      : c.method,
+                  ),
+                }),
+              );
           }
         } finally {
           unlock();
         }
       };
+      const settleAfterError = async (primary: unknown) => {
+        try {
+          await settle(false);
+        } catch (secondary) {
+          if (this.state.prefix)
+            this.state.prefix.secondary.push(operatorError(secondary).slice(0, 240));
+          console.error(
+            JSON.stringify({
+              event: 'canary_settlement_failed',
+              primary: operatorError(primary),
+              secondary: operatorError(secondary),
+            }),
+          );
+        }
+      };
       try {
         combined.throwIfAborted();
         const calls = JSON.parse(body) as RpcCall[];
-        this.scope(chain, calls);
+        if (scope) scope.request(chain, calls);
+        else this.scope(chain, calls);
         this.check(calls.length);
         const remaining = this.plan.caps.bytes - this.state.chargedBytes;
         reserved = this.plan.caps.responseBytes * 2;
@@ -256,22 +323,49 @@ export class CanarySession {
         this.state.pending = true;
         await this.save();
         await this.hooks.beforeDispatch?.();
+        if (phase) {
+          // Recheck after queueing, persistence and late wakes; this gate counts actual
+          // physical starts, not ProviderBudget's earlier slot reservations.
+          for (;;) {
+            active.throwIfAborted();
+            const now = this.time();
+            if (now >= this.state.deadline!) throw new CanaryStop('Canary elapsed cap reached.');
+            this.starts = this.starts.filter((s) => s.at > now - phase.cadence.rollingMilliseconds);
+            const full =
+              this.starts.length >= phase.cadence.http ||
+              this.starts.reduce((n, s) => n + s.logical, 0) + calls.length > phase.cadence.logical;
+            const earliest = Math.max(
+              this.state.start! + phase.cadence.quarantineMilliseconds,
+              this.lastStart + phase.cadence.spacingMilliseconds,
+              full ? this.starts[0]!.at + phase.cadence.rollingMilliseconds : now,
+            );
+            if (earliest <= now) break;
+            await this.clock.sleep(Math.min(earliest - now, this.state.deadline! - now), active);
+          }
+        }
         active.throwIfAborted();
         if (this.time() >= this.state.deadline!) {
           this.stop('Canary elapsed cap reached.');
           throw this.controller.signal.reason;
         }
+        dispatchAt = this.time();
+        this.lastStart = dispatchAt;
+        this.starts.push({ at: dispatchAt, logical: calls.length });
         const response = await transport(body, active);
         const self = this;
         return {
           ...response,
           close: async () => {
             aborter.abort();
-            await response.close?.();
-            await settle(false);
+            try {
+              await response.close?.();
+            } finally {
+              await settle(false);
+            }
           },
           body: (async function* () {
             let complete = false;
+            let failed = false;
             try {
               for await (const chunk of response.body) {
                 // Count the entire observed chunk even if it crosses the ceiling.
@@ -285,20 +379,27 @@ export class CanarySession {
                   self.stop('Canary elapsed cap reached.');
                   throw self.controller.signal.reason;
                 }
+                if (scope && response.status === 200) chunks.push(Buffer.from(chunk));
                 yield chunk;
               }
               active.throwIfAborted();
               await self.hooks.beforeSettlement?.();
+              if (scope && response.status === 200)
+                scope.response(calls, Buffer.concat(chunks).toString('utf8'));
               complete = true;
+            } catch (error) {
+              failed = true;
+              await settleAfterError(error);
+              throw error;
             } finally {
               aborter.abort();
-              await settle(complete);
+              if (!failed) await settle(complete);
             }
           })(),
         };
       } catch (e) {
         aborter.abort();
-        await settle(false);
+        await settleAfterError(e);
         throw e;
       }
     };

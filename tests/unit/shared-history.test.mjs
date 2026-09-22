@@ -141,7 +141,7 @@ test('finalized target retains exact observed identity for native and common sou
       const f = fixture({ last: 220 }),
         clock = new FakeClock(),
         budget = new ProviderBudget('worker', memoryCooldown(), clock);
-      f.setHead(origin === 1 ? 180 : 188);
+      f.setHead(origin === 1 ? 220 : 188);
       const profile = profileSchema.parse({ ...sharedProfile(), policy: { mode: 'finalized' } });
       const [source] = profileSources(
         profile,

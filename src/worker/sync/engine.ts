@@ -104,6 +104,7 @@ export class SyncEngine {
     )
       throw new Error('Constructor differs from source binding.');
     const values = [];
+    const observations = [];
     for (const source of this.sources) {
       await source.verify(checkpoint, signal);
       source.counters.receiptCalls++;
@@ -154,6 +155,7 @@ export class SyncEngine {
         JSON.stringify(actual) !== JSON.stringify(observed)
       )
         throw new Error('Constructor state mismatch.');
+      observations.push({ source: source.identity.id, checkpoint, ...state });
       values.push({
         id: source.rpc.id,
         operator: source.rpc.operator,
@@ -180,6 +182,7 @@ export class SyncEngine {
         providers: [this.sources[0].identity, this.sources[1].identity],
       },
     );
+    return observations;
   }
   async fork(parent: Header, entry: Header, signal: AbortSignal) {
     const binding = this.sources[0].binding;

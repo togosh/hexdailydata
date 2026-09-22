@@ -31,6 +31,7 @@ import { plan, inputs, environment, rawFixture } from './fixture.mjs';
 import { FakeClock, memoryCooldown } from '../sync/fixture.mjs';
 import { sharedProfile } from '../sync/shared-profile.mjs';
 import * as live from '../live/fixture.mjs';
+import { prefixTests } from './prefix.mjs';
 
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
@@ -184,6 +185,7 @@ try {
   } finally {
     await migration.end();
   }
+  await prefixTests({ root, test, reset, snapshot, cli });
   await test('shared transport compiled canary replay charges reused aliases and preserves logical range authorization', async () => {
     const p = await fresh({
       profile: sharedProfile(),

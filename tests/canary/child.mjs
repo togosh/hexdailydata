@@ -5,13 +5,15 @@ import { CanarySession } from '../../dist/operator/canary-session.js';
 import { maintenanceLease } from '../../dist/operator/lease.js';
 import { rawFixture, environment } from './fixture.mjs';
 import { FakeClock } from '../sync/fixture.mjs';
+import { prefixEnvironment, prefixFixture } from './prefix-fixture.mjs';
 
 globalThis.fetch = () => {
   throw Error('NETWORK FORBIDDEN');
 };
 const [action, path, mode = 'normal'] = process.argv.slice(2),
   p = JSON.parse(await readFile(path, 'utf8'));
-const env = environment(p),
+const isPrefix = p.phases[0].kind === 'common-prefix';
+const env = isPrefix ? prefixEnvironment(p) : environment(p),
   clock = new FakeClock();
 try {
   clock.time = JSON.parse(await readFile(p.sessionPath, 'utf8')).highWater;
@@ -58,7 +60,7 @@ if (action === 'lease') {
   else await pause(120000);
   await release();
 } else {
-  const f = rawFixture(p, clock, mode === 'split');
+  const f = isPrefix ? prefixFixture(p, clock, mode) : rawFixture(p, clock, mode === 'split');
   let committed = false;
   await runOperator(['canary', action, path, p.storagePath + '/approval.json'], {
     env,

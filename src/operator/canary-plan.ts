@@ -32,6 +32,23 @@ const phase = z.discriminatedUnion('kind', [
     to: uint,
   }),
   z.strictObject({ kind: z.literal('replay'), purpose, basis: z.literal('constructor-prefix') }),
+  z.strictObject({
+    kind: z.literal('common-prefix'),
+    purpose,
+    through: uint,
+    finalityHeaders: z.strictObject({ minimum: uint, maximum: uint }),
+    cadence: z.strictObject({
+      rollingMilliseconds: z.literal(60000),
+      http: z.literal(12),
+      logical: z.literal(360),
+      spacingMilliseconds: z.literal(2100),
+      quarantineMilliseconds: z.literal(60000),
+    }),
+    endpoints: z.tuple([
+      z.literal('https://rpc.pulsechain.com'),
+      z.literal('https://rpc-pulsechain.g4mm4.io'),
+    ]),
+  }),
   z.strictObject({ kind: z.literal('metrics'), purpose }),
   z.strictObject({
     kind: z.literal('address'),
@@ -55,7 +72,7 @@ export const canaryPlanSchema = z
     price: priceProfileSchema.nullable(),
     identityStatus: z.literal('declared-unverified'),
     correlation: z.enum(['declared-distinct', 'unknown']),
-    ranges: z.array(range).min(2).max(12),
+    ranges: z.array(range).min(1).max(12),
     methods: z
       .array(
         z.enum([
@@ -142,6 +159,41 @@ export const canaryPlanSchema = z
         (r) => r.chain === chain && BigInt(r.from) <= BigInt(n) && BigInt(n) <= BigInt(r.to),
       );
     for (const ph of p.phases) {
+      if (ph.kind === 'common-prefix') {
+        if (
+          p.phases.length !== 1 ||
+          p.price !== null ||
+          !p.allowHeadObservation ||
+          p.profile.commonHistory !== 'pulsechain' ||
+          p.profile.policy.mode !== 'finalized' ||
+          p.ranges.length !== 1 ||
+          p.ranges[0]!.chain !== 1 ||
+          p.ranges[0]!.from !== p.profile.constructor.checkpoint.number ||
+          p.ranges[0]!.to !== ph.through ||
+          BigInt(ph.through) < BigInt(p.profile.constructor.checkpoint.number) ||
+          BigInt(ph.through) > BigInt(p.profile.fork.parent.number) ||
+          BigInt(ph.through) - BigInt(p.profile.constructor.checkpoint.number) >= 1024n ||
+          BigInt(ph.finalityHeaders.minimum) < BigInt(p.profile.target.number) ||
+          BigInt(ph.finalityHeaders.maximum) < BigInt(ph.finalityHeaders.minimum) ||
+          BigInt(ph.finalityHeaders.maximum) > 100000000n ||
+          p.caps.milliseconds > 1800000 ||
+          p.caps.http > 250 ||
+          p.caps.logical > 5000 ||
+          p.caps.bytes > 134217728 ||
+          p.caps.responseBytes > 4194304
+        )
+          bad(
+            'Common prefix requires one bounded origin1 interval, finalized headers and sync-only caps.',
+          );
+        for (let i = 0; i < 2; i++) {
+          const alias = ['HDD_V2_PROVIDER_PULSE_OFFICIAL', 'HDD_V2_PROVIDER_PULSE_G4MM4'][i];
+          if (
+            p.profile.ethereum[i]!.endpointEnv !== alias ||
+            p.profile.pulsechain[i]!.endpointEnv !== alias
+          )
+            bad('Common prefix requires the two declared public endpoint aliases.');
+        }
+      }
       if (ph.kind === 'capabilities' && !contains(ph.chain, ph.at.number))
         bad('Capability boundary outside ranges.');
       if (
