@@ -395,32 +395,58 @@ export class CanarySession {
         const response = await transport(body, active, requestDeadline);
         exchange.headers(response.status, response.retryAfter);
         const self = this;
+        let closed = false;
+        let cleanupFailure: unknown;
+        const closeResponse = async () => {
+          if (closed) {
+            if (cleanupFailure) throw cleanupFailure;
+            return;
+          }
+          closed = true;
+          try {
+            await response.close?.();
+          } catch {
+            self.stop('Canary response cleanup failed.');
+            cleanupFailure = self.controller.signal.reason;
+            throw cleanupFailure;
+          } finally {
+            aborter.abort();
+          }
+        };
         return {
           ...response,
           exchange,
           close: async () => {
-            aborter.abort();
             try {
-              await response.close?.();
+              await closeResponse();
             } finally {
               await settle(false);
             }
+            // Deliberate per-attempt cancellation is distinct from a global stop.
+            combined.throwIfAborted();
+            if (self.time() >= requestDeadline || self.time() >= self.state.deadline!)
+              throw new CanaryStop('Canary original request/session deadline expired.');
           },
           body: (async function* () {
             let complete = false;
-            let failed = false;
+            let failure: unknown;
+            let receiving = true;
+            let sizeFailure = false;
             try {
               for await (const chunk of response.body) {
                 // Count the entire observed chunk even if it crosses the ceiling.
                 observed += chunk.byteLength;
                 exchange!.observe(chunk);
+                checkDeadline();
                 if (observed > self.plan.caps.responseBytes) {
+                  sizeFailure = true;
                   self.stop('Canary response byte cap crossed.');
                   throw self.controller.signal.reason;
                 }
-                checkDeadline();
                 if (scope && response.status === 200) chunks.push(Buffer.from(chunk));
+                receiving = false;
                 yield chunk;
+                receiving = true;
               }
               exchange!.complete = true;
               active.throwIfAborted();
@@ -430,26 +456,49 @@ export class CanarySession {
               checkDeadline();
               complete = true;
             } catch (caught) {
-              const error = safeRpcError(caught);
+              // An exception while unwinding a yielded chunk is an iterator-return
+              // failure. It must never be hidden by the client's local RangeError.
+              if (!receiving) self.stop('Canary response iterator cleanup failed.');
+              const error = !receiving ? self.controller.signal.reason : safeRpcError(caught);
               attachRpcDiagnostic(
                 error,
                 exchange!.failure(
                   'prefix',
                   self.clock.now(),
                   Buffer.concat(chunks),
-                  active.aborted ||
-                    self.clock.now() >= requestDeadline ||
-                    self.clock.now() >= self.state.deadline!
-                    ? 'deadline'
-                    : 'scope',
+                  sizeFailure
+                    ? 'response-size'
+                    : active.aborted ||
+                        self.clock.now() >= requestDeadline ||
+                        self.clock.now() >= self.state.deadline!
+                      ? 'deadline'
+                      : 'scope',
                 ),
               );
-              failed = true;
-              await settleAfterError(error);
+              failure = error;
               throw error;
             } finally {
-              aborter.abort();
-              if (!failed) await settle(complete);
+              // Hold the serialized transport gate through cleanup and durable
+              // settlement, including an early consumer return without acceptance.
+              try {
+                await closeResponse();
+              } catch (cleanup) {
+                if (failure) {
+                  const diagnostic = rpcDiagnostic(failure);
+                  if (diagnostic) diagnostic.cleanupFailed = true;
+                } else if (!complete) {
+                  attachRpcDiagnostic(
+                    cleanup,
+                    exchange!.failure('prefix', self.clock.now(), undefined, 'close'),
+                  );
+                  throw cleanup;
+                }
+                // A complete body still reaches the unchanged RPC envelope parser.
+                // close() then reports cleanup failure without replacing that primary.
+              } finally {
+                if (failure) await settleAfterError(failure);
+                else await settle(complete);
+              }
             }
           })(),
         };

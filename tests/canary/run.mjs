@@ -33,6 +33,7 @@ import { sharedProfile } from '../sync/shared-profile.mjs';
 import * as live from '../live/fixture.mjs';
 import { prefixTests } from './prefix.mjs';
 import { diagnosticTests } from './diagnostics.mjs';
+import { byteAwareTests } from './log-size.mjs';
 
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
@@ -43,7 +44,11 @@ const root = '/canary-test/' + randomUUID();
 await mkdir(root);
 let diagnosticsComplete = false;
 async function test(name, fn) {
-  if (diagnosticsComplete && process.argv.includes('--diagnostics-only')) return;
+  if (
+    diagnosticsComplete &&
+    (process.argv.includes('--diagnostics-only') || process.argv.includes('--byte-aware-only'))
+  )
+    return;
   const at = performance.now();
   try {
     await fn();
@@ -189,8 +194,11 @@ try {
     await migration.end();
   }
   await diagnosticTests({ root, test, reset });
-  diagnosticsComplete = true;
+  if (!process.argv.includes('--diagnostics-only'))
+    await byteAwareTests({ root, test, reset, snapshot });
+  diagnosticsComplete = process.argv.includes('--diagnostics-only');
   await prefixTests({ root, test, reset, snapshot, cli });
+  diagnosticsComplete = true;
   await test('shared transport compiled canary replay charges reused aliases and preserves logical range authorization', async () => {
     const p = await fresh({
       profile: sharedProfile(),

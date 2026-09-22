@@ -67,6 +67,7 @@ export function profileSources(
   origin: 1 | 369,
   transport: (source: SourceProfile['ethereum'][number]) => Transport,
   budget: ProviderBudget,
+  historicalLogResponseBytes?: number,
 ): [Source, Source] {
   const binding = profileBinding(profile, origin);
   return (origin === 1 ? profile.ethereum : profile.pulsechain).map(
@@ -79,6 +80,8 @@ export function profileSources(
           profile.contract,
           transport(s),
           budget,
+          undefined,
+          historicalLogResponseBytes,
         ),
         { codeHash: profile.codeHash, finality: profile.policy, completeness: 'filtered-ranges' },
         binding,

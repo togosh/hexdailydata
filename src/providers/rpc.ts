@@ -64,6 +64,8 @@ export function httpTransport(endpoint: string): Transport {
   };
 }
 export class RangeError extends Error {}
+/** A discarded local buffer, not a provider capability/error classification. */
+export class LocalLogSizeError extends RangeError {}
 export class RpcError extends Error {
   readonly code: number;
   constructor(code: number) {
@@ -183,6 +185,7 @@ export class RpcClient {
   readonly transport: Transport;
   readonly budget: ProviderBudget;
   readonly targets: ReadTargets | undefined;
+  readonly historicalLogResponseBytes: number | undefined;
   constructor(
     id: string,
     operator: string | null,
@@ -191,8 +194,17 @@ export class RpcClient {
     transport: Transport,
     budget: ProviderBudget,
     targets?: ReadTargets,
+    historicalLogResponseBytes?: number,
   ) {
     address.parse(contract);
+    if (
+      historicalLogResponseBytes !== undefined &&
+      (!Number.isSafeInteger(historicalLogResponseBytes) ||
+        historicalLogResponseBytes <= 0 ||
+        historicalLogResponseBytes > limits.provider.maximumResponseBytes)
+    )
+      throw new Error('Invalid historical log response threshold.');
+    this.historicalLogResponseBytes = historicalLogResponseBytes;
     this.id = id;
     this.operator = operator;
     this.chain = chain;
@@ -250,6 +262,14 @@ export class RpcClient {
     const guard = performance.now();
     for (const call of calls)
       validateCall(call, this.contract, this.targets, options.addressDiscovery);
+    const logFilter =
+      lane === 'sync' && calls.length === 1 && calls[0]!.method === 'eth_getLogs'
+        ? (calls[0]!.params[0] as { fromBlock: string; toBlock: string })
+        : undefined;
+    const earlyBytes =
+      logFilter && BigInt(logFilter.fromBlock) < BigInt(logFilter.toBlock)
+        ? this.historicalLogResponseBytes
+        : undefined;
     const requests = calls.map((call) => ({ jsonrpc: '2.0', id: this.nextId++, ...call }));
     const body = JSON.stringify(requests);
     this.counters.guardsMs += performance.now() - guard;
@@ -301,6 +321,7 @@ export class RpcClient {
             );
             const buffers: Buffer[] = [];
             let size = 0;
+            let sizeReason: 'local-size' | 'response-size' | undefined;
             let primary: unknown;
             try {
               response = await this.transport(body, combined, attemptDeadline);
@@ -313,8 +334,19 @@ export class RpcClient {
                 size += chunk.byteLength;
                 this.counters.bytes += chunk.byteLength;
                 if (size > limits.provider.maximumResponseBytes) {
+                  sizeReason = 'response-size';
                   controller.abort();
                   throw new RangeError('Provider response exceeds byte bound.');
+                }
+                if (response.status === 200 && earlyBytes !== undefined && size > earlyBytes) {
+                  if (this.budget.clock.now() >= attemptDeadline)
+                    throw new Error('Provider original request deadline expired.');
+                  sizeReason = 'local-size';
+                  // Let iterator return cancel/drain before aborting this attempt's
+                  // signal; deliberate early unwinding is not a session failure.
+                  throw new LocalLogSizeError(
+                    'Historical log response exceeds local size threshold.',
+                  );
                 }
                 buffers.push(Buffer.from(chunk));
               }
@@ -384,11 +416,12 @@ export class RpcClient {
                   'rpc',
                   this.budget.clock.now(),
                   Buffer.concat(buffers),
-                  combined.aborted || this.budget.clock.now() >= attemptDeadline
-                    ? 'deadline'
-                    : response
-                      ? 'envelope'
-                      : 'transport',
+                  sizeReason ??
+                    (combined.aborted || this.budget.clock.now() >= attemptDeadline
+                      ? 'deadline'
+                      : response
+                        ? 'envelope'
+                        : 'transport'),
                 ),
               );
               throw primary;
@@ -401,6 +434,13 @@ export class RpcClient {
                 if (primary) {
                   const diagnostic = rpcDiagnostic(primary);
                   if (diagnostic) diagnostic.cleanupFailed = true;
+                  if (primary instanceof LocalLogSizeError) {
+                    const terminal = combined.aborted
+                      ? combined.reason
+                      : new Error('Provider response cleanup failed.');
+                    if (diagnostic) attachRpcDiagnostic(terminal, diagnostic);
+                    throw terminal;
+                  }
                 } else {
                   attachRpcDiagnostic(
                     error,

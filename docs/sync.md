@@ -49,6 +49,17 @@ not invented parent links. Recovery promises retained checkpoint rewinds, not ar
 skipped block rewinds; a confirmed reorg without a retained checkpoint inside its
 configured block window pauses. Decoding remains outside the writer transaction.
 
+Common-prefix canaries opt in through the existing source factory to a 2 MiB early
+buffer threshold for a single HTTP 200, multi-block historical `eth_getLogs` call.
+The existing engine halves its attempted span and reacquires from the committed
+cursor; day clipping can yield the same log interval before a further halving.
+Incomplete responses admit no data or scope facts and retain their conservative
+reservation (8 MiB under the unchanged 4 MiB hard profile). Whole crossing chunks are
+counted. Only a safely closed/settled local-size interruption is recoverable; hard
+caps, cancellation, deadlines, ownership and persistence failures remain terminal.
+Singletons keep the hard-byte and 2,000-row rules. Ordinary workers and unrelated
+calls retain their existing limits; no profile/schema/API format changes.
+
 The durable acceptance policy is `filtered-range-sparse-v2`, with explicit range endpoints.
 Seed format2 rejects format1 and unsupported old acceptance metadata instead of treating
 old contiguous-header claims as sparse coverage. Schema2 and both existing migrations

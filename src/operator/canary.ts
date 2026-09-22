@@ -186,7 +186,13 @@ export async function runCanary(
       if (!sourcePairs.has(chain))
         sourcePairs.set(
           chain,
-          profileSources(plan.profile, chain, (s) => transports.get(s.id)!, workerBudget),
+          profileSources(
+            plan.profile,
+            chain,
+            (s) => transports.get(s.id)!,
+            workerBudget,
+            prefix ? 2 * 1024 * 1024 : undefined,
+          ),
         );
       return sourcePairs.get(chain)!;
     };

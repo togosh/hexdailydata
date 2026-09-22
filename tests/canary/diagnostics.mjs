@@ -11,7 +11,7 @@ import { FakeClock } from '../sync/fixture.mjs';
 const signal = new AbortController().signal;
 const sha = (v) => createHash('sha256').update(v).digest('hex');
 
-async function exactSnapshot() {
+export async function exactSnapshot() {
   const c = await connect(databaseConfig('worker'));
   try {
     const value = {};
