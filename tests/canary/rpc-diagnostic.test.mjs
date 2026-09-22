@@ -319,6 +319,66 @@ test('HTTP failure retains only safe Retry-After and the final actual observed r
     assert.equal(r.s.state.uncertainAttempts, 0);
   }
 });
+
+test('retry queue/deadline and cooldown failures retain the last exchange without replacing the terminal error', async () => {
+  for (const mode of ['retry-deadline', 'cooldown-failure']) {
+    const clock = new FakeClock(),
+      cooldown = memoryCooldown();
+    if (mode === 'cooldown-failure')
+      cooldown.extend = async () => {
+        throw Error('Synthetic cooldown persistence failure.');
+      };
+    let sends = 0,
+      body;
+    const rpc = new RpcClient(
+      'synthetic-retry',
+      null,
+      369,
+      CONTRACT,
+      async (input) => {
+        sends++;
+        body = Buffer.from(
+          JSON.stringify(
+            JSON.parse(input).map((c) => ({
+              jsonrpc: '2.0',
+              id: c.id,
+              error: { code: -32000, message: 'Synthetic unavailable' },
+            })),
+          ),
+        );
+        return {
+          status: mode === 'retry-deadline' ? 503 : 200,
+          retryAfter: mode === 'retry-deadline' ? '3600' : null,
+          body: (async function* () {
+            yield body;
+          })(),
+        };
+      },
+      new ProviderBudget('worker', cooldown, clock),
+    );
+    await assert.rejects(rpc.calls([logs], signal), (error) => {
+      assert.equal(error.constructor, Error);
+      assert.equal(
+        error.message,
+        mode === 'retry-deadline'
+          ? 'Provider work cannot meet deadline.'
+          : 'Synthetic cooldown persistence failure.',
+      );
+      const d = rpcDiagnostic(error);
+      assert.equal(d.source, 'synthetic-retry');
+      assert.equal(d.attempt, 1);
+      assert.equal(d.httpStatus, mode === 'retry-deadline' ? 503 : 200);
+      assert.equal(d.reason, mode === 'retry-deadline' ? 'http' : 'correlated-rpc-error');
+      assert.equal(d.observedBytes, body.length);
+      assert.equal(d.sha256, digest(body));
+      assert.equal(d.received[0].observedUntrustedError.code, -32000);
+      return true;
+    });
+    assert.equal(sends, 1);
+    assert.equal(rpc.counters.requests, 1);
+    assert.equal(rpc.counters.retries, 1);
+  }
+});
 test('partial, oversize and late bodies hash exactly observed bytes and do not claim complete digests', async () => {
   for (const mode of ['partial', 'oversize', 'late']) {
     const clock = new FakeClock(),

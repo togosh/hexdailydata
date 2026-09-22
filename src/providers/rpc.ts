@@ -5,7 +5,13 @@ import { ProviderBudget, type Lane } from './budget.ts';
 import { address, hash } from '../services/projections/input.ts';
 import { quantity, dataHex, selectors, topics } from './abi.ts';
 import { liveSelectors } from './live-abi.ts';
-import { RpcExchange, attachRpcDiagnostic, rpcDiagnostic, safeRpcError } from './rpc-diagnostic.ts';
+import {
+  RpcExchange,
+  attachRpcDiagnostic,
+  rpcDiagnostic,
+  safeRpcError,
+  type RpcDiagnostic,
+} from './rpc-diagnostic.ts';
 
 export type ReadTargets = {
   tokens: readonly string[];
@@ -247,6 +253,9 @@ export class RpcClient {
     const requests = calls.map((call) => ({ jsonrpc: '2.0', id: this.nextId++, ...call }));
     const body = JSON.stringify(requests);
     this.counters.guardsMs += performance.now() - guard;
+    // A queue/deadline/backoff refusal can end retrying before another exchange.
+    // Retain only the latest failed exchange, separately from the terminal error.
+    let lastDiagnostic: RpcDiagnostic | undefined;
     for (let attempt = 0; ; attempt++) {
       try {
         options.request?.check(calls.length);
@@ -405,6 +414,8 @@ export class RpcClient {
           options.request ? () => options.request!.charge(calls.length) : undefined,
         );
       } catch (error) {
+        lastDiagnostic = rpcDiagnostic(error) ?? lastDiagnostic;
+        if (lastDiagnostic) attachRpcDiagnostic(error, lastDiagnostic);
         if (signal.aborted && rpcDiagnostic(error)) throw error;
         signal.throwIfAborted();
         if (
@@ -417,7 +428,12 @@ export class RpcClient {
         )
           throw error;
         this.counters.retries++;
-        await this.budget.backoff(this.budget.clock.now() + 1000 * 2 ** attempt);
+        try {
+          await this.budget.backoff(this.budget.clock.now() + 1000 * 2 ** attempt);
+        } catch (error) {
+          if (lastDiagnostic) attachRpcDiagnostic(error, lastDiagnostic);
+          throw error;
+        }
       }
     }
   }

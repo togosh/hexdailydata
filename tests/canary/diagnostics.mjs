@@ -28,8 +28,16 @@ export async function diagnosticTests({ root, test, reset }) {
   assert.equal(process.env.HDD_V2_ALLOW_LIVE_RPC, 'false');
   assert.equal(process.env.HDD_V2_CANARY_OPT_IN, undefined);
   await test('compiled RPC diagnostics preserve exact committed SQL across client/wrapper/day-transition rejection and failed final save', async () => {
-    for (const mode of ['client', 'wrapper', 'close', 'final-save', 'settlement-save']) {
+    for (const mode of [
+      'client',
+      'wrapper',
+      'close',
+      'final-save',
+      'settlement-save',
+      'retry-refusal',
+    ]) {
       const wrapper = mode === 'wrapper' || mode === 'settlement-save';
+      const retryRefusal = mode === 'retry-refusal';
       const p = dayBoundaryPlan(root + '/' + randomUUID());
       await inputs(p);
       const clock = new FakeClock();
@@ -63,9 +71,9 @@ export async function diagnosticTests({ root, test, reset }) {
                 calls.map((c) => ({
                   jsonrpc: '2.0',
                   id: wrapper ? c.id + 1000 : c.id,
-                  result: null,
+                  ...(retryRefusal ? {} : { result: null }),
                   error: {
-                    code: -32005,
+                    code: retryRefusal ? -32000 : -32005,
                     message: 'Synthetic network timeout disagreement range; not the lost response',
                   },
                 })),
@@ -74,8 +82,8 @@ export async function diagnosticTests({ root, test, reset }) {
             rejected = true;
             if (mode === 'settlement-save') await rename(p.storagePath, p.storagePath + '-moved');
             return {
-              status: 200,
-              retryAfter: null,
+              status: retryRefusal ? 503 : 200,
+              retryAfter: retryRefusal ? '3600' : null,
               body: (async function* () {
                 yield responseBody;
               })(),
@@ -135,10 +143,17 @@ export async function diagnosticTests({ root, test, reset }) {
       assert.equal(result.http, sends);
       assert.match(
         result.reason,
-        wrapper ? /Common prefix missing response/ : /Missing\/conflicting RPC/,
+        retryRefusal
+          ? /Provider work cannot meet deadline/
+          : wrapper
+            ? /Common prefix missing response/
+            : /Missing\/conflicting RPC/,
       );
       const d = result.rpcDiagnostic;
-      assert.equal(d.reason, wrapper ? 'unexpected-id' : 'both-result-error');
+      assert.equal(
+        d.reason,
+        retryRefusal ? 'http' : wrapper ? 'unexpected-id' : 'both-result-error',
+      );
       assert.equal(d.stage, wrapper ? 'prefix' : 'rpc');
       assert.deepEqual(d.binding, { originChainId: 1, networkChainId: 369 });
       assert.equal(d.attempt, sends);
@@ -146,14 +161,15 @@ export async function diagnosticTests({ root, test, reset }) {
       assert.equal(d.requests[0].toBlock, request[0].params[0].toBlock);
       assert.equal(d.requests[0].id.value, request[0].id);
       assert.equal(d.received[0].id.value, request[0].id + (wrapper ? 1000 : 0));
-      assert.equal(d.received[0].observedUntrustedError.code, -32005);
+      assert.equal(d.received[0].observedUntrustedError.code, retryRefusal ? -32000 : -32005);
+      assert.equal(d.httpStatus, retryRefusal ? 503 : 200);
       assert.equal(d.observedBytes, responseBody.length);
       assert.equal(d.sha256, sha(responseBody));
       assert.equal(d.streamComplete, true);
       assert.equal(d.accepted, false);
       assert.equal(
-        result.prefix.accounting.every((a) => a.rpc.retries === 0),
-        true,
+        result.prefix.accounting.reduce((n, a) => n + a.rpc.retries, 0),
+        retryRefusal ? 1 : 0,
       );
       if (mode === 'close') {
         assert.equal(d.cleanupFailed, true);
