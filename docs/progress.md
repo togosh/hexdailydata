@@ -453,3 +453,19 @@ Evidence/report/review: `artifacts/task-09/20260921-capacity1/`; prior evidence 
 Live admission, full valid historical seed/rebuild, production and platform gaps remain
 unqualified. Tasks 10/11 pending; no live/canary/HDS/v1/existing DB/push/deployment.
 Stop for planner review. Documentation/status-only commit after frozen reviewed code.
+
+Task10 bounded shared-history integration SHARED_HISTORY_TRANSPORT_OFFLINE_PASS.
+Reviewed code `433ab902e396652f68becdf04e5dcccc2653d50e`, base `aa4cffab` preserved.
+Explicit network369/origin1 binding now uses existing worker/canary/replay/seed/recovery;
+declared parent fence, exact accounting, finality and provider limits remain enforced.
+One separate read-only `/root/shared_history_review` PASS after one correction round:
+finalized header identity and retained cursor hash/time checks fixed and independently
+reproduced. Final units/fresh ZIP 126/126; types/format/build/help PASS; public check
+NOT_CONFIGURED. Shared raw/SQL/portable sequence 18 groups PASS, seed audits 10 checkpoints;
+direct recovery regression PASS. Unchanged non-scale SQL/canary evidence reused by commit.
+Fake split canary charged 506 HTTP/600 logical calls, durable counters exact; no live calls.
+Report, compact actual failures/rechecks and source ZIP: `artifacts/task-10/shared-history/`.
+Task09 accepted; exact live declarations, real seed/history, duration/cost, live42/900 and
+full Task10 remain pending (docs/sync.md). All prior spent sessions/private canary preserved.
+No live/discovery/real import/rebuild/v1/UI/Task11/push/deploy. Stop for planner review.
+Documentation/status-only commit after the reviewed source.
