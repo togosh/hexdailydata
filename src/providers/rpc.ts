@@ -26,6 +26,8 @@ export interface RpcCall {
 export type Transport = (
   body: string,
   signal: AbortSignal,
+  /** Absolute attempt deadline, already clipped to the original logical deadline. */
+  deadline?: number,
 ) => Promise<{
   status: number;
   retryAfter: string | null;
@@ -253,6 +255,10 @@ export class RpcClient {
           async () => {
             const remaining = deadline - this.budget.clock.now();
             if (remaining <= 0) throw new Error('Provider deadline expired.');
+            const attemptDeadline = Math.min(
+              deadline,
+              this.budget.clock.now() + limits.provider.requestTimeoutSeconds * 1000,
+            );
             const controller = new AbortController();
             const timeout = setTimeout(
               () => controller.abort(new Error('Provider timeout.')),
@@ -274,7 +280,7 @@ export class RpcClient {
               }
             let response: Awaited<ReturnType<Transport>> | undefined;
             try {
-              response = await this.transport(body, combined);
+              response = await this.transport(body, combined, attemptDeadline);
               combined.throwIfAborted();
               const buffers: Buffer[] = [];
               let size = 0;

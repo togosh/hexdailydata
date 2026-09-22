@@ -242,7 +242,7 @@ export class CanarySession {
     const phase = prefixPhase(this.plan);
     const scope = phase ? new PrefixScope(this.plan, phase, source) : null;
     // chain is the authorized logical phase, not eth_chainId of the serving network.
-    return async (body, signal) => {
+    return async (body, signal, requestDeadline = Infinity) => {
       const previous = this.tail;
       let unlock!: () => void;
       this.tail = new Promise<void>((r) => {
@@ -257,6 +257,19 @@ export class CanarySession {
       const chunks: Buffer[] = [];
       const aborter = new AbortController();
       const active = AbortSignal.any([combined, aborter.signal]);
+      const checkDeadline = () => {
+        active.throwIfAborted();
+        const now = this.time();
+        if (now >= this.state.deadline!) {
+          this.stop('Canary elapsed cap reached.');
+          throw this.controller.signal.reason;
+        }
+        // A late continuation can precede an already-due abort timer callback.
+        // The RPC attempt's absolute deadline therefore travels through this gate.
+        if (now >= requestDeadline)
+          throw new CanaryStop('Canary original request deadline expired.');
+        return now;
+      };
       const settle = async (complete: boolean) => {
         if (finished) return;
         finished = true;
@@ -327,9 +340,7 @@ export class CanarySession {
           // Recheck after queueing, persistence and late wakes; this gate counts actual
           // physical starts, not ProviderBudget's earlier slot reservations.
           for (;;) {
-            active.throwIfAborted();
-            const now = this.time();
-            if (now >= this.state.deadline!) throw new CanaryStop('Canary elapsed cap reached.');
+            const now = checkDeadline();
             this.starts = this.starts.filter((s) => s.at > now - phase.cadence.rollingMilliseconds);
             const full =
               this.starts.length >= phase.cadence.http ||
@@ -340,18 +351,16 @@ export class CanarySession {
               full ? this.starts[0]!.at + phase.cadence.rollingMilliseconds : now,
             );
             if (earliest <= now) break;
-            await this.clock.sleep(Math.min(earliest - now, this.state.deadline! - now), active);
+            await this.clock.sleep(
+              Math.min(earliest - now, this.state.deadline! - now, requestDeadline - now),
+              active,
+            );
           }
         }
-        active.throwIfAborted();
-        if (this.time() >= this.state.deadline!) {
-          this.stop('Canary elapsed cap reached.');
-          throw this.controller.signal.reason;
-        }
-        dispatchAt = this.time();
+        dispatchAt = checkDeadline();
         this.lastStart = dispatchAt;
         this.starts.push({ at: dispatchAt, logical: calls.length });
-        const response = await transport(body, active);
+        const response = await transport(body, active, requestDeadline);
         const self = this;
         return {
           ...response,
@@ -374,11 +383,7 @@ export class CanarySession {
                   self.stop('Canary response byte cap crossed.');
                   throw self.controller.signal.reason;
                 }
-                active.throwIfAborted();
-                if (self.time() >= self.state.deadline!) {
-                  self.stop('Canary elapsed cap reached.');
-                  throw self.controller.signal.reason;
-                }
+                checkDeadline();
                 if (scope && response.status === 200) chunks.push(Buffer.from(chunk));
                 yield chunk;
               }
@@ -386,6 +391,7 @@ export class CanarySession {
               await self.hooks.beforeSettlement?.();
               if (scope && response.status === 200)
                 scope.response(calls, Buffer.concat(chunks).toString('utf8'));
+              checkDeadline();
               complete = true;
             } catch (error) {
               failed = true;
