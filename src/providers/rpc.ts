@@ -5,6 +5,7 @@ import { ProviderBudget, type Lane } from './budget.ts';
 import { address, hash } from '../services/projections/input.ts';
 import { quantity, dataHex, selectors, topics } from './abi.ts';
 import { liveSelectors } from './live-abi.ts';
+import { RpcExchange, attachRpcDiagnostic, rpcDiagnostic, safeRpcError } from './rpc-diagnostic.ts';
 
 export type ReadTargets = {
   tokens: readonly string[];
@@ -33,6 +34,8 @@ export type Transport = (
   retryAfter: string | null;
   body: AsyncIterable<Uint8Array>;
   close?: () => Promise<void>;
+  /** Internal observation shared with a bounded transport wrapper; never a payload. */
+  exchange?: RpcExchange;
 }>;
 export function httpTransport(endpoint: string): Transport {
   const url = new URL(endpoint);
@@ -279,12 +282,24 @@ export class RpcClient {
                 this.counters.selectors[selector] = (this.counters.selectors[selector] ?? 0) + 1;
               }
             let response: Awaited<ReturnType<Transport>> | undefined;
+            let exchange = new RpcExchange(
+              this.id,
+              requests,
+              this.contract,
+              this.counters.requests,
+              this.budget.clock.now(),
+              attemptDeadline,
+            );
+            const buffers: Buffer[] = [];
+            let size = 0;
+            let primary: unknown;
             try {
               response = await this.transport(body, combined, attemptDeadline);
+              exchange = response.exchange ?? exchange;
+              exchange.headers(response.status, response.retryAfter);
               combined.throwIfAborted();
-              const buffers: Buffer[] = [];
-              let size = 0;
               for await (const chunk of response.body) {
+                if (!response.exchange) exchange.observe(chunk);
                 combined.throwIfAborted();
                 size += chunk.byteLength;
                 this.counters.bytes += chunk.byteLength;
@@ -294,6 +309,7 @@ export class RpcClient {
                 }
                 buffers.push(Buffer.from(chunk));
               }
+              exchange.complete = true;
               if (response.status === 429 || response.status >= 500) {
                 const retry = response.retryAfter;
                 const delay =
@@ -351,15 +367,45 @@ export class RpcClient {
                 }
                 return row.result;
               });
+            } catch (error) {
+              primary = rpcDiagnostic(error) ? error : safeRpcError(error);
+              attachRpcDiagnostic(
+                primary,
+                exchange.failure(
+                  'rpc',
+                  this.budget.clock.now(),
+                  Buffer.concat(buffers),
+                  combined.aborted || this.budget.clock.now() >= attemptDeadline
+                    ? 'deadline'
+                    : response
+                      ? 'envelope'
+                      : 'transport',
+                ),
+              );
+              throw primary;
             } finally {
               clearTimeout(timeout);
               this.counters.transportMs += performance.now() - start;
-              await response?.close?.();
+              try {
+                await response?.close?.();
+              } catch (error) {
+                if (primary) {
+                  const diagnostic = rpcDiagnostic(primary);
+                  if (diagnostic) diagnostic.cleanupFailed = true;
+                } else {
+                  attachRpcDiagnostic(
+                    error,
+                    exchange.failure('rpc', this.budget.clock.now(), undefined, 'close'),
+                  );
+                  throw error;
+                }
+              }
             }
           },
           options.request ? () => options.request!.charge(calls.length) : undefined,
         );
       } catch (error) {
+        if (signal.aborted && rpcDiagnostic(error)) throw error;
         signal.throwIfAborted();
         if (
           error instanceof RangeError ||

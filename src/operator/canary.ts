@@ -20,6 +20,7 @@ import { canaryAuthority, canaryPlanSchema, checkCanary, readCanaryJson } from '
 import { prefixPhase } from './canary-prefix.ts';
 import { plainHeader } from '../providers/abi.ts';
 import type { SessionHooks } from './canary-session.ts';
+import { rpcDiagnostic } from '../providers/rpc-diagnostic.ts';
 
 export const canaryHelp =
   'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths. Run/resume require separate owner approval, session opt-in and live opt-in. No providers by default.';
@@ -368,6 +369,8 @@ export async function runCanary(
       session.state.status !== 'complete'
     ) {
       session.state.reason = primary.slice(0, 160);
+      const diagnostic = rpcDiagnostic(error);
+      if (diagnostic) session.state.rpcDiagnostic = diagnostic;
       return session.state;
     }
     throw error;
@@ -411,12 +414,18 @@ export async function runCanary(
           budget: s.rpc.budget.counters,
         }));
       }
-      await cleanup(() =>
-        session!.finish(
-          completed && !primary && !secondary.length ? 'complete' : 'stopped',
-          primary ?? secondary[0] ?? 'Bounded phases complete; no full feasibility claim.',
-        ),
-      );
+      await cleanup(async () => {
+        if (session!.state.rpcDiagnostic) session!.state.diagnosticPersistence = 'saved';
+        try {
+          await session!.finish(
+            completed && !primary && !secondary.length ? 'complete' : 'stopped',
+            primary ?? secondary[0] ?? 'Bounded phases complete; no full feasibility claim.',
+          );
+        } catch (e) {
+          if (session!.state.rpcDiagnostic) session!.state.diagnosticPersistence = 'failed';
+          throw e;
+        }
+      });
     }
     await cleanup(async () => release?.());
     if (
@@ -434,14 +443,18 @@ export async function runCanary(
       if (session.state.prefix)
         session.state.prefix.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
       try {
+        if (session.state.rpcDiagnostic) session.state.diagnosticPersistence = 'saved';
         await session.save();
       } catch (e) {
+        if (session.state.rpcDiagnostic) session.state.diagnosticPersistence = 'failed';
         console.error(
           JSON.stringify({
             event: 'canary_finalization_failed',
             primary,
             secondary,
             error: failure(e),
+            rpcDiagnostic: session.state.rpcDiagnostic,
+            diagnosticPersistence: session.state.diagnosticPersistence,
           }),
         );
       }

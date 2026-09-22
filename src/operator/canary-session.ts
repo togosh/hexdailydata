@@ -8,6 +8,13 @@ import type { Transport, RpcCall } from '../providers/rpc.ts';
 import { PrefixScope, prefixPhase } from './canary-prefix.ts';
 import { headerSchema } from '../services/projections/input.ts';
 import { operatorError } from './errors.ts';
+import {
+  RpcExchange,
+  attachRpcDiagnostic,
+  rpcDiagnostic,
+  safeRpcError,
+  type RpcDiagnostic,
+} from '../providers/rpc-diagnostic.ts';
 
 const integer = z.number().int().nonnegative().safe();
 const stateSchema = z.strictObject({
@@ -37,6 +44,16 @@ const stateSchema = z.strictObject({
       accounting: z.unknown().optional(),
     })
     .optional(),
+  rpcDiagnostic: z
+    .custom<RpcDiagnostic>(
+      (v) =>
+        v !== null &&
+        typeof v === 'object' &&
+        (v as RpcDiagnostic).version === 1 &&
+        Buffer.byteLength(JSON.stringify(v)) <= 8192,
+    )
+    .optional(),
+  diagnosticPersistence: z.enum(['saved', 'failed']).optional(),
 });
 export type CanaryState = z.infer<typeof stateSchema>;
 export class CanaryStop extends Error {}
@@ -145,7 +162,7 @@ export class CanarySession {
     try {
       this.time();
       const bytes = JSON.stringify(this.state);
-      if (bytes.length > 65536) throw new Error('Canary state too large.');
+      if (Buffer.byteLength(bytes) > 65536) throw new Error('Canary state too large.');
       await atomicJson(this.plan.storagePath, 'canary.json', {
         ...this.state,
         checksum: checksum(this.state),
@@ -254,6 +271,7 @@ export class CanarySession {
         observed = 0,
         finished = false;
       let dispatchAt: number | null = null;
+      let exchange: RpcExchange | undefined;
       const chunks: Buffer[] = [];
       const aborter = new AbortController();
       const active = AbortSignal.any([combined, aborter.signal]);
@@ -313,6 +331,8 @@ export class CanarySession {
               event: 'canary_settlement_failed',
               primary: operatorError(primary),
               secondary: operatorError(secondary),
+              rpcDiagnostic: rpcDiagnostic(primary),
+              diagnosticPersistence: 'failed',
             }),
           );
         }
@@ -360,10 +380,24 @@ export class CanarySession {
         dispatchAt = checkDeadline();
         this.lastStart = dispatchAt;
         this.starts.push({ at: dispatchAt, logical: calls.length });
+        exchange = new RpcExchange(
+          source,
+          calls,
+          this.plan.profile.contract,
+          this.state.http,
+          dispatchAt,
+          requestDeadline,
+        );
+        exchange.binding = {
+          originChainId: chain,
+          networkChainId: chain === 1 && this.plan.profile.commonHistory !== 'pulsechain' ? 1 : 369,
+        };
         const response = await transport(body, active, requestDeadline);
+        exchange.headers(response.status, response.retryAfter);
         const self = this;
         return {
           ...response,
+          exchange,
           close: async () => {
             aborter.abort();
             try {
@@ -379,6 +413,7 @@ export class CanarySession {
               for await (const chunk of response.body) {
                 // Count the entire observed chunk even if it crosses the ceiling.
                 observed += chunk.byteLength;
+                exchange!.observe(chunk);
                 if (observed > self.plan.caps.responseBytes) {
                   self.stop('Canary response byte cap crossed.');
                   throw self.controller.signal.reason;
@@ -387,13 +422,28 @@ export class CanarySession {
                 if (scope && response.status === 200) chunks.push(Buffer.from(chunk));
                 yield chunk;
               }
+              exchange!.complete = true;
               active.throwIfAborted();
               await self.hooks.beforeSettlement?.();
               if (scope && response.status === 200)
                 scope.response(calls, Buffer.concat(chunks).toString('utf8'));
               checkDeadline();
               complete = true;
-            } catch (error) {
+            } catch (caught) {
+              const error = safeRpcError(caught);
+              attachRpcDiagnostic(
+                error,
+                exchange!.failure(
+                  'prefix',
+                  self.clock.now(),
+                  Buffer.concat(chunks),
+                  active.aborted ||
+                    self.clock.now() >= requestDeadline ||
+                    self.clock.now() >= self.state.deadline!
+                    ? 'deadline'
+                    : 'scope',
+                ),
+              );
               failed = true;
               await settleAfterError(error);
               throw error;
@@ -403,7 +453,22 @@ export class CanarySession {
             }
           })(),
         };
-      } catch (e) {
+      } catch (caught) {
+        const e = safeRpcError(caught);
+        if (exchange)
+          attachRpcDiagnostic(
+            e,
+            exchange.failure(
+              'prefix',
+              this.clock.now(),
+              undefined,
+              active.aborted ||
+                this.clock.now() >= requestDeadline ||
+                this.clock.now() >= this.state.deadline!
+                ? 'deadline'
+                : 'transport',
+            ),
+          );
         aborter.abort();
         await settleAfterError(e);
         throw e;

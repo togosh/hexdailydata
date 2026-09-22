@@ -62,7 +62,19 @@ try {
     '/canary-test',
   ]);
   console.log(
-    run([...compose, 'run', '--rm', '-T', 'runner', 'node', 'tests/canary/run.mjs'], 600000),
+    run(
+      [
+        ...compose,
+        'run',
+        '--rm',
+        '-T',
+        'runner',
+        'node',
+        'tests/canary/run.mjs',
+        ...(process.argv.includes('--diagnostics-only') ? ['--diagnostics-only'] : []),
+      ],
+      600000,
+    ),
   );
 } catch (e) {
   console.error(e.message);

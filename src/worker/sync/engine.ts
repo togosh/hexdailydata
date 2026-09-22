@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { performance } from 'node:perf_hooks';
+import { rpcDiagnostic } from '../../providers/rpc-diagnostic.ts';
 import { statfs } from 'node:fs/promises';
 import { z } from 'zod';
 import { Source } from '../../providers/source.ts';
@@ -420,6 +421,8 @@ export class SyncEngine {
             accepted = validateBatch(batch);
             break;
           } catch (error) {
+            // A settlement/cleanup abort must not replace the exchange that failed.
+            if (signal.aborted && rpcDiagnostic(error)) throw error;
             signal.throwIfAborted();
             if (
               !(

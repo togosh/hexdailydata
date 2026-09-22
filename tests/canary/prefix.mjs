@@ -76,6 +76,7 @@ export async function prefixTests({ root, test, reset, snapshot, cli }) {
         s = await state(p),
         sql = await snapshot();
       assert.equal(s.status, 'complete');
+      assert.equal(s.rpcDiagnostic, undefined, 'successful responses have no durable diagnostic');
       assert.equal(s.prefix.stopHeader.number, '1380');
       assert.equal(s.prefix.stopHeader.timestamp, '1575763201');
       assert.deepEqual(

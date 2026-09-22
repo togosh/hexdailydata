@@ -32,6 +32,7 @@ import { FakeClock, memoryCooldown } from '../sync/fixture.mjs';
 import { sharedProfile } from '../sync/shared-profile.mjs';
 import * as live from '../live/fixture.mjs';
 import { prefixTests } from './prefix.mjs';
+import { diagnosticTests } from './diagnostics.mjs';
 
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
@@ -40,7 +41,9 @@ const signal = new AbortController().signal,
   results = [];
 const root = '/canary-test/' + randomUUID();
 await mkdir(root);
+let diagnosticsComplete = false;
 async function test(name, fn) {
+  if (diagnosticsComplete && process.argv.includes('--diagnostics-only')) return;
   const at = performance.now();
   try {
     await fn();
@@ -185,6 +188,8 @@ try {
   } finally {
     await migration.end();
   }
+  await diagnosticTests({ root, test, reset });
+  diagnosticsComplete = true;
   await prefixTests({ root, test, reset, snapshot, cli });
   await test('shared transport compiled canary replay charges reused aliases and preserves logical range authorization', async () => {
     const p = await fresh({

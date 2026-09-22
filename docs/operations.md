@@ -159,6 +159,16 @@ deadline shutdown; an overrun cannot pass. Keep the operator/SQL volumes after s
 for evidence. No full replay, native initialization or production readiness follows
 from a prefix result.
 
+New failed sessions may retain one optional `rpcDiagnostic` (at most8KiB), with source
+alias, bounded request/ID facts, structural rejection, observed status/byte count and
+SHA256. `streamComplete` describes transport observation, never acceptance; an incomplete
+digest covers only observed chunks. The preview is a sanitized structural summary,
+not a body archive. Provider prose is untrusted and never controls retry/splitting.
+No successful result payloads, endpoint secrets, wallet arguments or error.data are
+saved. `diagnosticPersistence:failed` means final evidence could only be returned/logged;
+it does not claim durable storage. A prior session without the field has unavailable
+diagnostics and gains no permission, reconstruction or allowance from this change.
+
 ## Cost target (planning envelope, not a vendor quote)
 
 Owner maximum is **$50–60/month total** before monetization. Suggested allocation:
