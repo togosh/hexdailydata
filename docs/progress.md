@@ -527,3 +527,18 @@ compact actual evidence: `artifacts/task-10/byte-aware-logs/`. Zero provider req
 no old database/spent-state access or modification. Prior live results remain unchanged.
 Task09 accepted; full Task10 PENDING; Task11 unstarted. No rebuild, fork initialization,
 HDS, v1, UI, push or deployment. Stop for planner review. Documentation-only final entry.
+
+Task10 pinned retained-checkpoint audit: PINNED_AUDIT_PASS. Reviewed runtime
+`f053ba10d6c9e00052307b380adee4defd489072`; baseline de4f5a2d and newer work preserved.
+One new session `b651adf2-1290-45b4-963d-fcbd2052ba76` audited retained block9046675,
+revision13: all1676 accounts/source, including53 zeros, plus two separate singleton
+checks. Both external aggregates and fresh canonical/schema/sequence equality pass;
+provider-disabled readback agrees. 351HTTP/3380logical,532100 observed/8920708 charged
+bytes, one recovered incomplete attempt,1930492ms; no second invocation or replay.
+Builder22 focused tests/11 compiled SQL groups PASS; separate `/root/byte_review`
+implementation, concrete bindings and saved-outcome PASS, including13 independent
+SQL groups. Report/result/actual evidence: `artifacts/task-10/pinned-audit/`.
+Only task containers removed; retained DB and new spent state preserved. Old state
+volumes never opened; original stopped first-day replay result remains unchanged.
+The linked replay and audit evidence complete this first-day milestone; full Task10
+remains PENDING and Task11 unstarted. Stop for planner review. Status-only final entry.
