@@ -2,12 +2,17 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile, rename } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
-import { prefixPlan, prefixEnvironment, prefixFixture } from './prefix-fixture.mjs';
+import {
+  prefixPlan,
+  prefixEnvironment,
+  prefixFixture,
+  dayBoundaryPlan,
+} from './prefix-fixture.mjs';
 import { inputs } from './fixture.mjs';
 import { CanarySession } from '../../dist/operator/canary-session.js';
 import { PrefixScope } from '../../dist/operator/canary-prefix.js';
 import { runCanary } from '../../dist/operator/canary.js';
-import { canaryPlanSchema } from '../../dist/operator/canary-plan.js';
+import { canaryPlanSchema, planDigest, canaryAuthority } from '../../dist/operator/canary-plan.js';
 import { FakeClock, A, B, hash, memoryCooldown } from '../sync/fixture.mjs';
 import { ProviderBudget } from '../../dist/providers/budget.js';
 import { RpcClient } from '../../dist/providers/rpc.js';
@@ -22,6 +27,231 @@ export async function prefixTests({ root, test, reset, snapshot, cli }) {
   const path = (p) => p.storagePath + '/plan.json';
   const approval = (p) => p.storagePath + '/approval.json';
   const state = async (p) => JSON.parse(await readFile(p.sessionPath, 'utf8'));
+  const freshLong = async (overrides) => {
+    const p = dayBoundaryPlan(root + '/' + randomUUID(), overrides);
+    await inputs(p);
+    return p;
+  };
+  await test('larger prefix sublimits are inclusive and immutable old authority cannot expand', async () => {
+    const p = await freshLong();
+    const atLimit = structuredClone(p);
+    // Schema-only synthetic fork above the inclusive limit; never used for replay.
+    Object.assign(atLimit.profile.fork.parent, { number: '20000', hash: hash(20000) });
+    Object.assign(atLimit.profile.fork.entry, { number: '20001', parentHash: hash(20000) });
+    atLimit.profile.target.number = '20010';
+    atLimit.phases[0].finalityHeaders.minimum = '20010';
+    atLimit.ranges[0].to = atLimit.phases[0].through = '16483';
+    assert.equal(canaryPlanSchema.safeParse(atLimit).success, true);
+    for (const change of [
+      (q) => (q.ranges[0].to = q.phases[0].through = '16484'),
+      (q) => (q.ranges[0].to = '1381'),
+      (q) => (q.ranges[0].from = '1381'),
+      ...['milliseconds', 'http', 'logical', 'bytes', 'responseBytes'].map(
+        (key) => (q) => q.caps[key]++,
+      ),
+    ]) {
+      const q = structuredClone(atLimit);
+      change(q);
+      assert.equal(canaryPlanSchema.safeParse(q).success, false);
+    }
+    const old = await fresh(),
+      oldApproval = JSON.parse(await readFile(approval(old), 'utf8'));
+    canaryAuthority(old, oldApproval, prefixEnvironment(old));
+    assert.deepEqual(canaryPlanSchema.parse(old), old);
+    const expanded = canaryPlanSchema.parse({ ...p, session: old.session });
+    assert.notEqual(planDigest(expanded), oldApproval.planDigest);
+    assert.throws(
+      () => canaryAuthority(expanded, oldApproval, prefixEnvironment(expanded)),
+      /approval/,
+    );
+    await cli(p, 'check');
+  });
+  let longSuccessHttp;
+  await test('compiled larger prefix crosses five UTC days with exact nonempty ledger, activation and full address audit', async () => {
+    let expectedDomain;
+    for (const mode of ['normal', 'split-retry']) {
+      const p = await freshLong();
+      await cli(p, 'prepare');
+      const r = await cli(p, 'run', mode),
+        s = await state(p),
+        sql = await snapshot();
+      assert.equal(s.status, 'complete');
+      assert.equal(s.prefix.stopHeader.number, '1380');
+      assert.equal(s.prefix.stopHeader.timestamp, '1575763201');
+      assert.deepEqual(
+        sql.chains.map((r) => r.chain_id),
+        [1],
+      );
+      assert.equal(sql.sync_state[0].block_number, '1380');
+      assert.equal(sql.sync_state[0].block_hash.toString('hex'), hash(1380).slice(2));
+      assert.equal(sql.current_state.length, 1);
+      const current = sql.current_state[0];
+      // Mint 9007199254740993 + 10000. Remaining locked=400; only stake4's
+      // 10-heart settlement mints a profit. GA removes shares, not locked funds.
+      for (const [key, value] of Object.entries({
+        contract_day: '5',
+        circulating_hearts: '9007199254750603',
+        locked_hearts: '400',
+        accounted_hearts: '300',
+        weighted_days: '20100',
+        active_shares: '150',
+        queued_shares: '0',
+        raw_share_rate: '100000',
+        holder_count: '2',
+        staker_count: '1',
+      }))
+        assert.equal(String(current[key]), value, key);
+      assert.deepEqual(
+        sql.accounts.map((r) => [r.address.toString('hex'), r.liquid_hearts]),
+        [
+          [A.slice(2), '9007199254740882'],
+          [B.slice(2), '9721'],
+        ],
+      );
+      assert.equal(sql.stakes.length, 5);
+      assert.equal(sql.share_schedule.length, 0, 'activated queue is empty, not missing input');
+      assert.deepEqual(
+        sql.daily_stats.map((r) => [
+          r.contract_day,
+          r.close_block,
+          r.active_shares,
+          r.queued_shares,
+          r.payout_status,
+          r.payout_hearts,
+          r.payout_shares,
+        ]),
+        [
+          [0, '355', '0', '250', 'materialized', '0', '0'],
+          [1, '611', '0', '250', 'materialized', '0', '0'],
+          [2, '867', '250', '0', 'materialized', '50', '250'],
+          [3, '1123', '150', '0', 'pending', null, null],
+          [4, '1379', '150', '0', 'pending', null, null],
+        ],
+      );
+      assert.deepEqual(
+        sql.daily_stats.map((r) => [r.starts, r.ends, r.payout_recorded]),
+        [
+          ['5', '1', '0'],
+          ['0', '0', '0'],
+          ['0', '0', '0'],
+          ['0', '1', '20'],
+          ['0', '0', '0'],
+        ],
+      );
+      const result = s.results[0].result;
+      assert.equal(result.audit, 'all-prefix-addresses');
+      assert.equal(result.progress.events, 20);
+      assert.equal(result.progress.cursor, '1380');
+      const raw = JSON.parse(r.out.trim().split('\n').at(-1)).fixtureTransport;
+      assert.equal(raw.peak, 1);
+      assert.equal(raw.http, s.http);
+      assert.equal(raw.logical, s.logical);
+      assert.equal(raw.bytes, s.observedBytes);
+      const balances = raw.calls.filter(
+        (c) =>
+          c.method === 'eth_call' &&
+          c.params[0].data.startsWith('0x70a08231') &&
+          c.params[1].blockHash === hash(1380),
+      );
+      assert.deepEqual(balances.map((c) => c.params[0].data.slice(-40)).sort(), [
+        A.slice(2),
+        A.slice(2),
+        B.slice(2),
+        B.slice(2),
+      ]);
+      const db = await connect(databaseConfig('worker'));
+      let rows;
+      try {
+        rows = (
+          await db.query(
+            'SELECT kind,count(*)::text AS count FROM hdd.events GROUP BY kind ORDER BY kind',
+          )
+        ).rows;
+        const binding = (await db.query('SELECT sources FROM hdd.source_history WHERE chain_id=1'))
+          .rows[0].sources.binding;
+        assert.equal(binding.networkChainId, 369);
+        assert.equal(binding.originChainId, 1);
+      } finally {
+        await db.end();
+      }
+      assert.deepEqual(rows, [
+        { kind: 'daily_update', count: '2' },
+        { kind: 'good_accounting', count: '1' },
+        { kind: 'stake_end', count: '2' },
+        { kind: 'stake_start', count: '5' },
+      ]);
+      const domain = {
+        current: sql.current_state,
+        accounts: sql.accounts,
+        stakes: sql.stakes,
+        days: sql.daily_stats,
+      };
+      if (mode === 'normal') {
+        expectedDomain = domain;
+        longSuccessHttp = s.http;
+      } else {
+        // Different commits can observe the same exact ledger word at different hashes.
+        const normalize = (d) => ({
+          ...d,
+          days: d.days.map(({ payout_block, payout_hash, ...r }) => r),
+        });
+        assert.deepEqual(normalize(domain), normalize(expectedDomain));
+        assert.ok(s.prefix.accounting.some((a) => a.rpc.retries > 0));
+        assert.ok(result.progress.splits > 0);
+      }
+      await writeFile(
+        `/evidence/day-boundary-${mode}.json`,
+        JSON.stringify({ state: s, sql, eventKinds: rows, raw }, null, 2),
+      );
+      const frozen = await readFile(p.sessionPath, 'utf8');
+      await cli(p, 'resume', 'normal', 1);
+      await cli(p, 'run', 'normal', 1);
+      assert.equal(await readFile(p.sessionPath, 'utf8'), frozen);
+      await reset();
+    }
+  });
+  await test('multi-day close and ledger contradictions plus replay/audit caps preserve accepted SQL without complete', async () => {
+    const base = await freshLong();
+    for (const mode of ['day-close', 'ledger-disagree', 'replay-cap', 'audit-cap']) {
+      const p = await freshLong(
+        mode.endsWith('cap')
+          ? { caps: { ...base.caps, http: longSuccessHttp - (mode === 'audit-cap' ? 1 : 50) } }
+          : undefined,
+      );
+      await cli(p, 'prepare');
+      const r = await cli(p, 'run', mode.endsWith('cap') ? 'normal' : mode, 2),
+        s = await state(p),
+        sql = await snapshot();
+      assert.equal(s.status, 'stopped');
+      assert.equal(s.results.length, 0);
+      assert.deepEqual(
+        sql.chains.map((r) => r.chain_id),
+        [1],
+      );
+      const cursor = sql.sync_state[0].block_number;
+      if (mode === 'day-close') {
+        assert.equal(cursor, '355');
+        assert.match(s.reason, /day-close/);
+        assert.equal(sql.daily_stats.length, 0);
+      }
+      if (mode === 'ledger-disagree') {
+        assert.equal(cursor, '1379');
+        assert.match(s.reason, /disagreement/);
+        assert.equal(sql.daily_stats.find((r) => r.contract_day === 2).payout_status, 'pending');
+      }
+      if (mode === 'replay-cap') assert.ok(BigInt(cursor) < 1380n);
+      if (mode === 'audit-cap') assert.equal(cursor, '1380');
+      if (mode.endsWith('cap')) {
+        assert.equal(s.http, p.caps.http);
+        assert.match(s.reason, /Canary HTTP cap reached/);
+      }
+      await writeFile(
+        `/evidence/day-boundary-${mode}.json`,
+        JSON.stringify({ state: s, sql, output: r.out }, null, 2),
+      );
+      await reset();
+    }
+  });
   await test('prefix schema rejects mixed/native/full phases, range, finality and endpoint changes', async () => {
     const p = await fresh();
     for (const change of [

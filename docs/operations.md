@@ -139,13 +139,15 @@ live identity/coverage/cost/full-history qualification remains NOT_RUN. Unchange
 evidence may be reused by its reviewed source commit, with limits explicitly retained.
 
 The explicit `common-prefix` canary phase is a single, non-resumable origin1 interval
-of at most1024 blocks, separate from the unchanged profile fork/native target. Its
+of at most16,384 inclusive positions, separate from the unchanged profile fork/native target. Its
 numeric `through` header is resolved and corroborated inside the session, followed by
 constructor verification, `once(stopAt)` and the full prefix address audit. Only the
 declared parent and bounded finalized/numeric identity headers are exceptions to the
 prefix range; they cannot authorize code, logs or state. The plan binds the two public
 PulseChain URLs and sync-only12HTTP/360logical per rolling minute,2100ms physical-start
-spacing and60s quarantine. Ordinary global42/900 quotas remain unchanged.
+spacing and60s quarantine. Prefix sublimits are60min/600HTTP/12000logical/256MiB,
+with4MiB per response. Each plan retains its own signed range and caps; old approvals
+and spent sessions gain no allowance. Ordinary global42/900 quotas remain unchanged.
 
 For an independently reviewed, owner-approved new environment, use the compiled
 `canary check` and provider-disabled `prepare` first. Invoke exactly once with

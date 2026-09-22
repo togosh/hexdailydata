@@ -172,14 +172,14 @@ export const canaryPlanSchema = z
           p.ranges[0]!.to !== ph.through ||
           BigInt(ph.through) < BigInt(p.profile.constructor.checkpoint.number) ||
           BigInt(ph.through) > BigInt(p.profile.fork.parent.number) ||
-          BigInt(ph.through) - BigInt(p.profile.constructor.checkpoint.number) >= 1024n ||
+          BigInt(ph.through) - BigInt(p.profile.constructor.checkpoint.number) >= 16384n ||
           BigInt(ph.finalityHeaders.minimum) < BigInt(p.profile.target.number) ||
           BigInt(ph.finalityHeaders.maximum) < BigInt(ph.finalityHeaders.minimum) ||
           BigInt(ph.finalityHeaders.maximum) > 100000000n ||
-          p.caps.milliseconds > 1800000 ||
-          p.caps.http > 250 ||
-          p.caps.logical > 5000 ||
-          p.caps.bytes > 134217728 ||
+          p.caps.milliseconds > 3600000 ||
+          p.caps.http > 600 ||
+          p.caps.logical > 12000 ||
+          p.caps.bytes > 268435456 ||
           p.caps.responseBytes > 4194304
         )
           bad(
