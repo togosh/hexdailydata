@@ -5,6 +5,35 @@ import limits from '../../config/limits.json' with { type: 'json' };
 import { profileSchema } from '../worker/sync/profile.ts';
 import { priceProfileSchema, PriceReader } from '../services/live/price.ts';
 import { address, headerSchema, uint } from '../services/projections/input.ts';
+import { totalColumns } from '../services/projections/reduce.ts';
+
+const sha256 = z.string().regex(/^[0-9a-f]{64}$/);
+export const pinnedAuditAdmissionSchema = z.strictObject({
+  volume: z.string().regex(/^hexdailydata-v2-[a-z0-9-]+_db_data$/),
+  checkpoint: headerSchema,
+  revision: uint,
+  sourceBindingDigest: sha256,
+  counts: z.strictObject({
+    accounts: uint,
+    stakes: uint,
+    share_schedule: uint,
+    daily_stats: uint,
+    blocks_recent: uint,
+    events: uint,
+    transfers_recent: uint,
+    checkpoints_recent: uint,
+    undo_recent: uint,
+    live_metrics: uint,
+    export_bundles: uint,
+  }),
+  current: z.strictObject({
+    contract_day: z.number().int().nonnegative(),
+    ...(Object.fromEntries(totalColumns.map((key) => [key, uint])) as Record<
+      (typeof totalColumns)[number],
+      typeof uint
+    >),
+  }),
+});
 
 const name = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
 const path = z
@@ -32,6 +61,28 @@ const phase = z.discriminatedUnion('kind', [
     to: uint,
   }),
   z.strictObject({ kind: z.literal('replay'), purpose, basis: z.literal('constructor-prefix') }),
+  z.strictObject({
+    kind: z.literal('pinned-audit'),
+    purpose,
+    admission: pinnedAuditAdmissionSchema,
+    inventoryDigest: sha256,
+    canonicalDigest: sha256,
+    priorSession: z.uuid(),
+    priorStorageIdentity: z.string().regex(/^\d+:\d+$/),
+    priorQuotaIdentity: z.string().regex(/^\d+:\d+$/),
+    priorDispatchFloor: z.number().int().nonnegative().safe(),
+    cadence: z.strictObject({
+      rollingMilliseconds: z.literal(60000),
+      http: z.literal(12),
+      logical: z.literal(360),
+      spacingMilliseconds: z.literal(2100),
+      quarantineMilliseconds: z.literal(60000),
+    }),
+    endpoints: z.tuple([
+      z.literal('https://rpc.pulsechain.com'),
+      z.literal('https://rpc-pulsechain.g4mm4.io'),
+    ]),
+  }),
   z.strictObject({
     kind: z.literal('common-prefix'),
     purpose,
@@ -159,6 +210,46 @@ export const canaryPlanSchema = z
         (r) => r.chain === chain && BigInt(r.from) <= BigInt(n) && BigInt(n) <= BigInt(r.to),
       );
     for (const ph of p.phases) {
+      if (ph.kind === 'pinned-audit') {
+        if (
+          p.phases.length !== 1 ||
+          p.price !== null ||
+          p.allowHeadObservation ||
+          p.profile.commonHistory !== 'pulsechain' ||
+          p.profile.policy.mode !== 'finalized' ||
+          p.ranges.length !== 1 ||
+          p.ranges[0]!.chain !== 1 ||
+          p.ranges[0]!.from !== ph.admission.checkpoint.number ||
+          p.ranges[0]!.to !== ph.admission.checkpoint.number ||
+          BigInt(ph.admission.checkpoint.number) <
+            BigInt(p.profile.constructor.checkpoint.number) ||
+          BigInt(ph.admission.checkpoint.number) > BigInt(p.profile.fork.parent.number) ||
+          BigInt(ph.admission.counts.accounts) < 1n ||
+          BigInt(ph.admission.counts.accounts) > 10000n ||
+          ph.priorSession === p.session ||
+          p.caps.milliseconds > 3600000 ||
+          p.caps.http > 500 ||
+          p.caps.logical > 5000 ||
+          p.caps.bytes > 134217728 ||
+          p.caps.responseBytes !== 4194304 ||
+          p.methods.length !== 4 ||
+          new Set(p.methods).size !== 4 ||
+          p.methods.some(
+            (m) => !['eth_chainId', 'eth_getBlockByNumber', 'eth_getCode', 'eth_call'].includes(m),
+          )
+        )
+          bad(
+            'Pinned audit requires one retained origin1 checkpoint, inventory and read-only caps.',
+          );
+        for (let i = 0; i < 2; i++) {
+          const alias = ['HDD_V2_PROVIDER_PULSE_OFFICIAL', 'HDD_V2_PROVIDER_PULSE_G4MM4'][i];
+          if (
+            p.profile.ethereum[i]!.endpointEnv !== alias ||
+            p.profile.pulsechain[i]!.endpointEnv !== alias
+          )
+            bad('Pinned audit requires the two declared public endpoint aliases.');
+        }
+      }
       if (ph.kind === 'common-prefix') {
         if (
           p.phases.length !== 1 ||

@@ -73,6 +73,7 @@ try {
         'tests/canary/run.mjs',
         ...(process.argv.includes('--diagnostics-only') ? ['--diagnostics-only'] : []),
         ...(process.argv.includes('--byte-aware-only') ? ['--byte-aware-only'] : []),
+        ...(process.argv.includes('--pinned-audit-only') ? ['--pinned-audit-only'] : []),
       ],
       600000,
     ),

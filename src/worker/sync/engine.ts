@@ -23,6 +23,8 @@ import { digest } from '../../services/projections/input.ts';
 import { totalColumns } from '../../services/projections/reduce.ts';
 import limits from '../../../config/limits.json' with { type: 'json' };
 
+import { auditState, auditBalances } from './audit.ts';
+
 export async function diskReserve(path: string) {
   const s = await statfs(path, { bigint: true });
   if (s.bavail * s.bsize < BigInt(limits.resources.minimumFreeBytes) || s.bavail * 5n < s.blocks)
@@ -215,7 +217,7 @@ export class SyncEngine {
         state.shareRate !== current.raw_share_rate
       )
         throw new Error('Inherited external aggregate mismatch.');
-      await this.reconcileBalances(source, 1, parent, signal);
+      await auditBalances(this.reader, source, 1, parent, signal);
       values.push({
         id: source.rpc.id,
         operator: source.rpc.operator,
@@ -243,50 +245,10 @@ export class SyncEngine {
       },
     );
   }
-  private async reconcileBalances(source: Source, chain: number, h: Header, signal: AbortSignal) {
-    let after = Buffer.alloc(0);
-    for (;;) {
-      signal.throwIfAborted();
-      const { rows } = await this.reader.query(
-        'SELECT address,liquid_hearts FROM hdd.accounts WHERE chain_id=$1 AND address>$2 ORDER BY address LIMIT 30',
-        [chain, after],
-      );
-      if (!rows.length) break;
-      const observed = await source.balances(
-        rows.map((r) => hex(r.address)),
-        h,
-        signal,
-      );
-      if (observed.some((v, i) => v.hearts !== rows[i]!.liquid_hearts))
-        throw new Error('Full current address reconciliation mismatch.');
-      after = rows.at(-1)!.address;
-    }
-  }
   async audit(signal: AbortSignal) {
     await this.verifyStored(signal);
-    const start = performance.now(),
-      s = await this.cursor();
-    if (!s) throw new Error('Chain not initialized.');
-    await reconcile(this.reader, this.writer.chainId);
-    const {
-      rows: [current],
-    } = await this.reader.query('SELECT * FROM hdd.current_state WHERE chain_id=$1', [
-      this.writer.chainId,
-    ]);
-    for (const source of this.sources) {
-      const h = plainHeader(await source.header(s.block_number, signal, true));
-      if (h.hash !== hex(s.block_hash)) throw new Error('Reconciliation checkpoint changed.');
-      const state = await source.state(h, signal);
-      if (
-        state.circulating !== current.circulating_hearts ||
-        state.locked !== current.locked_hearts ||
-        state.active !== current.active_shares ||
-        state.queued !== current.queued_shares ||
-        state.shareRate !== current.raw_share_rate
-      )
-        throw new Error('Final external aggregate reconciliation mismatch.');
-      await this.reconcileBalances(source, this.writer.chainId, h, signal);
-    }
+    const start = performance.now();
+    await auditState(this.reader, this.writer.chainId, this.sources, signal);
     this.progress.reconciliationMs += performance.now() - start;
   }
   private async recover(s: pg.QueryResultRow, signal: AbortSignal) {

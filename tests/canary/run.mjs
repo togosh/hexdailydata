@@ -34,6 +34,7 @@ import * as live from '../live/fixture.mjs';
 import { prefixTests } from './prefix.mjs';
 import { diagnosticTests } from './diagnostics.mjs';
 import { byteAwareTests } from './log-size.mjs';
+import { pinnedAuditTests } from './pinned-audit.mjs';
 
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
@@ -46,7 +47,9 @@ let diagnosticsComplete = false;
 async function test(name, fn) {
   if (
     diagnosticsComplete &&
-    (process.argv.includes('--diagnostics-only') || process.argv.includes('--byte-aware-only'))
+    (process.argv.includes('--diagnostics-only') ||
+      process.argv.includes('--byte-aware-only') ||
+      process.argv.includes('--pinned-audit-only'))
   )
     return;
   const at = performance.now();
@@ -193,10 +196,15 @@ try {
   } finally {
     await migration.end();
   }
+  if (process.argv.includes('--pinned-audit-only')) {
+    await pinnedAuditTests({ root, test, reset });
+    diagnosticsComplete = true;
+  }
   await diagnosticTests({ root, test, reset });
   if (!process.argv.includes('--diagnostics-only'))
     await byteAwareTests({ root, test, reset, snapshot });
-  diagnosticsComplete = process.argv.includes('--diagnostics-only');
+  diagnosticsComplete =
+    process.argv.includes('--diagnostics-only') || process.argv.includes('--pinned-audit-only');
   await prefixTests({ root, test, reset, snapshot, cli });
   diagnosticsComplete = true;
   await test('shared transport compiled canary replay charges reused aliases and preserves logical range authorization', async () => {

@@ -159,6 +159,35 @@ deadline shutdown; an overrun cannot pass. Keep the operator/SQL volumes after s
 for evidence. No full replay, native initialization or production readiness follows
 from a prefix result.
 
+The explicit `pinned-audit` phase admits a separately approved retained origin1
+checkpoint. Its plan binds the existing instance/volume, exact header and revision,
+source provenance, migration checksums, expected counts/totals, ordered whole-account
+inventory digest and a newly observed canonical digest. It never initializes or
+replays. Other modes still require their original empty targets. Prepare uses the
+same retained admission without providers; run requires new state/quota ownership,
+new approval and the one-shot supervisor. Resume and spent ledgers are refused.
+
+This mode holds the existing role/maintenance and both canonical locks with read-only
+worker connections, and uses an API-role repeatable-read read-only snapshot. Its
+transaction-local idle timeout is bounded by the original invocation deadline;
+global SQL/RPC timeouts are unchanged. A lost snapshot/lock fences each subsequent
+dispatch. Both sources verify the fixed identity/code/header and one first-inventory
+balance before the full ordered sweeps. SQL pages remain30; only this mode partitions
+them into at most10 balance calls. Zero balances are included and duplicate singleton
+checks do not increase full coverage. No automatic smaller-batch fallback exists.
+
+Only chain identity, the one numeric header/code read and hash-pinned globalInfo,
+totalSupply and admitted balanceOf arguments are authorized. Its caps are at most
+60min/500HTTP/5000logical/128MiB, with the unchanged4MiB hard response limit and8MiB
+incomplete charge,12/360 cadence,2100ms spacing and60s quarantine. The saved prior
+dispatch floor remains a lower bound; a new quota directory does not erase known
+cooldown. Bounded per-source progress and exact comparison evidence live only in
+the new state directory. A fresh snapshot under retained locks compares all canonical
+tables, schema and sequence evidence after provider work. Completion requires that
+equality, full paired coverage, closure and final persistence within the original
+deadline. Retain the DB and new spent evidence on success or failure; never rewrite
+the earlier replay result. Full Task10 remains a separate pending qualification.
+
 New failed sessions may retain one optional `rpcDiagnostic` (at most8KiB), with source
 alias, bounded request/ID facts, structural rejection, observed status/byte count and
 SHA256. `streamComplete` describes transport observation, never acceptance; an incomplete

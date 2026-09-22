@@ -6,6 +6,8 @@ import { canaryPlanSchema, planDigest, readCanaryJson, type CanaryPlan } from '.
 import { realClock, type Clock } from '../providers/budget.ts';
 import type { Transport, RpcCall } from '../providers/rpc.ts';
 import { PrefixScope, prefixPhase } from './canary-prefix.ts';
+import { AuditScope, auditPhase } from './canary-audit.ts';
+import type { AuditAccount } from '../worker/sync/audit.ts';
 import { headerSchema } from '../services/projections/input.ts';
 import { operatorError } from './errors.ts';
 import {
@@ -41,6 +43,17 @@ const stateSchema = z.strictObject({
       stopHeader: headerSchema.nullable(),
       ended: integer.nullable(),
       secondary: z.array(z.string().max(240)).max(16),
+      accounting: z.unknown().optional(),
+    })
+    .optional(),
+  audit: z
+    .strictObject({
+      ended: integer.nullable(),
+      secondary: z.array(z.string().max(240)).max(16),
+      before: z.string(),
+      after: z.string().nullable(),
+      unchanged: z.boolean().nullable(),
+      progress: z.unknown().optional(),
       accounting: z.unknown().optional(),
     })
     .optional(),
@@ -84,8 +97,27 @@ export class CanarySession {
     readonly clock: Clock,
     readonly hooks: SessionHooks = {},
   ) {}
+  static async checkAuditRoots(plan: CanaryPlan) {
+    const audit = auditPhase(plan);
+    if (audit) {
+      const identities = await Promise.all(
+        [plan.storagePath, plan.quotaPath].map(filesystemIdentity),
+      );
+      if (
+        identities[0] === identities[1] ||
+        identities.some((id) => [audit.priorStorageIdentity, audit.priorQuotaIdentity].includes(id))
+      )
+        throw Error('Pinned audit requires new distinct filesystem identities.');
+      for (const root of [plan.storagePath, plan.quotaPath]) {
+        const info = await safePath(root);
+        if (info.uid !== process.getuid!()) throw Error('Pinned audit state ownership mismatch.');
+      }
+    }
+  }
   static async prepare(plan: CanaryPlan, clock: Clock = realClock, hooks: SessionHooks = {}) {
     canaryPlanSchema.parse(plan);
+    const audit = auditPhase(plan);
+    await CanarySession.checkAuditRoots(plan);
     try {
       await lstat(plan.sessionPath);
       throw new Error('Canary session already exists; use status/resume.');
@@ -114,6 +146,17 @@ export class CanarySession {
       terminal: false,
       results: [],
       ...(prefixPhase(plan) ? { prefix: { stopHeader: null, ended: null, secondary: [] } } : {}),
+      ...(audit
+        ? {
+            audit: {
+              ended: null,
+              secondary: [],
+              before: audit.canonicalDigest,
+              after: null,
+              unchanged: null,
+            },
+          }
+        : {}),
     };
     const session = new CanarySession(plan, state, clock, hooks);
     await session.save();
@@ -200,6 +243,7 @@ export class CanarySession {
   async start(resume: boolean, invocationStart = this.time()) {
     if (prefixPhase(this.plan) && resume)
       throw new Error('Common prefix resume is not authorized.');
+    if (auditPhase(this.plan) && resume) throw new Error('Pinned audit resume is not authorized.');
     if (resume ? this.state.start === null : this.state.start !== null)
       throw new Error('Use run for prepared sessions; resume requires retained started state.');
     if (this.state.status === 'complete') throw new Error('Canary already complete.');
@@ -226,19 +270,20 @@ export class CanarySession {
     // drain the shared transport before publishing the final state; its last
     // reservation/settlement must never race this atomic file replacement.
     await this.close();
-    if (this.state.prefix) {
+    const oneShot = this.state.audit ?? this.state.prefix;
+    if (oneShot) {
       await this.hooks.beforeFinalSave?.();
       if (this.time() >= this.state.deadline! || this.state.terminal || this.poisoned) {
         status = 'stopped';
         reason = this.state.reason || 'Canary deadline or finalization failure.';
       }
       this.state.terminal = true; // This grant can never resume, even on ordinary failure.
-      this.state.prefix.ended = this.time();
+      oneShot.ended = this.time();
     }
     this.state.status = status;
     this.state.reason = reason.slice(0, 160);
     await this.save();
-    if (this.state.prefix && this.time() >= this.state.deadline! && status === 'complete') {
+    if (oneShot && this.time() >= this.state.deadline! && status === 'complete') {
       this.state.status = 'stopped';
       this.state.reason = 'Canary elapsed cap reached during final save.';
       await this.save();
@@ -255,9 +300,21 @@ export class CanarySession {
     await this.tail;
   }
   /** All chains/aliases share this serialized gate, including both role budgets. */
-  transport(chain: 1 | 369, transport: Transport, source = String(chain)): Transport {
-    const phase = prefixPhase(this.plan);
-    const scope = phase ? new PrefixScope(this.plan, phase, source) : null;
+  transport(
+    chain: 1 | 369,
+    transport: Transport,
+    source = String(chain),
+    auditContext?: { inventory: AuditAccount[]; guard: () => Promise<void> },
+  ): Transport {
+    const prefix = prefixPhase(this.plan),
+      audit = auditPhase(this.plan),
+      phase = prefix ?? audit;
+    if (audit && !auditContext) throw Error('Pinned audit requires admitted SQL context.');
+    const scope = audit
+      ? new AuditScope(this.plan, audit, auditContext!.inventory, source)
+      : prefix
+        ? new PrefixScope(this.plan, prefix, source)
+        : null;
     // chain is the authorized logical phase, not eth_chainId of the serving network.
     return async (body, signal, requestDeadline = Infinity) => {
       const previous = this.tail;
@@ -324,8 +381,8 @@ export class CanarySession {
         try {
           await settle(false);
         } catch (secondary) {
-          if (this.state.prefix)
-            this.state.prefix.secondary.push(operatorError(secondary).slice(0, 240));
+          const oneShot = this.state.audit ?? this.state.prefix;
+          if (oneShot) oneShot.secondary.push(operatorError(secondary).slice(0, 240));
           console.error(
             JSON.stringify({
               event: 'canary_settlement_failed',
@@ -367,6 +424,7 @@ export class CanarySession {
               this.starts.reduce((n, s) => n + s.logical, 0) + calls.length > phase.cadence.logical;
             const earliest = Math.max(
               this.state.start! + phase.cadence.quarantineMilliseconds,
+              audit?.priorDispatchFloor ?? 0,
               this.lastStart + phase.cadence.spacingMilliseconds,
               full ? this.starts[0]!.at + phase.cadence.rollingMilliseconds : now,
             );
@@ -377,6 +435,9 @@ export class CanarySession {
             );
           }
         }
+        // Fence lost SQL snapshots/locks after cadence/persistence waits and before
+        // every physical dispatch, including retries. Never reconnect to continue.
+        await auditContext?.guard();
         dispatchAt = checkDeadline();
         this.lastStart = dispatchAt;
         this.starts.push({ at: dispatchAt, logical: calls.length });

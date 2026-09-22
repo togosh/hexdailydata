@@ -21,9 +21,17 @@ import { prefixPhase } from './canary-prefix.ts';
 import { plainHeader } from '../providers/abi.ts';
 import type { SessionHooks } from './canary-session.ts';
 import { rpcDiagnostic } from '../providers/rpc-diagnostic.ts';
+import {
+  auditPhase,
+  beginAuditSnapshot,
+  inspectAuditTarget,
+  canonicalEvidence,
+  runPinnedAudit,
+} from './canary-audit.ts';
+import { atomicJson } from './files.ts';
 
 export const canaryHelp =
-  'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths. Run/resume require separate owner approval, session opt-in and live opt-in. No providers by default.';
+  'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths, except explicit pinned-audit retained read-only admission. One-shot common-prefix/pinned-audit cannot resume. Run/resume require separate owner approval, session opt-in and live opt-in. No providers by default.';
 export async function runCanary(
   args: string[],
   signal: AbortSignal,
@@ -46,14 +54,17 @@ export async function runCanary(
   const plan = canaryPlanSchema.parse(input),
     env = options.env ?? process.env,
     clock = options.clock ?? realClock;
-  const prefix = prefixPhase(plan);
-  if (prefix && command === 'run' && !options.transport) {
+  const prefix = prefixPhase(plan),
+    audit = auditPhase(plan),
+    oneShot = prefix ?? audit;
+  if (oneShot && command === 'run' && !options.transport) {
     const supplied = Number(env.HDD_V2_CANARY_INVOKED_AT);
     if (!Number.isSafeInteger(supplied) || supplied <= 0 || supplied > invocationStart)
-      throw new Error('Common prefix requires the canary-once host invocation clock.');
+      throw new Error('One-shot canary requires the canary-once host invocation clock.');
     invocationStart = supplied;
   }
   if (prefix && command === 'resume') throw new Error('Common prefix resume is not authorized.');
+  if (audit && command === 'resume') throw new Error('Pinned audit resume is not authorized.');
   // No external transport is constructed before ALL local and destination guards.
   if (
     env.HDD_V2_PROJECT !== plan.project ||
@@ -70,8 +81,8 @@ export async function runCanary(
       const urls = pair.map((p) => env[p.endpointEnv]);
       if (urls.some((u) => !u) || urls[0] === urls[1])
         throw new Error('Canary endpoints missing or duplicated.');
-      if (prefix && urls.some((url, i) => url !== prefix.endpoints[i]))
-        throw new Error('Common prefix endpoint URL mismatch.');
+      if (oneShot && urls.some((url, i) => url !== oneShot.endpoints[i]))
+        throw new Error('One-shot canary endpoint URL mismatch.');
     }
   }
   const controller = new AbortController();
@@ -79,7 +90,7 @@ export async function runCanary(
   let release: (() => Promise<void>) | undefined;
   const deadline = invocationStart + plan.caps.milliseconds;
   const invocationTimer =
-    prefix && command === 'run'
+    oneShot && command === 'run'
       ? setTimeout(
           () => controller.abort(new Error('Canary invocation elapsed cap reached.')),
           Math.max(0, deadline - clock.now()),
@@ -95,6 +106,9 @@ export async function runCanary(
   let ownsExecution = false;
   const secondary: string[] = [];
   const sourcePairs = new Map<1 | 369, ReturnType<typeof profileSources>>();
+  let auditReader: Awaited<ReturnType<typeof connect>> | undefined;
+  let auditOwner: Awaited<ReturnType<typeof connect>> | undefined;
+  let admitted: Awaited<ReturnType<typeof inspectAuditTarget>> | undefined;
   const failure = (error: unknown) => {
     const detail = operatorError(error);
     return /https?:\/\//i.test(detail) ? 'Canary provider transport failed.' : detail;
@@ -104,16 +118,23 @@ export async function runCanary(
   };
   const invocationSignal = activeSignal;
   invocationSignal.addEventListener('abort', cancelSql, { once: true });
-  async function db() {
-    const c = await connect(databaseConfig('worker', env), { signal: activeSignal });
+  async function db(role: 'api' | 'worker' = 'worker') {
+    const c = await connect(databaseConfig(role, env), { signal: activeSignal });
     clients.push(c);
     c.on('error', () => controller.abort(new Error('Canary database ownership lost.')));
     c.on('end', () => controller.abort(new Error('Canary database connection ended.')));
+    if (audit) await c.query('SET default_transaction_read_only = on');
     return c;
   }
   try {
+    await CanarySession.checkAuditRoots(plan);
     release = await maintenanceLease([plan.storagePath, plan.quotaPath], activeSignal);
     if (command === 'status') return (await CanarySession.load(plan, clock)).state;
+    if (audit && command === 'run') {
+      session = await CanarySession.load(plan, clock, options.sessionHooks);
+      if (session.state.start !== null || session.state.status !== 'prepared')
+        throw Error('Pinned audit session already spent.');
+    }
     const owner = await db();
     if (
       (await owner.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows
@@ -137,17 +158,29 @@ export async function runCanary(
       writerClients.set(chain, c);
       writers.set(chain, await CanonicalWriter.acquire(c, chain));
     }
+    if (audit) {
+      auditOwner = owner;
+      auditReader = await db('api');
+      await beginAuditSnapshot(auditReader, Math.max(0, deadline - clock.now()));
+      admitted = await inspectAuditTarget(auditReader, owner, plan.profile, audit.admission);
+      if (
+        admitted.inventoryDigest !== audit.inventoryDigest ||
+        admitted.canonical.digest !== audit.canonicalDigest
+      )
+        throw Error('Pinned audit inventory/canonical digest mismatch.');
+      await atomicJson(plan.storagePath, 'audit-before.json', admitted);
+    }
     if (command === 'prepare') {
-      await emptyTarget(owner);
+      if (!audit) await emptyTarget(owner);
       session = await CanarySession.prepare(plan, clock);
       return session.state;
     }
-    session = await CanarySession.load(plan, clock, options.sessionHooks);
-    if (command === 'run') await emptyTarget(owner);
-    if (session.state.status === 'complete' || (prefix && session.state.start !== null))
+    session ??= await CanarySession.load(plan, clock, options.sessionHooks);
+    if (command === 'run' && !audit) await emptyTarget(owner);
+    if (session.state.status === 'complete' || (oneShot && session.state.start !== null))
       throw new Error('Canary already complete or spent.');
     ownsExecution = true;
-    await session.start(command === 'resume', prefix ? invocationStart : clock.now());
+    await session.start(command === 'resume', oneShot ? invocationStart : clock.now());
     activeSignal = AbortSignal.any([activeSignal, session.controller.signal]);
     const cooldown = await cooldownFiles(plan.quotaPath, 'worker');
     const workerBudget = new ProviderBudget('worker', cooldown, clock);
@@ -157,7 +190,7 @@ export async function runCanary(
       [1, plan.profile.ethereum],
       [369, plan.profile.pulsechain],
     ] as const) {
-      if (prefix && chain === 369) continue;
+      if (oneShot && chain === 369) continue;
       for (const source of pair)
         transports.set(
           source.id,
@@ -165,6 +198,41 @@ export async function runCanary(
             chain,
             (options.transport ?? httpTransport)(env[source.endpointEnv]!),
             source.id,
+            audit
+              ? {
+                  inventory: admitted!.inventory,
+                  guard: async () => {
+                    activeSignal.throwIfAborted();
+                    const state = (
+                      await auditReader!.query(
+                        "SELECT current_setting('transaction_read_only') AS readonly,current_setting('transaction_isolation') AS isolation",
+                      )
+                    ).rows[0];
+                    if (state.readonly !== 'on' || state.isolation !== 'repeatable read')
+                      throw Error('Pinned audit snapshot lost.');
+                    for (const [client, locks] of [
+                      [
+                        owner,
+                        [
+                          [4244, 0],
+                          [4244, 1],
+                          [4250, 0],
+                        ],
+                      ],
+                      ...[1, 369].map((c) => [writerClients.get(c as 1 | 369)!, [[4242, c]]]),
+                    ] as [Awaited<ReturnType<typeof connect>>, number[][]][]) {
+                      const held = (
+                        await client.query(
+                          "SELECT classid::int AS a,objid::int AS b FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND objsubid=2 AND granted",
+                        )
+                      ).rows;
+                      if (locks.some(([a, b]) => !held.some((r) => r.a === a && r.b === b)))
+                        throw Error('Pinned audit ownership lost.');
+                    }
+                    activeSignal.throwIfAborted();
+                  },
+                }
+              : undefined,
           ),
         );
     }
@@ -196,7 +264,7 @@ export async function runCanary(
         );
       return sourcePairs.get(chain)!;
     };
-    const reader = await db();
+    const reader = auditReader ?? (await db());
     progressTimer = setInterval(
       () => console.log(JSON.stringify({ event: 'canary_progress', ...session!.state })),
       30000,
@@ -212,7 +280,16 @@ export async function runCanary(
         observedBytes: session.state.observedBytes,
       };
       let result: unknown;
-      if (phase.kind === 'capabilities') {
+      if (phase.kind === 'pinned-audit') {
+        result = await runPinnedAudit(
+          reader,
+          pair(1),
+          session,
+          phase,
+          admitted!.inventory,
+          activeSignal,
+        );
+      } else if (phase.kind === 'capabilities') {
         const observed = [];
         for (const source of pair(phase.chain)) {
           await source.verify(phase.at, activeSignal);
@@ -390,6 +467,23 @@ export async function runCanary(
       }
     };
     await cleanup(async () => session?.close());
+    if (auditReader && auditOwner && admitted) {
+      await cleanup(async () => {
+        // End the provider-wait snapshot, then read a fresh snapshot while ALL
+        // exclusions remain held. A same-snapshot comparison proves nothing.
+        await auditReader!.query('ROLLBACK');
+        await beginAuditSnapshot(auditReader!, Math.max(0, deadline - clock.now()));
+        const after = await canonicalEvidence(auditReader!, auditOwner!);
+        await atomicJson(plan.storagePath, 'audit-after.json', after);
+        if (session?.state.audit) {
+          session.state.audit.after = after.digest;
+          session.state.audit.unchanged = after.digest === admitted!.canonical.digest;
+        }
+        if (after.digest !== admitted!.canonical.digest)
+          throw Error('Pinned audit canonical state changed.');
+        await auditReader!.query('ROLLBACK');
+      });
+    }
     for (const c of clients) c.removeAllListeners('end');
     for (const writer of writers.values()) await cleanup(() => writer.close());
     for (const c of clients) {
@@ -397,23 +491,24 @@ export async function runCanary(
       await cleanup(() => c.end());
     }
     await cleanup(async () => options.cleanupHook?.());
-    if (prefix) {
+    if (oneShot) {
       // A spent common-prefix session cannot run/resume again. Publish completion
       // only after SQL clients and the filesystem leases have actually closed.
       await cleanup(async () => release?.());
       release = undefined;
     }
     if (ownsExecution && session?.state.start !== null && session) {
-      if (prefix && (clock.now() >= deadline || controller.signal.aborted || signal.aborted))
+      if (oneShot && (clock.now() >= deadline || controller.signal.aborted || signal.aborted))
         primary ??= failure(
           controller.signal.reason ??
             signal.reason ??
             new Error('Canary invocation elapsed cap reached.'),
         );
-      if (session.state.prefix) {
-        secondary.unshift(...session.state.prefix.secondary);
-        session.state.prefix.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
-        session.state.prefix.accounting = [...sourcePairs.values()].flat().map((s) => ({
+      const oneShotState = session.state.audit ?? session.state.prefix;
+      if (oneShotState) {
+        secondary.unshift(...oneShotState.secondary);
+        oneShotState.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
+        oneShotState.accounting = [...sourcePairs.values()].flat().map((s) => ({
           source: s.identity,
           rpc: s.rpc.counters,
           sourceCounters: s.counters,
@@ -438,16 +533,17 @@ export async function runCanary(
       session?.state.start !== null &&
       session &&
       ownsExecution &&
-      (secondary.length || (prefix && clock.now() >= deadline))
+      (secondary.length || (oneShot && clock.now() >= deadline))
     ) {
       session.state.status = 'stopped';
+      if (oneShot) session.state.terminal = true;
       session.state.reason = (
         primary ??
         secondary[0] ??
         'Canary invocation elapsed cap reached during release.'
       ).slice(0, 160);
-      if (session.state.prefix)
-        session.state.prefix.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
+      const oneShotState = session.state.audit ?? session.state.prefix;
+      if (oneShotState) oneShotState.secondary = secondary.slice(0, 16).map((s) => s.slice(0, 240));
       try {
         if (session.state.rpcDiagnostic) session.state.diagnosticPersistence = 'saved';
         await session.save();
@@ -467,6 +563,7 @@ export async function runCanary(
     }
     if (invocationTimer) clearTimeout(invocationTimer);
     invocationSignal.removeEventListener('abort', cancelSql);
-    if (secondary.length && !session) throw new Error(secondary.join('; '));
+    if (secondary.length && (!session || (audit && !ownsExecution)))
+      throw new Error(secondary.join('; '));
   }
 }
