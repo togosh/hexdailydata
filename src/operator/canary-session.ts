@@ -6,7 +6,7 @@ import { canaryPlanSchema, planDigest, readCanaryJson, type CanaryPlan } from '.
 import { realClock, type Clock } from '../providers/budget.ts';
 import type { Transport, RpcCall } from '../providers/rpc.ts';
 import { PrefixScope, prefixPhase } from './canary-prefix.ts';
-import { AuditScope, auditPhase } from './canary-audit.ts';
+import { AuditScope, auditPhase, retainedPhase } from './canary-audit.ts';
 import type { AuditAccount } from '../worker/sync/audit.ts';
 import { headerSchema } from '../services/projections/input.ts';
 import { operatorError } from './errors.ts';
@@ -53,8 +53,24 @@ const stateSchema = z.strictObject({
       before: z.string(),
       after: z.string().nullable(),
       unchanged: z.boolean().nullable(),
+      checkpoint: headerSchema.optional(),
       progress: z.unknown().optional(),
       accounting: z.unknown().optional(),
+    })
+    .optional(),
+  replay: z
+    .strictObject({
+      start: headerSchema,
+      admissionDigest: z.string(),
+      stopHeader: headerSchema.nullable(),
+      checkpoint: z.object({
+        number: z.string(),
+        hash: z.string(),
+        timestamp: z.string(),
+        revision: z.string(),
+      }),
+      reachedTarget: z.boolean(),
+      progress: z.unknown().nullable(),
     })
     .optional(),
   rpcDiagnostic: z
@@ -98,7 +114,7 @@ export class CanarySession {
     readonly hooks: SessionHooks = {},
   ) {}
   static async checkAuditRoots(plan: CanaryPlan) {
-    const audit = auditPhase(plan);
+    const audit = retainedPhase(plan);
     if (audit) {
       const identities = await Promise.all(
         [plan.storagePath, plan.quotaPath].map(filesystemIdentity),
@@ -116,7 +132,7 @@ export class CanarySession {
   }
   static async prepare(plan: CanaryPlan, clock: Clock = realClock, hooks: SessionHooks = {}) {
     canaryPlanSchema.parse(plan);
-    const audit = auditPhase(plan);
+    const audit = retainedPhase(plan);
     await CanarySession.checkAuditRoots(plan);
     try {
       await lstat(plan.sessionPath);
@@ -145,7 +161,9 @@ export class CanarySession {
       reason: 'NOT_RUN',
       terminal: false,
       results: [],
-      ...(prefixPhase(plan) ? { prefix: { stopHeader: null, ended: null, secondary: [] } } : {}),
+      ...(prefixPhase(plan)?.kind === 'common-prefix'
+        ? { prefix: { stopHeader: null, ended: null, secondary: [] } }
+        : {}),
       ...(audit
         ? {
             audit: {
@@ -154,6 +172,23 @@ export class CanarySession {
               before: audit.canonicalDigest,
               after: null,
               unchanged: null,
+            },
+          }
+        : {}),
+      ...(audit?.kind === 'common-continue'
+        ? {
+            replay: {
+              start: audit.admission.checkpoint,
+              admissionDigest: audit.canonicalDigest,
+              stopHeader: null,
+              checkpoint: {
+                number: audit.admission.checkpoint.number,
+                hash: audit.admission.checkpoint.hash,
+                timestamp: audit.admission.checkpoint.timestamp,
+                revision: audit.admission.revision,
+              },
+              reachedTarget: false,
+              progress: null,
             },
           }
         : {}),
@@ -308,12 +343,13 @@ export class CanarySession {
   ): Transport {
     const prefix = prefixPhase(this.plan),
       audit = auditPhase(this.plan),
+      retained = retainedPhase(this.plan),
       phase = prefix ?? audit;
-    if (audit && !auditContext) throw Error('Pinned audit requires admitted SQL context.');
+    if (retained && !auditContext) throw Error('Retained mode requires admitted SQL context.');
     const scope = audit
       ? new AuditScope(this.plan, audit, auditContext!.inventory, source)
       : prefix
-        ? new PrefixScope(this.plan, prefix, source)
+        ? new PrefixScope(this.plan, prefix, source, auditContext?.inventory)
         : null;
     // chain is the authorized logical phase, not eth_chainId of the serving network.
     return async (body, signal, requestDeadline = Infinity) => {
@@ -424,7 +460,7 @@ export class CanarySession {
               this.starts.reduce((n, s) => n + s.logical, 0) + calls.length > phase.cadence.logical;
             const earliest = Math.max(
               this.state.start! + phase.cadence.quarantineMilliseconds,
-              audit?.priorDispatchFloor ?? 0,
+              retained?.priorDispatchFloor ?? 0,
               this.lastStart + phase.cadence.spacingMilliseconds,
               full ? this.starts[0]!.at + phase.cadence.rollingMilliseconds : now,
             );

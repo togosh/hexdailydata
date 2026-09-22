@@ -7,7 +7,7 @@ export const auditPostgresImage =
  * initialization, export, backup or prior session mounts. No Docker mutation here. */
 export function checkAuditBindings(plan, graph, volume, stateVolumes, containers) {
   const phase = plan.phases[0];
-  assert.equal(phase.kind, 'pinned-audit');
+  assert(['pinned-audit', 'common-continue'].includes(phase.kind));
   assert.deepEqual(Object.keys(graph.services).sort(), ['db', 'operator']);
   const db = graph.services.db,
     op = graph.services.operator;
@@ -80,13 +80,13 @@ export function checkAuditBindings(plan, graph, volume, stateVolumes, containers
     assert.equal(c.Config.Image, auditPostgresImage);
   }
   return {
-    mode: 'pinned-audit',
+    mode: phase.kind,
     project: plan.project,
     instance: plan.instance,
     volume: volume.Name,
     image: op.image,
     onlyServices: ['db', 'operator'],
-    canonicalSql: 'read-only',
+    canonicalSql: phase.kind === 'common-continue' ? 'origin1-writer-only' : 'read-only',
     newStateVolumes: stateVolumes.map((v) => v.Name),
   };
 }

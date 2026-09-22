@@ -74,6 +74,7 @@ try {
         ...(process.argv.includes('--diagnostics-only') ? ['--diagnostics-only'] : []),
         ...(process.argv.includes('--byte-aware-only') ? ['--byte-aware-only'] : []),
         ...(process.argv.includes('--pinned-audit-only') ? ['--pinned-audit-only'] : []),
+        ...(process.argv.includes('--continuation-only') ? ['--continuation-only'] : []),
       ],
       600000,
     ),

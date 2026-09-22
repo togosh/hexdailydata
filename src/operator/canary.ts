@@ -23,15 +23,18 @@ import type { SessionHooks } from './canary-session.ts';
 import { rpcDiagnostic } from '../providers/rpc-diagnostic.ts';
 import {
   auditPhase,
+  retainedPhase,
+  auditInventory,
   beginAuditSnapshot,
   inspectAuditTarget,
   canonicalEvidence,
   runPinnedAudit,
 } from './canary-audit.ts';
 import { atomicJson, reserve } from './files.ts';
+import { digest, hex } from '../services/projections/input.ts';
 
 export const canaryHelp =
-  'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths, except explicit pinned-audit retained read-only admission. One-shot common-prefix/pinned-audit cannot resume. Run/resume require separate owner approval, session opt-in and live opt-in. No providers by default.';
+  'canary check|prepare|status|run|resume <plan.json> [owner-approval.json]. Check is local; prepare requires a NEW empty v2 DB/Linux paths, except explicit pinned-audit/common-continue retained admission. One-shot modes cannot resume. Common-continue needs a separately authorized new grant and exact populated start. Run/resume require owner approval, session opt-in and live opt-in. No providers by default.';
 export async function runCanary(
   args: string[],
   signal: AbortSignal,
@@ -56,6 +59,8 @@ export async function runCanary(
     clock = options.clock ?? realClock;
   const prefix = prefixPhase(plan),
     audit = auditPhase(plan),
+    retained = retainedPhase(plan),
+    continuation = retained?.kind === 'common-continue' ? retained : undefined,
     oneShot = prefix ?? audit;
   if (oneShot && command === 'run' && !options.transport) {
     const supplied = Number(env.HDD_V2_CANARY_INVOKED_AT);
@@ -109,6 +114,8 @@ export async function runCanary(
   let auditReader: Awaited<ReturnType<typeof connect>> | undefined;
   let auditOwner: Awaited<ReturnType<typeof connect>> | undefined;
   let admitted: Awaited<ReturnType<typeof inspectAuditTarget>> | undefined;
+  let auditBefore: Awaited<ReturnType<typeof canonicalEvidence>> | undefined;
+  let snapshotActive = false;
   const failure = (error: unknown) => {
     const detail = operatorError(error);
     return /https?:\/\//i.test(detail) ? 'Canary provider transport failed.' : detail;
@@ -122,24 +129,24 @@ export async function runCanary(
     await reserve(plan.storagePath);
     await reserve(plan.quotaPath);
   }
-  async function db(role: 'api' | 'worker' = 'worker') {
+  async function db(role: 'api' | 'worker' = 'worker', writable = false) {
     const c = await connect(databaseConfig(role, env), { signal: activeSignal });
     clients.push(c);
     c.on('error', () => controller.abort(new Error('Canary database ownership lost.')));
     c.on('end', () => controller.abort(new Error('Canary database connection ended.')));
-    if (audit) await c.query('SET default_transaction_read_only = on');
+    if (retained && !writable) await c.query('SET default_transaction_read_only = on');
     return c;
   }
   try {
     await CanarySession.checkAuditRoots(plan);
     release = await maintenanceLease([plan.storagePath, plan.quotaPath], activeSignal);
     if (command === 'status') return (await CanarySession.load(plan, clock)).state;
-    if (audit && command === 'run') {
+    if (retained && command === 'run') {
       session = await CanarySession.load(plan, clock, options.sessionHooks);
       if (session.state.start !== null || session.state.status !== 'prepared')
         throw Error('Pinned audit session already spent.');
     }
-    if (audit) await auditReserve();
+    if (retained) await auditReserve();
     const owner = await db();
     if (
       (await owner.query('SELECT version FROM hdd.schema_migrations ORDER BY version')).rows
@@ -159,29 +166,40 @@ export async function runCanary(
       )
         throw new Error('Canary requires exclusive stopped API/worker/writers.');
     for (const chain of [1, 369] as const) {
-      const c = await db();
+      const c = await db('worker', Boolean(continuation && chain === 1));
       writerClients.set(chain, c);
       writers.set(chain, await CanonicalWriter.acquire(c, chain));
     }
-    if (audit) {
+    if (retained) {
       auditOwner = owner;
       auditReader = await db('api');
       await beginAuditSnapshot(auditReader, Math.max(0, deadline - clock.now()));
-      admitted = await inspectAuditTarget(auditReader, owner, plan.profile, audit.admission);
+      snapshotActive = true;
+      admitted = await inspectAuditTarget(auditReader, owner, plan.profile, retained.admission);
       if (
-        admitted.inventoryDigest !== audit.inventoryDigest ||
-        admitted.canonical.digest !== audit.canonicalDigest
+        admitted.inventoryDigest !== retained.inventoryDigest ||
+        admitted.canonical.digest !== retained.canonicalDigest
       )
         throw Error('Pinned audit inventory/canonical digest mismatch.');
-      await atomicJson(plan.storagePath, 'audit-before.json', admitted);
+      await atomicJson(
+        plan.storagePath,
+        continuation ? 'continuation-start.json' : 'audit-before.json',
+        admitted,
+      );
+      if (continuation) {
+        // The engine must observe each committed writer checkpoint, not the
+        // admission snapshot. Exclusion locks survive this read-only handoff.
+        await auditReader.query('ROLLBACK');
+        snapshotActive = false;
+      } else auditBefore = admitted.canonical;
     }
     if (command === 'prepare') {
-      if (!audit) await emptyTarget(owner);
+      if (!retained) await emptyTarget(owner);
       session = await CanarySession.prepare(plan, clock);
       return session.state;
     }
     session ??= await CanarySession.load(plan, clock, options.sessionHooks);
-    if (command === 'run' && !audit) await emptyTarget(owner);
+    if (command === 'run' && !retained) await emptyTarget(owner);
     if (session.state.status === 'complete' || (oneShot && session.state.start !== null))
       throw new Error('Canary already complete or spent.');
     ownsExecution = true;
@@ -203,7 +221,7 @@ export async function runCanary(
             chain,
             (options.transport ?? httpTransport)(env[source.endpointEnv]!),
             source.id,
-            audit
+            retained
               ? {
                   inventory: admitted!.inventory,
                   guard: async () => {
@@ -214,7 +232,10 @@ export async function runCanary(
                         "SELECT current_setting('transaction_read_only') AS readonly,current_setting('transaction_isolation') AS isolation",
                       )
                     ).rows[0];
-                    if (state.readonly !== 'on' || state.isolation !== 'repeatable read')
+                    if (
+                      state.readonly !== 'on' ||
+                      state.isolation !== (snapshotActive ? 'repeatable read' : 'read committed')
+                    )
                       throw Error('Pinned audit snapshot lost.');
                     for (const [client, locks] of [
                       [
@@ -293,6 +314,88 @@ export async function runCanary(
           session,
           phase,
           admitted!.inventory,
+          activeSignal,
+        );
+      } else if (phase.kind === 'common-continue') {
+        const sources = pair(1);
+        const engine = new SyncEngine(
+          writers.get(1)!,
+          reader,
+          sources,
+          plan.storagePath,
+          options.hooks,
+        );
+        let replayError: unknown;
+        try {
+          const stops = [];
+          for (const source of sources) {
+            const start = plainHeader(
+              await source.header(phase.admission.checkpoint.number, activeSignal, true),
+            );
+            if (digest(start) !== digest(phase.admission.checkpoint))
+              throw Error('Continuation start header disagreement.');
+            await source.verify(start, activeSignal);
+            stops.push(plainHeader(await source.header(phase.through, activeSignal, true)));
+          }
+          if (digest(stops[0]) !== digest(stops[1]))
+            throw Error('Continuation stop header disagreement.');
+          const stopAt = stops[0]!;
+          session.state.replay!.stopHeader = stopAt;
+          await session.save();
+          await engine.once(activeSignal, stopAt);
+        } catch (error) {
+          replayError = error;
+          throw error;
+        } finally {
+          try {
+            // SQL is authoritative even if a post-commit hook lost outer progress.
+            const cursor = await engine.cursor();
+            const replay = session.state.replay!;
+            replay.checkpoint = {
+              number: cursor.block_number,
+              hash: hex(cursor.block_hash),
+              timestamp: cursor.block_time,
+              revision: cursor.revision,
+            };
+            replay.reachedTarget =
+              cursor.block_number === phase.through &&
+              hex(cursor.block_hash) === replay.stopHeader?.hash;
+            replay.progress = {
+              ...engine.progress,
+              lastError: engine.progress.lastError
+                ? failure(new Error(engine.progress.lastError))
+                : null,
+            };
+            await session.save();
+          } catch (error) {
+            if (replayError) secondary.push(failure(error));
+            else throw error;
+          }
+        }
+        if (!session.state.replay!.reachedTarget)
+          throw Error('Continuation did not reach exact stop.');
+        for (const c of writerClients.values())
+          await c.query('SET default_transaction_read_only = on');
+        await beginAuditSnapshot(reader, Math.max(0, deadline - clock.now()));
+        snapshotActive = true;
+        const inventory = await auditInventory(reader);
+        auditBefore = await canonicalEvidence(reader, owner);
+        session.state.audit!.before = auditBefore.digest;
+        await atomicJson(plan.storagePath, 'audit-before.json', {
+          canonical: auditBefore,
+          inventoryDigest: digest(inventory),
+          checkpoint: session.state.replay!.stopHeader,
+        });
+        await session.save();
+        result = await runPinnedAudit(
+          reader,
+          sources,
+          session,
+          {
+            admission: { checkpoint: session.state.replay!.stopHeader! },
+            inventoryDigest: digest(inventory),
+          },
+          inventory,
           activeSignal,
         );
       } else if (phase.kind === 'capabilities') {
@@ -473,7 +576,7 @@ export async function runCanary(
       }
     };
     await cleanup(async () => session?.close());
-    if (auditReader && auditOwner && admitted) {
+    if (auditReader && auditOwner && auditBefore) {
       await cleanup(async () => {
         // End the provider-wait snapshot, then read a fresh snapshot while ALL
         // exclusions remain held. A same-snapshot comparison proves nothing.
@@ -483,9 +586,9 @@ export async function runCanary(
         await atomicJson(plan.storagePath, 'audit-after.json', after);
         if (session?.state.audit) {
           session.state.audit.after = after.digest;
-          session.state.audit.unchanged = after.digest === admitted!.canonical.digest;
+          session.state.audit.unchanged = after.digest === auditBefore!.digest;
         }
-        if (after.digest !== admitted!.canonical.digest)
+        if (after.digest !== auditBefore!.digest)
           throw Error('Pinned audit canonical state changed.');
         await auditReader!.query('ROLLBACK');
       });
@@ -497,7 +600,7 @@ export async function runCanary(
       await cleanup(() => c.end());
     }
     await cleanup(async () => options.cleanupHook?.());
-    if (audit && ownsExecution) await cleanup(auditReserve);
+    if (retained && ownsExecution) await cleanup(auditReserve);
     if (oneShot) {
       // A spent common-prefix session cannot run/resume again. Publish completion
       // only after SQL clients and the filesystem leases have actually closed.
@@ -570,7 +673,7 @@ export async function runCanary(
     }
     if (invocationTimer) clearTimeout(invocationTimer);
     invocationSignal.removeEventListener('abort', cancelSql);
-    if (secondary.length && (!session || (audit && !ownsExecution)))
+    if (secondary.length && (!session || (retained && !ownsExecution)))
       throw new Error(secondary.join('; '));
   }
 }

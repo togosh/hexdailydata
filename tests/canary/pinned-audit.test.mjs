@@ -254,83 +254,99 @@ test('audit exhausted allowance and cancelled SQL context dispatch no extra requ
     await y.session.close();
   }
 });
-test('audit selected graph rejects missing/extraneous mounts, wrong instance, existing state and competing DB', () => {
-  const p = plan(),
-    volume = { Name: p.phases[0].admission.volume, Labels: { 'hdd.v2.instance': p.instance } },
-    states = ['state', 'quota'].map((Name) => ({
-      Name,
-      Labels: { 'hdd.v2.audit-session': p.session },
-    }));
-  const graph = {
-    name: p.project,
-    services: {
-      db: {
-        image: auditPostgresImage,
-        entrypoint: ['postgres'],
-        read_only: true,
-        cpus: 1.25,
-        mem_limit: '2684354560',
-        networks: { private: {} },
-        volumes: [{ type: 'volume', source: 'data', target: '/var/lib/postgresql/data' }],
-      },
-      operator: {
-        image: p.release,
-        entrypoint: ['node', 'dist/operator/main.js'],
-        read_only: true,
-        cpus: 0.5,
-        mem_limit: '1073741824',
-        networks: { private: {}, egress: {} },
-        secrets: [{ source: 'api' }, { source: 'worker' }],
-        volumes: [
-          { type: 'volume', source: 'state', target: p.storagePath },
-          { type: 'volume', source: 'quota', target: p.quotaPath },
-          { type: 'bind', source: '/input', target: '/input', read_only: true },
-        ],
-        environment: {
-          HDD_V2_DB_INSTANCE: p.instance,
-          HDD_V2_PROJECT: p.project,
-          HDD_V2_DB_HOST: 'db',
-          HDD_V2_DB_NAME: 'hexdailydata_v2',
-          HDD_V2_STORAGE_PATH: p.storagePath,
-          HDD_V2_PROVIDER_STATE: p.quotaPath,
-          HDD_V2_CANARY_RELEASE: p.release,
-          HDD_V2_ALLOW_LIVE_RPC: 'false',
+for (const kind of ['pinned-audit', 'common-continue'])
+  test(
+    kind +
+      ' selected graph rejects missing/extraneous mounts, wrong instance, existing state and competing DB',
+    () => {
+      const p = plan(),
+        volume = { Name: p.phases[0].admission.volume, Labels: { 'hdd.v2.instance': p.instance } },
+        states = ['state', 'quota'].map((Name) => ({
+          Name,
+          Labels: { 'hdd.v2.audit-session': p.session },
+        }));
+      const graph = {
+        name: p.project,
+        services: {
+          db: {
+            image: auditPostgresImage,
+            entrypoint: ['postgres'],
+            read_only: true,
+            cpus: 1.25,
+            mem_limit: '2684354560',
+            networks: { private: {} },
+            volumes: [{ type: 'volume', source: 'data', target: '/var/lib/postgresql/data' }],
+          },
+          operator: {
+            image: p.release,
+            entrypoint: ['node', 'dist/operator/main.js'],
+            read_only: true,
+            cpus: 0.5,
+            mem_limit: '1073741824',
+            networks: { private: {}, egress: {} },
+            secrets: [{ source: 'api' }, { source: 'worker' }],
+            volumes: [
+              { type: 'volume', source: 'state', target: p.storagePath },
+              { type: 'volume', source: 'quota', target: p.quotaPath },
+              { type: 'bind', source: '/input', target: '/input', read_only: true },
+            ],
+            environment: {
+              HDD_V2_DB_INSTANCE: p.instance,
+              HDD_V2_PROJECT: p.project,
+              HDD_V2_DB_HOST: 'db',
+              HDD_V2_DB_NAME: 'hexdailydata_v2',
+              HDD_V2_STORAGE_PATH: p.storagePath,
+              HDD_V2_PROVIDER_STATE: p.quotaPath,
+              HDD_V2_CANARY_RELEASE: p.release,
+              HDD_V2_ALLOW_LIVE_RPC: 'false',
+            },
+          },
         },
-      },
+        networks: { private: { internal: true }, egress: {} },
+        volumes: {
+          data: { external: true, name: volume.Name },
+          state: { external: true, name: 'state' },
+          quota: { external: true, name: 'quota' },
+        },
+      };
+      p.phases[0].kind = kind;
+      assert.equal(
+        checkAuditBindings(p, graph, volume, states, []).canonicalSql,
+        kind === 'common-continue' ? 'origin1-writer-only' : 'read-only',
+      );
+      for (const change of [
+        (g) => (g.volumes.data.external = false),
+        (g) => (g.services.worker = {}),
+        (g) => (g.services.db.ports = ['5432']),
+        (g) =>
+          g.services.operator.volumes.push({ type: 'volume', source: 'old', target: '/backup' }),
+        (g) => (g.services.operator.environment.HDD_V2_ALLOW_LIVE_RPC = 'true'),
+        (g) => (g.services.db.entrypoint = ['docker-entrypoint.sh']),
+      ]) {
+        const g = structuredClone(graph);
+        change(g);
+        assert.throws(() => checkAuditBindings(p, g, volume, states, []));
+      }
+      assert.throws(() => checkAuditBindings(p, graph, { ...volume, Labels: {} }, states, []));
+      assert.throws(() => checkAuditBindings(p, graph, volume, [], []));
+      assert.throws(() =>
+        checkAuditBindings(p, graph, volume, states, [
+          {
+            Mounts: [{ Type: 'volume', Name: volume.Name }],
+            Config: {
+              Labels: { 'com.docker.compose.project': 'another' },
+              Image: auditPostgresImage,
+            },
+          },
+        ]),
+      );
     },
-    networks: { private: { internal: true }, egress: {} },
-    volumes: {
-      data: { external: true, name: volume.Name },
-      state: { external: true, name: 'state' },
-      quota: { external: true, name: 'quota' },
-    },
-  };
-  checkAuditBindings(p, graph, volume, states, []);
-  for (const change of [
-    (g) => (g.volumes.data.external = false),
-    (g) => (g.services.worker = {}),
-    (g) => (g.services.db.ports = ['5432']),
-    (g) => g.services.operator.volumes.push({ type: 'volume', source: 'old', target: '/backup' }),
-    (g) => (g.services.operator.environment.HDD_V2_ALLOW_LIVE_RPC = 'true'),
-    (g) => (g.services.db.entrypoint = ['docker-entrypoint.sh']),
-  ]) {
-    const g = structuredClone(graph);
-    change(g);
-    assert.throws(() => checkAuditBindings(p, g, volume, states, []));
-  }
-  assert.throws(() => checkAuditBindings(p, graph, { ...volume, Labels: {} }, states, []));
-  assert.throws(() => checkAuditBindings(p, graph, volume, [], []));
-  assert.throws(() =>
-    checkAuditBindings(p, graph, volume, states, [
-      {
-        Mounts: [{ Type: 'volume', Name: volume.Name }],
-        Config: { Labels: { 'com.docker.compose.project': 'another' }, Image: auditPostgresImage },
-      },
-    ]),
   );
-});
 test('actual supervisor refuses a spent marker before Docker/config/provider work', () => {
-  const root = resolve('artifacts/task-10/pinned-audit/marker-test-' + randomUUID());
+  const root = resolve(
+    process.env.HDD_V2_CANARY_EVIDENCE ?? 'artifacts/task-10/canary-unit',
+    'marker-test-' + randomUUID(),
+  );
   mkdirSync(root, { recursive: true });
   writeFileSync(root + '/invocation.json', '{"spent":true}\n');
   writeFileSync(root + '/overlay.yaml', 'services: {}\n');

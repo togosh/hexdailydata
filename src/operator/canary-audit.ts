@@ -20,6 +20,14 @@ import type { z } from 'zod';
 export type AuditPhase = Extract<CanaryPlan['phases'][number], { kind: 'pinned-audit' }>;
 export const auditPhase = (plan: CanaryPlan) =>
   plan.phases.find((p): p is AuditPhase => p.kind === 'pinned-audit');
+export type RetainedPhase = Extract<
+  CanaryPlan['phases'][number],
+  { kind: 'pinned-audit' | 'common-continue' }
+>;
+export const retainedPhase = (plan: CanaryPlan) =>
+  plan.phases.find(
+    (p): p is RetainedPhase => p.kind === 'pinned-audit' || p.kind === 'common-continue',
+  );
 export type AuditAdmission = z.infer<typeof pinnedAuditAdmissionSchema>;
 const sha = (text: string) => createHash('sha256').update(text).digest('hex');
 const canonicalTables = {
@@ -205,11 +213,7 @@ export async function inspectAuditTarget(
   for (const [table, count] of Object.entries(expected.counts))
     if (String(canonical.tables['hdd.' + table]!.rows) !== count)
       throw Error('Pinned audit table count mismatch: ' + table);
-  const inventory: AuditAccount[] = (
-    await reader.query(
-      'SELECT address,liquid_hearts FROM hdd.accounts WHERE chain_id=1 ORDER BY address',
-    )
-  ).rows.map((r) => ({ address: hex(r.address), hearts: r.liquid_hearts }));
+  const inventory = await auditInventory(reader);
   if (inventory.length !== Number(expected.counts.accounts))
     throw Error('Pinned audit inventory count mismatch.');
   return {
@@ -221,6 +225,19 @@ export async function inspectAuditTarget(
     migrations,
     source: metadata,
   };
+}
+export async function auditInventory(reader: pg.Client): Promise<AuditAccount[]> {
+  const inventory: AuditAccount[] = [];
+  let after = Buffer.alloc(0);
+  for (;;) {
+    const { rows } = await reader.query(
+      'SELECT address,liquid_hearts FROM hdd.accounts WHERE chain_id=1 AND address>$1 ORDER BY address LIMIT 256',
+      [after],
+    );
+    if (!rows.length) return inventory;
+    inventory.push(...rows.map((r) => ({ address: hex(r.address), hearts: r.liquid_hearts })));
+    after = rows.at(-1)!.address;
+  }
 }
 
 export class AuditScope {
@@ -294,12 +311,13 @@ export async function runPinnedAudit(
   reader: pg.Client,
   sources: readonly Source[],
   session: CanarySession,
-  phase: AuditPhase,
+  phase: { admission: { checkpoint: Header }; inventoryDigest: string },
   inventory: AuditAccount[],
   signal: AbortSignal,
 ) {
   const root = session.plan.storagePath,
     file = root + '/audit-comparisons.jsonl';
+  session.state.audit!.checkpoint = phase.admission.checkpoint;
   await writeFile(file, '', { flag: 'wx', mode: 0o600, flush: true });
   const progress = sources.map((s) => ({
     source: s.identity.id,

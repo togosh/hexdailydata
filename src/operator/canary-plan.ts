@@ -46,6 +46,28 @@ const range = z.strictObject({
   to: uint,
 });
 const purpose = z.string().min(8).max(240);
+const cadence = z.strictObject({
+  rollingMilliseconds: z.literal(60000),
+  http: z.literal(12),
+  logical: z.literal(360),
+  spacingMilliseconds: z.literal(2100),
+  quarantineMilliseconds: z.literal(60000),
+});
+const endpoints = z.tuple([
+  z.literal('https://rpc.pulsechain.com'),
+  z.literal('https://rpc-pulsechain.g4mm4.io'),
+]);
+const retainedStart = {
+  admission: pinnedAuditAdmissionSchema,
+  inventoryDigest: sha256,
+  canonicalDigest: sha256,
+  priorSession: z.uuid(),
+  priorStorageIdentity: z.string().regex(/^\d+:\d+$/),
+  priorQuotaIdentity: z.string().regex(/^\d+:\d+$/),
+  priorDispatchFloor: z.number().int().nonnegative().safe(),
+  cadence,
+  endpoints,
+};
 const phase = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('capabilities'),
@@ -62,43 +84,24 @@ const phase = z.discriminatedUnion('kind', [
   }),
   z.strictObject({ kind: z.literal('replay'), purpose, basis: z.literal('constructor-prefix') }),
   z.strictObject({
+    kind: z.literal('common-continue'),
+    purpose,
+    ...retainedStart,
+    through: uint,
+    finalityHeaders: z.strictObject({ minimum: uint, maximum: uint }),
+  }),
+  z.strictObject({
     kind: z.literal('pinned-audit'),
     purpose,
-    admission: pinnedAuditAdmissionSchema,
-    inventoryDigest: sha256,
-    canonicalDigest: sha256,
-    priorSession: z.uuid(),
-    priorStorageIdentity: z.string().regex(/^\d+:\d+$/),
-    priorQuotaIdentity: z.string().regex(/^\d+:\d+$/),
-    priorDispatchFloor: z.number().int().nonnegative().safe(),
-    cadence: z.strictObject({
-      rollingMilliseconds: z.literal(60000),
-      http: z.literal(12),
-      logical: z.literal(360),
-      spacingMilliseconds: z.literal(2100),
-      quarantineMilliseconds: z.literal(60000),
-    }),
-    endpoints: z.tuple([
-      z.literal('https://rpc.pulsechain.com'),
-      z.literal('https://rpc-pulsechain.g4mm4.io'),
-    ]),
+    ...retainedStart,
   }),
   z.strictObject({
     kind: z.literal('common-prefix'),
     purpose,
     through: uint,
     finalityHeaders: z.strictObject({ minimum: uint, maximum: uint }),
-    cadence: z.strictObject({
-      rollingMilliseconds: z.literal(60000),
-      http: z.literal(12),
-      logical: z.literal(360),
-      spacingMilliseconds: z.literal(2100),
-      quarantineMilliseconds: z.literal(60000),
-    }),
-    endpoints: z.tuple([
-      z.literal('https://rpc.pulsechain.com'),
-      z.literal('https://rpc-pulsechain.g4mm4.io'),
-    ]),
+    cadence,
+    endpoints,
   }),
   z.strictObject({ kind: z.literal('metrics'), purpose }),
   z.strictObject({
@@ -250,7 +253,11 @@ export const canaryPlanSchema = z
             bad('Pinned audit requires the two declared public endpoint aliases.');
         }
       }
-      if (ph.kind === 'common-prefix') {
+      if (ph.kind === 'common-prefix' || ph.kind === 'common-continue') {
+        const continuing = ph.kind === 'common-continue';
+        const start = continuing
+          ? ph.admission.checkpoint.number
+          : p.profile.constructor.checkpoint.number;
         if (
           p.phases.length !== 1 ||
           p.price !== null ||
@@ -259,11 +266,11 @@ export const canaryPlanSchema = z
           p.profile.policy.mode !== 'finalized' ||
           p.ranges.length !== 1 ||
           p.ranges[0]!.chain !== 1 ||
-          p.ranges[0]!.from !== p.profile.constructor.checkpoint.number ||
+          p.ranges[0]!.from !== start ||
           p.ranges[0]!.to !== ph.through ||
-          BigInt(ph.through) < BigInt(p.profile.constructor.checkpoint.number) ||
+          BigInt(ph.through) < BigInt(start) ||
           BigInt(ph.through) > BigInt(p.profile.fork.parent.number) ||
-          BigInt(ph.through) - BigInt(p.profile.constructor.checkpoint.number) >= 16384n ||
+          BigInt(ph.through) - BigInt(start) > (continuing ? 16384n : 16383n) ||
           BigInt(ph.finalityHeaders.minimum) < BigInt(p.profile.target.number) ||
           BigInt(ph.finalityHeaders.maximum) < BigInt(ph.finalityHeaders.minimum) ||
           BigInt(ph.finalityHeaders.maximum) > 100000000n ||
@@ -276,6 +283,28 @@ export const canaryPlanSchema = z
           bad(
             'Common prefix requires one bounded origin1 interval, finalized headers and sync-only caps.',
           );
+        if (
+          continuing &&
+          (BigInt(start) < BigInt(p.profile.constructor.checkpoint.number) ||
+            BigInt(ph.through) <= BigInt(start) ||
+            BigInt(ph.admission.counts.accounts) < 1n ||
+            BigInt(ph.admission.counts.accounts) > 10000n ||
+            ph.priorSession === p.session ||
+            p.caps.responseBytes !== 4194304 ||
+            p.methods.length !== 5 ||
+            new Set(p.methods).size !== 5 ||
+            p.methods.some(
+              (m) =>
+                ![
+                  'eth_chainId',
+                  'eth_getBlockByNumber',
+                  'eth_getCode',
+                  'eth_getLogs',
+                  'eth_call',
+                ].includes(m),
+            ))
+        )
+          bad('Common continuation requires an exact populated start and a new bounded grant.');
         for (let i = 0; i < 2; i++) {
           const alias = ['HDD_V2_PROVIDER_PULSE_OFFICIAL', 'HDD_V2_PROVIDER_PULSE_G4MM4'][i];
           if (

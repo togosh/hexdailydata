@@ -163,7 +163,7 @@ The explicit `pinned-audit` phase admits a separately approved retained origin1
 checkpoint. Its plan binds the existing instance/volume, exact header and revision,
 source provenance, migration checksums, expected counts/totals, ordered whole-account
 inventory digest and a newly observed canonical digest. It never initializes or
-replays. Other modes still require their original empty targets. Prepare uses the
+replays. Fresh-target modes still require their original empty targets. Prepare uses the
 same retained admission without providers; run requires new state/quota ownership,
 new approval and the one-shot supervisor. Resume and spent ledgers are refused.
 
@@ -172,7 +172,7 @@ worker connections, and uses an API-role repeatable-read read-only snapshot. Its
 transaction-local idle timeout is bounded by the original invocation deadline;
 global SQL/RPC timeouts are unchanged. A lost snapshot/lock fences each subsequent
 dispatch. Both sources verify the fixed identity/code/header and one first-inventory
-balance before the full ordered sweeps. SQL pages remain30; only this mode partitions
+balance before the full ordered sweeps. SQL pages remain30; this terminal audit partitions
 them into at most10 balance calls. Zero balances are included and duplicate singleton
 checks do not increase full coverage. No automatic smaller-batch fallback exists.
 
@@ -187,6 +187,44 @@ tables, schema and sequence evidence after provider work. Completion requires th
 equality, full paired coverage, closure and final persistence within the original
 deadline. Retain the DB and new spent evidence on success or failure; never rewrite
 the earlier replay result. Full Task10 remains a separate pending qualification.
+
+The explicit `common-continue` phase advances an exactly admitted populated origin1
+checkpoint S to a fixed numeric T using the existing `SyncEngine.once(stopAt)`. It
+continues database history under a separate one-shot grant; it cannot resume or reset
+a spent allowance. It performs the same retained admission at prepare and again at
+run under exclusion locks, then ends the admission snapshot before replay. Only the
+origin1 canonical writer has write-capable SQL. Both sources verify S and corroborate
+T within the invocation. No constructor/fork initialization or unbounded replay runs.
+
+The future plan has one phase with `kind: "common-continue"`, `admission` containing
+the observed volume/header/revision/source/counts/totals, `inventoryDigest`,
+`canonicalDigest`, `priorSession`, `priorStorageIdentity`, `priorQuotaIdentity`,
+`priorDispatchFloor`, numeric-string `through`, `finalityHeaders`, and the existing
+fixed `cadence`/`endpoints`. Its sole origin1 range is S..T. Normal session/reviewed
+commit/image/project/instance bindings and new state/quota paths are still required.
+Those values must come from a later separately authorized preparation and review;
+this description is not an executable approval or a selected live interval.
+
+T must exceed S by at most16,384 blocks and remain at/before the declared common
+parent. Methods are exactly chain identity, numbered headers, code, logs and eth_call;
+constructor receipts are excluded. Logs are restricted to S+1..T; state/code pins to
+S..T. Existing parent/finality exceptions authorize headers only. The full admitted
+SQL inventory authorizes inherited accounts, with new accounts admitted by validated
+logs/headers. Existing two-source agreement and the2MiB early log split remain under
+the4MiB hard response limit. Caps are at most60min/600HTTP/12000logical/256MiB with
+the unchanged8MiB incomplete charge, cadence, original deadlines and both disk floors.
+
+After replay, save the actual accepted SQL cursor and replay progress independently
+of audit success. Reconcile and audit every resulting account at the exact T hash
+using the existing paired singleton probes and full ten-account batches. A fresh
+read-only snapshot and canonical before/after evidence cover that audit; successful
+replay is expected to differ from S. Audit failure keeps accepted replay and precise
+partial coverage, never complete status. Failure after SQL commit may leave progress
+counters behind; the admitted SQL checkpoint remains authoritative for any later
+separately approved grant. Never repair and rerun the same invocation. Use the existing
+`canary-once.mjs <new-environment> <retained-operator-only-override>` supervisor and
+retained-volume graph checks only after a future explicit approval. The continuation
+implementation is offline qualification; no real continuation is authorized by it.
 
 New failed sessions may retain one optional `rpcDiagnostic` (at most8KiB), with source
 alias, bounded request/ID facts, structural rejection, observed status/byte count and

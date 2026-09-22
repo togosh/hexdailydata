@@ -34,13 +34,13 @@ const plan = canaryPlanSchema.parse(
 );
 if (
   plan.phases.length !== 1 ||
-  !['common-prefix', 'pinned-audit'].includes(plan.phases[0].kind) ||
+  !['common-prefix', 'pinned-audit', 'common-continue'].includes(plan.phases[0].kind) ||
   plan.project !== config.project ||
   plan.instance !== config.instance ||
   plan.release !== (config.current ?? config.built)
 )
   throw Error('One-shot canary environment/image mismatch.');
-const audit = plan.phases[0].kind === 'pinned-audit';
+const audit = ['pinned-audit', 'common-continue'].includes(plan.phases[0].kind);
 const compose = [
   'compose',
   '--env-file',
@@ -84,7 +84,9 @@ if (audit) {
   });
 }
 const started = Date.now(),
-  name = config.project + (audit ? '-audit' : '-prefix');
+  name =
+    config.project +
+    (plan.phases[0].kind === 'common-continue' ? '-continue' : audit ? '-audit' : '-prefix');
 const argv = [
   ...(audit ? compose : ['scripts/operator/host.mjs', 'compose', directory, '-f', overridePath]),
   'run',

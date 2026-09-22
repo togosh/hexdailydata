@@ -10,12 +10,18 @@ import {
 import { validateCall, type RpcCall } from '../providers/rpc.ts';
 import { assertDeclaredHeader } from '../providers/binding.ts';
 import { profileBinding } from '../worker/sync/profile.ts';
-import type { Header } from '../services/projections/input.ts';
+import { digest, type Header } from '../services/projections/input.ts';
+import type { AuditAccount } from '../worker/sync/audit.ts';
 import type { CanaryPlan } from './canary-plan.ts';
 
-export type PrefixPhase = Extract<CanaryPlan['phases'][number], { kind: 'common-prefix' }>;
+export type PrefixPhase = Extract<
+  CanaryPlan['phases'][number],
+  { kind: 'common-prefix' | 'common-continue' }
+>;
 export const prefixPhase = (plan: CanaryPlan) =>
-  plan.phases.find((p): p is PrefixPhase => p.kind === 'common-prefix');
+  plan.phases.find(
+    (p): p is PrefixPhase => p.kind === 'common-prefix' || p.kind === 'common-continue',
+  );
 
 /** Ephemeral, bounded permission context for this one non-resumable prefix. Header-only
  * exceptions never enter the state-pin set. Source still performs its normal checks. */
@@ -24,18 +30,29 @@ export class PrefixScope {
   private addresses = new Set<string>();
   private logs: RawLog[] = [];
   private finalized: Header | undefined;
+  private start: string;
   constructor(
     private plan: CanaryPlan,
     private phase: PrefixPhase,
     private source = 'TEST',
+    inventory?: AuditAccount[],
   ) {
-    for (const b of plan.profile.constructor.balances) this.addresses.add(b.address);
+    this.start =
+      phase.kind === 'common-continue'
+        ? phase.admission.checkpoint.number
+        : plan.profile.constructor.checkpoint.number;
+    if (
+      phase.kind === 'common-continue' &&
+      (!inventory ||
+        digest(inventory) !== phase.inventoryDigest ||
+        inventory.length !== Number(phase.admission.counts.accounts) ||
+        new Set(inventory.map((a) => a.address)).size !== inventory.length)
+    )
+      throw Error('Common continuation requires admitted inventory.');
+    for (const b of inventory ?? plan.profile.constructor.balances) this.addresses.add(b.address);
   }
   private contains(n: string) {
-    return (
-      BigInt(n) >= BigInt(this.plan.profile.constructor.checkpoint.number) &&
-      BigInt(n) <= BigInt(this.phase.through)
-    );
+    return BigInt(n) >= BigInt(this.start) && BigInt(n) <= BigInt(this.phase.through);
   }
   request(chain: number, calls: RpcCall[]) {
     if (chain !== 1 || calls.length < 1 || calls.length > 30)
@@ -62,11 +79,15 @@ export class PrefixScope {
         const f = p[0] as { fromBlock: string; toBlock: string };
         if (
           !this.contains(BigInt(f.fromBlock).toString()) ||
-          !this.contains(BigInt(f.toBlock).toString())
+          !this.contains(BigInt(f.toBlock).toString()) ||
+          (this.phase.kind === 'common-continue' && BigInt(f.fromBlock) <= BigInt(this.start))
         )
           throw Error('Common prefix logs outside scope.');
       } else if (c.method === 'eth_getTransactionReceipt') {
-        if (p[0] !== this.plan.profile.constructor.transactionHash)
+        if (
+          this.phase.kind === 'common-continue' ||
+          p[0] !== this.plan.profile.constructor.transactionHash
+        )
           throw Error('Common prefix receipt rejected.');
       } else if (c.method === 'eth_call') {
         const data = (p[0] as { data: string }).data;
