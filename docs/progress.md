@@ -484,3 +484,19 @@ Only new stopped containers removed; new DB/spent volumes/private environment re
 Report/evidence: `artifacts/task-10/native-prefix/`. Full Task10 PENDING; no native fork,
 full replay/seed/rebuild/UI/v1/existing DB/Task11/push/deployment. Prior sessions preserved.
 Stop for planner review. This entry is a status-only commit after the reviewed code.
+
+Task10 nonempty/day-boundary prefix: OFFLINE_IMPLEMENTATION PASS; live STOPPED_INCOMPLETE.
+Reviewed code `189185990ef9e8fb71281a4631cc447d314d9579` extends only common-prefix
+sublimits; 22 compiled/raw/SQL groups and 29 focused tests PASS. Separate read-only
+`/root/prefix_review` code/binding PASS, with independent multi-day SQL probes.
+The one approved invocation stopped on "Missing/conflicting RPC response identity."
+at common-official eth_getLogs: 1050096ms, 187HTTP/207logical, 1687957 observed=charged
+bytes; no retry, pending reservation, uncertainty or secondary failure. Constructor
+verified; origin1 accepted through9046419 in six commits, day0 only, zero events/days.
+Requested9057567 was not reached; nonempty/day/ledger and full external audit remain
+unexercised/incomplete. Local read-only SQL reconcile passed; no native369 state.
+New instance `b52a7018-8d39-40d9-b1b3-223cf42a4f84` and all six volumes/spent session
+retained; only new stopped containers removed. Prior databases/sessions untouched.
+Report/result/evidence: `artifacts/task-10/nonempty-prefix/`. Full Task10 PENDING;
+Task11 unstarted. No post-stop fix/retry, rebuild, fork, UI, v1, HDS, push or deployment.
+Stop for planner review. This entry is a status-only commit after the reviewed code.
