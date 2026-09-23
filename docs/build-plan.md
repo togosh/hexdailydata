@@ -10,17 +10,15 @@ Do not introduce a new runtime gate or task-named subsystem to mark a task compl
 01 -> 02 -> 03 -> (04 and 05) -> 06 -> (07 and 08) -> 09 -> 10 -> 11
 ```
 
-04/05 and 07/08 can run in separate worktrees after their shared predecessor passes.
-At most two implementation workers. An integrator owns shared contracts, migrations,
-root lockfile, branch merges and final integration. If a task needs another owner's
-shared file, return a proposed patch/interface instead of editing it simultaneously.
-Each worktree uses a unique Compose project and temporary database. Never point two
-coders at the same mutable checkout. Sequential operation is always supported; the
-plan does not require a particular subagent feature to exist.
+The dependency branches make 04/05 and 07/08 eligible after their shared predecessor;
+they do not authorize additional implementation writers. The owner's current workflow
+uses one builder/integrator, owning shared contracts, migrations, lockfile and integrated
+checks, with one separate source-read-only reviewer. Work sequentially in the active
+checkout and preserve newer work. Use only task-authorized isolated test resources.
 
-A separate read-only reviewer is required at each task's integrated candidate, not
-for every file or every local edit. Review the combined result after parallel work is
-merged. Never keep a reviewer analyzing a moving checkout.
+A separate read-only reviewer checks each task's frozen integrated candidate, not
+every file or local edit. Never keep a reviewer analyzing a moving checkout. The plan
+does not require a particular subagent feature to exist.
 
 ## Bounded plan review (separate from code review)
 
@@ -100,7 +98,9 @@ Record effective settings only when the client exposes them; otherwise UNKNOWN.
 
 ### Keep context small without narrowing necessary inspection
 
-- Start a new builder session for the next meaningful task, not each review finding.
+- Start a new builder for the next meaningful task when useful, after the current task has a
+  recorded result and its owned processes are settled. Reuse the builder for review
+  corrections; do not create a fresh conversation merely to wait for a running job.
 - Read AGENTS.md, selected task, relevant contracts, and short current progress first.
   Follow references as needed; do not paste the whole old repo/chat into every agent.
 - Keep logs and long query plans in ignored artifacts/task-NN. Return counts, actual
@@ -111,10 +111,12 @@ Record effective settings only when the client exposes them; otherwise UNKNOWN.
 - Reviewer inspects evidence and reruns focused reproductions, not every expensive
   suite the builder just ran. Rerun affected tests after fixes; broader final checks
   remain mandatory where the task defines them.
-- No agent for every discipline by default. Use at most one extra scoped specialist
-  only for a concrete unresolved issue; do not let children recursively delegate.
-- At a clean milestone, stop finished agents. Use a bounded wait for a real test job,
-  not repeated model wakeups merely asking whether an agent has finished.
+- Keep one builder/integrator and one separate source-read-only reviewer. Do not add
+  specialist agents or recursively delegate; surface unresolved scope issues to the owner.
+- Follow AGENTS.md's "Active tasks and long-running work" rules for retained-session
+  completion waits, sparse fallback observations and mid-task owner messages. End
+  finished helper work at clean boundaries; keep the same independent reviewer for
+  correction rechecks rather than polling it or creating another review context.
 
 These are workflow guidelines. They do not modify the product's runtime, its data
 safety boundaries, or the acceptance tests below.

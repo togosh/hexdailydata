@@ -1,3 +1,14 @@
+# Historical Task01 starter
+
+This file preserves the original Task01 prompt below. For ongoing work, use AGENTS.md
+and the newest owner-supplied task packet with the actual current checkout and evidence.
+Do not execute this historical prompt's preflight/tests, Git initialization, dependency
+selection or Task01 implementation unless a new owner task explicitly selects them.
+Tasks01-09 remain accepted within their documented scopes; Task10/11 status comes from
+the latest evidence and docs/progress.md. An old starter does not reopen accepted work.
+
+---
+
 Build HEXDailyData v2 in THIS new repository, not in the sibling legacy project.
 Read AGENTS.md, README.md and `.agents/skills/hdd-build/SKILL.md`, then the task01
 section and lean review loop in docs/build-plan.md. Read docs/product.md and the

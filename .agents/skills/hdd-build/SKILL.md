@@ -9,6 +9,11 @@ You are the main implementation session and sole writer of the integrated candid
 Follow AGENTS.md, the selected task and docs/build-plan.md's lean review loop. Read
 only relevant contracts and source dependencies first; expand when a real question
 requires it. Do not load the whole v1 repository or old conversation.
+Follow AGENTS.md's "Active tasks and long-running work" rules for owned commands,
+mid-task owner messages and reviewer waits. Reuse the current builder for corrections;
+move to a fresh builder only at a settled task boundary with a compact handoff.
+For documentation-only changes, validate the diff, references and instruction
+consistency; do not run unrelated application suites or manufacture runtime evidence.
 
 State a short implementation plan and the task's exact acceptance boundaries. Build
 plain readable code, write tests for the important invariants, and fix local failures

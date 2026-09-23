@@ -591,3 +591,21 @@ removed; retained DB/new roots/private configuration preserved. Zero real provid
 calls or canonical SQL changes; no approval, real run/resume, push or deployment.
 FullTask10 andTask11 PENDING; productionReady=false. Stop for planner review.
 This is a documentation-only status entry after the final reviewed runtime commit.
+
+Task10 bulk execution returned 2026-09-23: STOPPED_INCOMPLETE. This later return
+supersedes the preparation entry's unstarted/zero-charge state for operation
+`3f79804f-60ce-423e-8dc9-359368fc2a6e`; that earlier entry remains historical.
+After four supervised segments, the operation ended terminal on `Provider timeout.`;
+resumeEligible=false.
+Last acknowledged accepted checkpoint is 9,051,991 / revision 72, not a new full SQL audit.
+No milestone audit completed; last full paired qualification remains 9,046,931 / revision 17
+with 2,231 accounts. Totals: 1,669 HTTP attempts, 9,726 logical calls, 305,320,333 observed
+bytes and 476,970,907 charged bytes. Source remained `1a467ac5eede9bf2f4c6f2622572fe6609ce3735`,
+reviewed runtime `a8d4b38f9c5a5ff28032d15b27e8e3648c4956ff`. Saved host receipts report
+owned runtime removed and data/control records preserved; no fresh host/SQL check is
+claimed here. Separate review and planner evidence review accepted return accuracy,
+not interval success. Execution report/result/seals are in
+`artifacts/task-10/bulk-preparation/execution/`; evidence ZIP SHA-256
+`613ccce631c8d8bc25afba1cbca1eaeaa3f7357a1c8c5b6a7a2f6102ba220bdf`.
+Full Task10 and Task11 remain PENDING; productionReady=false. No further execution
+authority is created by this status entry or the agent-waiting documentation task.

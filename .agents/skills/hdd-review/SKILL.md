@@ -22,6 +22,10 @@ Do not edit product code, contracts or task status. Run focused checks only in a
 v2/disposable resources, with no v1 database/credentials/VPS/live provider access. State
 which tests you ran and which evidence you only inspected. Prefer a high-value negative
 or failure-path reproduction to rerunning every unchanged expensive suite.
+For documentation-only workflow changes, check the actual instruction diff and its
+consistency with owner scope and available tool semantics. Static review is sufficient
+when executable behavior is unchanged; do not claim that waiting was runtime-tested.
+Use AGENTS.md's waiting rules for any owned checks.
 
 Return:
 - Reviewed base/candidate commit, separate context yes/no, review scope and checks.

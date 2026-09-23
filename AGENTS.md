@@ -1,8 +1,10 @@
 # Working agreements
 
-This is a NEW product implementation. Read README.md, docs/product.md, the selected
-build-plan task, and the relevant contract before writing code. Follow higher-priority
-platform/sandbox rules. Do not alter global Codex configuration to bypass them.
+This repository implements HEXDailyData v2. Start from the newest owner task packet
+and actual current checkout/evidence. Read README.md, docs/product.md, the selected
+build-plan task and relevant contracts as needed for that work. Preserve accepted
+tasks and product decisions. Follow higher-priority platform/sandbox rules; do not
+alter global Codex configuration to bypass them.
 
 ## Boundaries
 
@@ -67,12 +69,53 @@ self-review, then hand off to a separate reviewer session. Do not mark the task 
 until its independent review is actually complete. No new globally installed skills,
 permission changes, paid services, or orchestration framework are required.
 
+## Active tasks and long-running work
+
+Use the newest owner task packet and actual current evidence. An old starter or
+prepared/unstarted report does not restart a completed task or supersede a later
+result. Preserve newer checkout work; a reference ZIP is not a checkout reset.
+
+- Launch an authorized long-running command once. Retain its process/tool-session
+  handle and existing log/result paths, operation identity and deadline. Use the
+  task's existing artifacts; no new persistent registry or watcher service.
+- Prefer the available tool's completion notification or retained-session wait for
+  that same command. A tool yield or wait timeout alone does not establish the child's
+  state. Follow the actual tool's wait limits and cancellation semantics; never rerun
+  the launch command just to discover whether the first invocation finished.
+- Keep detailed output in the existing task log. Return the actual exit and a short
+  result when it settles. Do not repeatedly fetch the whole growing log. A monitor
+  read returning exit 0 proves only that the read succeeded; determine operation
+  completion, clean pause or terminal failure from its own final result/state.
+- If completion waiting is unavailable, use bounded, read-only observations of the
+  owned job. For a safely supervised long job, default to about five minutes between
+  observations, extending to ten while stable. This is an observation cadence, not
+  an instruction to block the shell with a long sleep. Use shorter checks only for
+  a concrete task deadline, failure concern, owner request or higher-priority rule.
+  Resume the same tool session as required without an extra log read on every yield.
+- Give updates for meaningful changes: start, phase/milestone, actionable failure,
+  required decision and final result. Do not narrate every counter increment. If
+  higher-priority instructions require more frequent communication, keep it brief;
+  a message need not trigger another command or provider/SQL observation.
+- Treat status questions and requests for less polling as steering the active task.
+  Answer briefly, adjust observation, and continue owning the same job. An explicit
+  stop/cancel or incompatible new objective changes that task. A chat interruption
+  alone does not establish the child's state; use existing authorized local receipts
+  to resolve it, and report UNKNOWN if they cannot. Do not assume success, cancellation
+  or permission to launch a replacement after a lost tool session.
+
+Waiting changes observation only. Preserve the task's supervision, lease, deadlines,
+limits, evidence collection and explicit stop behavior. Do not bypass a guard, detach
+an unsupervised operation or leave a job unowned to save context. Resume only where
+the current task already authorizes it and its actual state is eligible; terminal
+state and unused budget do not create a new grant. These rules also cover waiting
+for the one separate reviewer: use its supported completion wait, not status loops.
+
 ## Tasks and evidence
 
 Complete the requested task, its relevant tests, focused review, and in-scope fixes.
-Do not automatically implement all remaining tasks. One writer owns shared schema,
-contracts and lockfile. At most two disjoint implementation workers in separate
-worktrees; no recursive swarm. Integrator owns merges and integrated tests.
+Do not automatically implement all remaining tasks. The owner uses one builder/
+integrator as the sole implementation writer, including schema, contracts and
+lockfile, with one separate source-read-only reviewer. Do not start extra writers.
 The review loop and context budget are in docs/build-plan.md. Do not reread every
 project document or rerun unrelated suites after a small patch. Deterministic checks
 handle formatting/types; the critic prioritizes correctness, integration, realistic
