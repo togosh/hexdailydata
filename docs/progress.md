@@ -631,3 +631,25 @@ independent 7 unit tests and 6 SQL groups. Evidence/report/review/archive bindin
 `artifacts/task-10/replay-balance-paging/`. Zero real provider calls or retained/private
 resource access; live efficacy UNMEASURED. Spent operation remains terminal; full Task10
 and Task11 PENDING, productionReady=false. Stop for planner review. Status-only entry.
+
+Task10 paged execution terminal return: operation `777d194a-96c4-4e5a-923f-91ce8d2f3218`
+ended on `Clock rollback or invalid clock.` at acknowledged9,081,947/revision140.
+No full milestone audit began; inherited full qualification remains9,046,931/revision17,
+2,231 accounts. Supplied immutable totals:2,822 HTTP/30,150 logical/486,461,598 observed/
+626,636,417 charged bytes. These are saved-return facts, not fresh retained SQL checks.
+The owner did not send the proposed milestone-stop message. This operation and the
+earlier `3f79804f-60ce-423e-8dc9-359368fc2a6e` remain terminal; unused allowance is spent.
+
+Task10 clock and runner: CLOCK_AND_RUNNER_OFFLINE_PASS. Reviewed code
+`04f9d5cafaa05ae815f87fad3ec11167b6f947e9`; clean baseline `2b5c51faf076` preserved.
+Reconstruction uses conservative wall/monotonic expiry, continuous minimum waits,
+restart continuity and bounded diagnostics. Owner-terminal coordinator reuses the
+saved supervisor/collector, with durable status, clean-boundary pause and scoped
+cancellation. Builder49 affected tests PASS; unchanged23 full SQL groups, types/build
+reused from `1637d495`. Separate read-only `/root/clock_runner_review` PASS after one
+correction round; independent15 focused/2 SQL groups and12 runner recheck tests PASS.
+Report/result/review and verified archives: `artifacts/task-10/clock-and-runner/`.
+Zero real provider calls or retained/private access; no live preparation/approval/run/
+resume, clock/OS changes, push or deployment. Real Docker cancellation and end-of-AI-turn
+survival NOT_EXERCISED. Full Task10/Task11 PENDING; productionReady=false. Stop for
+planner review. This is a status-only commit after the reviewed source candidate.
