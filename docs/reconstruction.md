@@ -94,6 +94,14 @@ is conservative too. No automatic repair, rewind, grant renewal or state convers
 is supplied. Clean paused milliseconds are measured; crash downtime is not inferred,
 but it still consumes the immutable wall deadline.
 
+On a terminal writer acknowledgement failure, finalization reconciles that same
+receipt before releasing exclusions. A proven commit advances the reported accepted
+checkpoint; a proven rollback retains its previous checkpoint. The original error
+remains terminal. If SQL or exclusions cannot be verified, `acceptedSqlUncertain=true`
+in run/status output identifies `accepted` as the last acknowledged checkpoint;
+`pendingSql` retains the unresolved previous/next transition. Status does not open SQL
+to resolve uncertainty, and a terminal operation cannot resume or dispatch again.
+
 The synthetic example is intentionally unusable against real resources. Tests use
 fresh internal-network PostgreSQL fixtures, fake JSON-RPC transports and controlled
 clocks. Fake clock spans are not real uptime or provider throughput measurements.

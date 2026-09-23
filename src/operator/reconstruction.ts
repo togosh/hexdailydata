@@ -44,6 +44,7 @@ function result(session: ReconstructionSession) {
     b = s.segment?.before;
   return {
     ...s,
+    acceptedSqlUncertain: s.pendingSql !== null,
     remaining: {
       milliseconds:
         s.deadline === null ? caps.milliseconds : Math.max(0, s.deadline - session.clock.now()),
@@ -199,6 +200,30 @@ export async function runReconstruction(
       revision: s.revision as string,
     };
   };
+  const reconcilePendingSql = async (
+    actual: Awaited<ReturnType<typeof cursor>>,
+    allowRolledBack = false,
+  ) => {
+    const s = session!,
+      pending = s.state.pendingSql!;
+    const [receipt] = (
+      await reader!.query(
+        "SELECT batch_digest,previous_sync->>'block_number' previous_number,previous_sync->>'block_hash' previous_hash,previous_sync->>'revision' previous_revision FROM hdd.checkpoints_recent WHERE chain_id=1 AND block_number=$1",
+        [pending.next.header.number],
+      )
+    ).rows;
+    const committed =
+      digest(actual) === digest(pending.next) &&
+      receipt?.batch_digest === pending.batchDigest &&
+      receipt.previous_number === pending.previous.header.number &&
+      receipt.previous_hash === pending.previous.header.hash.replace('0x', '\\x') &&
+      receipt.previous_revision === pending.previous.revision;
+    const rolledBack = allowRolledBack && !receipt && digest(actual) === digest(pending.previous);
+    if (!committed && !rolledBack)
+      throw Error('BLOCKED_UNCERTAIN: SQL transition cannot be uniquely recovered.');
+    s.state.accepted = actual;
+    s.state.pendingSql = null;
+  };
   try {
     await localGuard();
     if (command !== 'prepare')
@@ -233,24 +258,8 @@ export async function runReconstruction(
     if (session) {
       const actual = await cursor(),
         pending = session.state.pendingSql;
-      if (pending) {
-        const [receipt] = (
-          await reader.query(
-            "SELECT batch_digest,previous_sync->>'block_number' previous_number,previous_sync->>'block_hash' previous_hash,previous_sync->>'revision' previous_revision FROM hdd.checkpoints_recent WHERE chain_id=1 AND block_number=$1",
-            [pending.next.header.number],
-          )
-        ).rows;
-        if (
-          digest(actual) === digest(pending.next) &&
-          receipt?.batch_digest === pending.batchDigest &&
-          receipt.previous_number === pending.previous.header.number &&
-          receipt.previous_hash === pending.previous.header.hash.replace('0x', '\\x') &&
-          receipt.previous_revision === pending.previous.revision
-        ) {
-          session.state.accepted = actual;
-          session.state.pendingSql = null;
-        } else throw Error('BLOCKED_UNCERTAIN: SQL transition cannot be uniquely recovered.');
-      } else if (digest(actual) !== digest(session.state.accepted))
+      if (pending) await reconcilePendingSql(actual);
+      else if (digest(actual) !== digest(session.state.accepted))
         throw Error('BLOCKED_UNCERTAIN: arbitrary SQL checkpoint drift.');
       else if (oldStatus === 'running' && !session.state.audit && !oldDigest)
         throw Error('BLOCKED_UNCERTAIN: no quiescent replay receipt.');
@@ -451,6 +460,17 @@ export async function runReconstruction(
         }
       };
       await cleanup(end);
+      if (reader && owner && session.state.pendingSql)
+        await cleanup(async () => {
+          try {
+            // A rejected acknowledgement may follow COMMIT. Resolve only the
+            // exact saved transition while exclusions still protect this SQL state.
+            await localGuard();
+            await reconcilePendingSql(await cursor(), true);
+          } catch (e) {
+            throw Error('Accepted SQL checkpoint uncertain: ' + operatorError(e));
+          }
+        });
       if (reader && owner && !session.state.terminal)
         await cleanup(async () => {
           await localGuard();

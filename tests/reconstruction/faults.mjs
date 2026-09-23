@@ -26,6 +26,73 @@ import {
 } from './fixture.mjs';
 
 export async function faultTests({ root, test, reset, child }) {
+  await test('terminal writer acknowledgement reconciles committed or rolled-back SQL and labels unavailable SQL uncertain', async () => {
+    const outcomes = [];
+    for (const kind of ['committed', 'rolled-back', 'reader-loss']) {
+      await reset();
+      const clock = clockAt(),
+        prior = await seeded(root, clock),
+        p = await newPlan(root, prior, { target: '611', milestones: ['611'] }),
+        f = fixture(p, clock);
+      await executeBulk(p, 'prepare', clock);
+      let attemptsAtFailure;
+      const reason = 'Synthetic writer acknowledgement failure: ' + kind;
+      const fault = async () => {
+        attemptsAtFailure = f.attempts.length;
+        if (kind === 'reader-loss')
+          await admin((c) =>
+            c.query(
+              "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND usename='hdd_v2_api'",
+            ),
+          );
+        throw Error(reason);
+      };
+      const state = await executeBulk(p, 'run', clock, {
+        fixture: f,
+        hooks: kind === 'rolled-back' ? { beforeCommit: fault } : { afterCommit: fault },
+      });
+      const sql = await admin(
+        async (c) =>
+          (
+            await c.query(
+              "SELECT block_number,revision,encode(block_hash,'hex') block_hash FROM hdd.sync_state WHERE chain_id=1",
+            )
+          ).rows[0],
+      );
+      assert.equal(state.status, 'blocked');
+      assert.equal(state.reason, reason);
+      assert.equal(state.audited, null);
+      assert.equal(state.milestone, 0);
+      assert.equal(f.attempts.length, attemptsAtFailure, 'No dispatch after writer failure');
+      assert.equal(sql.block_number, kind === 'rolled-back' ? '355' : '483');
+      if (kind === 'reader-loss') {
+        assert.equal(state.acceptedSqlUncertain, true);
+        assert.equal(state.accepted.header.number, '355');
+        assert.equal(state.pendingSql.next.header.number, sql.block_number);
+        assert(
+          state.secondary.some((message) => /Accepted SQL checkpoint uncertain/.test(message)),
+        );
+      } else {
+        assert.equal(state.acceptedSqlUncertain, false);
+        assert.equal(state.pendingSql, null);
+        assert.equal(state.accepted.header.number, sql.block_number);
+        assert.equal(state.accepted.header.hash, '0x' + sql.block_hash);
+        assert.equal(state.accepted.revision, sql.revision);
+      }
+      const saved = await json(p.storagePath + '/reconstruction.json');
+      assert.deepEqual(saved.accepted, state.accepted);
+      assert.deepEqual(saved.pendingSql, state.pendingSql);
+      assert.equal(saved.reason, reason);
+      const status = await executeBulk(p, 'status', clock);
+      assert.equal(status.acceptedSqlUncertain, state.acceptedSqlUncertain);
+      assert.deepEqual(status.accepted, state.accepted);
+      const refused = fixture(p, clock);
+      assert.equal((await executeBulk(p, 'resume', clock, { fixture: refused })).status, 'blocked');
+      assert.equal(refused.attempts.length, 0);
+      outcomes.push({ kind, state, saved, status, sql, attempts: f.attempts });
+    }
+    await save('writer-acknowledgement', outcomes);
+  });
   await test('cumulative limits, retries, cooldown, rollback, deadline and unsettled reservation remain fail closed', async () => {
     await reset();
     const clock = clockAt(),
