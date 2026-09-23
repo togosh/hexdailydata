@@ -1,0 +1,66 @@
+{
+  "commonHistory": "pulsechain",
+  "contract": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+  "codeHash": "0x331e6384b4acbab47e393ee5f85290cbdd8783be817b52643441c02bc0164511",
+  "policy": {
+    "mode": "finalized"
+  },
+  "ethereum": [
+    {
+      "id": "common-official",
+      "operator": null,
+      "accountGroup": "public-no-account",
+      "endpointEnv": "HDD_V2_PROVIDER_PULSE_OFFICIAL"
+    },
+    {
+      "id": "common-g4mm4",
+      "operator": null,
+      "accountGroup": "public-no-account",
+      "endpointEnv": "HDD_V2_PROVIDER_PULSE_G4MM4"
+    }
+  ],
+  "pulsechain": [
+    {
+      "id": "native-official",
+      "operator": null,
+      "accountGroup": "public-no-account",
+      "endpointEnv": "HDD_V2_PROVIDER_PULSE_OFFICIAL"
+    },
+    {
+      "id": "native-g4mm4",
+      "operator": null,
+      "accountGroup": "public-no-account",
+      "endpointEnv": "HDD_V2_PROVIDER_PULSE_G4MM4"
+    }
+  ],
+  "constructor": {
+    "checkpoint": {
+      "number": "9041184",
+      "hash": "0xd2e266161d4ff31cfc4ae5ee4ca3f5df46c2fab808380f65b0dce95006f3cbe1",
+      "parentHash": "0xb13d9c136e1dfcdce56389f744eb0357051e04959c1d64b9c9b86a354b668ead",
+      "timestamp": "1575337828"
+    },
+    "transactionHash": "0xcbe7bc037f24b04d8428e45416f0bc906105bad3ac63ce2df72702497c081668",
+    "balances": []
+  },
+  "fork": {
+    "parent": {
+      "number": "17232999",
+      "hash": "0xe5667f9cafb115b1dcfc36b0b569a5601f01dfa000698140a1298ef4f87e2e37",
+      "parentHash": "0xd3cee9e6e2a9adfc058118961788bc19592eb6825f89b087b591eff406f2763d",
+      "timestamp": "1683758171"
+    },
+    "entry": {
+      "number": "17233000",
+      "hash": "0x9c8280d1182c2648af6390d8ea4a00d5f4bb8d44bf39161cd8983ea5a5fb9fd0",
+      "parentHash": "0xe5667f9cafb115b1dcfc36b0b569a5601f01dfa000698140a1298ef4f87e2e37",
+      "timestamp": "1683759171"
+    }
+  },
+  "target": {
+    "number": "17233007",
+    "hash": "0xd00e47a98f87aa65ac0b400bce2ee94718f3e927b5f82cab681a9f11aea0333e",
+    "parentHash": "0x41556b2c84b8e873b4465cf419cec7c07c0445782f1ff8d6fb004e6da21da59e",
+    "timestamp": "1683786255"
+  }
+}

@@ -59,7 +59,13 @@ retries. Every attempt is durably precharged; an incomplete response keeps at
 least its 8 MiB reservation under the 4 MiB hard limit. Observed bytes are body
 bytes, not network-wire traffic. The existing 2 MiB eligible log split is retained.
 
-Operational pauses never insert full account audits. Replay stops at every declared
+Declared endpoints have distinct IDs, endpoint aliases and URLs. Operator names may
+be unknown (null), as in retained source history. Two known names must differ ignoring
+case. Two declared endpoints do not establish independently verified operators;
+unknown operators remain declared-unverified with correlation unknown. Admission
+still requires exact equality of the complete retained provider metadata.
+
+Work-budget pauses never insert full account audits. Replay stops at every declared
 milestone and cannot advance until both sources finish the pinned full inventory,
 including zeros. SQL inventory pages are at most 256; balance requests at most ten.
 Only the current page's addresses enter audit transport scope. The original JSON
@@ -78,7 +84,11 @@ canonical snapshot under retained exclusions. A finalization failure cannot PASS
 There is one small checksummed state file, one bounded atomic replacement, the latest
 16 segment receipts plus cumulative counters, and one streamed comparison file for
 the current/latest milestone. Starting the next audit reuses that evidence file only
-after the previous audited checkpoint is durably recorded. Current milestone evidence
+after the previous audited checkpoint is durably recorded. Every completed non-final
+declared milestone takes the existing clean-pause finalization path, preserving its
+complete comparison/result files until the next eligible resume. Seal those files
+before resuming; the final milestone completes normally without an extra pause.
+Deadline, cancellation, save or cleanup failures still block. Current milestone evidence
 is proportional to its required comparisons, not replay segments or historical days.
 No prior-attempt archive is read or rewritten per request. Attempt receipts go to
 bounded per-invocation output; the host retains its latest output/result. Archive

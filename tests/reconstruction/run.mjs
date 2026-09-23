@@ -22,6 +22,7 @@ import {
 } from './fixture.mjs';
 import { faultTests } from './faults.mjs';
 import { supervisorSmoke } from './supervisor.mjs';
+import { preparationTests } from './preparation.mjs';
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
 };
@@ -175,7 +176,8 @@ try {
     await assert.rejects(executeBulk(p, 'run', clock, { env: {} }));
     await save('plan-check', { result, plan: p });
   });
-  await test('uninterrupted common history: complete exact semantic control', async () => {
+  await preparationTests({ root, test, reset, child });
+  await test('common history with declared milestone pauses: complete exact semantic control', async () => {
     await reset();
     const prior = await seeded(root, clock),
       p = await newPlan(root, prior),
@@ -183,7 +185,7 @@ try {
       audits = [];
     await executeBulk(p, 'prepare', clock);
     const activation = [];
-    const state = await executeBulk(p, 'run', clock, {
+    const options = {
       fixture: f,
       afterMilestone: async (r) => audits.push(r),
       hooks: {
@@ -202,7 +204,10 @@ try {
           }
         },
       },
-    });
+    };
+    let state = await executeBulk(p, 'run', clock, options);
+    for (let i = 1; i < p.milestones.length && state.status === 'paused'; i++)
+      state = await executeBulk(p, 'resume', clock, options);
     assert.equal(state.status, 'complete', JSON.stringify(state));
     assert.equal(audits.length, 3);
     control = await semantic('control');
@@ -338,7 +343,9 @@ try {
         p = await newPlan(root, prior),
         f = fixture(p, clock, mode);
       await executeBulk(p, 'prepare', clock);
-      const s = await executeBulk(p, 'run', clock, { fixture: f });
+      let s = await executeBulk(p, 'run', clock, { fixture: f });
+      for (let i = 1; i < p.milestones.length && s.status === 'paused'; i++)
+        s = await executeBulk(p, 'resume', clock, { fixture: f });
       assert.equal(s.status, 'complete', JSON.stringify(s));
       assert.deepEqual(await semantic(), control);
       assert(f.attempts.some((a) => !a.complete && a.bytes === 2097153));

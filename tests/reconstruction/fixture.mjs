@@ -84,6 +84,7 @@ export function fixture(p, clock, mode = 'normal') {
           deadline,
           logical: calls.length,
           methods: calls.map((c) => c.method),
+          ...(p.target === '357' ? { calls: structuredClone(calls) } : {}),
           bytes: 0,
           complete: false,
         };

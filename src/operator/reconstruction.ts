@@ -438,6 +438,12 @@ export async function runReconstruction(
       s.state.audit = null;
       s.state.stopHeader = null;
       await s.save();
+      // Leave this milestone's complete evidence available to the host collector
+      // before bindAudit can reuse the comparison/result files on a later resume.
+      if (s.state.milestone < plan.milestones.length)
+        throw new ReconstructionPause(
+          'Declared milestone audited; collect evidence before resume.',
+        );
     }
     complete = true;
   } catch (e) {

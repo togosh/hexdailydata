@@ -1,0 +1,40 @@
+{
+  "volume": "hexdailydata-v2-352865e3_db_data",
+  "checkpoint": {
+    "number": "9046931",
+    "hash": "0x8cd55aafff31ea383798f4cebf0f38acc41e51ce5cb7db0e4013e59b3303facd",
+    "parentHash": "0x302d9436ca99ecd20b96464f4a14590e7f0bac650dc6d316062ee5a9f7f22239",
+    "timestamp": "1575425533"
+  },
+  "revision": "17",
+  "sourceBindingDigest": "4d538ac60b3693a8eadac1de4bb4f3528bc4c244f125b0c579f810e514005258",
+  "counts": {
+    "accounts": "2231",
+    "stakes": "3302",
+    "share_schedule": "1",
+    "daily_stats": "1",
+    "blocks_recent": "467",
+    "events": "5613",
+    "transfers_recent": "10212",
+    "checkpoints_recent": "17",
+    "undo_recent": "36616",
+    "live_metrics": "0",
+    "export_bundles": "0"
+  },
+  "current": {
+    "contract_day": 1,
+    "circulating_hearts": "77248849627815118",
+    "locked_hearts": "31727019050306596",
+    "accounted_hearts": "31727019050306596",
+    "weighted_days": "28332137639156247924",
+    "active_shares": "0",
+    "queued_shares": "46875523579226007",
+    "holder_count": "2148",
+    "staker_count": "1351",
+    "raw_share_rate": "100000",
+    "starts": "3302",
+    "ends": "4",
+    "payout_recorded": "0",
+    "penalty_hearts": "0"
+  }
+}

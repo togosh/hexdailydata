@@ -99,9 +99,8 @@ export const reconstructionPlanSchema = z
     const pair = p.profile.ethereum;
     if (
       pair[0].id === pair[1].id ||
-      !pair[0].operator ||
-      !pair[1].operator ||
-      pair[0].operator.toLowerCase() === pair[1].operator.toLowerCase() ||
+      (pair[0].operator !== null &&
+        pair[0].operator.toLowerCase() === pair[1].operator?.toLowerCase()) ||
       pair[0].endpointEnv === pair[1].endpointEnv ||
       p.endpoints[0] === p.endpoints[1]
     )
