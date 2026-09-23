@@ -227,13 +227,21 @@ export class Source {
     return state;
   }
   async balances(addresses: string[], h: Header, signal: AbortSignal) {
-    return (
-      await this.callsAt(
-        addresses.map((a) => ({ data: selectors.balanceOf + a.slice(2).padStart(64, '0') })),
+    assertDeclaredHeader(this.binding, h);
+    const balances: { address: string; hearts: string }[] = [];
+    // Keep the complete pinned sample; only the transport page is smaller.
+    for (let offset = 0; offset < addresses.length; offset += 10) {
+      const page = addresses.slice(offset, offset + 10);
+      const values = await this.callsAt(
+        page.map((a) => ({ data: selectors.balanceOf + a.slice(2).padStart(64, '0') })),
         h,
         signal,
-      )
-    ).map((v, i) => ({ address: addresses[i]!, hearts: words(v, 1)[0]!.toString() }));
+      );
+      balances.push(
+        ...values.map((v, i) => ({ address: page[i]!, hearts: words(v, 1)[0]!.toString() })),
+      );
+    }
+    return balances;
   }
   async events(headers: Header[], signal: AbortSignal): Promise<Event[]> {
     if (!headers.length) throw new Error('Event headers required.');

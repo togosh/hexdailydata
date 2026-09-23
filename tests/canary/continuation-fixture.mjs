@@ -19,7 +19,7 @@ export const inherited = Array.from(
 );
 export const added = '0x' + '33'.repeat(20);
 const word = (n) => BigInt(n).toString(16).padStart(64, '0');
-export function continuationFixture(plan, clock) {
+export function continuationFixture(plan, clock, inheritedAddresses = inherited) {
   const fixture = prefixFixture(plan, clock),
     f = fixture.f;
   for (const [n, state] of f.states) f.states.set(n, structuredClone(state));
@@ -53,8 +53,8 @@ export function continuationFixture(plan, clock) {
         state.balances.set(to, (state.balances.get(to) ?? 0n) + value);
       }
   }
-  for (const address of inherited) transfer(196, A, address, 1n);
-  transfer(197, inherited[0], A, 1n);
+  for (const address of inheritedAddresses) transfer(196, A, address, 1n);
+  transfer(197, inheritedAddresses[0], A, 1n);
   transfer(600, A, added, 3n);
   return fixture;
 }

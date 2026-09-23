@@ -59,6 +59,17 @@ retries. Every attempt is durably precharged; an incomplete response keeps at
 least its 8 MiB reservation under the 4 MiB hard limit. Observed bytes are body
 bytes, not network-wire traffic. The existing 2 MiB eligible log split is retained.
 
+Pinned replay balance reads use sequential pages of at most ten calls through the
+same RPC client and attempt gate. The complete deterministic sample remains at most
+32 addresses, in its original order and at one canonical block hash; all pages from
+both sources must succeed before a day close can be accepted. For 32 addresses,
+10+10+10+2 requires four HTTP batches per source instead of 30+2's two, while logical
+balance reads remain 32 per source, excluding retries. Generic state/daily-data calls
+keep their existing batch defaults. Deadlines, retries, charges and terminal rules
+are unchanged; failed pages do not trigger smaller fallback pages or a source switch.
+Size-sensitive injected tests establish request shaping and failure behavior only.
+The real timeout's cause and this mitigation's live efficacy remain unmeasured.
+
 Declared endpoints have distinct IDs, endpoint aliases and URLs. Operator names may
 be unknown (null), as in retained source history. Two known names must differ ignoring
 case. Two declared endpoints do not establish independently verified operators;

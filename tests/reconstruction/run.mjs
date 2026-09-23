@@ -23,6 +23,7 @@ import {
 import { faultTests } from './faults.mjs';
 import { supervisorSmoke } from './supervisor.mjs';
 import { preparationTests } from './preparation.mjs';
+import { balancePagingTests } from './balance-paging.mjs';
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
 };
@@ -149,6 +150,8 @@ try {
   } finally {
     await c.end();
   }
+  await balancePagingTests({ root, test, reset });
+  await reset();
   let control;
   await test('plan authority finite exact bounds and mandatory ordered final milestones', async () => {
     const prior = await seeded(root, clock),

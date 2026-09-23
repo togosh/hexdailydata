@@ -10,7 +10,7 @@ import {
   START,
 } from '../canary/continuation-fixture.mjs';
 import { dayBoundaryPlan, endpoints } from '../canary/prefix-fixture.mjs';
-import { FakeClock } from '../sync/fixture.mjs';
+import { FakeClock, hash } from '../sync/fixture.mjs';
 import { reconstructionPlanSchema } from '../../dist/operator/reconstruction-plan.js';
 import { digest } from '../../dist/services/projections/input.js';
 import { runReconstruction } from '../../dist/operator/reconstruction.js';
@@ -64,9 +64,9 @@ export async function inputs(p) {
     }),
   );
 }
-export function fixture(p, clock, mode = 'normal') {
+export function fixture(p, clock, mode = 'normal', inheritedAddresses) {
   const old = dayBoundaryPlan('/synthetic-input-only');
-  const f = continuationFixture(old, clock);
+  const f = continuationFixture(old, clock, inheritedAddresses);
   const attempts = [];
   let injected = false;
   return {
@@ -126,7 +126,13 @@ export function fixture(p, clock, mode = 'normal') {
         if (
           mode === 'mismatch' &&
           calls.length === 10 &&
-          calls.every((c) => c.method === 'eth_call' && c.params[0].data.startsWith('0x70a08231'))
+          // Replay also has ten-call pages; inject this audit fault only at the target pin.
+          calls.every(
+            (c) =>
+              c.method === 'eth_call' &&
+              c.params[0].data.startsWith('0x70a08231') &&
+              c.params[1].blockHash === hash(p.target),
+          )
         ) {
           const chunks = [];
           for await (const chunk of response.body) chunks.push(chunk);
