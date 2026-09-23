@@ -1,0 +1,1358 @@
+{
+  "provenance": {
+    "source": "artifacts/task-10/clock-and-runner/sql-final/clock-sql-faults.json",
+    "sha256": "46d06afeea8eb68154a7f5043d7ef92321a6744e594e39034024996c3a3c5c96",
+    "commit": "1637d49550d2b05b69450309a162c271bf9fee31",
+    "scope": "Saved offline SQL results; remove returned-only fields, rebind digest in new file fixtures; no runtime resources"
+  },
+  "cases": [
+    {
+      "mode": "control",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "dd66e5604cd95e4dc4e400843ba0ed90cf3abccfd7843891121ee2bbc560df0f",
+        "storage": "2112:977576",
+        "quota": "2112:977577",
+        "start": 1790202713200,
+        "deadline": 1790289113200,
+        "highWater": 1790203074800,
+        "http": 58,
+        "logical": 116,
+        "chargedBytes": 21786,
+        "observedBytes": 21786,
+        "uncertainAttempts": 0,
+        "pending": false,
+        "status": "complete",
+        "phase": "complete",
+        "reason": "Declared common-history interval fully audited.",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "357",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+            "timestamp": "1575417938"
+          },
+          "revision": "3"
+        },
+        "audited": {
+          "header": {
+            "number": "357",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+            "timestamp": "1575417938"
+          },
+          "revision": "3"
+        },
+        "milestone": 1,
+        "stopHeader": null,
+        "pendingSql": null,
+        "canonicalAtPause": "19e8ece0bf19672aa14bfdf16c11067fc776553d523b03a309fc8fbbb12a1e4e",
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202713200,
+          "deadline": 1790206313200,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": 1790203074800
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": 1790203074800,
+        "secondary": [],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790203074800,
+          "effective": 1790203074800,
+          "continuous": 1790203074800,
+          "failed": false,
+          "anomalies": {
+            "count": 0,
+            "first": null,
+            "last": null
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false
+      },
+      "sql": {
+        "block_number": "357",
+        "revision": "3"
+      }
+    },
+    {
+      "mode": "stream-invalid",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "7a82edb577771450c962cbcf05cc257586f6e4fccf11095ed087872386c87aeb",
+        "storage": "2112:977814",
+        "quota": "2112:977815",
+        "start": 1790202718800,
+        "deadline": 1790289118800,
+        "highWater": 1790202780800,
+        "http": 1,
+        "logical": 1,
+        "chargedBytes": 8388608,
+        "observedBytes": 255,
+        "uncertainAttempts": 1,
+        "pending": false,
+        "status": "blocked",
+        "phase": "replay",
+        "reason": "Reconstruction clock invalid/unprovable: invalid-wall",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "355",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+            "timestamp": "1575417263"
+          },
+          "revision": "2"
+        },
+        "audited": null,
+        "milestone": 0,
+        "stopHeader": null,
+        "pendingSql": null,
+        "canonicalAtPause": null,
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202718800,
+          "deadline": 1790206318800,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": null
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": null,
+        "secondary": [
+          "Reconstruction clock invalid/unprovable: invalid-wall",
+          "Reconstruction clock invalid/unprovable: invalid-wall"
+        ],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790202780800,
+          "effective": 1790202780800,
+          "continuous": 1790202780800,
+          "failed": true,
+          "anomalies": {
+            "count": 1,
+            "first": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202780800,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202780800,
+              "monotonic": {
+                "type": "bigint",
+                "value": "112001000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            },
+            "last": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202780800,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202780800,
+              "monotonic": {
+                "type": "bigint",
+                "value": "112001000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            }
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false,
+        "rpcDiagnostic": {
+          "version": 1,
+          "source": "fixture-1-1",
+          "stage": "prefix",
+          "reason": "deadline",
+          "accepted": false,
+          "cleanupFailed": true,
+          "binding": {
+            "originChainId": 1,
+            "networkChainId": 369
+          },
+          "clock": {
+            "domain": "reconstruction-ceiling-epoch-ms",
+            "waitDomain": "process-monotonic-epoch-ms",
+            "rawWall": 1790202780800,
+            "effective": 1790202780800,
+            "continuous": 1790202780800,
+            "failed": true,
+            "anomalies": {
+              "count": 1,
+              "first": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202780800,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202780800,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "112001000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              },
+              "last": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202780800,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202780800,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "112001000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              }
+            }
+          },
+          "timeDomain": "reconstruction-ceiling-epoch-ms",
+          "attempt": 1,
+          "started": 1790202780800,
+          "ended": null,
+          "deadline": 1790202795800,
+          "httpStatus": 200,
+          "retryAfter": null,
+          "observedBytes": 255,
+          "streamComplete": false,
+          "sha256": "5b1a245fef7b7894ab2bc78bfe9ee153da9cbe54d0a1add1b36730e0c1acb5b3",
+          "digestScope": "observed-prefix",
+          "requestBatchSize": 1,
+          "responseBatchSize": null,
+          "requests": [
+            {
+              "id": {
+                "type": "number",
+                "value": 1
+              },
+              "method": "eth_getBlockByNumber",
+              "block": "0x165"
+            }
+          ],
+          "received": [],
+          "truncatedRequests": 0,
+          "truncatedRows": 0,
+          "preview": "{\"reason\":\"deadline\",\"received\":[]}",
+          "previewTruncated": false
+        }
+      },
+      "sql": {
+        "block_number": "355",
+        "revision": "2"
+      }
+    },
+    {
+      "mode": "cleanup-invalid",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "8b593a0b13115bf929cd1db410ac45ab715730d7ed0fb0397b34586d9927abd7",
+        "storage": "2112:977931",
+        "quota": "2112:977932",
+        "start": 1790202723000,
+        "deadline": 1790289123000,
+        "highWater": 1790202786400,
+        "http": 1,
+        "logical": 1,
+        "chargedBytes": 255,
+        "observedBytes": 255,
+        "uncertainAttempts": 0,
+        "pending": false,
+        "status": "blocked",
+        "phase": "replay",
+        "reason": "Reconstruction clock invalid/unprovable: invalid-wall",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "355",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+            "timestamp": "1575417263"
+          },
+          "revision": "2"
+        },
+        "audited": null,
+        "milestone": 0,
+        "stopHeader": null,
+        "pendingSql": null,
+        "canonicalAtPause": null,
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202723000,
+          "deadline": 1790206323000,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": null
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": null,
+        "secondary": ["Reconstruction clock invalid/unprovable: invalid-wall"],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790202786400,
+          "effective": 1790202786400,
+          "continuous": 1790202786400,
+          "failed": true,
+          "anomalies": {
+            "count": 1,
+            "first": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202786400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202786400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "113401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            },
+            "last": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202786400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202786400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "113401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            }
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false,
+        "rpcDiagnostic": {
+          "version": 1,
+          "source": "fixture-1-1",
+          "stage": "rpc",
+          "reason": "deadline",
+          "accepted": false,
+          "cleanupFailed": true,
+          "binding": {
+            "originChainId": 1,
+            "networkChainId": 369
+          },
+          "clock": {
+            "domain": "reconstruction-ceiling-epoch-ms",
+            "waitDomain": "process-monotonic-epoch-ms",
+            "rawWall": 1790202786400,
+            "effective": 1790202786400,
+            "continuous": 1790202786400,
+            "failed": true,
+            "anomalies": {
+              "count": 1,
+              "first": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202786400,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202786400,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "113401000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              },
+              "last": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202786400,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202786400,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "113401000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              }
+            }
+          },
+          "timeDomain": "reconstruction-ceiling-epoch-ms",
+          "attempt": 1,
+          "started": 1790202786400,
+          "ended": null,
+          "deadline": 1790202801400,
+          "httpStatus": 200,
+          "retryAfter": null,
+          "observedBytes": 255,
+          "streamComplete": true,
+          "sha256": "5b1a245fef7b7894ab2bc78bfe9ee153da9cbe54d0a1add1b36730e0c1acb5b3",
+          "digestScope": "complete-body",
+          "requestBatchSize": 1,
+          "responseBatchSize": 1,
+          "requests": [
+            {
+              "id": {
+                "type": "number",
+                "value": 1
+              },
+              "method": "eth_getBlockByNumber",
+              "block": "0x165"
+            }
+          ],
+          "received": [
+            {
+              "id": {
+                "type": "number",
+                "value": 1
+              },
+              "resultPresent": true,
+              "errorPresent": false
+            }
+          ],
+          "truncatedRequests": 0,
+          "truncatedRows": 0,
+          "preview": "{\"reason\":\"deadline\",\"received\":[{\"id\":{\"type\":\"number\",\"value\":1},\"resultPresent\":true,\"errorPresent\":false}]}",
+          "previewTruncated": false
+        }
+      },
+      "sql": {
+        "block_number": "355",
+        "revision": "2"
+      }
+    },
+    {
+      "mode": "reservation-invalid",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "87d3b64aae233b4fd6598bca65ffcddfead32107bd974a110d32eee183aee602",
+        "storage": "2112:978048",
+        "quota": "2112:978049",
+        "start": 1790202723000,
+        "deadline": 1790289123000,
+        "highWater": 1790202786400,
+        "http": 1,
+        "logical": 1,
+        "chargedBytes": 8388608,
+        "observedBytes": 0,
+        "uncertainAttempts": 1,
+        "pending": false,
+        "status": "blocked",
+        "phase": "replay",
+        "reason": "Reconstruction clock invalid/unprovable: invalid-wall",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "355",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+            "timestamp": "1575417263"
+          },
+          "revision": "2"
+        },
+        "audited": null,
+        "milestone": 0,
+        "stopHeader": null,
+        "pendingSql": null,
+        "canonicalAtPause": null,
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202723000,
+          "deadline": 1790206323000,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": null
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": null,
+        "secondary": [
+          "Reconstruction clock invalid/unprovable: invalid-wall",
+          "Reconstruction clock invalid/unprovable: invalid-wall"
+        ],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790202786400,
+          "effective": 1790202786400,
+          "continuous": 1790202786400,
+          "failed": true,
+          "anomalies": {
+            "count": 1,
+            "first": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202786400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202786400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "113401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            },
+            "last": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202786400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202786400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "113401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            }
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false,
+        "rpcDiagnostic": {
+          "version": 1,
+          "source": "fixture-1-1",
+          "stage": "rpc",
+          "reason": "deadline",
+          "accepted": false,
+          "cleanupFailed": false,
+          "binding": null,
+          "clock": {
+            "domain": "reconstruction-ceiling-epoch-ms",
+            "waitDomain": "process-monotonic-epoch-ms",
+            "rawWall": 1790202786400,
+            "effective": 1790202786400,
+            "continuous": 1790202786400,
+            "failed": true,
+            "anomalies": {
+              "count": 1,
+              "first": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202786400,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202786400,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "113401000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              },
+              "last": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202786400,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202786400,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "113401000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              }
+            }
+          },
+          "timeDomain": "reconstruction-ceiling-epoch-ms",
+          "attempt": 1,
+          "started": 1790202786400,
+          "ended": null,
+          "deadline": 1790202801400,
+          "httpStatus": null,
+          "retryAfter": null,
+          "observedBytes": 0,
+          "streamComplete": false,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "digestScope": "observed-prefix",
+          "requestBatchSize": 1,
+          "responseBatchSize": null,
+          "requests": [
+            {
+              "id": {
+                "type": "number",
+                "value": 1
+              },
+              "method": "eth_getBlockByNumber",
+              "block": "0x165"
+            }
+          ],
+          "received": [],
+          "truncatedRequests": 0,
+          "truncatedRows": 0,
+          "preview": "{\"reason\":\"deadline\",\"received\":[]}",
+          "previewTruncated": false
+        }
+      },
+      "sql": {
+        "block_number": "355",
+        "revision": "2"
+      }
+    },
+    {
+      "mode": "settlement-invalid",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "22cb238e4d22e22e974ba335d60deeeadf23bef183d485d102580fc49197bb98",
+        "storage": "2112:978165",
+        "quota": "2112:978166",
+        "start": 1790202723000,
+        "deadline": 1790289123000,
+        "highWater": 1790202786400,
+        "http": 1,
+        "logical": 1,
+        "chargedBytes": 8388608,
+        "observedBytes": 255,
+        "uncertainAttempts": 1,
+        "pending": false,
+        "status": "blocked",
+        "phase": "replay",
+        "reason": "Reconstruction clock invalid/unprovable: invalid-wall",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "355",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+            "timestamp": "1575417263"
+          },
+          "revision": "2"
+        },
+        "audited": null,
+        "milestone": 0,
+        "stopHeader": null,
+        "pendingSql": null,
+        "canonicalAtPause": null,
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202723000,
+          "deadline": 1790206323000,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": null
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": null,
+        "secondary": [
+          "Reconstruction clock invalid/unprovable: invalid-wall",
+          "Reconstruction clock invalid/unprovable: invalid-wall"
+        ],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790202786400,
+          "effective": 1790202786400,
+          "continuous": 1790202786400,
+          "failed": true,
+          "anomalies": {
+            "count": 1,
+            "first": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202786400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202786400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "113401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            },
+            "last": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "replay",
+                "checkpoint": {
+                  "header": {
+                    "number": "355",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                    "timestamp": "1575417263"
+                  },
+                  "revision": "2"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790202786400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790202786400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "113401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            }
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false,
+        "rpcDiagnostic": {
+          "version": 1,
+          "source": "fixture-1-1",
+          "stage": "prefix",
+          "reason": "deadline",
+          "accepted": false,
+          "cleanupFailed": true,
+          "binding": {
+            "originChainId": 1,
+            "networkChainId": 369
+          },
+          "clock": {
+            "domain": "reconstruction-ceiling-epoch-ms",
+            "waitDomain": "process-monotonic-epoch-ms",
+            "rawWall": 1790202786400,
+            "effective": 1790202786400,
+            "continuous": 1790202786400,
+            "failed": true,
+            "anomalies": {
+              "count": 1,
+              "first": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202786400,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202786400,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "113401000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              },
+              "last": {
+                "classification": "terminal",
+                "reason": "invalid-wall",
+                "context": {
+                  "phase": "replay",
+                  "checkpoint": {
+                    "header": {
+                      "number": "355",
+                      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+                      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+                      "timestamp": "1575417263"
+                    },
+                    "revision": "2"
+                  },
+                  "segment": 1
+                },
+                "previousRawWall": 1790202786400,
+                "rawWall": {
+                  "type": "number",
+                  "value": "NaN"
+                },
+                "previousEffective": 1790202786400,
+                "monotonic": {
+                  "type": "bigint",
+                  "value": "113401000000"
+                },
+                "monotonicDeltaNanoseconds": "1000000",
+                "monotonicValid": true,
+                "selectedEffective": null
+              }
+            }
+          },
+          "timeDomain": "reconstruction-ceiling-epoch-ms",
+          "attempt": 1,
+          "started": 1790202786400,
+          "ended": null,
+          "deadline": 1790202801400,
+          "httpStatus": 200,
+          "retryAfter": null,
+          "observedBytes": 255,
+          "streamComplete": true,
+          "sha256": "5b1a245fef7b7894ab2bc78bfe9ee153da9cbe54d0a1add1b36730e0c1acb5b3",
+          "digestScope": "complete-body",
+          "requestBatchSize": 1,
+          "responseBatchSize": 1,
+          "requests": [
+            {
+              "id": {
+                "type": "number",
+                "value": 1
+              },
+              "method": "eth_getBlockByNumber",
+              "block": "0x165"
+            }
+          ],
+          "received": [
+            {
+              "id": {
+                "type": "number",
+                "value": 1
+              },
+              "resultPresent": true,
+              "errorPresent": false
+            }
+          ],
+          "truncatedRequests": 0,
+          "truncatedRows": 0,
+          "preview": "{\"reason\":\"deadline\",\"received\":[{\"id\":{\"type\":\"number\",\"value\":1},\"resultPresent\":true,\"errorPresent\":false}]}",
+          "previewTruncated": false
+        }
+      },
+      "sql": {
+        "block_number": "355",
+        "revision": "2"
+      }
+    },
+    {
+      "mode": "ack-invalid",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "242c8a85a1c08904288e062b2dde9b78656bd8d3c3d7e289f095e8bc8678faa9",
+        "storage": "2112:978282",
+        "quota": "2112:978283",
+        "start": 1790202728600,
+        "deadline": 1790289128600,
+        "highWater": 1790203016000,
+        "http": 44,
+        "logical": 74,
+        "chargedBytes": 15214,
+        "observedBytes": 15214,
+        "uncertainAttempts": 0,
+        "pending": false,
+        "status": "blocked",
+        "phase": "milestone-pending",
+        "reason": "Reconstruction clock invalid/unprovable: invalid-wall",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "357",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+            "timestamp": "1575417938"
+          },
+          "revision": "3"
+        },
+        "audited": null,
+        "milestone": 0,
+        "stopHeader": {
+          "number": "357",
+          "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+          "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+          "timestamp": "1575417938"
+        },
+        "pendingSql": null,
+        "canonicalAtPause": null,
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202728600,
+          "deadline": 1790206328600,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": null
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": null,
+        "secondary": ["Reconstruction clock invalid/unprovable: invalid-wall"],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790203016000,
+          "effective": 1790203016000,
+          "continuous": 1790203016000,
+          "failed": true,
+          "anomalies": {
+            "count": 1,
+            "first": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "milestone-pending",
+                "checkpoint": {
+                  "header": {
+                    "number": "357",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+                    "timestamp": "1575417938"
+                  },
+                  "revision": "3"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790203016000,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790203016000,
+              "monotonic": {
+                "type": "bigint",
+                "value": "337401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            },
+            "last": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "milestone-pending",
+                "checkpoint": {
+                  "header": {
+                    "number": "357",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+                    "timestamp": "1575417938"
+                  },
+                  "revision": "3"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790203016000,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790203016000,
+              "monotonic": {
+                "type": "bigint",
+                "value": "337401000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            }
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false
+      },
+      "sql": {
+        "block_number": "357",
+        "revision": "3"
+      }
+    },
+    {
+      "mode": "final-invalid",
+      "state": {
+        "version": 1,
+        "kind": "reconstruction-state",
+        "digest": "def62ad352e6485c62d4be3ad20c2c087f239595baf19d0bedcb27925a101b32",
+        "storage": "2112:978399",
+        "quota": "2112:978400",
+        "start": 1790202732800,
+        "deadline": 1790289132800,
+        "highWater": 1790203094400,
+        "http": 58,
+        "logical": 116,
+        "chargedBytes": 21786,
+        "observedBytes": 21786,
+        "uncertainAttempts": 0,
+        "pending": false,
+        "status": "blocked",
+        "phase": "milestone-audited",
+        "reason": "Reconstruction clock invalid/unprovable: invalid-wall",
+        "terminal": true,
+        "accepted": {
+          "header": {
+            "number": "357",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+            "timestamp": "1575417938"
+          },
+          "revision": "3"
+        },
+        "audited": {
+          "header": {
+            "number": "357",
+            "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+            "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+            "timestamp": "1575417938"
+          },
+          "revision": "3"
+        },
+        "milestone": 1,
+        "stopHeader": null,
+        "pendingSql": null,
+        "canonicalAtPause": "4d1a01acc8588875f133c44653e706d182db4004ec633a9a61fd9fcaf1308226",
+        "audit": null,
+        "segment": {
+          "number": 1,
+          "started": 1790202732800,
+          "deadline": 1790206332800,
+          "before": {
+            "http": 0,
+            "logical": 0,
+            "chargedBytes": 0,
+            "observedBytes": 0
+          },
+          "ended": null
+        },
+        "receipts": [],
+        "pausedMs": 0,
+        "lastEnded": null,
+        "secondary": ["Reconstruction clock invalid/unprovable: invalid-wall"],
+        "clockDiagnostic": {
+          "domain": "reconstruction-ceiling-epoch-ms",
+          "waitDomain": "process-monotonic-epoch-ms",
+          "rawWall": 1790203094400,
+          "effective": 1790203094400,
+          "continuous": 1790203094400,
+          "failed": true,
+          "anomalies": {
+            "count": 1,
+            "first": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "complete",
+                "checkpoint": {
+                  "header": {
+                    "number": "357",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+                    "timestamp": "1575417938"
+                  },
+                  "revision": "3"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790203094400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790203094400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "411601000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            },
+            "last": {
+              "classification": "terminal",
+              "reason": "invalid-wall",
+              "context": {
+                "phase": "complete",
+                "checkpoint": {
+                  "header": {
+                    "number": "357",
+                    "hash": "0x0000000000000000000000000000000000000000000000000000000000000165",
+                    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000164",
+                    "timestamp": "1575417938"
+                  },
+                  "revision": "3"
+                },
+                "segment": 1
+              },
+              "previousRawWall": 1790203094400,
+              "rawWall": {
+                "type": "number",
+                "value": "NaN"
+              },
+              "previousEffective": 1790203094400,
+              "monotonic": {
+                "type": "bigint",
+                "value": "411601000000"
+              },
+              "monotonicDeltaNanoseconds": "1000000",
+              "monotonicValid": true,
+              "selectedEffective": null
+            }
+          }
+        },
+        "fullTask10": "PENDING",
+        "productionReady": false
+      },
+      "sql": {
+        "block_number": "357",
+        "revision": "3"
+      }
+    }
+  ]
+}

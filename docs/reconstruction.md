@@ -217,6 +217,17 @@ SIGTERM requests scoped emergency cancellation and yields terminal/uncertain sta
 never a claimed clean pause. Cleanup verifies owned container identities and keeps
 all data volumes and operation records.
 
+A settled terminal clock failure may have unknown operator end times. Collection
+requires the checked state and matching settled native/host records, preserves the
+original null times and diagnostics, and never makes that terminal record resumable.
+Completed comparisons still pass the full paired verifier; a partial prefix is sealed
+with its partial label. A missing or corrupt audit remains collection uncertainty.
+The compact return separates `currentSegment` from preceding `lastSettled` progress.
+Current evidence is `UNVERIFIED` until collection succeeds, then `SEALED`; the reported
+primary reason remains separate from collection/cleanup errors. Pending SQL makes the
+ending accepted pin unknown and retains the last acknowledged pin and pending transition.
+Neither sealed terminal evidence nor an acknowledged pin grants completion/audit credit.
+
 Coordinator exit0 means `SCOPED_INTERVAL_COMPLETE` for that operation; exit3 means
 a recorded clean coordinator pause, and exit2 means failure/terminal/uncertain.
 Always inspect the result's native outcome and qualification fields. All commands

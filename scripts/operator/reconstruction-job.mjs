@@ -141,6 +141,7 @@ export async function coordinate(
     segment: null,
     phase: 'admitting',
     lastSettled: null,
+    currentSegment: null,
     originalDeadline: null,
     nativeOutcome: null,
     resultFile: null,
@@ -276,7 +277,12 @@ export async function coordinate(
         break;
       }
       const number = (previous.segment?.number ?? 0) + 1;
-      update({ phase: 'segment-running', segment: number, child: null });
+      update({
+        phase: 'segment-running',
+        segment: number,
+        child: null,
+        currentSegment: { segment: number, evidence: 'UNVERIFIED', reported: null },
+      });
       checkDeadline(); // Also fence a delayed wake / clock step during publication.
       const native = await adapter.launch(next, number, (child) => {
         currentChild = child;
@@ -285,6 +291,27 @@ export async function coordinate(
       currentChild = null;
       update({ phase: 'collecting', child: null, nativeOutcome: native });
       const { state, host, hostResult, snapshot } = await adapter.snapshot(number);
+      // A snapshot is only a reported claim until the real collector verifies it.
+      // Keep it separate from the preceding sealed progress if collection fails.
+      const reported = {
+        segment: number,
+        accepted: state.pendingSql ? null : state.accepted,
+        lastAcknowledged: state.accepted,
+        acceptedSqlUncertain: Boolean(state.pendingSql),
+        pendingSql: state.pendingSql ?? null,
+        pendingAttempt: state.pending,
+        audited: state.audited,
+        totals: totals(state),
+        phase: state.phase,
+        milestone: state.milestone,
+        status: state.status,
+        terminal: state.terminal,
+        ended: state.segment?.ended ?? null,
+        reason: typeof state.reason === 'string' ? state.reason.slice(0, 240) : null,
+        nativeExit: native.exit,
+        hostError: hostResult.result?.error ?? null,
+      };
+      current.currentSegment.reported = reported;
       originalStart ??= host.start;
       originalDeadline ??= host.deadline;
       assert.equal(host.start, originalStart);
@@ -303,24 +330,23 @@ export async function coordinate(
         counters.every((k) => Number.isSafeInteger(state[k]) && state[k] >= previous[k]),
         'Accounting decreased/invalid',
       );
+      assert.equal(native.exit, hostResult.result.status, 'Native/supervisor status mismatch');
       const collection = await adapter.collect(snapshot);
       assert.equal(collection.status, 'SEALED', 'Collection unsealed');
       assert.equal(collection.binding.run, operation);
       assert.equal(collection.binding.planDigest, digest(plan));
       assert.equal(collection.binding.segment, number);
-      assert.equal(native.exit, hostResult.result.status, 'Native/supervisor status mismatch');
       const settled = {
-        accepted: state.accepted,
-        audited: state.audited,
-        totals: totals(state),
-        phase: state.phase,
-        milestone: state.milestone,
-        status: state.status,
-        nativeExit: native.exit,
+        ...reported,
         collection,
       };
       publish(root, 'segment-' + String(number).padStart(5, '0') + '-summary.json', settled, true);
-      update({ phase: 'boundary', lastSettled: settled, originalDeadline });
+      update({
+        phase: 'boundary',
+        lastSettled: settled,
+        originalDeadline,
+        currentSegment: { segment: number, evidence: 'SEALED', reported: settled },
+      });
       previous = state;
       const complete =
         native.exit === 0 &&
@@ -334,6 +360,10 @@ export async function coordinate(
         !host.pending;
       if (emergency) {
         outcome = 'CANCELED_UNCERTAIN';
+        break;
+      }
+      if (state.pending || state.pendingSql || hostResult.result.error) {
+        outcome = 'STOPPED_UNCERTAIN';
         break;
       }
       if (complete && clock.now() < originalDeadline) {
@@ -389,6 +419,10 @@ export async function coordinate(
         originalStart: originalStart ?? null,
         originalDeadline: originalDeadline ?? null,
         lastSettled: current.lastSettled,
+        currentSegment: current.currentSegment,
+        primaryReason:
+          current.currentSegment?.reported?.reason ?? current.nativeOutcome?.error ?? null,
+        primaryReasonEvidence: current.currentSegment?.evidence ?? 'UNVERIFIED',
         nativeOutcome: current.nativeOutcome,
         error: current.error ?? null,
         cleanupError: current.cleanupError ?? null,

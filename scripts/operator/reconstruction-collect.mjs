@@ -6,6 +6,7 @@ import { readFile, mkdir, lstat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { digest } from '../../dist/services/projections/input.js';
+import { reconstructionStateSchema } from '../../dist/operator/reconstruction-state.js';
 import { seal, verify, identity } from './reconstruction-seal.mjs';
 const json = async (p) => JSON.parse(await readFile(p, 'utf8'));
 
@@ -84,7 +85,37 @@ export async function collect(environment, snapshot, archive) {
   assert.equal(result.deadline, host.deadline);
   assert.equal(state.start, host.start);
   assert.equal(state.deadline, host.deadline);
-  assert(state.segment.ended !== null && state.status !== 'running');
+  const unknownEnd = state.segment.ended === null;
+  if (unknownEnd) {
+    // Clock-failed timestamps cannot prove settlement. The bound host/native
+    // records must do so; this exception only preserves terminal evidence.
+    reconstructionStateSchema.parse(state);
+    const clock = state.clockDiagnostic;
+    const clockFailed =
+      (clock?.domain === 'reconstruction-ceiling-epoch-ms' &&
+        clock.failed === true &&
+        Number.isSafeInteger(clock.anomalies?.count) &&
+        clock.anomalies.count > 0 &&
+        clock.anomalies.last?.classification === 'terminal') ||
+      (clock?.domain === 'injected-effective-ms' && clock.classification === 'terminal');
+    const native = result.result;
+    const exit = Object.hasOwn(native ?? {}, 'nativeStatus') ? native.nativeStatus : native?.status;
+    assert(
+      state.status === 'blocked' &&
+        state.terminal === true &&
+        state.lastEnded === null &&
+        clockFailed &&
+        state.reason.length > 0 &&
+        host.terminal === true &&
+        result.terminal === true &&
+        result.pending === false &&
+        native?.status === 2 &&
+        Number.isSafeInteger(exit) &&
+        exit >= 0 &&
+        native.signal == null,
+      'Null ending requires a settled terminal clock failure',
+    );
+  } else assert(Number.isSafeInteger(state.segment.ended) && state.status !== 'running');
   for (const name of ['.reconstruction-host.lock'])
     await assert.rejects(lstat(join(environment, name)), { code: 'ENOENT' });
   await mkdir(archive, { recursive: true });
@@ -96,6 +127,14 @@ export async function collect(environment, snapshot, archive) {
     audited: state.audited,
   };
   const destination = join(archive, 'segment-' + String(host.segments).padStart(5, '0'));
+  const partial = {};
+  if (state.terminal && state.audit) {
+    const label = await json(join(snapshot, 'PARTIAL.json'));
+    assert.equal(label.classification, 'PARTIAL_NOT_A_COMPLETED_AUDIT');
+    assert.deepEqual(label.audit, state.audit);
+    partial['comparisons-partial.jsonl'] = join(snapshot, 'comparisons-PARTIAL.jsonl');
+    partial['partial.json'] = join(snapshot, 'PARTIAL.json');
+  }
   await seal(
     destination,
     {
@@ -103,6 +142,7 @@ export async function collect(environment, snapshot, archive) {
       'reconstruction-host-result.json': join(environment, 'reconstruction-host-result.json'),
       'reconstruction-host.json': join(environment, 'reconstruction-host.json'),
       'reconstruction.json': statePath,
+      ...partial,
     },
     binding,
   );
@@ -174,6 +214,8 @@ export async function collect(environment, snapshot, archive) {
     binding,
     resumeEligible,
     authorization: 'NOT_AUTHORIZED_BY_COLLECTION',
+    classification: state.terminal ? 'TERMINAL_EVIDENCE' : 'SETTLED_EVIDENCE',
+    endingTime: unknownEnd ? 'UNKNOWN' : 'RECORDED',
   };
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
