@@ -559,3 +559,20 @@ Zero real provider requests or retained DB/private credential/spent-volume acces
 All new disposable SQL projects cleaned; prior databases/sessions untouched. No live
 grant or continuation, rebuild, seed, UI, v1, Task11, push or deployment. Task09 remains
 accepted; full Task10 PENDING. Stop for planner review. Status-only final entry.
+
+Task10 bounded reconstruction: BULK_RECONSTRUCTION_OFFLINE_PASS. Reviewed code
+`09ebaa14f029297888fc8c20e9e252b70c98ab95`; baseline `bbd586cf` preserved.
+One reconstruct operator reuses replay/audit/accounting with immutable cumulative
+limits, explicit milestone barriers and durable paged paired verification. Complete
+small replay semantics match across seven processes; 10,037 accounts/source produce
+20,074 exact comparisons, with fixed checkpoint and original deadline across restarts.
+Final 12 bulk SQL groups, types/build/format PASS; unchanged 25 focused unit tests,
+7 continuation and 11 pinned-audit SQL groups reused from `d6cd042`. Separate read-only
+`/root/bulk_review` PASS after two corrections: terminal SQL acknowledgement reporting
+and byte-identical refusals. Independent SQL/budget/page/semantic/integer probes and
+actual review records are in `artifacts/task-10/bulk/`, with report/result and hashed
+source/evidence archives. All 13 task-owned synthetic projects have zero remaining
+containers/volumes/networks. Zero real provider requests or retained/private/spent
+resource access; no live grant, rebuild, fork, seed/export, v1, UI, Task11, push or
+deployment. Full Task10 PENDING; productionReady=false. Stop for planner review.
+This is a documentation-only status entry after the final reviewed code commit.
