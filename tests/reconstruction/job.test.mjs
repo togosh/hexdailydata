@@ -69,6 +69,41 @@ test('duplicate operation/output owner and stale lock refuse without overwriting
   assert.equal(readFileSync(path, 'utf8'), 'unknown prior owner');
   assert.equal(f.children.length, 0);
 });
+test('absolute expiry before admission, during admission/startup or final publication launches no child', async () => {
+  for (const stage of ['initial', 'admit', 'start', 'publication']) {
+    const f = jobFixture(fresh('expiry-' + stage));
+    f.options.plan.expiresAt = 2000;
+    f.state().digest = digest(f.options.plan);
+    let now = stage === 'initial' ? 2000 : 1000;
+    const clock = {
+      now: () => now,
+      wallNow: () => {
+        // The second status publication is the final prelaunch publication.
+        if (stage === 'publication' && f.events.includes('boundary')) now = 2000;
+        return now;
+      },
+    };
+    for (const name of ['admit', 'start']) {
+      const original = f.adapter[name];
+      f.adapter[name] = async (...args) => {
+        const value = await original(...args);
+        if (stage === name) now = 2000;
+        return value;
+      };
+    }
+    if (stage === 'initial') {
+      await assert.rejects(coordinate(f.options, f.adapter, clock), /Absolute coordinator expiry/);
+      assert.deepEqual(f.events, []);
+    } else {
+      const result = await coordinate(f.options, f.adapter, clock);
+      assert.equal(result.outcome, 'STOPPED_UNCERTAIN');
+      assert.match(result.error, /Absolute coordinator expiry/);
+      assert.equal(f.events.at(-1), 'closed');
+      if (stage === 'admit') assert(!f.events.includes('start'));
+    }
+    assert.equal(f.children.length, 0);
+  }
+});
 test('operation-bound pause and full-milestone stop collect first, preserve partial status, and permit explicit clean resume', async () => {
   const f = jobFixture(fresh('pause'), 'pause');
   const first = await coordinate(f.options, f.adapter);

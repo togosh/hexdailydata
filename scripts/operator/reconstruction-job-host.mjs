@@ -90,6 +90,9 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
   ];
   let serial = 0,
     child,
+    childCompletion,
+    childSettled = true,
+    cancellation,
     dbId,
     collectorId,
     canceled = false;
@@ -359,6 +362,7 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
       assert(!canceled, 'Emergency cancellation requested');
     },
     async launch(mode, number, onChild) {
+      assert(!canceled, 'Emergency cancellation requested');
       const name = 'invocation-' + String(number).padStart(5, '0');
       const stdout = openSync(join(root, name + '.stdout.log'), 'wx'),
         stderr = openSync(join(root, name + '.stderr.log'), 'wx');
@@ -376,10 +380,17 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
           stdio: ['ignore', stdout, stderr],
           windowsHide: true,
         });
-        const completion = new Promise((resolve) => {
-          child.once('error', (e) => resolve({ exit: null, error: e.message }));
-          child.once('close', (exit, signal) => resolve({ exit, signal }));
-        });
+        childSettled = false;
+        let spawnError;
+        const completion = (childCompletion = new Promise((resolve) => {
+          child.once('error', (e) => {
+            spawnError = e.message;
+          });
+          child.once('close', (exit, signal) => {
+            childSettled = true;
+            resolve({ exit, signal, ...(spawnError ? { error: spawnError } : {}) });
+          });
+        }));
         let publicationError;
         try {
           onChild({ pid: child.pid ?? null, kind: 'owned-supervisor', segment: number });
@@ -395,7 +406,11 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
           );
         } catch (error) {
           publicationError = error;
-          await adapter.cancel();
+          try {
+            await adapter.cancel();
+          } catch (cancelError) {
+            publicationError = new Error(error.message + '; cancellation: ' + cancelError.message);
+          }
         }
         const native = await completion;
         if (publicationError) throw publicationError;
@@ -425,8 +440,38 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
     },
     async cancel() {
       canceled = true;
-      const id = verifyOperator();
-      if (id) command(['stop', '--time', '20', id], 30000);
+      // A supervisor can still be checking bindings when cancellation arrives.
+      // Retain ownership until its native settlement and stop an exact operator
+      // that appears after the first lookup. Never kill the supervisor/PID and
+      // orphan a Docker client that can subsequently create work.
+      cancellation ??= (async () => {
+        try {
+          do {
+            const id = verifyOperator();
+            if (id) command(['stop', '--time', '20', id], 30000);
+            if (!childSettled) {
+              let timer;
+              try {
+                await Promise.race([
+                  childCompletion,
+                  new Promise((resolve) => {
+                    timer = setTimeout(resolve, 250);
+                  }),
+                ]);
+              } finally {
+                clearTimeout(timer);
+              }
+            }
+          } while (!childSettled);
+          const late = verifyOperator();
+          if (late) command(['stop', '--time', '20', late], 30000);
+        } finally {
+          // Identity/discovery failure is uncertainty, never permission to release
+          // a still-owned supervisor or kill a different process/container.
+          await childCompletion;
+        }
+      })();
+      await cancellation;
     },
     async close() {
       if (collectorId) {

@@ -155,6 +155,17 @@ export async function coordinate(
     };
     publish(root, 'status.json', current);
   };
+  const checkDeadline = () => {
+    const now = clock.now();
+    if (plan.expiresAt != null)
+      assert(
+        Number.isSafeInteger(plan.expiresAt) && now < plan.expiresAt,
+        'Absolute coordinator expiry reached',
+      );
+    if (originalDeadline != null)
+      assert(now < originalDeadline, 'Original coordinator deadline expired');
+    return now;
+  };
   let cancellation;
   const cancel = () => {
     if (emergency) return;
@@ -188,6 +199,7 @@ export async function coordinate(
       });
     }
     const markerPath = join(lockRoot, 'reconstruction-job-binding.json');
+    checkDeadline(); // No admission/startup adapter is reached by expired authority.
     if (action === 'run') {
       assert(!existsSync(join(root, 'status.json')), 'Existing output refuses a new run');
       publish(lockRoot, 'reconstruction-job-binding.json', { operation, root, binding }, true);
@@ -206,6 +218,7 @@ export async function coordinate(
       originalStart = old.result.originalStart;
       originalDeadline = old.result.originalDeadline;
     }
+    checkDeadline();
     ({ state: previous } = await adapter.admit(action));
     assert.equal(previous.digest, digest(plan));
     assert(
@@ -230,13 +243,12 @@ export async function coordinate(
     });
     process.on('SIGINT', cancel);
     process.on('SIGTERM', cancel);
+    checkDeadline(); // Admission and status publication spend the same allowance.
     await adapter.start?.();
     let next = action;
     for (;;) {
       await adapter.boundary(previous, next);
-      const now = clock.now();
-      if (originalDeadline != null)
-        assert(now < originalDeadline, 'Original coordinator deadline expired');
+      const now = checkDeadline();
       if (previous.highWater !== undefined) {
         clock.assertContinuity?.(previous.highWater);
         assert(
@@ -265,6 +277,7 @@ export async function coordinate(
       }
       const number = (previous.segment?.number ?? 0) + 1;
       update({ phase: 'segment-running', segment: number, child: null });
+      checkDeadline(); // Also fence a delayed wake / clock step during publication.
       const native = await adapter.launch(next, number, (child) => {
         currentChild = child;
         update({ child });
