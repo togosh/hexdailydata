@@ -576,3 +576,18 @@ containers/volumes/networks. Zero real provider requests or retained/private/spe
 resource access; no live grant, rebuild, fork, seed/export, v1, UI, Task11, push or
 deployment. Full Task10 PENDING; productionReady=false. Stop for planner review.
 This is a documentation-only status entry after the final reviewed code commit.
+
+Task10 bulk preparation: BULK_PREPARATION_READY_FOR_PLANNER_REVIEW. Reviewed runtime
+`a8d4b38f9c5a5ff28032d15b27e8e3648c4956ff`; accepted baseline `6799798d` preserved.
+Nullable provider metadata and completed non-final milestone pause pass10 parser
+tests and15 reconstruction SQL groups. Separate read-only `/root/bulk_preparation_review`
+PASS after one task-local collector correction; real comparison commitments and full
+coverage now gate evidence sealing. Cached image, exact plan/root bindings, review,
+report/result and compact evidence are in `artifacts/task-10/bulk-preparation/`.
+Operation `3f79804f-60ce-423e-8dc9-359368fc2a6e` is prepared, unstarted, with zero charges.
+Read-only retained9046931/revision17 matches all25 table/schema/sequence/inventory
+receipts;8446086 undo bytes/12466419 tail bytes/17 checkpoints. Owned containers
+removed; retained DB/new roots/private configuration preserved. Zero real provider
+calls or canonical SQL changes; no approval, real run/resume, push or deployment.
+FullTask10 andTask11 PENDING; productionReady=false. Stop for planner review.
+This is a documentation-only status entry after the final reviewed runtime commit.
