@@ -653,3 +653,18 @@ Zero real provider calls or retained/private access; no live preparation/approva
 resume, clock/OS changes, push or deployment. Real Docker cancellation and end-of-AI-turn
 survival NOT_EXERCISED. Full Task10/Task11 PENDING; productionReady=false. Stop for
 planner review. This is a status-only commit after the reviewed source candidate.
+
+Task10 clock/runner R3 correction: CLOCK_AND_RUNNER_OFFLINE_PASS after focused R3
+closure. Reviewed code `0ab1c914340eb433b12b0216fcd945067f63b00f`; base `fb2a75d17d1e`
+preserved. Actual collector red reproduced the null terminal-ending rejection.
+Settled terminal clock records now seal with unknown times intact; current segment,
+primary cause, acknowledged pin/counters and SQL uncertainty reach the coordinator
+return without resume or extra audit credit. Partial/full comparison checks remain.
+Builder19 affected tests and static checks PASS; same separate `/root/clock_runner_review`
+PASS, independent19 tests plus exact-red-input, provenance and cleanup-uncertainty checks.
+Unchanged SQL23/clock/provider evidence reused by commit; R1/R2 regressions pass.
+Prior1030 evidence payloads and both archive identities verified unchanged. New report,
+result, recheck and verified archives: `artifacts/task-10/clock-and-runner/correction-2/`.
+Zero real provider/Docker calls or retained/private access; no live preparation/approval/
+run/resume, OS changes, push or deployment. Old operations remain terminal. Full Task10
+and Task11 PENDING, productionReady=false. Stop for planner review. Status-only entry.
