@@ -619,3 +619,15 @@ NOT_EXERCISED; application tests NOT_RUN (docs only). Report/result, actual chec
 review and archive hashes: `artifacts/task-10/agent-waiting/`. No runtime operation or
 provider/database/Docker/private-root access. Full Task10 and Task11 PENDING;
 productionReady=false. Stop for planner review. This is a status-only final entry.
+
+Task10 pinned replay balance paging: REPLAY_BALANCE_PAGING_OFFLINE_PASS. Reviewed
+candidate `5d6f68d76b01eaf782e27edbe25d91073c68e56f`; baseline `93da5dbc6f8bf2522ae687dbec14080f7cdc0e97`.
+Source.balances now sends sequential 10+10+10+2 pages for the full 32-address sample,
+preserving exact pinned values and paired-source validation. Builder: types/backend
+build/format, 37 unit tests and 21 disposable SQL groups PASS; four failure cases retain
+355/revision2, success reaches356/revision3. Full audit regression covers10,037 accounts
+per source. Existing separate `/root/agent_waiting_review` PASS with no findings;
+independent 7 unit tests and 6 SQL groups. Evidence/report/review/archive bindings:
+`artifacts/task-10/replay-balance-paging/`. Zero real provider calls or retained/private
+resource access; live efficacy UNMEASURED. Spent operation remains terminal; full Task10
+and Task11 PENDING, productionReady=false. Stop for planner review. Status-only entry.
