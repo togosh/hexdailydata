@@ -609,3 +609,13 @@ not interval success. Execution report/result/seals are in
 `613ccce631c8d8bc25afba1cbca1eaeaa3f7357a1c8c5b6a7a2f6102ba220bdf`.
 Full Task10 and Task11 remain PENDING; productionReady=false. No further execution
 authority is created by this status entry or the agent-waiting documentation task.
+
+Agent waiting documentation: AGENT_WAITING_DOCS_PASS. Reviewed candidate
+`4b783b826b76d2491772f24b224cb69ad159de0a`; baseline `1a467ac5eede9bf2f4c6f2622572fe6609ce3735`.
+Six Markdown files align active-task waiting, one builder/one reviewer, the historical
+starter and the later terminal execution status. Focused static checks PASS; separate
+source-read-only `/root/agent_waiting_review` PASS with no findings. Runtime waiting
+NOT_EXERCISED; application tests NOT_RUN (docs only). Report/result, actual checks,
+review and archive hashes: `artifacts/task-10/agent-waiting/`. No runtime operation or
+provider/database/Docker/private-root access. Full Task10 and Task11 PENDING;
+productionReady=false. Stop for planner review. This is a status-only final entry.
