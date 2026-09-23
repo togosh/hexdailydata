@@ -301,11 +301,15 @@ export class ReconstructionSession {
     )
       throw new ReconstructionPause('Segment allowance reached at accepted checkpoint/page.');
   }
-  async start(resume: boolean, invoked: number) {
-    const s = this.state,
-      now = this.time();
+  assertStartable(resume: boolean) {
+    const s = this.state;
     if (s.terminal || s.status === 'complete' || (resume ? s.start === null : s.start !== null))
       throw Error('Operation cannot run/resume.');
+  }
+  async start(resume: boolean, invoked: number) {
+    this.assertStartable(resume);
+    const s = this.state,
+      now = this.time();
     if (
       !Number.isSafeInteger(invoked) ||
       invoked > now ||

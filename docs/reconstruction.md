@@ -42,7 +42,9 @@ surface remains on the host, never in an application container.
 Exit 0 means command success; inspect `status` because check/prepare are not work
 completion. Exit 3 is a clean segment pause. Exit 2 is a terminal operation block.
 Exit 1 is malformed input, authority/admission failure before execution, or a host
-failure. Only `status=complete` with `phase=complete` means the declared interval
+failure. An ineligible run/resume also exits 1 without changing the saved operation:
+use run only for a prepared operation, and resume only for an eligible started one.
+Only `status=complete` with `phase=complete` means the declared interval
 and its mandatory final full paired audit completed; `fullTask10=PENDING` and
 `productionReady=false` remain explicit.
 

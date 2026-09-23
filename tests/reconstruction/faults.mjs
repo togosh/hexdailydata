@@ -87,9 +87,28 @@ export async function faultTests({ root, test, reset, child }) {
       assert.equal(status.acceptedSqlUncertain, state.acceptedSqlUncertain);
       assert.deepEqual(status.accepted, state.accepted);
       const refused = fixture(p, clock);
-      assert.equal((await executeBulk(p, 'resume', clock, { fixture: refused })).status, 'blocked');
+      const beforeRefusal = await readFile(p.storagePath + '/reconstruction.json');
+      for (const action of ['run', 'resume'])
+        await assert.rejects(
+          executeBulk(p, action, clock, { fixture: refused }),
+          /Operation cannot run\/resume/,
+        );
+      const afterRefusal = await readFile(p.storagePath + '/reconstruction.json');
+      assert.deepEqual(
+        afterRefusal,
+        beforeRefusal,
+        'Refusal must preserve the entire saved record',
+      );
       assert.equal(refused.attempts.length, 0);
-      outcomes.push({ kind, state, saved, status, sql, attempts: f.attempts });
+      outcomes.push({
+        kind,
+        state,
+        saved,
+        status,
+        sql,
+        attempts: f.attempts,
+        refusal: { before: beforeRefusal.toString(), after: afterRefusal.toString() },
+      });
     }
     await save('writer-acknowledgement', outcomes);
   });

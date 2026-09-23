@@ -267,6 +267,26 @@ try {
     const prior = await seeded(root, clock),
       p = await newPlan(root, prior);
     await executeBulk(p, 'prepare', clock);
+    const refusals = [];
+    const refuse = async (action, state) => {
+      const before = await readFile(p.storagePath + '/reconstruction.json');
+      const refusalClock = clockAt(state.highWater + 1),
+        f = fixture(p, refusalClock);
+      await assert.rejects(
+        executeBulk(p, action, refusalClock, { fixture: f }),
+        /Operation cannot run\/resume/,
+      );
+      const after = await readFile(p.storagePath + '/reconstruction.json');
+      assert.deepEqual(after, before, 'Refused mode must preserve the entire saved record');
+      assert.equal(f.attempts.length, 0);
+      refusals.push({
+        action,
+        status: state.status,
+        before: before.toString(),
+        after: after.toString(),
+      });
+    };
+    await refuse('resume', await json(p.storagePath + '/reconstruction.json'));
     const processResults = [];
     let r = await child(p, 'run', 'commit-crash');
     assert.equal(r.code, 77);
@@ -275,9 +295,16 @@ try {
       r = await child(p, 'resume', i < 5 ? 'one-commit' : 'normal');
       processResults.push(r);
       assert([0, 3].includes(r.code), JSON.stringify(r));
+      if (i === 0) {
+        assert.equal(r.state.status, 'paused');
+        await refuse('run', r.state);
+      }
       if (r.state.status === 'complete') break;
     }
     assert.equal(r.state.status, 'complete', r.state.reason);
+    await refuse('resume', r.state);
+    await refuse('run', r.state);
+    await save('mode-refusals', refusals);
     const continued = await semantic('segmented');
     assert.deepEqual(continued, control);
     const attempts = processResults.flatMap((r) => r.attempts);

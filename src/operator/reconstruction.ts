@@ -232,6 +232,7 @@ export async function runReconstruction(
     const oldDigest = session?.state.canonicalAtPause;
     const oldStatus = session?.state.status;
     if (execute) {
+      session!.assertStartable(command === 'resume');
       owned = true;
       await session!.start(command === 'resume', invoked);
     }
