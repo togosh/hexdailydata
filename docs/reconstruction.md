@@ -131,3 +131,96 @@ clocks. Fake clock spans are not real uptime or provider throughput measurements
 Parent/fork/native audits, lineage, complete seed/rebuild equality, exports, real
 provider admission, end-to-end duration/cost/storage qualification and Task11 remain
 separate obligations requiring planner/owner action.
+
+## Reconstruction clock domains
+
+Reconstruction alone uses `ReconstructionClock`, once per operator/host process.
+Expiry is the larger of raw UTC and an epoch anchor plus monotonic elapsed time.
+A forward wall jump rebases that anchor; a later correction cannot return spent
+time. Bigint nanoseconds retain sub-millisecond progress. ProviderBudget and the
+physical attempt gate use a separate continuous monotonic axis for rolling windows,
+spacing, quarantine and cooldowns. All caps, retries and timeout lengths remain
+unchanged. Ordinary API, sync and canary `realClock` behavior is unchanged.
+
+HTTP-date Retry-After is converted from raw wall UTC into a minimum elapsed delay;
+numeric Retry-After is already a delay. Reconstruction persists an outstanding
+cooldown duration and conservatively reimposes that entire duration on a fresh
+process, clearing it only after the elapsed wait finishes. This can wait longer
+after a restart. Existing worker cooldown files are also honored. Restart never
+compares unrelated monotonic origins: raw UTC must be at least the saved effective
+high-water, and the original start/deadline and counters remain fixed.
+
+Invalid/unsafe wall samples, monotonic regression, overflow and failed continuity
+stop work. A directly injected effective `Clock` still rejects any backward value.
+Clock witnesses retain only first/last anomaly and count, with phase/checkpoint,
+segment, raw sample type/value, prior effective time and monotonic delta. Request
+times identify their ceiling domain and retain raw observations separately.
+Terminal clock failure can still persist settled charges and the exact acknowledged
+or explicitly uncertain SQL state. Its end time and remaining duration are unknown,
+rather than a new reading from the failed clock. Failure-marker behavior is retained
+when storage cannot persist the record. Diagnostics never replace the primary cause.
+
+This is not a trusted-time oracle. Both clocks can lose observable elapsed time in
+a suspended VM. Keep the machine awake; no sleep/reboot/crash continuity, OS clock
+repair or known NTP/Windows/WSL cause is claimed. The historical failing sample and
+rollback magnitude were not recorded.
+
+## Owner-terminal coordinator
+
+`node scripts/operator/reconstruction-job.mjs help` describes the maintained
+foreground coordinator. It adapts the saved supervisor/collect/continue loop;
+`reconstruction-collect.mjs` and `reconstruction-seal.mjs` are the promoted existing
+collector and seal implementation. Collection remains the continuation gate. No
+service, scheduler, autostart, detached mode or permanently waiting AI is involved.
+
+A future separately prepared and authorized operation supplies an explicit owned
+environment, scope JSON and distinct output directory, all under this repository's
+`.local/` or `artifacts/`. Scope version1 binds `run`, `project`, `instance`, `release`,
+`reviewedCommit`, `planDigest`, `approvalSha256`, `overrideSha256`, `override` (local
+YAML filename), `databaseVolume`, `stateVolume` and `quotaVolume`. The environment
+already contains `input/plan.json`, `input/approval.json`, `environment.json` and
+`compose.env`. The coordinator validates those bindings and existing authority;
+it never prepares an image, plan, root or approval. Keep private inputs out of source
+and evidence archives. This offline task supplies no real scope or executable grant.
+
+The following is a **non-executable future PowerShell recipe**, with placeholders
+that must be derived by a later authorized preparation:
+
+```text
+cd <REVIEWED_REPOSITORY>
+node scripts/operator/reconstruction-job.mjs run <OWNED_ENV> <SCOPE_JSON> <OUTPUT_DIR> --stop-at=<DECLARED_MILESTONE>
+# In another ordinary owner terminal, one bounded local observation:
+node scripts/operator/reconstruction-job.mjs status <OUTPUT_DIR>
+# Request a clean pause after the currently owned segment is collected:
+node scripts/operator/reconstruction-job.mjs pause <OUTPUT_DIR> <OPERATION_UUID>
+# Only an eligible, explicitly clean pause may later be continued:
+node scripts/operator/reconstruction-job.mjs resume <OWNED_ENV> <SCOPE_JSON> <OUTPUT_DIR>
+```
+
+The owner keeps the first PowerShell terminal open. No survival across terminal
+closure, logout, sleep, reboot, Docker shutdown or the end of an AI turn is promised.
+`status` reads a bounded durable record once, without a process/SQL/provider probe.
+An unfinished saved running label is `OWNERSHIP_UNKNOWN`, even if its PID exists;
+missing/corrupt evidence is `UNKNOWN`, never success. Current segment activity and
+last collected accepted/audited pins are separate. Logs, native process receipts and
+seals are create-once. After sealing, each full milestone has one archived evidence
+set. Partial audits retain their partial classification.
+
+Both environment and output roots have exclusive coordinator locks. A stale or
+ambiguous lock refuses without deletion or restart. A fresh coordinator can resume
+only after an explicit action and a recorded clean pause with verified seals,
+unchanged authority, accounting and deadline. It cannot adopt a crashed/running
+coordinator or terminal operation. Pause is checked at the next clean boundary;
+terminal and uncertain outcomes win. `--stop-at` only stops after the named declared
+milestone has its full paired audit and seal; it does not mutate the plan. SIGINT or
+SIGTERM requests scoped emergency cancellation and yields terminal/uncertain status,
+never a claimed clean pause. Cleanup verifies owned container identities and keeps
+all data volumes and operation records.
+
+Coordinator exit0 means `SCOPED_INTERVAL_COMPLETE` for that operation; exit3 means
+a recorded clean coordinator pause, and exit2 means failure/terminal/uncertain.
+Always inspect the result's native outcome and qualification fields. All commands
+continue to report fullTask10=PENDING and productionReady=false. The spent operations
+`777d194a-96c4-4e5a-923f-91ce8d2f3218` and
+`3f79804f-60ce-423e-8dc9-359368fc2a6e` remain terminal. The owner did not send the prior
+suggested first-milestone stop; this optional future flag does not rewrite that history.

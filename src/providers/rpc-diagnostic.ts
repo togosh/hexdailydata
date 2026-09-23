@@ -111,6 +111,7 @@ export class RpcExchange {
   status: number | null = null;
   retryAfter: string | null = null;
   binding: { networkChainId: 1 | 369; originChainId: 1 | 369 } | null = null;
+  clock: unknown;
   readonly source: string;
   readonly calls: (RpcCall & { id?: number })[];
   readonly contract: string;
@@ -145,7 +146,12 @@ export class RpcExchange {
         ? retry
         : null;
   }
-  failure(stage: 'rpc' | 'prefix', ended: number, body?: Uint8Array, fallback = 'transport') {
+  failure(
+    stage: 'rpc' | 'prefix',
+    ended: number | null,
+    body?: Uint8Array,
+    fallback = 'transport',
+  ) {
     let reason = fallback;
     let parsed: unknown;
     let parseOk = false;
@@ -214,6 +220,8 @@ export class RpcExchange {
       accepted: false as const,
       cleanupFailed: false,
       binding: this.binding,
+      clock: this.clock,
+      timeDomain: this.clock ? 'reconstruction-ceiling-epoch-ms' : 'caller-clock-ms',
       attempt: this.attempt,
       started: this.started,
       ended,

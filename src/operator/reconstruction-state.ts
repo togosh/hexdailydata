@@ -12,6 +12,7 @@ import {
 } from './reconstruction-plan.ts';
 import type { Clock } from '../providers/budget.ts';
 import type { SessionHooks } from './canary-session.ts';
+import { ReconstructionClock, clockValue } from './reconstruction-clock.ts';
 
 const checkpoint = z.strictObject({ header: headerSchema, revision: uint });
 const coverage = z.strictObject({
@@ -71,6 +72,7 @@ export const reconstructionStateSchema = z.strictObject({
   lastEnded: exact.nullable(),
   secondary: z.array(z.string().max(240)).max(16),
   rpcDiagnostic: z.unknown().optional(),
+  clockDiagnostic: z.unknown().optional(),
   fullTask10: z.literal('PENDING'),
   productionReady: z.literal(false),
 });
@@ -97,12 +99,21 @@ export class ReconstructionSession {
   readonly gate = new AttemptGate(this);
   private poisoned = false;
   private timer: NodeJS.Timeout | undefined;
+  clockFailure: unknown;
+  waitStarted = 0;
   constructor(
     readonly plan: ReconstructionPlan,
     readonly state: ReconstructionState,
     readonly clock: Clock,
     readonly hooks: SessionHooks = {},
-  ) {}
+  ) {
+    if (clock instanceof ReconstructionClock)
+      clock.context = () => ({
+        phase: state.phase,
+        checkpoint: state.accepted,
+        segment: state.segment?.number ?? null,
+      });
+  }
   static async roots(p: ReconstructionPlan) {
     const ids = await Promise.all([p.storagePath, p.quotaPath].map(rootIdentity));
     if (ids[0] === ids[1] || ids.some((id) => p.excludedRootIdentities.includes(id)))
@@ -223,17 +234,44 @@ export class ReconstructionSession {
     )
       throw Error('BLOCKED_UNCERTAIN: inconsistent checkpoint/audit progress.');
     const s = new ReconstructionSession(p, state, clock, hooks);
+    // Fresh-process admission checks raw UTC, before the ceiling can conceal a gap.
+    if (clock instanceof ReconstructionClock) clock.assertContinuity(state.highWater);
+    else if (clock.wallNow && clock.wallNow() < state.highWater)
+      throw Error('Clock continuity failure: raw UTC below durable high-water.');
     s.time();
     return s;
   }
   time() {
-    const now = this.clock.now();
-    if (!Number.isSafeInteger(now) || now < this.state.highWater) {
-      this.stop('Clock rollback or invalid clock.');
-      throw this.controller.signal.reason;
+    try {
+      const now = this.clock.now();
+      if (!Number.isSafeInteger(now) || now < this.state.highWater) {
+        this.state.clockDiagnostic = {
+          domain: 'injected-effective-ms',
+          classification: 'terminal',
+          phase: this.state.phase,
+          checkpoint: this.state.accepted,
+          segment: this.state.segment?.number ?? null,
+          previousEffective: this.state.highWater,
+          reading: clockValue(now),
+        };
+        throw Error('Clock rollback or invalid clock.');
+      }
+      this.state.highWater = now;
+      return now;
+    } catch (error) {
+      this.clockFailure ??= error;
+      this.state.clockDiagnostic = this.clock.snapshot?.() ?? this.state.clockDiagnostic;
+      this.stop(error instanceof Error ? error.message : 'Invalid clock.');
+      throw this.clockFailure;
     }
-    this.state.highWater = now;
-    return now;
+  }
+  waitTime() {
+    this.time();
+    try {
+      return this.clock.waitNow?.() ?? this.state.highWater;
+    } catch {
+      return this.time();
+    }
   }
   deadline() {
     return this.state.segment?.deadline ?? this.state.deadline!;
@@ -249,7 +287,24 @@ export class ReconstructionSession {
   async save() {
     if (this.poisoned) throw Error('BLOCKED_UNCERTAIN: persistence failed.');
     try {
-      this.time();
+      // A known clock fault still permits terminal accounting evidence, never work.
+      if (!this.clockFailure) {
+        try {
+          this.time();
+        } catch {
+          /* time marks this operation terminal */
+        }
+      }
+      this.state.clockDiagnostic = this.clock.snapshot?.() ?? this.state.clockDiagnostic;
+      if (this.clockFailure) {
+        if (this.state.status === 'complete' || !this.state.reason)
+          this.state.reason =
+            this.clockFailure instanceof Error ? this.clockFailure.message : 'Invalid clock.';
+        this.state.status = 'blocked';
+        if (this.state.phase === 'complete') this.state.phase = 'milestone-audited';
+        this.state.lastEnded = null;
+        if (this.state.segment) this.state.segment.ended = null;
+      }
       reconstructionStateSchema.parse(this.state);
       if (Buffer.byteLength(JSON.stringify(this.state)) > 60000)
         throw Error('Control record too large.');
@@ -269,6 +324,7 @@ export class ReconstructionSession {
       }).catch(() => {});
       throw e;
     }
+    if (this.clockFailure) throw this.clockFailure;
   }
   totals() {
     const { http, logical, chargedBytes, observedBytes } = this.state;
@@ -310,6 +366,7 @@ export class ReconstructionSession {
     this.assertStartable(resume);
     const s = this.state,
       now = this.time();
+    this.waitStarted = this.waitTime();
     if (
       !Number.isSafeInteger(invoked) ||
       invoked > now ||

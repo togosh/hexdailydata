@@ -4,6 +4,18 @@ export type Lane = 'address' | 'metrics' | 'sync';
 export interface Clock {
   now(): number;
   sleep(ms: number, signal: AbortSignal): Promise<void>;
+  /** Optional reconstruction domains. Ordinary callers retain wall-clock behavior. */
+  waitNow?(): number;
+  wallNow?(): number;
+  snapshot?(): unknown;
+}
+export function diagnosticTime(clock: Clock): number | null {
+  try {
+    const now = clock.now();
+    return Number.isSafeInteger(now) ? now : null;
+  } catch {
+    return null; // Diagnostics must never replace the primary failure.
+  }
 }
 export const realClock: Clock = {
   now: Date.now,
@@ -68,7 +80,7 @@ export class ProviderBudget {
     this.role = role;
     this.cooldown = cooldown;
     this.clock = clock;
-    this.started = clock.now();
+    this.started = this.waitNow();
   }
   run<T>(
     lane: Lane,
@@ -105,7 +117,14 @@ export class ProviderBudget {
     });
   }
   async backoff(until: number) {
-    await this.cooldown.extend(until);
+    if (!this.clock.waitNow) return this.cooldown.extend(until);
+    await this.backoffFor(Math.max(0, until - this.clock.now()));
+  }
+  async backoffFor(delay: number) {
+    await this.cooldown.extend(this.waitNow() + delay);
+  }
+  private waitNow() {
+    return this.clock.waitNow?.() ?? this.clock.now();
   }
   /** Reserve one entire public job, including retry headroom, before discovery.
    * Actual dispatch consumes the reservation; completion releases only unused work.
@@ -190,8 +209,9 @@ export class ProviderBudget {
           this.queue.sort((a, b) => Number(b.lane === 'metrics') - Number(a.lane === 'metrics'));
           job = this.queue[0]!;
           job.signal.throwIfAborted();
-          const now = this.clock.now();
-          if (now >= job.deadline) throw new Error('Provider deadline expired in queue.');
+          const ceiling = this.clock.now(),
+            now = this.waitNow();
+          if (ceiling >= job.deadline) throw new Error('Provider deadline expired in queue.');
           const used = (this.used[job.lane] = this.used[job.lane].filter(
             (x) => x.at > now - windowMs,
           ));
@@ -206,7 +226,8 @@ export class ProviderBudget {
           if (earliest - slot * slotMs > tolerance) slot++;
           while (slots[slot % slots.length] !== job.lane) slot++;
           const at = Math.max(slot * slotMs, earliest);
-          if (at >= job.deadline) throw new Error('Provider work cannot meet deadline.');
+          if (at - now >= job.deadline - ceiling)
+            throw new Error('Provider work cannot meet deadline.');
           if (at > now) {
             const wait = Math.min(at - now, 1000);
             this.counters.waitingMs += wait;
@@ -214,8 +235,8 @@ export class ProviderBudget {
             await this.clock.sleep(wait, job.signal);
             continue;
           }
-          const dispatchAt = this.clock.now();
-          if (dispatchAt > slot * slotMs + tolerance || dispatchAt >= job.deadline) continue;
+          const dispatchAt = this.waitNow();
+          if (dispatchAt > slot * slotMs + tolerance || this.clock.now() >= job.deadline) continue;
           job.signal.throwIfAborted();
           job.onDispatch?.();
           this.queue.shift();

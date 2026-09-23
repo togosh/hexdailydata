@@ -5,6 +5,7 @@ import { runWorker } from '../worker/main.ts';
 import { backup, restore } from './backup.ts';
 import { operatorStatus } from './status.ts';
 import { operatorError } from './errors.ts';
+import { ReconstructionClockError } from './reconstruction-clock.ts';
 import { runCanary, canaryHelp } from './canary.ts';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
@@ -98,6 +99,7 @@ export async function runOperator(
         event: 'operator_failed',
         command: command ?? 'missing',
         reason: operatorError(error),
+        ...(error instanceof ReconstructionClockError ? { clockDiagnostic: error.witness } : {}),
       }),
     );
     process.exitCode = 1;

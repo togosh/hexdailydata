@@ -80,6 +80,7 @@ try {
         ...(process.argv.includes('--byte-aware-only') ? ['--byte-aware-only'] : []),
         ...(process.argv.includes('--pinned-audit-only') ? ['--pinned-audit-only'] : []),
         ...(process.argv.includes('--continuation-only') ? ['--continuation-only'] : []),
+        ...(process.argv.includes('--clock-only') ? ['--clock-only'] : []),
       ],
       600000,
     ),

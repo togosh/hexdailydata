@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { performance } from 'node:perf_hooks';
 import limits from '../../config/limits.json' with { type: 'json' };
-import { ProviderBudget, type Lane } from './budget.ts';
+import { ProviderBudget, diagnosticTime, type Lane } from './budget.ts';
 import { address, hash } from '../services/projections/input.ts';
 import { quantity, dataHex, selectors, topics } from './abi.ts';
 import { liveSelectors } from './live-abi.ts';
@@ -357,11 +357,11 @@ export class RpcClient {
                   retry && /^\d+$/.test(retry)
                     ? Number(retry) * 1000
                     : retry
-                      ? Date.parse(retry) - this.budget.clock.now()
+                      ? Date.parse(retry) -
+                        (this.budget.clock.wallNow?.() ?? this.budget.clock.now())
                       : 0;
-                await this.budget.backoff(
-                  this.budget.clock.now() +
-                    Math.max(Number.isFinite(delay) ? delay : 0, 1000 * 2 ** attempt),
+                await this.budget.backoffFor(
+                  Math.max(Number.isFinite(delay) ? delay : 0, 1000 * 2 ** attempt),
                 );
                 throw new RpcError(response.status);
               }
@@ -410,14 +410,16 @@ export class RpcClient {
               });
             } catch (error) {
               primary = rpcDiagnostic(error) ? error : safeRpcError(error);
+              const ended = diagnosticTime(this.budget.clock);
+              exchange.clock = this.budget.clock.snapshot?.();
               attachRpcDiagnostic(
                 primary,
                 exchange.failure(
                   'rpc',
-                  this.budget.clock.now(),
+                  ended,
                   Buffer.concat(buffers),
                   sizeReason ??
-                    (combined.aborted || this.budget.clock.now() >= attemptDeadline
+                    (combined.aborted || (ended !== null && ended >= attemptDeadline)
                       ? 'deadline'
                       : response
                         ? 'envelope'
@@ -444,7 +446,7 @@ export class RpcClient {
                 } else {
                   attachRpcDiagnostic(
                     error,
-                    exchange.failure('rpc', this.budget.clock.now(), undefined, 'close'),
+                    exchange.failure('rpc', diagnosticTime(this.budget.clock), undefined, 'close'),
                   );
                   throw error;
                 }
@@ -469,7 +471,7 @@ export class RpcClient {
           throw error;
         this.counters.retries++;
         try {
-          await this.budget.backoff(this.budget.clock.now() + 1000 * 2 ** attempt);
+          await this.budget.backoffFor(1000 * 2 ** attempt);
         } catch (error) {
           if (lastDiagnostic) attachRpcDiagnostic(error, lastDiagnostic);
           throw error;

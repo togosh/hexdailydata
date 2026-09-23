@@ -1,4 +1,4 @@
-import type { Clock } from '../providers/budget.ts';
+import { diagnosticTime, type Clock } from '../providers/budget.ts';
 import type { Transport, RpcCall } from '../providers/rpc.ts';
 import { operatorError } from './errors.ts';
 import {
@@ -111,6 +111,20 @@ export class AttemptGate {
                   source,
                   dispatchAt,
                   ended: this.owner.time(),
+                  timeDomain: this.owner.clock.snapshot
+                    ? 'reconstruction-ceiling-epoch-ms'
+                    : 'caller-clock-ms',
+                  clock: (() => {
+                    const snapshot = this.owner.clock.snapshot?.() as
+                      { rawWall?: number; effective?: number; continuous?: number } | undefined;
+                    return snapshot
+                      ? {
+                          rawWall: snapshot.rawWall,
+                          effective: snapshot.effective,
+                          continuous: snapshot.continuous,
+                        }
+                      : undefined;
+                  })(),
                   observedBytes: observed,
                   complete,
                   calls: JSON.parse(body).map((c: RpcCall) =>
@@ -164,13 +178,16 @@ export class AttemptGate {
           // Recheck after queueing, persistence and late wakes; this gate counts actual
           // physical starts, not ProviderBudget's earlier slot reservations.
           for (;;) {
-            const now = checkDeadline();
+            const ceiling = checkDeadline();
+            const now = this.owner.clock.waitNow?.() ?? ceiling;
             this.starts = this.starts.filter((s) => s.at > now - phase.cadence.rollingMilliseconds);
             const full =
               this.starts.length >= phase.cadence.http ||
               this.starts.reduce((n, s) => n + s.logical, 0) + calls.length > phase.cadence.logical;
             const earliest = Math.max(
-              this.owner.state.start! + phase.cadence.quarantineMilliseconds,
+              this.owner.clock.waitNow
+                ? floor
+                : this.owner.state.start! + phase.cadence.quarantineMilliseconds,
               floor,
               this.lastStart + phase.cadence.spacingMilliseconds,
               full ? this.starts[0]!.at + phase.cadence.rollingMilliseconds : now,
@@ -179,8 +196,8 @@ export class AttemptGate {
             await this.owner.clock.sleep(
               Math.min(
                 earliest - now,
-                (this.owner.deadline?.() ?? this.owner.state.deadline!) - now,
-                requestDeadline - now,
+                (this.owner.deadline?.() ?? this.owner.state.deadline!) - ceiling,
+                requestDeadline - ceiling,
               ),
               active,
             );
@@ -189,9 +206,10 @@ export class AttemptGate {
         // Fence lost SQL snapshots/locks after cadence/persistence waits and before
         // every physical dispatch, including retries. Never reconnect to continue.
         await auditContext?.guard();
+        const continuousDispatch = this.owner.clock.waitNow?.();
         dispatchAt = checkDeadline();
-        this.lastStart = dispatchAt;
-        this.starts.push({ at: dispatchAt, logical: calls.length });
+        this.lastStart = continuousDispatch ?? dispatchAt;
+        this.starts.push({ at: this.lastStart, logical: calls.length });
         exchange = new RpcExchange(
           source,
           calls,
@@ -276,17 +294,19 @@ export class AttemptGate {
               // failure. It must never be hidden by the client's local RangeError.
               if (!receiving) self.owner.stop('Canary response iterator cleanup failed.');
               const error = !receiving ? self.owner.controller.signal.reason : safeRpcError(caught);
+              const ended = diagnosticTime(self.owner.clock);
+              exchange!.clock = self.owner.clock.snapshot?.();
               attachRpcDiagnostic(
                 error,
                 exchange!.failure(
                   'prefix',
-                  self.owner.clock.now(),
+                  ended,
                   Buffer.concat(chunks),
                   sizeFailure
                     ? 'response-size'
                     : active.aborted ||
-                        self.owner.clock.now() >= requestDeadline ||
-                        self.owner.clock.now() >= self.owner.state.deadline!
+                        (ended !== null &&
+                          (ended >= requestDeadline || ended >= self.owner.state.deadline!))
                       ? 'deadline'
                       : 'scope',
                 ),
@@ -305,7 +325,12 @@ export class AttemptGate {
                 } else if (!complete) {
                   attachRpcDiagnostic(
                     cleanup,
-                    exchange!.failure('prefix', self.owner.clock.now(), undefined, 'close'),
+                    exchange!.failure(
+                      'prefix',
+                      diagnosticTime(self.owner.clock),
+                      undefined,
+                      'close',
+                    ),
                   );
                   throw cleanup;
                 }
@@ -320,16 +345,18 @@ export class AttemptGate {
         };
       } catch (caught) {
         const e = safeRpcError(caught);
+        const ended = diagnosticTime(this.owner.clock);
+        if (exchange) exchange.clock = this.owner.clock.snapshot?.();
         if (exchange)
           attachRpcDiagnostic(
             e,
             exchange.failure(
               'prefix',
-              this.owner.clock.now(),
+              ended,
               undefined,
               active.aborted ||
-                this.owner.clock.now() >= requestDeadline ||
-                this.owner.clock.now() >= this.owner.state.deadline!
+                (ended !== null &&
+                  (ended >= requestDeadline || ended >= this.owner.state.deadline!))
                 ? 'deadline'
                 : 'transport',
             ),

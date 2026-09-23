@@ -1,6 +1,6 @@
 import { connect, databaseConfig } from '../db/connect.ts';
-import { realClock, ProviderBudget, type Clock } from '../providers/budget.ts';
-import { cooldownFiles } from '../providers/cooldown.ts';
+import { ProviderBudget, type Clock } from '../providers/budget.ts';
+import { ReconstructionClock, reconstructionCooldown } from './reconstruction-clock.ts';
 import { httpTransport, type Transport } from '../providers/rpc.ts';
 import { profileSources } from '../worker/sync/profile.ts';
 import { SyncEngine } from '../worker/sync/engine.ts';
@@ -46,8 +46,11 @@ function result(session: ReconstructionSession) {
     ...s,
     acceptedSqlUncertain: s.pendingSql !== null,
     remaining: {
-      milliseconds:
-        s.deadline === null ? caps.milliseconds : Math.max(0, s.deadline - session.clock.now()),
+      milliseconds: session.clockFailure
+        ? null
+        : s.deadline === null
+          ? caps.milliseconds
+          : Math.max(0, s.deadline - s.highWater),
       http: Math.max(0, caps.http - s.http),
       logical: Math.max(0, caps.logical - s.logical),
       chargedBytes: Math.max(0, caps.bytes - s.chargedBytes),
@@ -67,7 +70,7 @@ export async function runReconstruction(
   signal: AbortSignal,
   options: ReconstructionOptions = {},
 ) {
-  const clock = options.clock ?? realClock,
+  const clock = options.clock ?? new ReconstructionClock(),
     entered = clock.now();
   const [command, path, approval] = args;
   if (!command || command === 'help') return { help: reconstructionHelp };
@@ -298,9 +301,19 @@ export async function runReconstruction(
       active = AbortSignal.any([sqlSignal, s.controller.signal]);
     await s.save();
     await end();
-    const cooldown = await cooldownFiles(plan.quotaPath, 'worker');
+    const cooldown = await reconstructionCooldown(plan.quotaPath, clock);
     const budget = new ProviderBudget('worker', cooldown, {
       now: () => s.time(),
+      ...(clock.waitNow ? { waitNow: () => s.waitTime() } : {}),
+      ...(clock.wallNow
+        ? {
+            wallNow: () => {
+              s.time();
+              return clock.wallNow!();
+            },
+          }
+        : {}),
+      ...(clock.snapshot ? { snapshot: () => clock.snapshot!() } : {}),
       sleep: (ms, signal) => clock.sleep(ms, signal),
     });
     const boundary = async () => {
@@ -315,7 +328,7 @@ export async function runReconstruction(
         plan.profile.ethereum[index]!.id,
         scope,
         cadence,
-        s.state.segment!.started + 60000,
+        (clock.waitNow ? s.waitStarted : s.state.segment!.started) + 60000,
         { guard: localGuard },
       );
     while (s.state.milestone < plan.milestones.length) {
@@ -488,7 +501,13 @@ export async function runReconstruction(
       closing = true;
       for (const c of clients) await cleanup(() => c.end());
       const st = session.state;
-      if (clock.now() >= session.deadline() || sqlSignal.aborted) {
+      let ended: number | null = null;
+      try {
+        ended = session.time();
+      } catch (error) {
+        primary ??= error;
+      }
+      if (ended === null || ended >= session.deadline() || sqlSignal.aborted) {
         st.terminal = true;
         primary ??= Error('Deadline/cancellation during finalization.');
       }
@@ -503,12 +522,12 @@ export async function runReconstruction(
           : (st.secondary[0] ?? 'Declared common-history interval fully audited.')
       ).slice(0, 240);
       st.rpcDiagnostic = rpcDiagnostic(primary);
-      st.lastEnded = clock.now();
+      st.lastEnded = ended;
       if (st.segment) st.segment.ended = st.lastEnded;
       try {
         await session.hooks.beforeFinalSave?.();
         await session.save();
-        if (clock.now() >= session.deadline() && st.status !== 'blocked') {
+        if (session.time() >= session.deadline() && st.status !== 'blocked') {
           st.status = 'blocked';
           st.terminal = true;
           st.phase = complete ? 'milestone-audited' : st.phase;
@@ -519,7 +538,14 @@ export async function runReconstruction(
         st.status = 'blocked';
         st.terminal = true;
         if (complete) st.phase = 'milestone-audited';
-        st.secondary.push(operatorError(e).slice(0, 240));
+        if (session.clockFailure) {
+          st.lastEnded = null;
+          if (st.segment) st.segment.ended = null;
+          if (!primary) st.reason = operatorError(session.clockFailure);
+          // save persists the terminal charges/witness then rethrows the clock cause.
+          await session.save().catch(() => {});
+        }
+        session.secondary(operatorError(e));
       }
     } else {
       closing = true;

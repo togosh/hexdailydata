@@ -15,9 +15,33 @@ import { fileURLToPath } from 'node:url';
 import { reconstructionPlanSchema } from '../../dist/operator/reconstruction-plan.js';
 import { digest } from '../../dist/services/projections/input.js';
 import { checkAuditBindings } from './audit-bindings.mjs';
+import { ReconstructionClock } from '../../dist/operator/reconstruction-clock.js';
 
 /** A timed child, not a scheduler. The same host record covers all invocations. */
-export function supervise(root, plan, action, work, now = Date.now, invocationStart = now()) {
+export function supervise(
+  root,
+  plan,
+  action,
+  work,
+  clock = new ReconstructionClock(),
+  invocationStart,
+) {
+  const source = typeof clock === 'function' ? { now: clock } : clock;
+  let highWater = null,
+    invalidReading;
+  const now = () => {
+    const value = source.now();
+    if (!Number.isSafeInteger(value) || value < 0 || (highWater !== null && value < highWater)) {
+      invalidReading = {
+        type: typeof value,
+        value: String(value).slice(0, 80),
+        previousEffective: highWater,
+      };
+      throw Error('Invalid/backward effective host clock.');
+    }
+    highWater = value;
+    return value;
+  };
   const lock = openSync(join(root, '.reconstruction-host.lock'), 'wx', 0o600);
   const save = (name, value) => {
     const temp = join(root, name + '.tmp');
@@ -34,9 +58,18 @@ export function supervise(root, plan, action, work, now = Date.now, invocationSt
       }
     }
   };
+  let record, result, invoked, deadline;
+  if (source instanceof ReconstructionClock)
+    source.context = () => ({
+      phase: 'host-supervision',
+      segment: record?.segments ?? null,
+      checkpoint: null,
+    });
   try {
-    let record;
-    const invoked = invocationStart;
+    invoked = invocationStart ?? now();
+    const entered = now();
+    if (!Number.isSafeInteger(invoked) || invoked <= 0 || invoked > entered)
+      throw Error('Invalid original host invocation.');
     if (action === 'run') {
       try {
         lstatSync(join(root, 'reconstruction-host.json'));
@@ -63,27 +96,45 @@ export function supervise(root, plan, action, work, now = Date.now, invocationSt
         record.pending ||
         record.terminal ||
         invoked < record.highWater ||
+        (source.wallNow && source.wallNow() < record.highWater) ||
+        ![record.start, record.deadline, record.highWater, record.segments].every(
+          Number.isSafeInteger,
+        ) ||
         record.deadline !==
           Math.min(record.start + plan.caps.milliseconds, plan.expiresAt ?? Number.MAX_SAFE_INTEGER)
       )
         throw Error('Host continuation uncertain/incompatible.');
     } else throw Error('Expected run or resume.');
-    if (invoked >= record.deadline) throw Error('Original host deadline expired.');
-    const deadline = Math.min(record.deadline, invoked + plan.segment.milliseconds);
+    if (!Number.isSafeInteger(record.deadline) || entered >= record.deadline)
+      throw Error('Original host deadline expired.');
+    deadline = Math.min(record.deadline, invoked + plan.segment.milliseconds);
+    if (!Number.isSafeInteger(deadline) || now() >= deadline)
+      throw Error('Host segment deadline expired.');
     record.pending = true;
     record.segments++;
     record.highWater = invoked;
     save('reconstruction-host.json', record);
-    const result = work({
+    const remaining = deadline - now();
+    if (remaining <= 0) throw Error('Deadline spent before host child launch.');
+    result = work({
       invoked,
       deadline,
       originalStart: record.start,
-      timeout: deadline - now(),
+      timeout: remaining,
+      now,
     });
     record.highWater = now();
     record.pending = false;
     // Only the compiled operator's clean-pause exit may resume.
     record.terminal = result.status !== 3 || record.highWater >= deadline;
+    record.clock = source.snapshot?.();
+    if (record.highWater >= deadline)
+      result = {
+        ...result,
+        nativeStatus: result.status,
+        status: 2,
+        error: 'Host deadline expired.',
+      };
     save('reconstruction-host.json', record);
     save('reconstruction-host-result.json', {
       ...record,
@@ -92,6 +143,29 @@ export function supervise(root, plan, action, work, now = Date.now, invocationSt
       result,
     });
     return result;
+  } catch (error) {
+    // Only an invocation we marked pending may be terminalized here. Refused old
+    // records (including terminal ones) remain byte-for-byte unchanged.
+    if (record?.pending && deadline !== undefined) {
+      record.terminal = true;
+      record.highWater = highWater ?? record.highWater;
+      record.clock = source.snapshot?.() ?? {
+        domain: 'injected-effective-ms',
+        lastValid: highWater,
+        invalidReading,
+      };
+      if (result) record.pending = false;
+      const failure = { status: 2, nativeStatus: result?.status ?? null, error: error.message };
+      save('reconstruction-host.json', record);
+      save('reconstruction-host-result.json', {
+        ...record,
+        invoked,
+        segmentDeadline: deadline,
+        result: failure,
+      });
+      return failure;
+    }
+    throw error;
   } finally {
     closeSync(lock);
     unlinkSync(join(root, '.reconstruction-host.lock'));
@@ -105,7 +179,8 @@ export function main([
   planName = 'plan.json',
   approvalName = 'approval.json',
 ]) {
-  const invocationStart = Date.now();
+  const clock = new ReconstructionClock(),
+    invocationStart = clock.now();
   if (
     !directory ||
     !override ||
@@ -165,7 +240,7 @@ export function main([
     root,
     plan,
     action,
-    ({ invoked, deadline, timeout }) => {
+    ({ invoked, deadline, timeout, now }) => {
       const graph = inspect([...compose, 'config', '--format', 'json']);
       const volume = inspect(['volume', 'inspect', plan.admission.volume])[0];
       const names = graph.services.operator.volumes
@@ -184,7 +259,7 @@ export function main([
         inspect(['volume', 'inspect', ...names]),
         ids.length ? inspect(['inspect', ...ids]) : [],
       );
-      if (Date.now() >= deadline) throw Error('Deadline spent during host binding checks.');
+      if (now() >= deadline) throw Error('Deadline spent during host binding checks.');
       const name = plan.project + '-reconstruction';
       const argv = [
         ...compose,
@@ -207,17 +282,38 @@ export function main([
       ];
       const r = spawnSync('docker', argv, {
         encoding: 'utf8',
-        timeout: Math.max(1, Math.min(timeout, deadline - Date.now())),
+        timeout: Math.max(1, Math.min(timeout, deadline - now())),
         maxBuffer: 8 * 1024 * 1024,
       });
       writeFileSync(join(root, 'reconstruction-output.log'), (r.stdout ?? '') + (r.stderr ?? ''), {
         flush: true,
       });
-      if (r.error || Date.now() >= deadline)
-        spawnSync('docker', ['kill', name], { encoding: 'utf8', timeout: 15000 });
+      let expired;
+      try {
+        expired = now() >= deadline;
+      } catch {
+        expired = true;
+      }
+      if (r.error || expired) {
+        const owned = inspect(['inspect', name])[0];
+        if (
+          owned.Config.Labels?.['com.docker.compose.project'] !== plan.project ||
+          owned.Config.Labels?.['com.docker.compose.service'] !== 'operator' ||
+          owned.Config.Image !== plan.release ||
+          ![plan.storagePath, plan.quotaPath].every((target) =>
+            owned.Mounts.some((m) => m.Destination === target && names.includes(m.Name)),
+          )
+        )
+          throw Error('Uncertain child identity; scoped cancellation refused.');
+        const killed = spawnSync('docker', ['kill', owned.Id], {
+          encoding: 'utf8',
+          timeout: 15000,
+        });
+        if (killed.status !== 0) throw Error('Scoped child cancellation uncertain.');
+      }
       return { status: r.status, error: r.error?.message };
     },
-    Date.now,
+    clock,
     invocationStart,
   );
   process.exitCode = result.status ?? 2;

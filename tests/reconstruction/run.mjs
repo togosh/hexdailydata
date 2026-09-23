@@ -24,6 +24,7 @@ import { faultTests } from './faults.mjs';
 import { supervisorSmoke } from './supervisor.mjs';
 import { preparationTests } from './preparation.mjs';
 import { balancePagingTests } from './balance-paging.mjs';
+import { clockSqlTests } from './clock-sql.mjs';
 globalThis.fetch = () => {
   throw Error('REAL NETWORK FORBIDDEN');
 };
@@ -149,6 +150,11 @@ try {
     await migrateCurrent(c);
   } finally {
     await c.end();
+  }
+  await clockSqlTests({ root, test, reset, semantic });
+  if (process.argv.includes('--clock-only')) {
+    await save('results', { results, realProviderCalls: 0 });
+    process.exit(0); // All fixture sessions/connections have already closed.
   }
   await balancePagingTests({ root, test, reset });
   await reset();
