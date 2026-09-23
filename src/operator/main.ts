@@ -9,17 +9,28 @@ import { runCanary, canaryHelp } from './canary.ts';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { runHistory, historyHelp } from './history.ts';
+import {
+  runReconstruction,
+  reconstructionHelp,
+  type ReconstructionOptions,
+} from './reconstruction.ts';
 
 export async function runOperator(
   argv = process.argv.slice(2),
   canaryOptions: Parameters<typeof runCanary>[2] = {},
+  reconstructionOptions: ReconstructionOptions = {},
 ) {
   const [command, ...args] = argv;
   const controller = new AbortController();
   const onSignal = () => controller.abort(new Error('Operator cancelled.'));
   for (const sig of ['SIGINT', 'SIGTERM'] as const) process.once(sig, onSignal);
   try {
-    if (command === 'history')
+    if (command === 'reconstruct') {
+      const result = await runReconstruction(args, controller.signal, reconstructionOptions);
+      console.log(JSON.stringify(result));
+      if ('status' in result && result.status === 'blocked') process.exitCode = 2;
+      if ('status' in result && result.status === 'paused') process.exitCode = 3;
+    } else if (command === 'history')
       console.log(JSON.stringify(await runHistory(args, controller.signal)));
     else if (command === 'canary') {
       const result = await runCanary(args, controller.signal, canaryOptions);
@@ -31,7 +42,9 @@ export async function runOperator(
         'Operator: doctor | status | migrate | sync | rebuild | exports | backup | restore | ' +
           canaryHelp +
           ' | ' +
-          historyHelp,
+          historyHelp +
+          ' | ' +
+          reconstructionHelp,
       );
     } else if (command === 'doctor' || command === 'status') {
       const result = await operatorStatus();

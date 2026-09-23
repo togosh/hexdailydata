@@ -32,15 +32,24 @@ export class PrefixScope {
   private finalized: Header | undefined;
   private start: string;
   constructor(
-    private plan: CanaryPlan,
-    private phase: PrefixPhase,
+    private plan: Pick<CanaryPlan, 'profile' | 'methods'>,
+    private phase:
+      | PrefixPhase
+      | {
+          kind: 'reconstruct';
+          start: Header;
+          through: string;
+          finalityHeaders: { minimum: string; maximum: string };
+        },
     private source = 'TEST',
     inventory?: AuditAccount[],
   ) {
     this.start =
-      phase.kind === 'common-continue'
-        ? phase.admission.checkpoint.number
-        : plan.profile.constructor.checkpoint.number;
+      phase.kind === 'reconstruct'
+        ? phase.start.number
+        : phase.kind === 'common-continue'
+          ? phase.admission.checkpoint.number
+          : plan.profile.constructor.checkpoint.number;
     if (
       phase.kind === 'common-continue' &&
       (!inventory ||
@@ -50,6 +59,10 @@ export class PrefixScope {
     )
       throw Error('Common continuation requires admitted inventory.');
     for (const b of inventory ?? plan.profile.constructor.balances) this.addresses.add(b.address);
+  }
+  /** Bulk replay carries only the current deterministic sample, never its full inventory. */
+  sample(inventory: AuditAccount[]) {
+    this.addresses = new Set(inventory.map((a) => a.address));
   }
   private contains(n: string) {
     return BigInt(n) >= BigInt(this.start) && BigInt(n) <= BigInt(this.phase.through);
@@ -80,12 +93,12 @@ export class PrefixScope {
         if (
           !this.contains(BigInt(f.fromBlock).toString()) ||
           !this.contains(BigInt(f.toBlock).toString()) ||
-          (this.phase.kind === 'common-continue' && BigInt(f.fromBlock) <= BigInt(this.start))
+          (this.phase.kind !== 'common-prefix' && BigInt(f.fromBlock) <= BigInt(this.start))
         )
           throw Error('Common prefix logs outside scope.');
       } else if (c.method === 'eth_getTransactionReceipt') {
         if (
-          this.phase.kind === 'common-continue' ||
+          this.phase.kind !== 'common-prefix' ||
           p[0] !== this.plan.profile.constructor.transactionHash
         )
           throw Error('Common prefix receipt rejected.');
@@ -141,6 +154,9 @@ export class PrefixScope {
             if (prior && JSON.stringify(prior) !== JSON.stringify(h))
               throw Error('Common prefix header changed.');
             this.headers.set(h.number, h);
+            if (this.phase.kind === 'reconstruct')
+              while (this.headers.size > 4096)
+                this.headers.delete(this.headers.keys().next().value!);
             const remaining: RawLog[] = [];
             for (const log of this.logs) {
               if (BigInt(log.blockNumber).toString() !== h.number) {

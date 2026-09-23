@@ -128,6 +128,7 @@ export async function inspectAuditTarget(
   owner: pg.Client,
   profile: SourceProfile,
   input: AuditAdmission,
+  streamedInventory = false,
 ) {
   const expected = pinnedAuditAdmissionSchema.parse(input);
   const migrations = (
@@ -213,18 +214,52 @@ export async function inspectAuditTarget(
   for (const [table, count] of Object.entries(expected.counts))
     if (String(canonical.tables['hdd.' + table]!.rows) !== count)
       throw Error('Pinned audit table count mismatch: ' + table);
-  const inventory = await auditInventory(reader);
-  if (inventory.length !== Number(expected.counts.accounts))
+  const inventory = streamedInventory ? [] : await auditInventory(reader);
+  const inventoryEvidence = streamedInventory
+    ? await auditInventoryDigest(reader)
+    : { count: inventory.length, digest: digest(inventory) };
+  if (String(inventoryEvidence.count) !== expected.counts.accounts)
     throw Error('Pinned audit inventory count mismatch.');
   return {
     canonical,
     inventory,
-    inventoryDigest: digest(inventory),
+    inventoryDigest: inventoryEvidence.digest,
+    inventoryCount: inventoryEvidence.count,
     current: states[0],
     cursor,
     migrations,
     source: metadata,
   };
+}
+export async function auditPage(
+  reader: pg.Client,
+  after: string | null,
+  limit = 10,
+): Promise<AuditAccount[]> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 256)
+    throw Error('Invalid audit page bound.');
+  const { rows } = await reader.query(
+    'SELECT address,liquid_hearts FROM hdd.accounts WHERE chain_id=1 AND address>$1 ORDER BY address LIMIT $2',
+    [after ? Buffer.from(after.slice(2), 'hex') : Buffer.alloc(0), limit],
+  );
+  return rows.map((r) => ({ address: hex(r.address), hearts: r.liquid_hearts }));
+}
+/** Exactly the old JSON-array digest, streamed without retaining the inventory. */
+export async function auditInventoryDigest(reader: pg.Client) {
+  const hash = createHash('sha256').update('[');
+  let count = 0,
+    after: string | null = null;
+  for (;;) {
+    const page = await auditPage(reader, after, 256);
+    if (!page.length) break;
+    for (const row of page) {
+      hash.update((count ? ',' : '') + JSON.stringify(row));
+      count++;
+    }
+    if (!Number.isSafeInteger(count)) throw Error('Inventory count overflow.');
+    after = page.at(-1)!.address;
+  }
+  return { count, digest: hash.update(']').digest('hex') };
 }
 export async function auditInventory(reader: pg.Client): Promise<AuditAccount[]> {
   const inventory: AuditAccount[] = [];

@@ -304,7 +304,15 @@ export class SyncEngine {
       await source.verify(plainHeader(await source.header(s.block_number, signal, true)), signal);
     this.verified = true;
   }
-  async once(signal: AbortSignal, stopAt?: Header) {
+  async once(
+    signal: AbortSignal,
+    stopAt?: Header,
+    control?: {
+      beforeRange?: () => Promise<void>;
+      beforeCommit?: (accepted: ReturnType<typeof validateBatch>) => Promise<void>;
+      checkpoint?: () => Promise<void>;
+    },
+  ) {
     try {
       this.progress.phase = 'acquiring';
       if (stopAt) assertEventRange(this.sources[0].binding, stopAt.number);
@@ -327,6 +335,7 @@ export class SyncEngine {
       let range = 128;
       while (BigInt(s.block_number) < BigInt(target.number)) {
         signal.throwIfAborted();
+        await control?.beforeRange?.();
         await diskReserve(this.storagePath);
         const expected = {
           blockNumber: s.block_number,
@@ -404,6 +413,7 @@ export class SyncEngine {
         signal.throwIfAborted();
         this.progress.phase = 'committing';
         const beforeTimings = { ...this.writer.timings };
+        await control?.beforeCommit?.(accepted);
         await this.writer.commit(accepted.batch, this.hooks);
         this.progress.sqlMs += this.writer.timings.sqlMs - beforeTimings.sqlMs;
         this.progress.replayMs += this.writer.timings.replayMs - beforeTimings.replayMs;
@@ -416,6 +426,7 @@ export class SyncEngine {
         const pruneStart = performance.now();
         await this.writer.prune();
         this.progress.pruneMs += performance.now() - pruneStart;
+        await control?.checkpoint?.();
         range = Math.min(1048576, range * 2);
         this.progress.phase = 'acquiring';
       }

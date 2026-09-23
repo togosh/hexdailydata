@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "kind": "common-history-reconstruction",
+  "run": "22222222-2222-4222-8222-222222222222",
+  "release": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "reviewedCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "project": "hexdailydata-v2-synthetic-bulk",
+  "instance": "11111111-1111-4111-8111-111111111111",
+  "storagePath": "/synthetic-bulk/state",
+  "quotaPath": "/synthetic-bulk/quota",
+  "profile": {
+    "commonHistory": "pulsechain",
+    "contract": "0xabababababababababababababababababababab",
+    "codeHash": "0x8610831f75a6b7da7c428c7c490db797438e90a401d6fa31ffa5fe8ac1470f84",
+    "policy": {
+      "mode": "finalized"
+    },
+    "ethereum": [
+      {
+        "id": "fixture-1-1",
+        "operator": "operator-1",
+        "accountGroup": "physical-1",
+        "endpointEnv": "HDD_V2_PROVIDER_SYNTHETIC_A"
+      },
+      {
+        "id": "fixture-1-2",
+        "operator": "operator-2",
+        "accountGroup": "physical-2",
+        "endpointEnv": "HDD_V2_PROVIDER_SYNTHETIC_B"
+      }
+    ],
+    "pulsechain": [
+      {
+        "id": "fixture-369-1",
+        "operator": "operator-1",
+        "accountGroup": "physical-1",
+        "endpointEnv": "HDD_V2_PROVIDER_UNUSED_SYNTHETIC_A"
+      },
+      {
+        "id": "fixture-369-2",
+        "operator": "operator-2",
+        "accountGroup": "physical-2",
+        "endpointEnv": "HDD_V2_PROVIDER_UNUSED_SYNTHETIC_B"
+      }
+    ],
+    "constructor": {
+      "checkpoint": {
+        "number": "100",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000064",
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000063",
+        "timestamp": "1575331201"
+      },
+      "transactionHash": "0x0000000000000000000000000000000000000000000000000000000000002710",
+      "balances": []
+    },
+    "fork": {
+      "parent": {
+        "number": "3000",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000bb8",
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000bb7",
+        "timestamp": "1576309951"
+      },
+      "entry": {
+        "number": "3001",
+        "hash": "0x0000000000000000000000000000000000000000000000000000000000000bb9",
+        "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000bb8",
+        "timestamp": "1576310288"
+      }
+    },
+    "target": {
+      "number": "3010",
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000bc2",
+      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000bc1",
+      "timestamp": "1576313326"
+    }
+  },
+  "origin": 1,
+  "transport": 369,
+  "endpoints": [
+    "https://source-a.synthetic.invalid",
+    "https://source-b.synthetic.invalid"
+  ],
+  "admission": {
+    "volume": "hexdailydata-v2-synthetic-bulk_db_data",
+    "checkpoint": {
+      "number": "355",
+      "hash": "0x0000000000000000000000000000000000000000000000000000000000000163",
+      "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000162",
+      "timestamp": "1575417263"
+    },
+    "revision": "2",
+    "sourceBindingDigest": "be8dac894d5f563fecef1b5f287da9a730ca851d38873a6ffd719483c1a55b6f",
+    "counts": {
+      "accounts": "14",
+      "stakes": "5",
+      "share_schedule": "1",
+      "daily_stats": "0",
+      "blocks_recent": "11",
+      "events": "6",
+      "transfers_recent": "21",
+      "checkpoints_recent": "2",
+      "undo_recent": "91",
+      "live_metrics": "0",
+      "export_bundles": "0"
+    },
+    "current": {
+      "contract_day": 0,
+      "circulating_hearts": "9007199254760493",
+      "locked_hearts": "500",
+      "accounted_hearts": "500",
+      "weighted_days": "20300",
+      "active_shares": "0",
+      "queued_shares": "250",
+      "holder_count": "13",
+      "staker_count": "2",
+      "raw_share_rate": "100000",
+      "starts": "5",
+      "ends": "1",
+      "payout_recorded": "0",
+      "penalty_hearts": "0"
+    }
+  },
+  "canonicalDigest": "2a8069a310f44dcf6c388b214a8422e343d098a454cd86cde7b0bcb4dbdf1561",
+  "inventoryDigest": "ce390e59cb547a9c40746b5691ec880b637d91f08edcdd000ee809229c460b75",
+  "excludedRootIdentities": [
+    "0:111",
+    "0:222"
+  ],
+  "target": "1380",
+  "milestones": [
+    "611",
+    "1123",
+    "1380"
+  ],
+  "finalityHeaders": {
+    "minimum": "3010",
+    "maximum": "100000000"
+  },
+  "methods": [
+    "eth_chainId",
+    "eth_getBlockByNumber",
+    "eth_getCode",
+    "eth_getLogs",
+    "eth_call"
+  ],
+  "caps": {
+    "milliseconds": 86400000,
+    "http": 20000,
+    "logical": 200000,
+    "bytes": 2147483648,
+    "responseBytes": 4194304
+  },
+  "segment": {
+    "milliseconds": 3600000,
+    "http": 600,
+    "logical": 12000,
+    "bytes": 268435456
+  },
+  "expiresAt": null,
+  "resumePolicy": "same-operation-clean-or-proven-quiescent",
+  "cost": {
+    "policy": "no-paid-overage",
+    "maximumUsd": 0,
+    "basis": "SYNTHETIC OFFLINE EXAMPLE ONLY. No real admission, release, endpoints or owner approval."
+  }
+}

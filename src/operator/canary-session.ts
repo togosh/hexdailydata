@@ -9,14 +9,9 @@ import { PrefixScope, prefixPhase } from './canary-prefix.ts';
 import { AuditScope, auditPhase, retainedPhase } from './canary-audit.ts';
 import type { AuditAccount } from '../worker/sync/audit.ts';
 import { headerSchema } from '../services/projections/input.ts';
-import { operatorError } from './errors.ts';
-import {
-  RpcExchange,
-  attachRpcDiagnostic,
-  rpcDiagnostic,
-  safeRpcError,
-  type RpcDiagnostic,
-} from '../providers/rpc-diagnostic.ts';
+import type { RpcDiagnostic } from '../providers/rpc-diagnostic.ts';
+import { AttemptGate, CanaryStop } from './attempt-gate.ts';
+export { CanaryStop } from './attempt-gate.ts';
 
 const integer = z.number().int().nonnegative().safe();
 const stateSchema = z.strictObject({
@@ -85,7 +80,6 @@ const stateSchema = z.strictObject({
   diagnosticPersistence: z.enum(['saved', 'failed']).optional(),
 });
 export type CanaryState = z.infer<typeof stateSchema>;
-export class CanaryStop extends Error {}
 export interface SessionHooks {
   /** Offline crash witnesses only; no environment/CLI mechanism enables these hooks. */
   beforeDispatch?: () => Promise<void>;
@@ -101,12 +95,10 @@ async function filesystemIdentity(path: string) {
 
 /** The caller holds both stable filesystem leases until SQL and transport cleanup finish. */
 export class CanarySession {
-  private tail = Promise.resolve();
+  private gate = new AttemptGate(this);
   private poisoned = false;
   readonly controller = new AbortController();
   private timer: NodeJS.Timeout | undefined;
-  private starts: { at: number; logical: number }[] = [];
-  private lastStart = 0;
   private constructor(
     readonly plan: CanaryPlan,
     readonly state: CanaryState,
@@ -271,7 +263,7 @@ export class CanarySession {
       throw this.controller.signal.reason;
     }
   }
-  private stop(reason: string) {
+  stop(reason: string) {
     this.state.terminal = true;
     this.controller.abort(new CanaryStop(reason));
   }
@@ -332,7 +324,7 @@ export class CanarySession {
   async close() {
     if (this.timer) clearTimeout(this.timer);
     this.controller.abort(new CanaryStop('Canary stopped.'));
-    await this.tail;
+    await this.gate.drain();
   }
   /** All chains/aliases share this serialized gate, including both role budgets. */
   transport(
@@ -351,275 +343,18 @@ export class CanarySession {
       : prefix
         ? new PrefixScope(this.plan, prefix, source, auditContext?.inventory)
         : null;
-    // chain is the authorized logical phase, not eth_chainId of the serving network.
-    return async (body, signal, requestDeadline = Infinity) => {
-      const previous = this.tail;
-      let unlock!: () => void;
-      this.tail = new Promise<void>((r) => {
-        unlock = r;
-      });
-      await previous;
-      const combined = AbortSignal.any([signal, this.controller.signal]);
-      let reserved = 0,
-        observed = 0,
-        finished = false;
-      let dispatchAt: number | null = null;
-      let exchange: RpcExchange | undefined;
-      const chunks: Buffer[] = [];
-      const aborter = new AbortController();
-      const active = AbortSignal.any([combined, aborter.signal]);
-      const checkDeadline = () => {
-        active.throwIfAborted();
-        const now = this.time();
-        if (now >= this.state.deadline!) {
-          this.stop('Canary elapsed cap reached.');
-          throw this.controller.signal.reason;
-        }
-        // A late continuation can precede an already-due abort timer callback.
-        // The RPC attempt's absolute deadline therefore travels through this gate.
-        if (now >= requestDeadline)
-          throw new CanaryStop('Canary original request deadline expired.');
-        return now;
-      };
-      const settle = async (complete: boolean) => {
-        if (finished) return;
-        finished = true;
-        try {
-          if (reserved) {
-            this.state.observedBytes += observed;
-            this.state.chargedBytes +=
-              (complete ? observed : Math.max(reserved, observed)) - reserved;
-            this.state.pending = false;
-            if (!complete) this.state.uncertainAttempts++;
-            await this.save();
-            if (phase)
-              console.log(
-                JSON.stringify({
-                  event: 'canary_attempt',
-                  source,
-                  dispatchAt,
-                  ended: this.time(),
-                  observedBytes: observed,
-                  complete,
-                  calls: JSON.parse(body).map((c: RpcCall) =>
-                    c.method === 'eth_call'
-                      ? (c.params[0] as { data: string }).data.slice(0, 10)
-                      : c.method,
-                  ),
-                }),
-              );
-          }
-        } finally {
-          unlock();
-        }
-      };
-      const settleAfterError = async (primary: unknown) => {
-        try {
-          await settle(false);
-        } catch (secondary) {
-          const oneShot = this.state.audit ?? this.state.prefix;
-          if (oneShot) oneShot.secondary.push(operatorError(secondary).slice(0, 240));
-          console.error(
-            JSON.stringify({
-              event: 'canary_settlement_failed',
-              primary: operatorError(primary),
-              secondary: operatorError(secondary),
-              rpcDiagnostic: rpcDiagnostic(primary),
-              diagnosticPersistence: 'failed',
-            }),
-          );
-        }
-      };
-      try {
-        combined.throwIfAborted();
-        const calls = JSON.parse(body) as RpcCall[];
-        if (scope) scope.request(chain, calls);
-        else this.scope(chain, calls);
-        this.check(calls.length);
-        const remaining = this.plan.caps.bytes - this.state.chargedBytes;
-        reserved = this.plan.caps.responseBytes * 2;
-        if (remaining < reserved) {
-          reserved = 0;
-          this.stop('Canary byte reservation unavailable.');
-          throw this.controller.signal.reason;
-        }
-        this.state.http++;
-        this.state.logical += calls.length;
-        this.state.chargedBytes += reserved;
-        this.state.pending = true;
-        await this.save();
-        await this.hooks.beforeDispatch?.();
-        if (phase) {
-          // Recheck after queueing, persistence and late wakes; this gate counts actual
-          // physical starts, not ProviderBudget's earlier slot reservations.
-          for (;;) {
-            const now = checkDeadline();
-            this.starts = this.starts.filter((s) => s.at > now - phase.cadence.rollingMilliseconds);
-            const full =
-              this.starts.length >= phase.cadence.http ||
-              this.starts.reduce((n, s) => n + s.logical, 0) + calls.length > phase.cadence.logical;
-            const earliest = Math.max(
-              this.state.start! + phase.cadence.quarantineMilliseconds,
-              retained?.priorDispatchFloor ?? 0,
-              this.lastStart + phase.cadence.spacingMilliseconds,
-              full ? this.starts[0]!.at + phase.cadence.rollingMilliseconds : now,
-            );
-            if (earliest <= now) break;
-            await this.clock.sleep(
-              Math.min(earliest - now, this.state.deadline! - now, requestDeadline - now),
-              active,
-            );
-          }
-        }
-        // Fence lost SQL snapshots/locks after cadence/persistence waits and before
-        // every physical dispatch, including retries. Never reconnect to continue.
-        await auditContext?.guard();
-        dispatchAt = checkDeadline();
-        this.lastStart = dispatchAt;
-        this.starts.push({ at: dispatchAt, logical: calls.length });
-        exchange = new RpcExchange(
-          source,
-          calls,
-          this.plan.profile.contract,
-          this.state.http,
-          dispatchAt,
-          requestDeadline,
-        );
-        exchange.binding = {
-          originChainId: chain,
-          networkChainId: chain === 1 && this.plan.profile.commonHistory !== 'pulsechain' ? 1 : 369,
-        };
-        const response = await transport(body, active, requestDeadline);
-        exchange.headers(response.status, response.retryAfter);
-        const self = this;
-        let closed = false;
-        let cleanupFailure: unknown;
-        const closeResponse = async () => {
-          if (closed) {
-            if (cleanupFailure) throw cleanupFailure;
-            return;
-          }
-          closed = true;
-          try {
-            await response.close?.();
-          } catch {
-            self.stop('Canary response cleanup failed.');
-            cleanupFailure = self.controller.signal.reason;
-            throw cleanupFailure;
-          } finally {
-            aborter.abort();
-          }
-        };
-        return {
-          ...response,
-          exchange,
-          close: async () => {
-            try {
-              await closeResponse();
-            } finally {
-              await settle(false);
-            }
-            // Deliberate per-attempt cancellation is distinct from a global stop.
-            combined.throwIfAborted();
-            if (self.time() >= requestDeadline || self.time() >= self.state.deadline!)
-              throw new CanaryStop('Canary original request/session deadline expired.');
-          },
-          body: (async function* () {
-            let complete = false;
-            let failure: unknown;
-            let receiving = true;
-            let sizeFailure = false;
-            try {
-              for await (const chunk of response.body) {
-                // Count the entire observed chunk even if it crosses the ceiling.
-                observed += chunk.byteLength;
-                exchange!.observe(chunk);
-                checkDeadline();
-                if (observed > self.plan.caps.responseBytes) {
-                  sizeFailure = true;
-                  self.stop('Canary response byte cap crossed.');
-                  throw self.controller.signal.reason;
-                }
-                if (scope && response.status === 200) chunks.push(Buffer.from(chunk));
-                receiving = false;
-                yield chunk;
-                receiving = true;
-              }
-              exchange!.complete = true;
-              active.throwIfAborted();
-              await self.hooks.beforeSettlement?.();
-              if (scope && response.status === 200)
-                scope.response(calls, Buffer.concat(chunks).toString('utf8'));
-              checkDeadline();
-              complete = true;
-            } catch (caught) {
-              // An exception while unwinding a yielded chunk is an iterator-return
-              // failure. It must never be hidden by the client's local RangeError.
-              if (!receiving) self.stop('Canary response iterator cleanup failed.');
-              const error = !receiving ? self.controller.signal.reason : safeRpcError(caught);
-              attachRpcDiagnostic(
-                error,
-                exchange!.failure(
-                  'prefix',
-                  self.clock.now(),
-                  Buffer.concat(chunks),
-                  sizeFailure
-                    ? 'response-size'
-                    : active.aborted ||
-                        self.clock.now() >= requestDeadline ||
-                        self.clock.now() >= self.state.deadline!
-                      ? 'deadline'
-                      : 'scope',
-                ),
-              );
-              failure = error;
-              throw error;
-            } finally {
-              // Hold the serialized transport gate through cleanup and durable
-              // settlement, including an early consumer return without acceptance.
-              try {
-                await closeResponse();
-              } catch (cleanup) {
-                if (failure) {
-                  const diagnostic = rpcDiagnostic(failure);
-                  if (diagnostic) diagnostic.cleanupFailed = true;
-                } else if (!complete) {
-                  attachRpcDiagnostic(
-                    cleanup,
-                    exchange!.failure('prefix', self.clock.now(), undefined, 'close'),
-                  );
-                  throw cleanup;
-                }
-                // A complete body still reaches the unchanged RPC envelope parser.
-                // close() then reports cleanup failure without replacing that primary.
-              } finally {
-                if (failure) await settleAfterError(failure);
-                else await settle(complete);
-              }
-            }
-          })(),
-        };
-      } catch (caught) {
-        const e = safeRpcError(caught);
-        if (exchange)
-          attachRpcDiagnostic(
-            e,
-            exchange.failure(
-              'prefix',
-              this.clock.now(),
-              undefined,
-              active.aborted ||
-                this.clock.now() >= requestDeadline ||
-                this.clock.now() >= this.state.deadline!
-                ? 'deadline'
-                : 'transport',
-            ),
-          );
-        aborter.abort();
-        await settleAfterError(e);
-        throw e;
-      }
-    };
+    return this.gate.transport(
+      chain,
+      transport,
+      source,
+      scope ?? { request: (c, calls) => this.scope(c, calls), response() {} },
+      phase,
+      retained?.priorDispatchFloor ?? 0,
+      auditContext,
+    );
+  }
+  secondary(reason: string) {
+    (this.state.audit ?? this.state.prefix)?.secondary.push(reason);
   }
   private scope(chain: number, calls: RpcCall[]) {
     const contains = (n: unknown) =>

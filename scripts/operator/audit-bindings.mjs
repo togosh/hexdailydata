@@ -6,8 +6,9 @@ export const auditPostgresImage =
 /** Validate the effective, standalone audit graph; never inherit normal worker,
  * initialization, export, backup or prior session mounts. No Docker mutation here. */
 export function checkAuditBindings(plan, graph, volume, stateVolumes, containers) {
-  const phase = plan.phases[0];
-  assert(['pinned-audit', 'common-continue'].includes(phase.kind));
+  const bulk = plan.kind === 'common-history-reconstruction';
+  const phase = bulk ? { kind: 'reconstruct', admission: plan.admission } : plan.phases[0];
+  assert(['pinned-audit', 'common-continue', 'reconstruct'].includes(phase.kind));
   assert.deepEqual(Object.keys(graph.services).sort(), ['db', 'operator']);
   const db = graph.services.db,
     op = graph.services.operator;
@@ -25,9 +26,14 @@ export function checkAuditBindings(plan, graph, volume, stateVolumes, containers
   assert.equal(op.environment.HDD_V2_DB_NAME, 'hexdailydata_v2');
   assert.equal(op.environment.HDD_V2_STORAGE_PATH, plan.storagePath);
   assert.equal(op.environment.HDD_V2_PROVIDER_STATE, plan.quotaPath);
-  assert.equal(op.environment.HDD_V2_CANARY_RELEASE, plan.release);
+  assert.equal(
+    op.environment[bulk ? 'HDD_V2_RECONSTRUCTION_RELEASE' : 'HDD_V2_CANARY_RELEASE'],
+    plan.release,
+  );
+  if (bulk) assert.equal(op.environment.HDD_V2_REVIEWED_COMMIT, plan.reviewedCommit);
   assert.equal(op.environment.HDD_V2_ALLOW_LIVE_RPC, 'false');
   assert.equal(op.environment.HDD_V2_CANARY_OPT_IN ?? '', '');
+  if (bulk) assert.equal(op.environment.HDD_V2_RECONSTRUCTION_OPT_IN ?? '', '');
   assert.deepEqual(op.entrypoint, ['node', 'dist/operator/main.js']);
   assert.equal(db.read_only, true);
   assert.equal(op.read_only, true);
@@ -61,7 +67,10 @@ export function checkAuditBindings(plan, graph, volume, stateVolumes, containers
     assert.equal(definition.external, true);
     assert.notEqual(definition.name, phase.admission.volume);
     const actual = stateVolumes.find((v) => v.Name === definition.name);
-    assert.equal(actual?.Labels?.['hdd.v2.audit-session'], plan.session);
+    assert.equal(
+      actual?.Labels?.[bulk ? 'hdd.v2.reconstruction-run' : 'hdd.v2.audit-session'],
+      bulk ? plan.run : plan.session,
+    );
   }
   assert.notEqual(
     op.volumes.find((m) => m.target === plan.storagePath).source,
@@ -86,7 +95,7 @@ export function checkAuditBindings(plan, graph, volume, stateVolumes, containers
     volume: volume.Name,
     image: op.image,
     onlyServices: ['db', 'operator'],
-    canonicalSql: phase.kind === 'common-continue' ? 'origin1-writer-only' : 'read-only',
+    canonicalSql: phase.kind === 'common-continue' || bulk ? 'origin1-writer-only' : 'read-only',
     newStateVolumes: stateVolumes.map((v) => v.Name),
   };
 }

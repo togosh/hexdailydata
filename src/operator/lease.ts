@@ -1,4 +1,4 @@
-import { open, type FileHandle } from 'node:fs/promises';
+import { open, lstat, type FileHandle } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
@@ -38,7 +38,22 @@ export async function maintenanceLease(roots: string[], signal: AbortSignal) {
       });
       signal.throwIfAborted();
     }
-    return release;
+    return Object.assign(release, {
+      check: async () => {
+        for (let i = 0; i < files.length; i++) {
+          const held = await files[i]!.stat(),
+            path = await lstat(join(roots[i]!, '.maintenance.lock'));
+          if (
+            !path.isFile() ||
+            path.isSymbolicLink() ||
+            path.ino !== held.ino ||
+            path.dev !== held.dev ||
+            held.nlink !== 1
+          )
+            throw Error('Maintenance filesystem ownership lost.');
+        }
+      },
+    });
   } catch (error) {
     await release().catch(() => {});
     throw error;

@@ -107,6 +107,11 @@ below), **seed** (an independently trusted seed plus explicit expectation), or *
 (an owner-provisioned source profile and separately authorized live access). No qualified
 real seed download URL is supplied. A seed is not a recovery backup.
 
+The offline-tested `reconstruct` command continues a bounded common-history operation
+with cumulative limits and resumable milestone audits. See [operator instructions](docs/reconstruction.md)
+and the synthetic-only [example plan](config/reconstruction.synthetic.example.json).
+No live reconstruction approval is included; full Task10 remains pending.
+
 The release operator exposes `migrate`, `rebuild`, `sync --once`, `sync --watch`,
 `repair-range <retained-block>`, `exports`, `seed-export <path>` and
 `seed-import <path> <expectation.json>`. These call the same worker/services as development.

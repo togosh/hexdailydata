@@ -16,6 +16,8 @@ export interface AuditOptions {
   batchSize?: 10 | 30;
   header?: Header;
   batch?: (event: AuditBatch) => Promise<void>;
+  /** Optional bounded/resumable iterator; aggregate comparisons remain shared. */
+  balances?: (source: Source, header: Header) => Promise<void>;
 }
 
 /** Same exact balance comparison for ordinary audits, probes and bounded partitions. */
@@ -104,6 +106,7 @@ export async function auditState(
       state.shareRate !== current.raw_share_rate
     )
       throw new Error('Final external aggregate reconciliation mismatch.');
-    await auditBalances(reader, source, chain, h, signal, options);
+    if (options.balances) await options.balances(source, h);
+    else await auditBalances(reader, source, chain, h, signal, options);
   }
 }
