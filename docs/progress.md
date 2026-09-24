@@ -668,3 +668,20 @@ result, recheck and verified archives: `artifacts/task-10/clock-and-runner/corre
 Zero real provider/Docker calls or retained/private access; no live preparation/approval/
 run/resume, OS changes, push or deployment. Old operations remain terminal. Full Task10
 and Task11 PENDING, productionReady=false. Stop for planner review. Status-only entry.
+
+Task10 owner CLI launch correction: OWNER_CLI_CORRECTION_PASS. Reviewed code
+`a22ecc8eadf9c72f840d3cd5d8466efa74349fac`; base `85091bfd265d977751caa64ccc993b519c2b7b20`.
+The owner's direct launch exited 13 before host admission because top-level await
+formed a circular import with the host adapter. Promise handlers now allow module
+evaluation to finish, preserving result/error exit mapping. Actual CLI run/resume
+and PowerShell regressions reproduced exit 13 before the fix; builder and the same
+separate `/root/clock_runner_review` independently pass all 23 affected tests.
+Owner explicitly authorized this minor correction without another planner cycle.
+The supplementary host binding records the corrected script while preserving the
+prepared image, plan/digest, roots and create-once approval/scope for operation
+`d9433784-14dc-4d15-884a-00fa8c5154af`. No rebuild, reprepare, new operation or real
+Codex run/resume; no provider/SQL/Docker calls. The owner may use the unchanged
+foreground command with mandatory `--stop-at=9100255` after full paired audit and
+verified seal. Later resume needs a new explicit decision. Source/evidence/report/
+review: `artifacts/task-10/clock-and-runner/entrypoint-correction-d9433784/`.
+Full Task10/Task11 remain PENDING; productionReady=false. Status-only final entry.
