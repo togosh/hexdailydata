@@ -475,18 +475,20 @@ export async function main(args) {
   });
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const result = await main(process.argv.slice(2));
-    console.log(JSON.stringify(result, null, 2));
-    if (result.outcome)
-      process.exitCode =
-        result.outcome === 'SCOPED_INTERVAL_COMPLETE'
-          ? 0
-          : result.outcome.startsWith('PAUSED_')
-            ? 3
-            : 2;
-  } catch (error) {
-    console.error(error.message);
-    process.exitCode = 2;
-  }
+  // Finish module evaluation before the host adapter imports this module back.
+  main(process.argv.slice(2))
+    .then((result) => {
+      console.log(JSON.stringify(result, null, 2));
+      if (result.outcome)
+        process.exitCode =
+          result.outcome === 'SCOPED_INTERVAL_COMPLETE'
+            ? 0
+            : result.outcome.startsWith('PAUSED_')
+              ? 3
+              : 2;
+    })
+    .catch((error) => {
+      console.error(error.message);
+      process.exitCode = 2;
+    });
 }
