@@ -685,3 +685,19 @@ foreground command with mandatory `--stop-at=9100255` after full paired audit an
 verified seal. Later resume needs a new explicit decision. Source/evidence/report/
 review: `artifacts/task-10/clock-and-runner/entrypoint-correction-d9433784/`.
 Full Task10/Task11 remain PENDING; productionReady=false. Status-only final entry.
+
+Task10 offline power-loss recovery: POWER_LOSS_RECOVERY_OFFLINE_PASS. Reviewed code
+`608f4e7aa9bf491475d6e74923df8f781e70117c`; base `6b50dd559500e1bcd05c4b97d05f3b3783ba36ae`.
+Host recovery proves durable SQL/control equality, preserves progress/accounting/audit/
+deadline, publishes an explicit recovery boundary with unknown original exit/ending,
+and handles proved stale locks through an idempotent journal. Existing runtime image
+and canonical writer remain unchanged. Synthetic SQL preserved six acknowledged
+commits and the next actual supervisor segment resumed and normally sealed. Builder
+and separate read-only `/root/power_loss_review`:45 SQL/process groups and45 final
+affected tests PASS; two focused correction rounds closed repeated-pause admission
+defects. Report, contract, receipts, review and archives: `artifacts/task-10/power-loss-recovery/`.
+Zero real provider calls or retained/private operation access; real recovery NOT_RUN.
+Physical reboot and full Windows/Docker recovery CLI qualification NOT_EXERCISED.
+Future owner procedure is NON-EXECUTED and needs separate authorization. No push or
+deployment; Task10/Task11 PENDING, productionReady=false. Stop for planner review.
+This entry is a status-only commit after the reviewed code.
