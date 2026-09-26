@@ -167,6 +167,10 @@ rollback magnitude were not recorded.
 
 ## Owner-terminal coordinator
 
+An explicitly authorized host power-loss recovery procedure is documented in
+[interrupted replay recovery](reconstruction-recovery.md). It establishes a distinct
+recovery boundary; ordinary collect/resume rules below are unchanged.
+
 `node scripts/operator/reconstruction-job.mjs help` describes the maintained
 foreground coordinator. It adapts the saved supervisor/collect/continue loop;
 `reconstruction-collect.mjs` and `reconstruction-seal.mjs` are the promoted existing

@@ -129,6 +129,7 @@ export async function coordinate(
     previous,
     originalStart,
     originalDeadline,
+    recoveryResult,
     currentChild = null,
     emergency = false;
   let current = {
@@ -213,14 +214,25 @@ export async function coordinate(
       const old = status(root);
       assert(
         old.observation === 'SETTLED_RECORD' &&
-          ['PAUSED_AT_BOUNDARY', 'PAUSED_AFTER_MILESTONE'].includes(old.result.outcome),
+          ['PAUSED_AT_BOUNDARY', 'PAUSED_AFTER_MILESTONE', 'RECOVERED_AFTER_POWER_LOSS'].includes(
+            old.result.outcome,
+          ),
         'Only an explicitly clean paused coordinator may resume',
       );
       originalStart = old.result.originalStart;
       originalDeadline = old.result.originalDeadline;
+      if (old.result.outcome === 'RECOVERED_AFTER_POWER_LOSS') recoveryResult = old.result;
     }
     checkDeadline();
     ({ state: previous } = await adapter.admit(action));
+    if (recoveryResult) {
+      assert(adapter.recovery, 'Recovery verifier required');
+      assert.equal(
+        await adapter.recovery(previous, recoveryResult),
+        true,
+        'Recovery proof refused',
+      );
+    }
     assert.equal(previous.digest, digest(plan));
     assert(
       !previous.terminal && !previous.pending && !previous.pendingSql,
@@ -229,7 +241,12 @@ export async function coordinate(
     assert(
       action === 'run'
         ? previous.status === 'prepared' && previous.start === null
-        : clean(previous),
+        : recoveryResult
+          ? previous.status === 'paused' &&
+            previous.segment?.ended === null &&
+            previous.lastEnded === null &&
+            previous.reason === 'RECOVERED_AFTER_POWER_LOSS'
+          : clean(previous),
       'Invalid start state',
     );
     admitted = true;

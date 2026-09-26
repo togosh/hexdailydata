@@ -19,6 +19,8 @@ import { checkAuditBindings } from './audit-bindings.mjs';
 import { collect } from './reconstruction-collect.mjs';
 import { verify } from './reconstruction-seal.mjs';
 import { coordinate, publish, readSmall } from './reconstruction-job.mjs';
+import { verifyRecovery } from './reconstruction-recovery.mjs';
+import { recoveryMutex } from './reconstruction-recovery-mutex.mjs';
 
 function owned(path) {
   const rel = relative(process.cwd(), path);
@@ -95,7 +97,8 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
     cancellation,
     dbId,
     collectorId,
-    canceled = false;
+    canceled = false,
+    recovered;
   const command = (args, timeout = 30000) => {
     const begin = performance.now(),
       r = spawnSync('docker', args, {
@@ -275,6 +278,25 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
     return op.Id;
   };
   const adapter = {
+    async recovery(state, result) {
+      await verifyRecovery({
+        environment,
+        root,
+        plan,
+        binding: digest({ environment, identities }),
+        state,
+        stateBytes: readFileSync(
+          join(
+            root,
+            'admission-' + String(state.segment.number).padStart(5, '0'),
+            'reconstruction.json',
+          ),
+        ),
+        result,
+      });
+      recovered = result;
+      return true;
+    },
     async admit(mode) {
       assertBindings();
       quiescent();
@@ -321,6 +343,12 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
       assertBindings();
       quiescent();
       if (next === 'resume') {
+        if (previous.segment?.ended === null) {
+          assert(recovered, 'Missing recovered coordinator boundary');
+          await adapter.recovery(previous, recovered);
+          assert(!canceled, 'Emergency cancellation requested');
+          return;
+        }
         const host = readSmall(join(environment, 'reconstruction-host.json'));
         assert(!host.pending && !host.terminal && host.digest === previous.digest);
         assert.equal(host.start, previous.start);
@@ -499,16 +527,21 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
       assert.equal(command(['ps', '-q', '--filter', 'volume=' + plan.admission.volume]).trim(), '');
     },
   };
-  return coordinate(
-    {
-      root,
-      lockRoot: environment,
-      operation: plan.run,
-      plan,
-      action,
-      stopAt,
-      binding: digest({ environment, identities }),
-    },
-    adapter,
-  );
+  const release = await recoveryMutex(environment);
+  try {
+    return await coordinate(
+      {
+        root,
+        lockRoot: environment,
+        operation: plan.run,
+        plan,
+        action,
+        stopAt,
+        binding: digest({ environment, identities }),
+      },
+      adapter,
+    );
+  } finally {
+    await release();
+  }
 }

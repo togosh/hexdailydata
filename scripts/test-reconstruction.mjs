@@ -10,6 +10,19 @@ const relativeEvidence = relative(resolve('artifacts'), evidence);
 if (relativeEvidence.startsWith('..') || isAbsolute(relativeEvidence))
   throw Error('Canary test evidence must remain in artifacts.');
 mkdirSync(evidence, { recursive: true });
+if (process.argv.includes('--recovery-only')) {
+  const base = '6b50dd559500e1bcd05c4b97d05f3b3783ba36ae';
+  const original = spawnSync('git', ['show', base + ':scripts/operator/reconstruction-job.mjs'], {
+    encoding: 'utf8',
+  });
+  if (original.status !== 0) throw Error('Missing recorded recovery baseline');
+  writeFileSync(resolve(evidence, 'before-job-original.mjs'), original.stdout);
+  // Only module locations change for the isolated Linux witness.
+  writeFileSync(
+    resolve(evidence, 'before-job.mjs'),
+    original.stdout.replaceAll("'../../dist/", "'/app/dist/"),
+  );
+}
 const env = {
   ...process.env,
   HDD_V2_PROJECT: project,
@@ -73,14 +86,17 @@ try {
         '-T',
         'runner',
         'node',
-        process.argv.includes('--balance-paging-only')
-          ? 'tests/reconstruction/balance-paging.mjs'
-          : 'tests/reconstruction/run.mjs',
+        process.argv.includes('--recovery-only')
+          ? 'tests/reconstruction/recovery-run.mjs'
+          : process.argv.includes('--balance-paging-only')
+            ? 'tests/reconstruction/balance-paging.mjs'
+            : 'tests/reconstruction/run.mjs',
         ...(process.argv.includes('--diagnostics-only') ? ['--diagnostics-only'] : []),
         ...(process.argv.includes('--byte-aware-only') ? ['--byte-aware-only'] : []),
         ...(process.argv.includes('--pinned-audit-only') ? ['--pinned-audit-only'] : []),
         ...(process.argv.includes('--continuation-only') ? ['--continuation-only'] : []),
         ...(process.argv.includes('--clock-only') ? ['--clock-only'] : []),
+        ...(process.argv.includes('--red-only') ? ['--red-only'] : []),
       ],
       600000,
     ),

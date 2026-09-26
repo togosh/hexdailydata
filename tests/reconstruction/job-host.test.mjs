@@ -10,6 +10,9 @@ import { publish, readSmall } from '../../scripts/operator/reconstruction-job.mj
 import { digest } from '../../dist/services/projections/input.js';
 
 let fixture;
+mock.module(new URL('../../scripts/operator/reconstruction-recovery-mutex.mjs', import.meta.url), {
+  namedExports: { recoveryMutex: async () => Object.assign(async () => {}, { check() {} }) },
+});
 mock.module('node:child_process', {
   namedExports: {
     spawn: () => {
