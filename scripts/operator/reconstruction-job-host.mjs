@@ -1,7 +1,7 @@
 // Host adapter promoted from the saved task coordinator. Never imported by status/pause.
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
   readFileSync,
@@ -98,7 +98,8 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
     dbId,
     collectorId,
     canceled = false,
-    recovered;
+    recovered,
+    admission;
   const command = (args, timeout = 30000) => {
     const begin = performance.now(),
       r = spawnSync('docker', args, {
@@ -176,7 +177,9 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
     quiescent();
     const destination = join(
       root,
-      (initial ? 'admission-' : 'snapshot-') + String(number).padStart(5, '0'),
+      (initial ? 'admission-' : 'snapshot-') +
+        String(number).padStart(5, '0') +
+        (initial ? '-' + randomUUID() : ''),
     );
     mkdirSync(destination);
     // A stopped, read-only, networkless copy container, exactly as in the saved loop.
@@ -285,13 +288,7 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
         plan,
         binding: digest({ environment, identities }),
         state,
-        stateBytes: readFileSync(
-          join(
-            root,
-            'admission-' + String(state.segment.number).padStart(5, '0'),
-            'reconstruction.json',
-          ),
-        ),
+        stateBytes: readFileSync(join(admission, 'reconstruction.json')),
         result,
       });
       recovered = result;
@@ -312,7 +309,9 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
         );
       const number =
         mode === 'run' ? 0 : readSmall(join(environment, 'reconstruction-host.json')).segments;
-      return snapshot(number, true);
+      const observed = snapshot(number, true);
+      admission = observed.snapshot;
+      return observed;
     },
     async start() {
       // Mark startup ownership before the command so a failed readiness wait is cleaned.

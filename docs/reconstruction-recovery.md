@@ -89,6 +89,8 @@ the recovered classification and manifest reference. Repeated pause/resume cycle
 still verify that same boundary. Its original native exit and ending remain null;
 the new coordinator command returns 3 for the requested pause. Once a new segment
 settles, ordinary collection and pause/terminal classification apply.
+Each admission gets a fresh immutable snapshot directory, including repeated
+admission of the same segment; recovery verification reads that exact new snapshot.
 
 No automatic resume follows recovery. A successful recovery does not add audit
 credit or complete Task10/Task11. A second replay interruption after this special
