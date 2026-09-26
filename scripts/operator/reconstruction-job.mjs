@@ -290,7 +290,30 @@ export async function coordinate(
         break;
       }
       if (pauseRequested()) {
-        outcome = previous.start === null ? 'STOPPED_NOT_STARTED' : 'PAUSED_AT_BOUNDARY';
+        if (recoveryResult && previous.segment?.ended === null) {
+          // No new child has settled. Keep the verified recovery boundary usable
+          // by the next coordinator without claiming the interrupted child paused.
+          outcome = 'RECOVERED_AFTER_POWER_LOSS';
+          update({
+            segment: previous.segment.number,
+            currentSegment: {
+              segment: previous.segment.number,
+              evidence: 'RECOVERY_BOUNDARY',
+              reported: {
+                accepted: previous.accepted,
+                audited: previous.audited,
+                totals: totals(previous),
+                reason: outcome,
+                ended: null,
+                nativeExit: null,
+              },
+            },
+            nativeOutcome: { exit: null, signal: null, classification: 'UNKNOWN_INTERRUPTED' },
+            recovery: recoveryResult.recovery,
+          });
+        } else {
+          outcome = previous.start === null ? 'STOPPED_NOT_STARTED' : 'PAUSED_AT_BOUNDARY';
+        }
         break;
       }
       const number = (previous.segment?.number ?? 0) + 1;
@@ -441,6 +464,14 @@ export async function coordinate(
           current.currentSegment?.reported?.reason ?? current.nativeOutcome?.error ?? null,
         primaryReasonEvidence: current.currentSegment?.evidence ?? 'UNVERIFIED',
         nativeOutcome: current.nativeOutcome,
+        ...(outcome === 'RECOVERED_AFTER_POWER_LOSS'
+          ? {
+              recovery: recoveryResult.recovery,
+              accepted: previous.accepted,
+              audited: previous.audited,
+              originalEnded: null,
+            }
+          : {}),
         error: current.error ?? null,
         cleanupError: current.cleanupError ?? null,
         cancellationError: current.cancelError ?? null,
@@ -500,7 +531,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         process.exitCode =
           result.outcome === 'SCOPED_INTERVAL_COMPLETE'
             ? 0
-            : result.outcome.startsWith('PAUSED_')
+            : result.outcome.startsWith('PAUSED_') ||
+                result.outcome === 'RECOVERED_AFTER_POWER_LOSS'
               ? 3
               : 2;
     })

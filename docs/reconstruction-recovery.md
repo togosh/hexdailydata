@@ -84,6 +84,12 @@ interrupted segment receipt with a null ending. Because `lastEnded` is null, nei
 crash downtime nor the wait after recovery is added to clean `pausedMs`. Both still
 consume the immutable whole-operation deadline. Restart quarantine remains unchanged.
 
+If a pause request arrives before that next segment launches, the coordinator keeps
+the recovered classification and manifest reference. Repeated pause/resume cycles
+still verify that same boundary. Its original native exit and ending remain null;
+the new coordinator command returns 3 for the requested pause. Once a new segment
+settles, ordinary collection and pause/terminal classification apply.
+
 No automatic resume follows recovery. A successful recovery does not add audit
 credit or complete Task10/Task11. A second replay interruption after this special
 boundary, active audit recovery, ordinary same-boot crash adoption, and physical

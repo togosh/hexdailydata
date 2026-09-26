@@ -7,7 +7,7 @@ import { recoveryBindings } from '../../scripts/operator/reconstruction-recover.
 import { recoveryMutex } from '../../scripts/operator/reconstruction-recovery-mutex.mjs';
 import { sha, jsonBytes } from '../../scripts/operator/reconstruction-recovery.mjs';
 import { digest } from '../../dist/services/projections/input.js';
-import { coordinate, publish } from '../../scripts/operator/reconstruction-job.mjs';
+import { coordinate, publish, pause } from '../../scripts/operator/reconstruction-job.mjs';
 import { jobFixture } from './job-fixture.mjs';
 const root = resolve('artifacts/task-10/power-loss-recovery/unit-' + randomUUID());
 mkdirSync(root, { recursive: true });
@@ -116,4 +116,76 @@ test('normal paused unknown ending and recovered status without verifier both re
     );
     assert.equal(f.children.length, 0);
   }
+});
+test('pause before recovered launch preserves the verified boundary across repeated resumes', async () => {
+  const f = jobFixture(join(root, 'recovered-pause')),
+    owner = randomUUID(),
+    start = Date.now(),
+    deadline = start + f.options.plan.caps.milliseconds,
+    recovery = { directory: 'recovery-00002', manifest: 'a'.repeat(64) };
+  publish(f.options.lockRoot, 'reconstruction-job-binding.json', {
+    operation: f.options.operation,
+    root: f.options.root,
+    binding: f.options.binding,
+  });
+  publish(f.options.root, 'result-' + owner + '.json', {
+    owner,
+    operation: f.options.operation,
+    outcome: 'RECOVERED_AFTER_POWER_LOSS',
+    originalStart: start,
+    originalDeadline: deadline,
+    recovery,
+  });
+  publish(f.options.root, 'status.json', { owner, resultFile: 'result-' + owner + '.json' });
+  Object.assign(f.state(), {
+    status: 'paused',
+    start,
+    deadline,
+    segment: { number: 2, ended: null },
+    lastEnded: null,
+    reason: 'RECOVERED_AFTER_POWER_LOSS',
+  });
+  let verifications = 0;
+  f.adapter.recovery = async (state, result) => {
+    assert.equal(state.segment.ended, null);
+    assert.deepEqual(result.recovery, recovery);
+    assert.equal(result.originalStart, start);
+    assert.equal(result.originalDeadline, deadline);
+    verifications++;
+    return true;
+  };
+  f.adapter.start = async () => pause(f.options.root, f.options.operation);
+  const results = [];
+  for (let i = 0; i < 2; i++) {
+    const result = await coordinate({ ...f.options, action: 'resume' }, f.adapter);
+    assert.equal(result.outcome, 'RECOVERED_AFTER_POWER_LOSS');
+    assert.deepEqual(result.recovery, recovery);
+    assert.equal(result.currentSegment.evidence, 'RECOVERY_BOUNDARY');
+    assert.equal(result.currentSegment.reported.ended, null);
+    assert.equal(result.currentSegment.reported.nativeExit, null);
+    assert.equal(result.nativeOutcome.exit, null);
+    assert.equal(result.originalEnded, null);
+    assert.equal(f.children.length, 0);
+    results.push(result);
+  }
+  f.adapter.start = async () => {};
+  const snapshot = f.adapter.snapshot;
+  f.adapter.snapshot = async (number) => {
+    const observed = await snapshot(number);
+    // This coordinator-only fixture otherwise supplies a fresh start on launch.
+    for (const record of [observed.state, observed.host]) {
+      record.start = start;
+      record.deadline = deadline;
+    }
+    return observed;
+  };
+  const resumed = await coordinate({ ...f.options, action: 'resume', stopAt: '20' }, f.adapter);
+  assert.equal(verifications, 3);
+  assert.equal(f.children.length, 1);
+  assert.equal(f.children[0].number, 3);
+  assert.equal(resumed.outcome, 'PAUSED_AFTER_MILESTONE');
+  assert.equal(resumed.currentSegment.evidence, 'SEALED');
+  assert.equal(resumed.nativeOutcome.exit, 3);
+  assert.equal(resumed.recovery, undefined);
+  put(join(root, 'pause-before-launch-receipt.json'), { results, resumed, verifications });
 });
