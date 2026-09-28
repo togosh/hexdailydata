@@ -92,7 +92,10 @@ mock.module('node:child_process', {
 const { hostJob } = await import('../../scripts/operator/reconstruction-job-host.mjs');
 
 test('actual host and coordinator preserve fresh admission receipts across recovered pauses', async () => {
-  const directory = resolve('artifacts/task-10/power-loss-recovery/host-repeat-' + randomUUID()),
+  const directory = resolve(
+      process.env.HDD_V2_RECOVERY_HOST_EVIDENCE ?? 'artifacts/task-10/power-loss-recovery',
+      'host-repeat-' + randomUUID(),
+    ),
     environment = join(directory, 'environment'),
     output = join(directory, 'output'),
     put = (path, value) => writeFileSync(path, JSON.stringify(value)),

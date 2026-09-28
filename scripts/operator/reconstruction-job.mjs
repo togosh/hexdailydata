@@ -14,13 +14,14 @@ import {
   lstatSync,
   fsyncSync,
 } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ReconstructionClock } from '../../dist/operator/reconstruction-clock.js';
 import { digest } from '../../dist/services/projections/input.js';
+import { proveClockStop, waitForRawBoundary } from './reconstruction-boundary.mjs';
 
 export const jobHelp =
-  'reconstruction-job run|resume <owned-environment> <scope.json> <output-directory> [--stop-at=<declared-milestone>]\nreconstruction-job status <output-directory>\nreconstruction-job pause <output-directory> <operation-UUID>\nForeground owner PowerShell only. Requires an existing separately authorized plan/approval/runtime. No prepare, grant renewal, crash restart or detached mode.';
+  'reconstruction-job run|resume <owned-environment> <scope.json> <output-directory> [--stop-at=<declared-milestone>] [--readmit-clock-stop=<stopped-owner-UUID>]\nreconstruction-job status <output-directory>\nreconstruction-job pause <output-directory> <operation-UUID>\nForeground owner PowerShell only. Clock readmission is explicit resume of a proven normal replay seal only. Requires an existing separately authorized plan/approval/runtime. No prepare, grant renewal, crash restart or detached mode.';
 const counters = ['http', 'logical', 'observedBytes', 'chargedBytes'];
 export function readSmall(path) {
   const stat = lstatSync(path);
@@ -115,11 +116,15 @@ function totals(state) {
 /** Adapters expose the existing supervisor/collector, or explicit offline fixtures.
  * No adapter is selected from a scope file, CLI string, or environment variable. */
 export async function coordinate(
-  { root, lockRoot, operation, plan, action, stopAt, binding },
+  { root, lockRoot, operation, plan, action, stopAt, binding, readmitClockStop, scopePath },
   adapter,
   clock = new ReconstructionClock(),
 ) {
   assert(['run', 'resume'].includes(action));
+  assert(
+    !readmitClockStop || (action === 'resume' && /^[0-9a-f-]{36}$/.test(readmitClockStop)),
+    'Clock readmission requires resume and an explicit stopped owner',
+  );
   assert(!stopAt || plan.milestones.includes(stopAt), 'Stop must name a declared milestone');
   mkdirSync(root, { recursive: true });
   const owner = randomUUID(),
@@ -130,8 +135,12 @@ export async function coordinate(
     originalStart,
     originalDeadline,
     recoveryResult,
+    clockProof,
+    stoppedObservation,
     currentChild = null,
     emergency = false;
+  const waitAbort = new AbortController();
+  const readmissionFiles = [];
   let current = {
     version: 1,
     owner,
@@ -147,6 +156,8 @@ export async function coordinate(
     nativeOutcome: null,
     resultFile: null,
   };
+  if (clock instanceof ReconstructionClock)
+    clock.context = () => ({ phase: current.phase, segment: current.segment });
   const update = (patch) => {
     current = {
       ...current,
@@ -172,6 +183,7 @@ export async function coordinate(
   const cancel = () => {
     if (emergency) return;
     emergency = true;
+    waitAbort.abort(Error('Emergency cancellation requested'));
     // The adapter retains the actual child handle / verifies exact container bindings.
     // Cancellation is never a clean-boundary pause and is awaited before release.
     cancellation = adapter.cancel?.().catch((error) => {
@@ -212,19 +224,46 @@ export async function coordinate(
         'Coordinator binding changed',
       );
       const old = status(root);
-      assert(
-        old.observation === 'SETTLED_RECORD' &&
-          ['PAUSED_AT_BOUNDARY', 'PAUSED_AFTER_MILESTONE', 'RECOVERED_AFTER_POWER_LOSS'].includes(
-            old.result.outcome,
-          ),
-        'Only an explicitly clean paused coordinator may resume',
-      );
+      if (readmitClockStop) {
+        clockProof = await proveClockStop({
+          root,
+          environment: lockRoot,
+          operation,
+          plan,
+          binding,
+          scopePath,
+          oldOwner: readmitClockStop,
+          old,
+        });
+        stoppedObservation = readSmall(join(root, 'status.json'));
+        const { observation, result, limitation, ...savedStatus } = old;
+        assert.deepEqual(stoppedObservation, savedStatus, 'Stopped status changed during proof');
+        // Fresh-process continuity never waits away a prior failed admission.
+        clock.assertContinuity(clockProof.floor);
+        assert(
+          clock.wallNow() >= clockProof.floor,
+          'Fresh raw clock below prior coordinator maximum',
+        );
+      } else
+        assert(
+          old.observation === 'SETTLED_RECORD' &&
+            ['PAUSED_AT_BOUNDARY', 'PAUSED_AFTER_MILESTONE', 'RECOVERED_AFTER_POWER_LOSS'].includes(
+              old.result.outcome,
+            ),
+          'Only an explicitly clean paused coordinator may resume',
+        );
       originalStart = old.result.originalStart;
       originalDeadline = old.result.originalDeadline;
       if (old.result.outcome === 'RECOVERED_AFTER_POWER_LOSS') recoveryResult = old.result;
     }
     checkDeadline();
-    ({ state: previous } = await adapter.admit(action));
+    const admission = await adapter.admit(action);
+    previous = admission.state;
+    if (clockProof) {
+      assert.deepEqual(previous, clockProof.state, 'Readmission control differs from sealed state');
+      if (admission.snapshot) readmissionFiles.push(basename(admission.snapshot));
+      await clockProof.recheck(readmissionFiles);
+    }
     if (recoveryResult) {
       assert(adapter.recovery, 'Recovery verifier required');
       assert.equal(
@@ -250,6 +289,17 @@ export async function coordinate(
       'Invalid start state',
     );
     admitted = true;
+    if (clockProof) {
+      const receipt = 'clock-readmission-' + owner + '.json';
+      publish(
+        root,
+        receipt,
+        { owner, operation, ...clockProof.reference, originalStatus: stoppedObservation },
+        true,
+      );
+      readmissionFiles.push(receipt);
+      current.clockReadmission = { ...clockProof.reference, receipt };
+    }
     update({
       lastSettled: {
         accepted: previous.accepted,
@@ -262,17 +312,55 @@ export async function coordinate(
     process.on('SIGINT', cancel);
     process.on('SIGTERM', cancel);
     checkDeadline(); // Admission and status publication spend the same allowance.
-    await adapter.start?.();
+    // Existing clean/recovery admission keeps its startup and pause ordering.
+    // Explicit clock readmission also proves the boundary before database startup.
+    if (!clockProof) await adapter.start?.();
+    let started = !clockProof;
     let next = action;
     for (;;) {
-      await adapter.boundary(previous, next);
+      let requiredRawFloor = previous.highWater;
+      let boundary = await adapter.boundary(previous, next);
+      if (
+        next === 'resume' &&
+        clean(previous) &&
+        previous.phase === 'replay' &&
+        !previous.audit &&
+        boundary?.normalSeal === true
+      ) {
+        const floor = Math.max(previous.highWater, boundary.highWater, clockProof?.floor ?? 0);
+        requiredRawFloor = floor;
+        const wait = await waitForRawBoundary(
+          clock,
+          floor,
+          Math.min(originalDeadline, plan.expiresAt ?? Number.MAX_SAFE_INTEGER),
+          waitAbort.signal,
+        );
+        if (wait.samples > 0) {
+          // Re-read authority, ownership, retained control and seal after any wait.
+          boundary = await adapter.boundary(previous, next, true);
+          if (boundary.admissionSnapshot)
+            readmissionFiles.push(basename(boundary.admissionSnapshot));
+          assert.equal(
+            Math.max(previous.highWater, boundary.highWater, clockProof?.floor ?? 0),
+            floor,
+            'Boundary clock floor changed',
+          );
+          publish(
+            root,
+            'boundary-clock-wait-' + owner + '-' + previous.segment.number + '.json',
+            wait,
+            true,
+          );
+          update({ boundaryClockWait: { ...wait, segment: previous.segment.number } });
+        }
+        if (clockProof) await clockProof.recheck(readmissionFiles);
+      }
       const now = checkDeadline();
-      if (previous.highWater !== undefined) {
-        clock.assertContinuity?.(previous.highWater);
+      if (requiredRawFloor !== undefined) {
+        clock.assertContinuity?.(requiredRawFloor);
         assert(
-          Number.isSafeInteger(previous.highWater) &&
-            (clock.wallNow?.() ?? now) >= previous.highWater,
-          'Raw UTC below settled operator high-water',
+          Number.isSafeInteger(requiredRawFloor) && (clock.wallNow?.() ?? now) >= requiredRawFloor,
+          'Raw UTC below required boundary high-water',
         );
       }
       assert(
@@ -311,10 +399,20 @@ export async function coordinate(
             nativeOutcome: { exit: null, signal: null, classification: 'UNKNOWN_INTERRUPTED' },
             recovery: recoveryResult.recovery,
           });
+        } else if (clockProof) {
+          // No child has established a new clean coordinator pause yet.
+          outcome = 'STOPPED_UNCERTAIN';
+          current.error = 'Readmission paused before next dispatch';
         } else {
           outcome = previous.start === null ? 'STOPPED_NOT_STARTED' : 'PAUSED_AT_BOUNDARY';
         }
         break;
+      }
+      if (!started) {
+        await adapter.start?.();
+        started = true;
+        checkDeadline();
+        if (emergency || pauseRequested()) continue;
       }
       const number = (previous.segment?.number ?? 0) + 1;
       update({
@@ -323,6 +421,13 @@ export async function coordinate(
         child: null,
         currentSegment: { segment: number, evidence: 'UNVERIFIED', reported: null },
       });
+      if (requiredRawFloor !== undefined) {
+        clock.assertContinuity?.(requiredRawFloor);
+        assert(
+          (clock.wallNow?.() ?? clock.now()) >= requiredRawFloor,
+          'Raw UTC changed before dispatch',
+        );
+      }
       checkDeadline(); // Also fence a delayed wake / clock step during publication.
       const native = await adapter.launch(next, number, (child) => {
         currentChild = child;
@@ -388,6 +493,7 @@ export async function coordinate(
         currentSegment: { segment: number, evidence: 'SEALED', reported: settled },
       });
       previous = state;
+      clockProof = null; // The next ordinary seal now owns the continuation boundary.
       const complete =
         native.exit === 0 &&
         state.status === 'complete' &&
@@ -464,6 +570,7 @@ export async function coordinate(
           current.currentSegment?.reported?.reason ?? current.nativeOutcome?.error ?? null,
         primaryReasonEvidence: current.currentSegment?.evidence ?? 'UNVERIFIED',
         nativeOutcome: current.nativeOutcome,
+        ...(current.clockReadmission ? { clockReadmission: current.clockReadmission } : {}),
         ...(outcome === 'RECOVERED_AFTER_POWER_LOSS'
           ? {
               recovery: recoveryResult.recovery,
@@ -499,7 +606,7 @@ export async function coordinate(
   return status(root).result;
 }
 export async function main(args) {
-  const [action, directory, scope, output, stop] = args;
+  const [action, directory, scope, output, ...flags] = args;
   if (!action || action === 'help' || action === '--help') return { help: jobHelp };
   if (action === 'status' && directory && args.length === 2) return status(resolve(directory));
   if (action === 'pause' && directory && scope && args.length === 3)
@@ -509,8 +616,13 @@ export async function main(args) {
       directory &&
       scope &&
       output &&
-      args.length <= 5 &&
-      (!stop || /^--stop-at=\d+$/.test(stop)),
+      args.length <= 6 &&
+      flags.every(
+        (flag) =>
+          /^--stop-at=\d+$/.test(flag) ||
+          (action === 'resume' && /^--readmit-clock-stop=[0-9a-f-]{36}$/.test(flag)),
+      ) &&
+      new Set(flags.map((flag) => flag.split('=')[0])).size === flags.length,
     jobHelp,
   );
   const { hostJob } = await import('./reconstruction-job-host.mjs');
@@ -519,7 +631,8 @@ export async function main(args) {
     scopePath: resolve(scope),
     root: resolve(output),
     action,
-    stopAt: stop?.slice(10),
+    stopAt: flags.find((flag) => flag.startsWith('--stop-at='))?.slice(10),
+    readmitClockStop: flags.find((flag) => flag.startsWith('--readmit-clock-stop='))?.split('=')[1],
   });
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -17,7 +17,7 @@ const quote = (s) => "'" + s.replaceAll("'", "''") + "'";
 function invoke(args, directory, powershell = false) {
   // Keep the real CLI/host module graph. Missing fixture scope must fail before
   // authority or Docker; Node also denies child processes and filesystem writes.
-  const nodeArgs = ['--permission', '--allow-fs-read=*', cli, ...args];
+  const nodeArgs = ['--max-old-space-size=512', '--permission', '--allow-fs-read=*', cli, ...args];
   const command = powershell
     ? [
         'powershell.exe',
@@ -61,14 +61,14 @@ function invoke(args, directory, powershell = false) {
   return result;
 }
 
-function rejectedLaunch(action, powershell = false) {
+function rejectedLaunch(action, powershell = false, flags = []) {
   const directory = join(root, action + '-' + randomUUID());
   const environment = join(directory, 'environment');
   const output = join(directory, 'output');
   const scope = join(directory, 'missing-scope.json');
   mkdirSync(environment, { recursive: true });
   const result = invoke(
-    [action, environment, scope, output, '--stop-at=9100255'],
+    [action, environment, scope, output, '--stop-at=9100255', ...flags],
     directory,
     powershell,
   );
@@ -95,6 +95,7 @@ test(
   { skip: process.platform !== 'win32' },
   () => {
     rejectedLaunch('run', true);
+    rejectedLaunch('resume', true, ['--readmit-clock-stop=22222222-2222-4222-8222-222222222222']);
   },
 );
 

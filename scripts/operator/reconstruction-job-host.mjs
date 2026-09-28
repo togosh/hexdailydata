@@ -21,6 +21,7 @@ import { verify } from './reconstruction-seal.mjs';
 import { coordinate, publish, readSmall } from './reconstruction-job.mjs';
 import { verifyRecovery } from './reconstruction-recovery.mjs';
 import { recoveryMutex } from './reconstruction-recovery-mutex.mjs';
+import { replayClockFloor } from './reconstruction-boundary.mjs';
 
 function owned(path) {
   const rel = relative(process.cwd(), path);
@@ -34,7 +35,10 @@ function owned(path) {
   for (let p = path; p !== dirname(p); p = dirname(p))
     if (existsSync(p)) assert(!lstatSync(p).isSymbolicLink(), 'Indirect path refused');
 }
-export async function hostJob({ environment, scopePath, root, action, stopAt }) {
+export async function hostJob(
+  { environment, scopePath, root, action, stopAt, readmitClockStop },
+  clock,
+) {
   for (const p of [environment, root, scopePath]) owned(p);
   assert.equal(realpathSync(environment), environment);
   assert(
@@ -127,6 +131,7 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
   };
   const inspect = (args) => JSON.parse(command(args));
   const assertBindings = () => {
+    release.check();
     assert.equal(process.env.DOCKER_HOST, undefined);
     assert.equal(process.env.DOCKER_CONTEXT, undefined);
     assert.equal(command(['context', 'show']).trim(), 'desktop-linux');
@@ -338,7 +343,7 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
       assert.equal(db.Mounts[0].Name, plan.admission.volume);
       assert.deepEqual(Object.keys(db.NetworkSettings.Networks), [plan.project + '_private']);
     },
-    async boundary(previous, next) {
+    async boundary(previous, next, refresh = false) {
       assertBindings();
       quiescent();
       if (next === 'resume') {
@@ -385,10 +390,20 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
             'audit-result.json',
             'reconstruction.json',
           ]);
+        let admissionSnapshot;
+        if (refresh) {
+          const current = snapshot(host.segments, true);
+          assert.deepEqual(current.state, previous, 'Operator state changed during boundary wait');
+          admissionSnapshot = current.snapshot;
+        }
+        assert(!canceled, 'Emergency cancellation requested');
+        if (previous.phase === 'replay' && !previous.audit) replayClockFloor(previous, host);
+        return { normalSeal: true, highWater: host.highWater, admissionSnapshot };
       }
       assert(!canceled, 'Emergency cancellation requested');
     },
     async launch(mode, number, onChild) {
+      release.check();
       assert(!canceled, 'Emergency cancellation requested');
       const name = 'invocation-' + String(number).padStart(5, '0');
       const stdout = openSync(join(root, name + '.stdout.log'), 'wx'),
@@ -536,9 +551,12 @@ export async function hostJob({ environment, scopePath, root, action, stopAt }) 
         plan,
         action,
         stopAt,
+        readmitClockStop,
+        scopePath,
         binding: digest({ environment, identities }),
       },
       adapter,
+      clock,
     );
   } finally {
     await release();

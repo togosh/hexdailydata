@@ -239,3 +239,39 @@ continue to report fullTask10=PENDING and productionReady=false. The spent opera
 `777d194a-96c4-4e5a-923f-91ce8d2f3218` and
 `3f79804f-60ce-423e-8dc9-359368fc2a6e` remain terminal. The owner did not send the prior
 suggested first-milestone stop; this optional future flag does not rewrite that history.
+
+### Sealed replay clock boundary
+
+After a normal, verified replay seal, the host coordinator may wait without launching
+work until **actual raw UTC** reaches the retained operator and host high-water values.
+The wait is bounded by 5,000 monotonic milliseconds and the original effective deadline,
+whichever is earlier. This is a wait budget, not a backward-time tolerance. A frozen,
+invalid or regressing elapsed clock, exhausted wait, expiry or cancellation refuses.
+After waiting, authority, ownership, control and seals are checked again. The runtime's
+own raw continuity, SQL admission, cooldown and quarantine checks remain unchanged.
+
+An already saved `STOPPED_UNCERTAIN` is still refused by ordinary `resume`. The narrow
+owner-invoked form is:
+
+```text
+node scripts/operator/reconstruction-job.mjs resume <OWNED_ENV> <SCOPE_JSON> <OUTPUT_DIR> --stop-at=<DECLARED_MILESTONE> --readmit-clock-stop=<STOPPED_COORDINATOR_OWNER_UUID>
+```
+
+This requires the latest stopped coordinator's exact raw-high-water witness, an ordinary
+complete replay seal, native exit3, matching paused host/operator/control and authority,
+no audit or pending work, and no cleanup/cancellation uncertainty. Fresh raw UTC must
+cover the retained host/operator and recorded coordinator effective maxima before
+admission. Process-local monotonic origins are never compared across processes. All
+normal locks and runtime SQL checks remain required; stale locks are never taken over.
+The conservative implementation refuses other coordinator results, any prior readmission
+receipt, or later admission/segment evidence. It cannot resume terminal/provider failures,
+uncollected crashes, unsupported audit interruptions or arbitrary uncertain outcomes.
+
+The new coordinator records `READMITTED_SEALED_CLOCK_BOUNDARY`, hashes of the original
+failure and seal, and a create-once copy of the original status including its witness.
+The old result and seal remain unchanged. An interruption before the next child settles
+produces an honest uncertain result and cannot be retried through this option. Once the
+next child seals normally, ordinary clean continuations apply. No allowance, deadline,
+counter, audit credit, cooldown, plan, approval or runtime image is replaced. Source
+qualification uses finite fake-clock/file/process fixtures; it is not a Docker/SQL or
+live provider rehearsal and does not authorize an owner launch.
