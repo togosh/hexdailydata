@@ -44,6 +44,7 @@ function result(session: ReconstructionSession) {
     b = s.segment?.before;
   return {
     ...s,
+    ...(session.plan.auditOnly ? { mode: 'pinned-audit-only' } : {}),
     acceptedSqlUncertain: s.pendingSql !== null,
     remaining: {
       milliseconds: session.clockFailure
@@ -127,7 +128,11 @@ export async function runReconstruction(
   };
   sqlSignal.addEventListener('abort', cancelSql, { once: true });
   const db = async (role: 'api' | 'worker', writable = false) => {
-    const c = await connect(databaseConfig(role, env), { signal: sqlSignal });
+    if (plan.auditOnly && writable) throw Error('Audit-only writable client refused.');
+    const c = await connect(databaseConfig(role, env), {
+      signal: sqlSignal,
+      ...(plan.auditOnly ? { readOnly: true } : {}),
+    });
     clients.push(c);
     const lost = () => {
       if (!closing) controller.abort(Error('SQL ownership lost.'));
@@ -209,6 +214,7 @@ export async function runReconstruction(
   ) => {
     const s = session!,
       pending = s.state.pendingSql!;
+    if (plan.auditOnly) throw Error('Audit-only SQL recovery refused.');
     const [receipt] = (
       await reader!.query(
         "SELECT batch_digest,previous_sync->>'block_number' previous_number,previous_sync->>'block_hash' previous_hash,previous_sync->>'revision' previous_revision FROM hdd.checkpoints_recent WHERE chain_id=1 AND block_number=$1",
@@ -252,10 +258,15 @@ export async function runReconstruction(
         throw Error('Exclusive stopped API/worker/maintenance required.');
     let writer: CanonicalWriter | undefined;
     for (const chain of [1, 369] as const) {
-      const c = await db('worker', execute && chain === 1);
+      const c = await db('worker', !plan.auditOnly && execute && chain === 1);
       writerClients.push(c);
-      const w = await CanonicalWriter.acquire(c, chain);
-      if (chain === 1) writer = w;
+      if (plan.auditOnly) {
+        if (!(await c.query('SELECT pg_try_advisory_lock(4242,$1) AS held', [chain])).rows[0].held)
+          throw Error('Canonical writer already active.');
+      } else {
+        const w = await CanonicalWriter.acquire(c, chain);
+        if (chain === 1) writer = w;
+      }
     }
     reader = await db('api');
     await begin();
@@ -270,7 +281,7 @@ export async function runReconstruction(
     }
     // Reuse the exact admission checks for migrations, chain/history/identities and totals.
     let expected = plan.admission;
-    if (session && command === 'resume') {
+    if (session && command === 'resume' && !plan.auditOnly) {
       const [current] = (await reader.query('SELECT * FROM hdd.current_state WHERE chain_id=1'))
         .rows;
       const counts: Record<string, string> = {};
@@ -286,7 +297,7 @@ export async function runReconstruction(
     }
     const admitted = await inspectAuditTarget(reader, owner, plan.profile, expected, true);
     if (
-      command !== 'resume' &&
+      (command !== 'resume' || plan.auditOnly) &&
       (admitted.canonical.digest !== plan.canonicalDigest ||
         admitted.inventoryDigest !== plan.inventoryDigest)
     )
@@ -335,6 +346,7 @@ export async function runReconstruction(
       await boundary();
       const target = plan.milestones[s.state.milestone]!;
       if (BigInt(s.state.accepted.header.number) < BigInt(target)) {
+        if (plan.auditOnly) throw Error('Audit-only replay refused.');
         const scopes = plan.profile.ethereum.map(
           (provider) =>
             new PrefixScope(
@@ -496,6 +508,13 @@ export async function runReconstruction(
           await localGuard();
           await begin();
           session!.state.canonicalAtPause = (await canonicalEvidence(reader!, owner!)).digest;
+          if (
+            plan.auditOnly &&
+            (session!.state.canonicalAtPause !== plan.canonicalDigest ||
+              digest(await cursor()) !==
+                digest({ header: plan.admission.checkpoint, revision: plan.admission.revision }))
+          )
+            throw Error('Audit-only final canonical admission changed.');
           await end();
         });
       closing = true;
@@ -519,7 +538,10 @@ export async function runReconstruction(
       st.reason = (
         primary
           ? operatorError(primary)
-          : (st.secondary[0] ?? 'Declared common-history interval fully audited.')
+          : (st.secondary[0] ??
+            (plan.auditOnly
+              ? 'Admitted checkpoint fully audited against both sources; no replay.'
+              : 'Declared common-history interval fully audited.'))
       ).slice(0, 240);
       st.rpcDiagnostic = rpcDiagnostic(primary);
       st.lastEnded = ended;

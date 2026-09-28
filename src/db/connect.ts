@@ -31,7 +31,7 @@ export function databaseConfig(role: DbRole, env = process.env): DatabaseConfig 
 }
 export async function connect(
   config: DatabaseConfig,
-  bounds: { signal?: AbortSignal; queryTimeoutMillis?: number } = {},
+  bounds: { signal?: AbortSignal; queryTimeoutMillis?: number; readOnly?: boolean } = {},
 ): Promise<pg.Client> {
   if (
     config.host !== 'db' ||
@@ -49,6 +49,7 @@ export async function connect(
     statement_timeout: 15000,
     idle_in_transaction_session_timeout: 15000,
     application_name: 'hexdailydata-v2',
+    ...(bounds.readOnly ? { options: '-c default_transaction_read_only=on' } : {}),
     ...(bounds.queryTimeoutMillis === undefined
       ? {}
       : { query_timeout: bounds.queryTimeoutMillis }),

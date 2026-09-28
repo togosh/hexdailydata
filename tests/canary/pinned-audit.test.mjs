@@ -10,7 +10,11 @@ import { CanarySession } from '../../dist/operator/canary-session.js';
 import { digest } from '../../dist/services/projections/input.js';
 import { totalColumns } from '../../dist/services/projections/reduce.js';
 import { FakeClock, A, hash } from '../sync/fixture.mjs';
-import { checkAuditBindings, auditPostgresImage } from '../../scripts/operator/audit-bindings.mjs';
+import {
+  checkAuditBindings,
+  auditPostgresImage,
+  auditDatabaseCommand,
+} from '../../scripts/operator/audit-bindings.mjs';
 import { rpcDiagnostic } from '../../dist/providers/rpc-diagnostic.js';
 
 const inventory = [{ address: A, hearts: '0' }];
@@ -254,7 +258,7 @@ test('audit exhausted allowance and cancelled SQL context dispatch no extra requ
     await y.session.close();
   }
 });
-for (const kind of ['pinned-audit', 'common-continue'])
+for (const kind of ['pinned-audit', 'common-continue', 'audit-only'])
   test(
     kind +
       ' selected graph rejects missing/extraneous mounts, wrong instance, existing state and competing DB',
@@ -310,6 +314,29 @@ for (const kind of ['pinned-audit', 'common-continue'])
         },
       };
       p.phases[0].kind = kind;
+      if (kind === 'audit-only') {
+        Object.assign(p, {
+          kind: 'common-history-reconstruction',
+          auditOnly: true,
+          admission: p.phases[0].admission,
+          run: p.session,
+        });
+        for (const s of states) s.Labels = { 'hdd.v2.reconstruction-run': p.run };
+        Object.assign(graph.services.operator.environment, {
+          HDD_V2_RECONSTRUCTION_RELEASE: p.release,
+          HDD_V2_REVIEWED_COMMIT: p.reviewedCommit,
+        });
+        graph.services.db.command = auditDatabaseCommand(p);
+        for (const command of [
+          undefined,
+          ['-D', '/var/lib/postgresql/data'],
+          ['-D', '/var/lib/postgresql/data', '-c', 'default_transaction_read_only=off'],
+        ]) {
+          const changed = structuredClone(graph);
+          changed.services.db.command = command;
+          assert.throws(() => checkAuditBindings(p, changed, volume, states, []));
+        }
+      }
       assert.equal(
         checkAuditBindings(p, graph, volume, states, []).canonicalSql,
         kind === 'common-continue' ? 'origin1-writer-only' : 'read-only',

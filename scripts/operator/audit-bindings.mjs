@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 export const auditPostgresImage =
   'postgres:17.11-bookworm@sha256:e8587c2065ad04a2798579d86275e12c85b73b164ed2cacaa46693d636340d08';
 
+export const auditDatabaseCommand = (plan) => [
+  '-D',
+  '/var/lib/postgresql/data',
+  ...(plan.auditOnly ? ['-c', 'default_transaction_read_only=on'] : []),
+];
+
 /** Validate the effective, standalone audit graph; never inherit normal worker,
  * initialization, export, backup or prior session mounts. No Docker mutation here. */
 export function checkAuditBindings(plan, graph, volume, stateVolumes, containers) {
@@ -16,6 +22,7 @@ export function checkAuditBindings(plan, graph, volume, stateVolumes, containers
   assert.equal(op.image, plan.release);
   assert.equal(db.image, auditPostgresImage);
   assert.deepEqual(db.entrypoint, ['postgres']); // Missing PG data cannot invoke initdb.
+  if (bulk && plan.auditOnly) assert.deepEqual(db.command, auditDatabaseCommand(plan));
   assert.equal(db.ports, undefined);
   assert.equal(op.ports, undefined);
   assert.equal(op.depends_on, undefined);
@@ -95,7 +102,10 @@ export function checkAuditBindings(plan, graph, volume, stateVolumes, containers
     volume: volume.Name,
     image: op.image,
     onlyServices: ['db', 'operator'],
-    canonicalSql: phase.kind === 'common-continue' || bulk ? 'origin1-writer-only' : 'read-only',
+    canonicalSql:
+      phase.kind === 'common-continue' || (bulk && !plan.auditOnly)
+        ? 'origin1-writer-only'
+        : 'read-only',
     newStateVolumes: stateVolumes.map((v) => v.Name),
   };
 }

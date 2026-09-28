@@ -15,13 +15,14 @@ import {
 import { join, relative, isAbsolute, dirname } from 'node:path';
 import { reconstructionPlanSchema } from '../../dist/operator/reconstruction-plan.js';
 import { digest } from '../../dist/services/projections/input.js';
-import { checkAuditBindings } from './audit-bindings.mjs';
+import { checkAuditBindings, auditDatabaseCommand } from './audit-bindings.mjs';
 import { collect } from './reconstruction-collect.mjs';
 import { verify } from './reconstruction-seal.mjs';
 import { coordinate, publish, readSmall } from './reconstruction-job.mjs';
 import { verifyRecovery } from './reconstruction-recovery.mjs';
 import { recoveryMutex } from './reconstruction-recovery-mutex.mjs';
-import { replayClockFloor } from './reconstruction-boundary.mjs';
+import { replayClockFloor, normalClockBoundary } from './reconstruction-boundary.mjs';
+import { assertAuditOnlyState } from '../../dist/operator/reconstruction-state.js';
 
 function owned(path) {
   const rel = relative(process.cwd(), path);
@@ -225,6 +226,7 @@ export async function hostJob(
       const { checksum, ...state } = readSmall(join(destination, 'reconstruction.json'));
       assert.equal(checksum, digest(state));
       assert.equal(state.digest, digest(plan));
+      assertAuditOnlyState(plan, state);
       if (
         !initial &&
         state.milestone > 0 &&
@@ -234,9 +236,13 @@ export async function hostJob(
         for (const name of ['comparisons.jsonl', 'audit-result.json'])
           command(['cp', collectorId + ':/state/' + name, join(destination, name)]);
       } else if (
-        !initial &&
+        (!initial || plan.auditOnly) &&
         state.audit &&
-        (state.terminal || state.pending || state.pendingSql || state.status === 'blocked')
+        (plan.auditOnly ||
+          state.terminal ||
+          state.pending ||
+          state.pendingSql ||
+          state.status === 'blocked')
       ) {
         // Preserve a partial comparison prefix without awarding full audit credit.
         command([
@@ -339,7 +345,7 @@ export async function hostJob(
       dbId = command([...compose, 'ps', '-q', 'db']).trim();
       const db = inspect(['inspect', dbId])[0];
       assert.deepEqual(db.Config.Entrypoint, ['postgres']);
-      assert.deepEqual(db.Config.Cmd, ['-D', '/var/lib/postgresql/data']);
+      assert.deepEqual(db.Config.Cmd, auditDatabaseCommand(plan));
       assert.equal(db.Mounts[0].Name, plan.admission.volume);
       assert.deepEqual(Object.keys(db.NetworkSettings.Networks), [plan.project + '_private']);
     },
@@ -394,10 +400,18 @@ export async function hostJob(
         if (refresh) {
           const current = snapshot(host.segments, true);
           assert.deepEqual(current.state, previous, 'Operator state changed during boundary wait');
+          if (plan.auditOnly && previous.audit) {
+            const { identity } = await import('./reconstruction-seal.mjs');
+            assert.deepEqual(
+              await identity(join(current.snapshot, 'comparisons-PARTIAL.jsonl')),
+              seal.files['comparisons-partial.jsonl'],
+              'Audit prefix changed during boundary wait',
+            );
+          }
           admissionSnapshot = current.snapshot;
         }
         assert(!canceled, 'Emergency cancellation requested');
-        if (previous.phase === 'replay' && !previous.audit) replayClockFloor(previous, host);
+        if (normalClockBoundary(plan, previous)) replayClockFloor(previous, host);
         return { normalSeal: true, highWater: host.highWater, admissionSnapshot };
       }
       assert(!canceled, 'Emergency cancellation requested');

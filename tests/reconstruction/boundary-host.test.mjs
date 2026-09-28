@@ -9,10 +9,12 @@ import { randomUUID, createHash } from 'node:crypto';
 import { boundaryFixture } from './boundary-fixture.mjs';
 import { pause, readSmall } from '../../scripts/operator/reconstruction-job.mjs';
 import { digest } from '../../dist/services/projections/input.js';
+import { auditDatabaseCommand } from '../../scripts/operator/audit-bindings.mjs';
 
 let fixture;
 mock.module(new URL('../../scripts/operator/audit-bindings.mjs', import.meta.url), {
   namedExports: {
+    auditDatabaseCommand,
     checkAuditBindings() {
       fixture.events.push('injected-compose-binding-inspection');
     },

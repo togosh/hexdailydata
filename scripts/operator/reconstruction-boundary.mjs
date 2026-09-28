@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { digest } from '../../dist/services/projections/input.js';
-import { reconstructionStateSchema } from '../../dist/operator/reconstruction-state.js';
+import {
+  reconstructionStateSchema,
+  assertAuditOnlyState,
+} from '../../dist/operator/reconstruction-state.js';
 import { identity, verify } from './reconstruction-seal.mjs';
 
 const failure = 'Reconstruction clock invalid/unprovable: raw-continuity-below-durable-high-water';
@@ -75,6 +78,22 @@ export function replayClockFloor(state, host) {
   assert.equal(host.clock.effective, host.highWater);
   assert(integer(state.highWater) && integer(host.highWater));
   return Math.max(state.highWater, host.highWater);
+}
+
+// Only an ordinary clean audit-only seal may use the existing no-dispatch wait.
+// This predicate does not change the separate terminal clock readmission proof.
+export function normalClockBoundary(plan, state) {
+  if (state.phase === 'replay' && !state.audit && !plan.auditOnly) return true;
+  if (!plan.auditOnly) return false;
+  assertAuditOnlyState(plan, state);
+  return (
+    state.status === 'paused' &&
+    !state.terminal &&
+    !state.pending &&
+    state.pendingSql === null &&
+    state.canonicalAtPause === plan.canonicalDigest &&
+    ['milestone-pending', 'audit'].includes(state.phase)
+  );
 }
 
 /** Only one settled coordinator's ordinary replay seal qualifies. The caller owns

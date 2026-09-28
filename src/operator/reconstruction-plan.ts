@@ -20,6 +20,7 @@ export const reconstructionPlanSchema = z
   .strictObject({
     version: z.literal(1),
     kind: z.literal('common-history-reconstruction'),
+    auditOnly: z.literal(true).optional(),
     run: z.uuid(),
     release: z.string().regex(/^sha256:[0-9a-f]{64}$/),
     reviewedCommit: z.string().regex(/^[0-9a-f]{40}$/),
@@ -42,12 +43,20 @@ export const reconstructionPlanSchema = z
     target: uint,
     milestones: z.array(uint).min(1).max(256),
     finalityHeaders: z.strictObject({ minimum: uint, maximum: uint }),
-    methods: z.tuple([
-      z.literal('eth_chainId'),
-      z.literal('eth_getBlockByNumber'),
-      z.literal('eth_getCode'),
-      z.literal('eth_getLogs'),
-      z.literal('eth_call'),
+    methods: z.union([
+      z.tuple([
+        z.literal('eth_chainId'),
+        z.literal('eth_getBlockByNumber'),
+        z.literal('eth_getCode'),
+        z.literal('eth_getLogs'),
+        z.literal('eth_call'),
+      ]),
+      z.tuple([
+        z.literal('eth_chainId'),
+        z.literal('eth_getBlockByNumber'),
+        z.literal('eth_getCode'),
+        z.literal('eth_call'),
+      ]),
     ]),
     caps: z.strictObject({
       milliseconds: positive.max(1209600000),
@@ -82,11 +91,22 @@ export const reconstructionPlanSchema = z
       BigInt(p.admission.counts.accounts) > BigInt(Number.MAX_SAFE_INTEGER)
     )
       bad('Exact populated finalized origin1 / transport369 admission required.');
-    let previous = BigInt(p.admission.checkpoint.number);
-    for (const milestone of p.milestones) {
-      if (BigInt(milestone) <= previous || BigInt(milestone) > BigInt(p.target))
-        bad('Milestones must be strictly forward and ordered within target.');
-      previous = BigInt(milestone);
+    if (p.auditOnly) {
+      if (
+        p.target !== p.admission.checkpoint.number ||
+        p.milestones.length !== 1 ||
+        p.milestones[0] !== p.target ||
+        p.methods.length !== 4
+      )
+        bad('Audit-only requires exactly the admitted target and four read-only methods.');
+    } else {
+      if (p.methods.length !== 5) bad('Replay requires its existing five methods.');
+      let previous = BigInt(p.admission.checkpoint.number);
+      for (const milestone of p.milestones) {
+        if (BigInt(milestone) <= previous || BigInt(milestone) > BigInt(p.target))
+          bad('Milestones must be strictly forward and ordered within target.');
+        previous = BigInt(milestone);
+      }
     }
     if (p.milestones.at(-1) !== p.target || BigInt(p.target) > BigInt(p.profile.fork.parent.number))
       bad('Mandatory final audit at target, at/before common parent required.');

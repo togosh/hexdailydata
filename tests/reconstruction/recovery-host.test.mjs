@@ -1,6 +1,7 @@
 // Actual host admission and coordinator with intercepted Docker and proof adapters.
 // SQL/recovery proof and OS exclusion are qualified separately by the offline suites.
 import test, { mock } from 'node:test';
+import { auditDatabaseCommand } from '../../scripts/operator/audit-bindings.mjs';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
@@ -10,7 +11,7 @@ import { digest } from '../../dist/services/projections/input.js';
 
 let fixture;
 mock.module(new URL('../../scripts/operator/audit-bindings.mjs', import.meta.url), {
-  namedExports: { checkAuditBindings() {} },
+  namedExports: { checkAuditBindings() {}, auditDatabaseCommand },
 });
 mock.module(new URL('../../scripts/operator/reconstruction-recovery-mutex.mjs', import.meta.url), {
   namedExports: { recoveryMutex: async () => Object.assign(async () => {}, { check() {} }) },

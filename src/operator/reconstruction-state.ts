@@ -77,6 +77,54 @@ export const reconstructionStateSchema = z.strictObject({
   productionReady: z.literal(false),
 });
 export type ReconstructionState = z.infer<typeof reconstructionStateSchema>;
+/** Audit-only has no SQL transition to recover and never earns a new checkpoint. */
+export function assertAuditOnlyState(p: ReconstructionPlan, s: ReconstructionState) {
+  if (!p.auditOnly) return;
+  const pin = { header: p.admission.checkpoint, revision: p.admission.revision };
+  const finished = s.milestone === 1;
+  const a = s.audit;
+  if (
+    digest(s.accepted) !== digest(pin) ||
+    s.pendingSql !== null ||
+    s.phase === 'replay' ||
+    (s.phase === 'audit' && a === null) ||
+    (s.start === null &&
+      (a !== null ||
+        s.milestone !== 0 ||
+        s.pending ||
+        s.logical !== 0 ||
+        s.chargedBytes !== 0 ||
+        s.observedBytes !== 0 ||
+        s.uncertainAttempts !== 0)) ||
+    (s.canonicalAtPause !== null && s.canonicalAtPause !== p.canonicalDigest) ||
+    (finished
+      ? digest(s.audited) !== digest(pin) ||
+        a !== null ||
+        s.stopHeader !== null ||
+        !['milestone-audited', 'complete'].includes(s.phase)
+      : s.milestone !== 0 ||
+        s.audited !== null ||
+        digest(s.stopHeader) !== digest(pin.header) ||
+        !['milestone-pending', 'audit'].includes(s.phase)) ||
+    (a &&
+      (digest(a.pin) !== digest(pin) ||
+        (a.finalizing && a.sources.some((source) => source.count !== a.count)) ||
+        a.canonical !== p.canonicalDigest ||
+        a.inventory !== p.inventoryDigest ||
+        String(a.count) !== p.admission.counts.accounts ||
+        a.binding !==
+          digest({
+            pin,
+            canonical: a.canonical,
+            schema: a.schema,
+            inventory: { count: a.count, digest: a.inventory },
+            instance: p.instance,
+            profile: p.profile,
+            endpoints: p.endpoints,
+          })))
+  )
+    throw Error('BLOCKED_UNCERTAIN: audit-only admission/progress changed.');
+}
 export class ReconstructionPause extends Error {}
 export async function rootIdentity(root: string) {
   const s = await safePath(root);
@@ -142,13 +190,13 @@ export class ReconstructionSession {
       uncertainAttempts: 0,
       pending: false,
       status: 'prepared',
-      phase: 'replay',
+      phase: p.auditOnly ? 'milestone-pending' : 'replay',
       reason: 'NOT_RUN',
       terminal: false,
       accepted: { header: p.admission.checkpoint, revision: p.admission.revision },
       audited: null,
       milestone: 0,
-      stopHeader: null,
+      stopHeader: p.auditOnly ? p.admission.checkpoint : null,
       pendingSql: null,
       canonicalAtPause: p.canonicalDigest,
       audit: null,
@@ -180,6 +228,7 @@ export class ReconstructionSession {
     if (sha.parse(checksum) !== digest(payload))
       throw Error('BLOCKED_UNCERTAIN: corrupt operation checksum.');
     const state = reconstructionStateSchema.parse(payload);
+    assertAuditOnlyState(p, state);
     const ids = await this.roots(p);
     if (
       state.digest !== digest(p) ||
@@ -306,6 +355,7 @@ export class ReconstructionSession {
         if (this.state.segment) this.state.segment.ended = null;
       }
       reconstructionStateSchema.parse(this.state);
+      assertAuditOnlyState(this.plan, this.state);
       if (Buffer.byteLength(JSON.stringify(this.state)) > 60000)
         throw Error('Control record too large.');
       await atomicJson(this.plan.storagePath, 'reconstruction.json', {
@@ -351,6 +401,9 @@ export class ReconstructionSession {
       cap = this.plan.segment;
     if (
       now >= seg.deadline ||
+      // Leave the existing 15-second request deadline available before an audit
+      // dispatch. A hard expiry during requests/finalization remains terminal.
+      (this.plan.auditOnly && logical > 0 && seg.deadline - now <= 15000) ||
       s.http - seg.before.http >= cap.http ||
       s.logical - seg.before.logical + logical > cap.logical ||
       s.chargedBytes - seg.before.chargedBytes + (logical ? 8388608 : 0) > cap.bytes

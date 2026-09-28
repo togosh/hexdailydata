@@ -6,13 +6,16 @@ import { readFile, mkdir, lstat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { digest } from '../../dist/services/projections/input.js';
-import { reconstructionStateSchema } from '../../dist/operator/reconstruction-state.js';
+import {
+  reconstructionStateSchema,
+  assertAuditOnlyState,
+} from '../../dist/operator/reconstruction-state.js';
 import { seal, verify, identity } from './reconstruction-seal.mjs';
 const json = async (p) => JSON.parse(await readFile(p, 'utf8'));
 
 // Same page commitment as the runtime. Streaming keeps collection bounded even
 // when a milestone's full comparison inventory is large.
-async function verifyComparisons(path, audit, sources) {
+async function verifyComparisons(path, audit, sources, partial = false) {
   const before = await identity(path);
   assert.equal(before.bytes, audit.coverage.bytes, 'Comparison byte count changed');
   assert(Number.isSafeInteger(audit.count) && audit.count > 0);
@@ -24,6 +27,7 @@ async function verifyComparisons(path, audit, sources) {
   const page = (line) => {
     assert(Buffer.byteLength(line) <= 4096, 'Comparison page exceeds bound');
     const p = JSON.parse(line);
+    if (partial) assert.equal(p.binding, audit.binding, 'Partial audit binding changed');
     if (progress[active]?.count === audit.count) active++;
     const current = progress[active];
     assert(
@@ -59,7 +63,7 @@ async function verifyComparisons(path, audit, sources) {
   }
   assert.equal(tail, '', 'Incomplete comparison page');
   assert(
-    progress.every((p) => p.count === audit.count),
+    partial || progress.every((p) => p.count === audit.count),
     'Incomplete paired comparison coverage',
   );
   assert.deepEqual(progress, audit.coverage.sources, 'Comparison coverage changed');
@@ -76,6 +80,7 @@ export async function collect(environment, snapshot, archive) {
   const result = await json(join(environment, 'reconstruction-host-result.json'));
   assert.equal(checksum, digest(state));
   assert.equal(state.digest, digest(plan));
+  assertAuditOnlyState(plan, state);
   assert.equal(host.digest, state.digest);
   assert.equal(result.digest, state.digest);
   assert.equal(host.pending, false);
@@ -128,10 +133,25 @@ export async function collect(environment, snapshot, archive) {
   };
   const destination = join(archive, 'segment-' + String(host.segments).padStart(5, '0'));
   const partial = {};
-  if (state.terminal && state.audit) {
+  if ((state.terminal || plan.auditOnly) && state.audit) {
     const label = await json(join(snapshot, 'PARTIAL.json'));
     assert.equal(label.classification, 'PARTIAL_NOT_A_COMPLETED_AUDIT');
     assert.deepEqual(label.audit, state.audit);
+    if (plan.auditOnly && !state.terminal) {
+      await verifyComparisons(
+        join(snapshot, 'comparisons-PARTIAL.jsonl'),
+        {
+          ...state.audit,
+          coverage: {
+            bytes: state.audit.bytes,
+            commitment: state.audit.commitment,
+            sources: state.audit.sources,
+          },
+        },
+        plan.profile.ethereum.map((s) => s.id),
+        true,
+      );
+    }
     partial['comparisons-partial.jsonl'] = join(snapshot, 'comparisons-PARTIAL.jsonl');
     partial['partial.json'] = join(snapshot, 'PARTIAL.json');
   }

@@ -18,7 +18,11 @@ import { join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ReconstructionClock } from '../../dist/operator/reconstruction-clock.js';
 import { digest } from '../../dist/services/projections/input.js';
-import { proveClockStop, waitForRawBoundary } from './reconstruction-boundary.mjs';
+import {
+  proveClockStop,
+  waitForRawBoundary,
+  normalClockBoundary,
+} from './reconstruction-boundary.mjs';
 
 export const jobHelp =
   'reconstruction-job run|resume <owned-environment> <scope.json> <output-directory> [--stop-at=<declared-milestone>] [--readmit-clock-stop=<stopped-owner-UUID>]\nreconstruction-job status <output-directory>\nreconstruction-job pause <output-directory> <operation-UUID>\nForeground owner PowerShell only. Clock readmission is explicit resume of a proven normal replay seal only. Requires an existing separately authorized plan/approval/runtime. No prepare, grant renewal, crash restart or detached mode.';
@@ -323,8 +327,7 @@ export async function coordinate(
       if (
         next === 'resume' &&
         clean(previous) &&
-        previous.phase === 'replay' &&
-        !previous.audit &&
+        normalClockBoundary(plan, previous) &&
         boundary?.normalSeal === true
       ) {
         const floor = Math.max(previous.highWater, boundary.highWater, clockProof?.floor ?? 0);
@@ -562,6 +565,7 @@ export async function coordinate(
         owner,
         operation,
         outcome,
+        ...(plan.auditOnly ? { mode: 'pinned-audit-only', replayedBlocks: 0 } : {}),
         originalStart: originalStart ?? null,
         originalDeadline: originalDeadline ?? null,
         lastSettled: current.lastSettled,

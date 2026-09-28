@@ -5,6 +5,7 @@ import { resolve, relative, isAbsolute } from 'node:path';
 
 const id = randomUUID().slice(0, 8),
   project = `hexdailydata-v2-bulk-${id}`;
+const auditOnly = process.argv.includes('--audit-only');
 const evidence = resolve(process.env.HDD_V2_BULK_EVIDENCE ?? `artifacts/task-10/bulk/run-${id}`);
 const relativeEvidence = relative(resolve('artifacts'), evidence);
 if (relativeEvidence.startsWith('..') || isAbsolute(relativeEvidence))
@@ -25,6 +26,9 @@ if (process.argv.includes('--recovery-only')) {
 }
 const env = {
   ...process.env,
+  ...(auditOnly
+    ? { DOCKER_CONTEXT: 'desktop-linux', NODE_OPTIONS: '--max-old-space-size=512' }
+    : {}),
   HDD_V2_PROJECT: project,
   HDD_V2_DB_INSTANCE: randomUUID(),
   HDD_V2_SQL_EVIDENCE: evidence,
@@ -62,7 +66,11 @@ console.log(
   `Evidence ${evidence}; internal network, DB1.5CPU/3GiB + runner0.5CPU/1GiB; zero provider access.`,
 );
 try {
-  run([...compose, 'up', '-d', '--wait', 'db']);
+  run([...compose, 'up', '-d', '--wait', ...(auditOnly ? ['--pull', 'never'] : []), 'db']);
+  if (auditOnly) {
+    run(['inspect', project + '-db-1', '--format', '{{json .HostConfig}}']);
+    run(['network', 'inspect', project + '_sql', '--format', '{{json .Internal}}']);
+  }
   run([
     ...compose,
     'run',
@@ -72,6 +80,7 @@ try {
     '0:0',
     '--cap-add',
     'CHOWN',
+    ...(auditOnly ? ['--pull', 'never'] : []),
     'runner',
     'chown',
     '1000:1000',
@@ -84,19 +93,24 @@ try {
         'run',
         '--rm',
         '-T',
+        ...(auditOnly ? ['--pull', 'never', '--name', project + '-runner'] : []),
         'runner',
         'node',
-        process.argv.includes('--recovery-only')
-          ? 'tests/reconstruction/recovery-run.mjs'
-          : process.argv.includes('--balance-paging-only')
-            ? 'tests/reconstruction/balance-paging.mjs'
-            : 'tests/reconstruction/run.mjs',
+        auditOnly
+          ? 'tests/reconstruction/audit-only-run.mjs'
+          : process.argv.includes('--recovery-only')
+            ? 'tests/reconstruction/recovery-run.mjs'
+            : process.argv.includes('--balance-paging-only')
+              ? 'tests/reconstruction/balance-paging.mjs'
+              : 'tests/reconstruction/run.mjs',
         ...(process.argv.includes('--diagnostics-only') ? ['--diagnostics-only'] : []),
         ...(process.argv.includes('--byte-aware-only') ? ['--byte-aware-only'] : []),
         ...(process.argv.includes('--pinned-audit-only') ? ['--pinned-audit-only'] : []),
         ...(process.argv.includes('--continuation-only') ? ['--continuation-only'] : []),
         ...(process.argv.includes('--clock-only') ? ['--clock-only'] : []),
         ...(process.argv.includes('--red-only') ? ['--red-only'] : []),
+        ...(process.argv.includes('--small-only') ? ['--small-only'] : []),
+        ...(process.argv.includes('--large-only') ? ['--large-only'] : []),
       ],
       600000,
     ),
@@ -106,7 +120,19 @@ try {
   process.exitCode = 1;
 } finally {
   try {
-    console.log(run([...compose, 'down', '--volumes', '--remove-orphans']));
+    console.log(run([...compose, 'down', '--timeout', '10', '--volumes', '--remove-orphans']));
+    if (auditOnly) {
+      for (const kind of ['container', 'volume', 'network']) {
+        const remaining = run([
+          kind,
+          'ls',
+          '-q',
+          '--filter',
+          'label=com.docker.compose.project=' + project,
+        ]);
+        if (remaining) throw Error('Disposable resources remain: ' + kind);
+      }
+    }
   } catch (e) {
     console.error(e.message);
     process.exitCode = 1;

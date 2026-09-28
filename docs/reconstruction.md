@@ -132,6 +132,50 @@ Parent/fork/native audits, lineage, complete seed/rebuild equality, exports, rea
 provider admission, end-to-end duration/cost/storage qualification and Task11 remain
 separate obligations requiring planner/owner action.
 
+## Audit an already reached checkpoint
+
+An explicit `auditOnly:true` plan uses the same operator and streamed paired audit.
+It requires `target == admission.checkpoint.number`, exactly `[target]` as milestones,
+and exactly `eth_chainId`, `eth_getBlockByNumber`, `eth_getCode`, `eth_call`, in that
+order. Absent `auditOnly` preserves the existing replay plan bytes and digest;
+`false` is invalid. The legacy one-shot canary limits are unchanged.
+
+Prepare starts at the admitted header/revision with no audit credit. Every SQL
+client starts with `default_transaction_read_only=on`; worker clients retain the
+five advisory exclusions, while the API client owns the repeatable-read snapshot.
+No canonical writer or replay engine is constructed. Run, resume, and finalization
+must retain the exact admission, inventory, schema/source and canonical digest.
+Pending SQL cannot be reconciled into an audit-only operation. The host graph also
+requires PostgreSQL command
+`['-D', '/var/lib/postgresql/data', '-c', 'default_transaction_read_only=on']`.
+
+All accounts, including zeros, are compared in ten-account pages against both
+sources at one hash. The existing comparison append/fsync/cursor ordering, restart
+quarantine, cumulative charges, cooldowns and immutable deadline apply. Audit-only
+request admission pauses before reserving another attempt when at most the existing
+15-second attempt interval remains in the segment. Expiry during a request or
+finalization remains terminal. Small segment limits can pause before useful work;
+they do not promise progress or renew the whole-operation allowance.
+
+A normal clean audit-only pause seals its partial comparison prefix. The host's
+existing bounded raw-clock wait may cover this boundary only after a verified seal,
+healthy clocks, exact admission, no pending work and unchanged canonical state.
+After a wait it rechecks authority, ownership, state and prefix before dispatch;
+the runtime again verifies the inventory and committed prefix before provider calls.
+Terminal clock readmission and power-loss recovery keep their replay-only scope.
+
+The existing coordinator `SCOPED_INTERVAL_COMPLETE` outcome in this mode means only
+the fixed checkpoint audit completed. Output adds `mode=pinned-audit-only` and the
+coordinator reports `replayedBlocks=0`. `--stop-at` cannot complete a partial audit.
+A future real operation needs a new reviewed runtime image, UUID, empty distinct
+state/quota roots, freshly verified admission and separately bound owner approval.
+Old terminal cursors, plans, images, counters and results are never imported or rewritten.
+
+Offline witnesses: `node scripts/test-reconstruction.mjs --audit-only --small-only`
+and `--audit-only --large-only`. Both use cached images, new internal SQL resources,
+synthetic provider transports, and remove their exact project. The large case has
+10,037 accounts and 20,074 matches; it is not a live throughput forecast.
+
 ## Reconstruction clock domains
 
 Reconstruction alone uses `ReconstructionClock`, once per operator/host process.
