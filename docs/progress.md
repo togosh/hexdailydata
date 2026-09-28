@@ -701,3 +701,16 @@ Physical reboot and full Windows/Docker recovery CLI qualification NOT_EXERCISED
 Future owner procedure is NON-EXECUTED and needs separate authorization. No push or
 deployment; Task10/Task11 PENDING, productionReady=false. Stop for planner review.
 This entry is a status-only commit after the reviewed code.
+
+Task10 sealed replay clock boundary: SEALED_CLOCK_BOUNDARY_OFFLINE_PASS. Reviewed code
+`6348330c76322a914cc50ae86c4dca2b1f19a75e`; base `9cca8f0d7feac4f3f6b9cc7b90cf184ff8c5e52c`.
+The original post-seal raw/effective handoff failure is reproduced offline. Host-only
+bounded raw-clock waiting and explicit proof-checked same-operation readmission preserve
+the old uncertain result, seal, accounting and deadline. Runtime/image/SQL policy unchanged.
+Builder31/31 and static checks PASS; separate `/root/power_loss_review` PASS, independent
+original1/1 and fixed7/7 with28 refusals. The reviewer's initial child-heap propagation
+gap is retained and corrected by a bounded rerun. All18 inspected real files retain
+bytes/mtime/inodes. No Docker, SQL, retained-volume access, provider calls or real
+continuation occurred. Evidence and NON-EXECUTED owner procedure:
+`artifacts/task-10/sealed-clock-boundary-20260927/`. Task10/Task11 remain PENDING;
+productionReady=false. Stop for planner review. This is a status-only final entry.
