@@ -714,3 +714,23 @@ bytes/mtime/inodes. No Docker, SQL, retained-volume access, provider calls or re
 continuation occurred. Evidence and NON-EXECUTED owner procedure:
 `artifacts/task-10/sealed-clock-boundary-20260927/`. Task10/Task11 remain PENDING;
 productionReady=false. Stop for planner review. This is a status-only final entry.
+
+Task10 target-only audit: TARGET_ONLY_AUDIT_OFFLINE_PASS. Reviewed source
+`92c2789cf01e44f29df45495f5f6dbcbcf04072d`; base `c8c4e3047444536e5c3ba3879f0e531a8d11c8f9`.
+Explicit audit-only plans admit target == checkpoint and reuse the streamed paired
+audit with read-only SQL, unchanged canonical data, zero replay and no imported audit
+credit. Builder: 9 SQL/process groups and static checks passed; 64/65 affected tests
+passed initially, then the unchanged PowerShell test passed with its required fixture
+root name. Separate read-only `/root/power_loss_review`: PASS, 8 SQL groups, 28 host/
+clock/negative tests and independent large-stream/incident recomputation; no source
+correction rounds. Both sources covered all 10,037 synthetic accounts, including
+10,024 zero balances, across five segments. Scoped disposable resources were removed.
+Saved segment32 remains terminal and sealed: 9,750 first-source matches, no second-
+source inventory coverage; final ten-call balance request failed without response
+bytes. Network root cause is UNKNOWN. All 13 authorized originals remain unchanged.
+The saved inventory needs at least 38,530 balance HTTP batches versus 34,475 arithmetic
+remaining, before overhead; planner resolution is required for any later real scope.
+Report, review, receipts and NON-EXECUTED future procedure:
+`artifacts/task-10/target-only-audit-20260928/`. No real provider call, retained DB/state/
+quota access, operation, approval, image build, push or deployment. Task10/Task11 remain
+PENDING; productionReady=false. Stop for planner review. Status-only final entry.
