@@ -22,6 +22,8 @@ import {
   type ProductPair,
   type ProductReading,
   productSchemaVersion,
+  marketMethodRevision,
+  reserveBasedPools,
 } from '../../contracts/product-daily.ts';
 
 export const columns = [
@@ -99,7 +101,16 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
       const identity = [...r.set.pools]
         .sort((a, b) => a.address.localeCompare(b.address))
         .map((p) => ({ address: p.address, venue: p.version === 'V1' ? 0 : 1 }));
-      if (hash(JSON.stringify(identity)) !== r.set.id) throw Error('TRACKED_SET_DIGEST');
+      const reserveBased = r.set.measure === 'reserve-based source-derived USD estimate';
+      if (reserveBased) {
+        if (
+          r.set.methodRevision !== marketMethodRevision ||
+          JSON.stringify(identity) !== JSON.stringify(reserveBasedPools)
+        )
+          throw Error('TRACKED_SET_METHOD_COHORT');
+      } else if (r.set.methodRevision !== undefined) throw Error('TRACKED_SET_METHOD_COHORT');
+      const binding = reserveBased ? { method: r.set.methodRevision, pools: identity } : identity;
+      if (hash(JSON.stringify(binding)) !== r.set.id) throw Error('TRACKED_SET_DIGEST');
     }
     const values = r.kind === 'gas' ? [r.gasPriceWei, r.baseFeeWei, r.priorityFeeWei] : [r.value];
     for (const value of values)

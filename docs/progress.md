@@ -764,3 +764,15 @@ saved-data review rejected promotion; the selected saved product remains byte-
 identical and market values remain unavailable. Raw observations and all failures
 are retained in the pulsex-market-feed-r1 return. No main merge, deployment,
 scheduler, database access or indexer restart.
+
+### 2026-10-08 — Four-pool PulseX qualification
+
+Qualified two current observations and 90 historical UTC dates for the fixed
+four-pool source-derived USD method. The one session closed after 152 POSTs,
+715,672 charged wire bytes and 6,606 objects, with no retries. The exact raw
+evidence and independent calculations are in the pulsex-market-qualification-r2
+return. Actual local update replay, small restore, original-value preservation,
+access/CSV checks and desktop/mobile preview passed; the 503-versus-500 fixture
+failure remains recorded with its focused correction. The observations are
+qualified but stale under the unchanged 300-second rule. Original R1 remains
+PARTIAL_NOT_PROMOTABLE; main, prior datasets and parked indexer are unchanged.

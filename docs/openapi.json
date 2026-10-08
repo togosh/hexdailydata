@@ -340,7 +340,14 @@
                             },
                             "measure": {
                               "type": "string",
-                              "const": "two-sided source reserveUSD estimate"
+                              "enum": [
+                                "two-sided source reserveUSD estimate",
+                                "reserve-based source-derived USD estimate"
+                              ]
+                            },
+                            "methodRevision": {
+                              "type": "string",
+                              "const": "pulsex-four-pool-derived-usd-2"
                             },
                             "coverage": {
                               "type": "string",
@@ -4467,7 +4474,14 @@
                                 },
                                 "measure": {
                                   "type": "string",
-                                  "const": "two-sided source reserveUSD estimate"
+                                  "enum": [
+                                    "two-sided source reserveUSD estimate",
+                                    "reserve-based source-derived USD estimate"
+                                  ]
+                                },
+                                "methodRevision": {
+                                  "type": "string",
+                                  "const": "pulsex-four-pool-derived-usd-2"
                                 },
                                 "coverage": {
                                   "type": "string",

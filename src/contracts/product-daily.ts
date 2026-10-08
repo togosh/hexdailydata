@@ -136,9 +136,21 @@ export const PairSchema = z.strictObject({
   stakeStartRecordCount: z.number().int().nonnegative(),
 });
 export type ProductPair = z.infer<typeof PairSchema>;
+export const marketMethodRevision = 'pulsex-four-pool-derived-usd-2' as const;
+export const reserveBasedPools = [
+  { address: '0x19bb45a7270177e303dee6eaa6f5ad700812ba98', venue: 1 },
+  { address: '0x6f1747370b1cacb911ad6d4477b718633db328c8', venue: 0 },
+  { address: '0xc475332e92561cd58f278e4e2ed76c17d5b50f05', venue: 1 },
+  { address: '0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65', venue: 0 },
+] as const;
+export const LiquidityMeasureSchema = z.enum([
+  'two-sided source reserveUSD estimate',
+  'reserve-based source-derived USD estimate',
+]);
 export const TrackedSetSchema = z.strictObject({
   id: digest,
-  measure: z.literal('two-sided source reserveUSD estimate'),
+  measure: LiquidityMeasureSchema,
+  methodRevision: z.literal(marketMethodRevision).optional(),
   coverage: z.literal('bounded contemporary HEX-pool cohort'),
   pools: z
     .array(
@@ -289,7 +301,8 @@ export const ProductLiveResponseSchema = z.strictObject({
     .strictObject({
       id: digest,
       poolCount: z.number().int().min(1).max(12),
-      measure: z.literal('two-sided source reserveUSD estimate'),
+      measure: LiquidityMeasureSchema,
+      methodRevision: z.literal(marketMethodRevision).optional(),
       coverage: z.literal('bounded contemporary HEX-pool cohort'),
     })
     .nullable()

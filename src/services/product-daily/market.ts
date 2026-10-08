@@ -11,6 +11,7 @@ import {
   type ProductMetadata,
   type ProductRow,
   type ProductReading,
+  marketMethodRevision,
 } from '../../contracts/product-daily.ts';
 import { readingKey, validateReadings } from './project.ts';
 
@@ -18,6 +19,7 @@ export const MarketUpdateSchema = z.strictObject({
   readings: z.array(ReadingSchema).max(8),
   liquidityHistory: z.array(LiquidityBucketSchema).max(90),
   receiptSha256: digest,
+  methodRevision: z.literal(marketMethodRevision).optional(),
 });
 const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 const dateOf = (time: string) => new Date(time).toISOString().slice(0, 10);
@@ -232,6 +234,12 @@ export function applyMarketUpdate(
       ...new Set([
         ...base.metadata.methods,
         'Tracked HEX liquidity is a bounded contemporary pool cohort and a source-derived two-sided USD estimate. Daily reserve buckets are not verified closes; missing constituents are gaps. Live HEX spot never replaces historical reference quotes.',
+        ...(update.methodRevision ||
+        observations.some((r) => r.kind === 'tracked-liquidity' && r.set.methodRevision)
+          ? [
+              'Reserve-based method pulsex-four-pool-derived-usd-2: one primary HEX price from materially funded pools corroborated across venues and distinct quote addresses; every HEX reserve uses that common price, each quote reserve its source USD reference. Fixed four-pool cohort. Cached reserveUSD is diagnostic, not the valuation. Shared source inputs are not an independent oracle or token-backing proof.',
+            ]
+          : []),
       ]),
     ],
     credits: base.metadata.credits.includes('PulseX subgraphs')

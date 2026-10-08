@@ -414,7 +414,8 @@ export class ProductDailyStore {
     let trackedSet: {
       id: string;
       poolCount: number;
-      measure: 'two-sided source reserveUSD estimate';
+      measure: 'two-sided source reserveUSD estimate' | 'reserve-based source-derived USD estimate';
+      methodRevision?: 'pulsex-four-pool-derived-usd-2';
       coverage: 'bounded contemporary HEX-pool cohort';
     } | null = null;
     for (const r of m.readings) {
@@ -454,6 +455,7 @@ export class ProductDailyStore {
           id: r.set.id,
           poolCount: r.set.pools.length,
           measure: r.set.measure,
+          ...(r.set.methodRevision ? { methodRevision: r.set.methodRevision } : {}),
           coverage: r.set.coverage,
         };
       } else {

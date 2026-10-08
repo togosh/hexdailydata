@@ -58,6 +58,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
         <p>
           {data.trackedSet.poolCount} identified HEX pools · bounded tracked set, not all HEX
           liquidity. Source-derived two-sided USD estimate.
+          {data.trackedSet.methodRevision &&
+            ' Valued from pool reserves using one common HEX reference and source quote-token USD references; not an independent oracle or backing proof.'}
         </p>
       )}
       <div className="product-readings saved-readings">
@@ -179,15 +181,13 @@ export default function Home() {
             {h.liquidityHistory?.some((p) => p.value !== null) ? (
               <ChartGraphic
                 title="Tracked HEX liquidity observations"
-                points={h.liquidityHistory
-                  .slice(-liquidityDays)
-                  .map((p) => ({
-                    key: p.dateUtc,
-                    date: p.dateUtc,
-                    value: p.value,
-                    detail: 'USD estimate · fixed contemporary cohort · not a verified close',
-                    status: p.value === null ? 'unavailable' : 'recorded',
-                  }))}
+                points={h.liquidityHistory.slice(-liquidityDays).map((p) => ({
+                  key: p.dateUtc,
+                  date: p.dateUtc,
+                  value: p.value,
+                  detail: 'USD estimate · fixed contemporary cohort · not a verified close',
+                  status: p.value === null ? 'unavailable' : 'recorded',
+                }))}
               />
             ) : (
               <p>No qualified tracked-liquidity history is available.</p>
