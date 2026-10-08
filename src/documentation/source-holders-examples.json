@@ -1,0 +1,89 @@
+{
+  "basis": "Actual complete saved source reader at the fixed historical pin. Example cursor is illustrative and expired; start without a cursor.",
+  "query": {
+    "source": "subgraph",
+    "limit": "2",
+    "order": "source-id-asc"
+  },
+  "response": {
+    "chain": "pulsechain",
+    "source": "subgraph",
+    "datasetVersion": "94906fb219cceb6476f9fb7373ffd8a752cc0e4b2f3d2bbc096ac84d6ce66014",
+    "snapshot": {
+      "source": "pulsechain/hex",
+      "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+      "number": 27720851,
+      "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+      "timestamp": 1791215285,
+      "observedAtUtc": "2026-10-05T15:48:05Z"
+    },
+    "coverage": "complete_source_inventory_at_pin",
+    "refreshEnabled": false,
+    "totals": {
+      "sourceRows": 664405,
+      "representedAddresses": 664405,
+      "sourcePositiveAddressCountExcludingZeroAddress": 380242,
+      "zeroBalanceRows": 284162,
+      "negativeBalanceRows": 1,
+      "zeroAddressRows": 1,
+      "duplicateAddressGroups": 0,
+      "duplicateNumeralGroups": 0,
+      "ambiguousAddressGroups": 0,
+      "sourceOnly": true,
+      "balancesIndependentlyVerified": false,
+      "sumsAreTotalSupply": false,
+      "activeStakerCountAvailable": false
+    },
+    "order": "source-id-asc",
+    "replacementStatus": "accepted",
+    "items": [
+      {
+        "reported": {
+          "id": "0x0000000000000000000000000000000000000000",
+          "numeralIndex": "1",
+          "holderAddress": "0x0000000000000000000000000000000000000000",
+          "totalSent": "242100584919555885928",
+          "totalReceived": "236839833958624279939",
+          "tokenBalance": "-5260750960931605989",
+          "createdTimeStamp": "1575417701",
+          "createdBlocknumber": "9046423",
+          "createdHexDay": "1",
+          "lastModifiedHexDay": "2498",
+          "lastModifiedTimeStamp": "1791215265"
+        },
+        "anomaly": "negative_reported_balance",
+        "provenance": {
+          "segment": "HOLDER_R2",
+          "sourcePage": 1,
+          "sourceAttempt": 2,
+          "rowInPage": 0,
+          "originalPageSha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944"
+        }
+      },
+      {
+        "reported": {
+          "id": "0x0000000000000000000000000000000000000001",
+          "numeralIndex": "258249",
+          "holderAddress": "0x0000000000000000000000000000000000000001",
+          "totalSent": "0",
+          "totalReceived": "20100000000",
+          "tokenBalance": "20100000000",
+          "createdTimeStamp": "1618268010",
+          "createdBlocknumber": "12228081",
+          "createdHexDay": "496",
+          "lastModifiedHexDay": "1206",
+          "lastModifiedTimeStamp": "1679609099"
+        },
+        "anomaly": null,
+        "provenance": {
+          "segment": "HOLDER_R2",
+          "sourcePage": 1,
+          "sourceAttempt": 2,
+          "rowInPage": 1,
+          "originalPageSha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944"
+        }
+      }
+    ],
+    "nextCursor": "eyJ2ZXJzaW9uIjoxLCJiaW5kaW5nIjoiN2U3ZGQ0NmM2YjVmYjcxNzdiYTU5YjQ0Yzg3MzllYmI5ZDk1Mzc0MmJhZGUyOTE2YTA1YTAxZjk4MmM0ODI4MSIsImlkZW50aXR5IjoiOTQ5MDZmYjIxOWNjZWI2NDc2ZjlmYjczNzNmZmQ4YTc1MmNjMGU0YjJmM2QyYmJjMDk2YWM4NGQ2Y2U2NjAxNCIsImtleSI6IjIiLCJleHBpcmVzIjo2MDAwMH0.19LQvAnwoWCEQ7wVigHG5_YF1yyiOizZtGgECkhChqA"
+  }
+}

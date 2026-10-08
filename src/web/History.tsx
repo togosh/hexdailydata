@@ -7,7 +7,15 @@ import { endpoint, RequestError, useResource } from './api.ts';
 import { dateShift, today, numberText, multiplyDecimals } from './format.ts';
 import { Feedback, Table } from './components.tsx';
 import { Icon } from './visuals.tsx';
-import { loadArchive, loadNative, validRange, plot, type Point } from './history.ts';
+import {
+  loadArchive,
+  loadNative,
+  loadLedger,
+  ledgerPoints,
+  validRange,
+  plot,
+  type Point,
+} from './history.ts';
 
 type Daily = z.infer<typeof DailyResponseSchema>;
 const nativeMetrics = {
@@ -61,6 +69,8 @@ export function Chart({
   compact = false,
   controls,
   schedule = false,
+  tableLabel,
+  expandDetails = false,
 }: {
   points: Point[];
   title: string;
@@ -68,6 +78,8 @@ export function Chart({
   compact?: boolean;
   controls?: ReactNode;
   schedule?: boolean;
+  tableLabel?: string;
+  expandDetails?: boolean;
 }) {
   const [page, setPage] = useState(0);
   useEffect(() => setPage(0), [points]);
@@ -151,7 +163,7 @@ export function Chart({
         <details open>
           <summary>Data table · {points.length} records</summary>
           <Table
-            title={`${title} — exact published values`}
+            title={tableLabel ?? `${title} — exact published values`}
             headings={['Date (UTC)', unit, 'State', 'Source detail']}
           >
             {points.slice(page * 100, (page + 1) * 100).map((p) => (
@@ -159,7 +171,16 @@ export function Chart({
                 <td>{p.date}</td>
                 <td className="exact">{p.value === null ? 'Unavailable' : numberText(p.value)}</td>
                 <td>{p.status}</td>
-                <td>{p.detail}</td>
+                <td>
+                  {expandDetails ? (
+                    <details>
+                      <summary>Exact source values</summary>
+                      <p>{p.detail}</p>
+                    </details>
+                  ) : (
+                    p.detail
+                  )}
+                </td>
               </tr>
             ))}
           </Table>
@@ -226,7 +247,7 @@ export function HomeChart({ date }: { date: string | null }) {
   );
 }
 type Selection = {
-  source: 'hds' | 'native';
+  source: 'hds' | 'native' | 'contract-ledger';
   from: string;
   to: string;
   metric: string;
@@ -241,10 +262,16 @@ function initial(): Selection {
     all: false,
   };
   const params = new URLSearchParams(location.search);
-  if (params.has('metric')) {
-    const source = params.get('source') === 'native' ? 'native' : 'hds';
-    const from = params.get('from') ?? defaults.from,
-      to = params.get('to') ?? defaults.to;
+  if (params.has('metric') || params.get('source') === 'contract-ledger') {
+    const source =
+      params.get('source') === 'contract-ledger'
+        ? 'contract-ledger'
+        : params.get('source') === 'native'
+          ? 'native'
+          : 'hds';
+    const from =
+        params.get('from') ?? (source === 'contract-ledger' ? '2026-09-05' : defaults.from),
+      to = params.get('to') ?? (source === 'contract-ledger' ? '2026-10-04' : defaults.to);
     // Full dashboard ranges use bounded exact API windows with a stable revision.
     const valid = validRange(from, to, 10000);
     return {
@@ -259,7 +286,7 @@ function initial(): Selection {
     const stored = JSON.parse(sessionStorage.getItem('history-selection') ?? 'null');
     if (
       stored &&
-      ['hds', 'native'].includes(stored.source) &&
+      ['hds', 'native', 'contract-ledger'].includes(stored.source) &&
       validRange(stored.from, stored.to) &&
       typeof stored.metric === 'string'
     )
@@ -277,10 +304,12 @@ export default function History() {
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true);
   const [archive, setArchive] = useState<Awaited<ReturnType<typeof loadArchive>>>(),
-    [native, setNative] = useState<Daily>();
+    [native, setNative] = useState<Daily>(),
+    [ledger, setLedger] = useState<Awaited<ReturnType<typeof loadLedger>>>();
   const select = (s: Selection) => {
     setArchive(undefined);
     setNative(undefined);
+    setLedger(undefined);
     setError('');
     setLoading(true);
     setSelection(s);
@@ -294,11 +323,15 @@ export default function History() {
     setError('');
     setArchive(undefined);
     setNative(undefined);
+    setLedger(undefined);
     void (async () => {
       try {
         if (selection.source === 'hds') {
           const result = await loadArchive(selection.from, selection.to, controller.signal);
           if (active) setArchive(result);
+        } else if (selection.source === 'contract-ledger') {
+          const result = await loadLedger(selection.from, selection.to, controller.signal);
+          if (active) setLedger(result);
         } else {
           const result = await loadNative(selection.from, selection.to, controller.signal);
           if (active) setNative(result);
@@ -327,15 +360,18 @@ export default function History() {
     }
   }, [selection]);
   const hds = selection.source === 'hds';
-  const metric = hds
-    ? selection.metric === 'price' ||
-      selection.metric === 'cost' ||
-      selection.metric in metricDefinitions
-      ? selection.metric
-      : 'price'
-    : selection.metric in nativeMetrics
-      ? selection.metric
-      : 'payout';
+  const exactLedger = selection.source === 'contract-ledger';
+  const metric = exactLedger
+    ? 'payout'
+    : hds
+      ? selection.metric === 'price' ||
+        selection.metric === 'cost' ||
+        selection.metric in metricDefinitions
+        ? selection.metric
+        : 'price'
+      : selection.metric in nativeMetrics
+        ? selection.metric
+        : 'payout';
   const unit = hds
     ? metric === 'cost'
       ? 'USD/T-share'
@@ -343,40 +379,46 @@ export default function History() {
         ? 'USD/HEX'
         : metricDefinitions[metric as ArchiveMetric].unit
     : nativeMetrics[metric as NativeMetric][1];
-  const title = hds
-    ? metric === 'cost'
-      ? 'T-Share Cost USD · derived HDS'
-      : metric === 'price'
-        ? 'HDS reference price'
-        : metricDefinitions[metric as ArchiveMetric].meaning
-    : nativeMetrics[metric as NativeMetric][0];
-  const points: Point[] = hds
-    ? (archive?.rows ?? []).map((r) => {
-        const cost =
-          metric === 'cost'
-            ? multiplyDecimals(r.metrics.tshareRateHEX.value, r.referencePriceUsd.value)
-            : null;
-        const v =
-          metric === 'cost'
-            ? {
-                value: cost,
-                availability: cost === null ? 'unavailable input' : 'derived',
-                published: null,
-              }
-            : metric === 'price'
-              ? r.referencePriceUsd
-              : r.metrics[metric as ArchiveMetric];
-        return {
-          key: String(r.sourceDay),
-          date: r.sourceRecordDateUtc,
-          value: v.value,
-          status: v.availability,
-          detail: `HDS sourceDay ${r.sourceDay} · ${r.sourceDate} · ${r.dateRelationship}${v.published !== null && v.value === null ? ' · excluded published token ' + v.published : ''}${metric === 'cost' ? ` · share rate ${r.metrics.tshareRateHEX.value ?? 'unavailable'} × reference USD price ${r.referencePriceUsd.value ?? 'unavailable'} (${r.referencePriceUsd.availability})` : ''}`,
-        };
-      })
-    : native
-      ? nativePoints(native, metric as NativeMetric)
-      : [];
+  const title = exactLedger
+    ? 'Saved daily payout per T-share'
+    : hds
+      ? metric === 'cost'
+        ? 'T-Share Cost USD · derived HDS'
+        : metric === 'price'
+          ? 'HDS reference price'
+          : metricDefinitions[metric as ArchiveMetric].meaning
+      : nativeMetrics[metric as NativeMetric][0];
+  const points: Point[] = exactLedger
+    ? ledger
+      ? ledgerPoints(ledger)
+      : []
+    : hds
+      ? (archive?.rows ?? []).map((r) => {
+          const cost =
+            metric === 'cost'
+              ? multiplyDecimals(r.metrics.tshareRateHEX.value, r.referencePriceUsd.value)
+              : null;
+          const v =
+            metric === 'cost'
+              ? {
+                  value: cost,
+                  availability: cost === null ? 'unavailable input' : 'derived',
+                  published: null,
+                }
+              : metric === 'price'
+                ? r.referencePriceUsd
+                : r.metrics[metric as ArchiveMetric];
+          return {
+            key: String(r.sourceDay),
+            date: r.sourceRecordDateUtc,
+            value: v.value,
+            status: v.availability,
+            detail: `HDS sourceDay ${r.sourceDay} · ${r.sourceDate} · ${r.dateRelationship}${v.published !== null && v.value === null ? ' · excluded published token ' + v.published : ''}${metric === 'cost' ? ` · share rate ${r.metrics.tshareRateHEX.value ?? 'unavailable'} × reference USD price ${r.referencePriceUsd.value ?? 'unavailable'} (${r.referencePriceUsd.availability})` : ''}`,
+          };
+        })
+      : native
+        ? nativePoints(native, metric as NativeMetric)
+        : [];
   return (
     <>
       <div className="page-heading">
@@ -398,13 +440,14 @@ export default function History() {
                 source: e.target.value as Selection['source'],
                 metric: e.target.value === 'hds' ? 'price' : 'payout',
                 all: false,
-                from: dateShift(today(), -29),
-                to: today(),
+                from: dateShift(e.target.value === 'contract-ledger' ? '2026-10-04' : today(), -29),
+                to: e.target.value === 'contract-ledger' ? '2026-10-04' : today(),
               })
             }
           >
             <option value="hds">HDS reported history</option>
             <option value="native">Native daily history</option>
+            <option value="contract-ledger">Saved contract ledger</option>
           </select>
         </label>
         <label>
@@ -414,7 +457,9 @@ export default function History() {
             value={metric}
             onChange={(e) => setSelection({ ...selection, metric: e.target.value })}
           >
-            {hds ? (
+            {exactLedger ? (
+              <option value="payout">Stored payout per T-share (HEX/T-share)</option>
+            ) : hds ? (
               <>
                 <option value="price">HDS reference price</option>
                 <option value="cost">T-Share Cost USD (same-record HDS inputs)</option>
@@ -457,22 +502,71 @@ export default function History() {
         </form>
       </div>
       <p className="notice">
-        {hds
-          ? 'Source: HEXDailyStats · PulseChain reported statistics. Dates are source-record dates; market close times are unproved. Reference prices are neither OHLC nor executable prices. Common Ethereum-era native history is a separate source.'
-          : 'Native protocol daily values. Pending payouts remain unavailable until materialized. Inherited Ethereum origins remain identified.'}
+        {exactLedger
+          ? 'Saved contract ledger · as of 5 Oct 2026. Historical storage observed on PulseChain at block 27,720,851. Dates are nominal contract-day UTC dates, not original materialization times. Zero-share rates remain undefined. Chart values truncate to 8 decimals; source detail retains the exact ratio. API also labels a half-up 18-decimal display. Refresh disabled.'
+          : hds
+            ? 'Source: HEXDailyStats · PulseChain reported statistics. Dates are source-record dates; market close times are unproved. Reference prices are neither OHLC nor executable prices. Common Ethereum-era native history is a separate source.'
+            : 'Native protocol daily values. Pending payouts remain unavailable until materialized. Inherited Ethereum origins remain identified.'}
       </p>
-      <Feedback loading={loading} error={error} refresh={() => setVersion((v) => v + 1)} />
+      {exactLedger ? (
+        <p role="status">{loading ? 'Loading saved ledger...' : error}</p>
+      ) : (
+        <Feedback loading={loading} error={error} refresh={() => setVersion((v) => v + 1)} />
+      )}
       {!loading && !error && (
         <section className="panel">
           <p className="meta">
             Complete selection: {selection.from}–{selection.to} · {points.length} records
-            {archive
-              ? ` · ${archive.pages} page(s) · one archive revision`
-              : native
-                ? ` · ${native.coverage.missingDays.length} missing days`
-                : ''}
+            {ledger
+              ? ` / ${ledger.pages} bounded windows / one saved dataset / ${ledger.missing.length} unavailable dates`
+              : archive
+                ? ` · ${archive.pages} page(s) · one archive revision`
+                : native
+                  ? ` · ${native.coverage.missingDays.length} missing days`
+                  : ''}
           </p>
-          <Chart points={points} title={title} unit={unit} />
+          <Chart
+            points={points}
+            title={title}
+            unit={unit}
+            {...(exactLedger
+              ? {
+                  tableLabel: 'Truncated display; exact source integers and ratio in Source detail',
+                  expandDetails: true,
+                }
+              : {})}
+          />
+        </section>
+      )}
+      {ledger && (
+        <section className="panel">
+          <h2>Saved contract observation</h2>
+          <p>
+            2,498 stored days: 2019-12-03 through 2026-10-04. Days 0 and 1 have undefined zero-share
+            rates.
+          </p>
+          <p className="meta">
+            Observed {ledger.first.metadata.observationPin.blockTimestamp}; captured{' '}
+            {ledger.first.metadata.captureStartedAt} through {ledger.first.metadata.fetchedAt}.
+          </p>
+          <details>
+            <summary>Source identity and limitations</summary>
+            <p className="exact">Block {ledger.first.metadata.observationPin.blockHash}</p>
+            <p className="exact">Dataset {ledger.first.datasetVersion}</p>
+            <p>{ledger.first.metadata.meaning}</p>
+            <p>
+              Historical counts, prices, closing state, day-close share rate, activity, historical
+              origin, materialization and independently verified finality remain unavailable. Full
+              product launch is not qualified.
+            </p>
+          </details>
+          <button
+            onClick={() =>
+              select({ ...selection, from: '2019-12-03', to: '2026-10-04', all: true })
+            }
+          >
+            Load all 2,498 saved days
+          </button>
         </section>
       )}
       {archive && (

@@ -1,10 +1,15 @@
 FROM postgres:17.11-bookworm@sha256:e8587c2065ad04a2798579d86275e12c85b73b164ed2cacaa46693d636340d08 AS pgtools
 FROM node:24.21.0-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS build
 WORKDIR /app
-COPY package.json package-lock.json .npmrc ./
+COPY package.json package-lock.json ./
+# Public lockfile and npm defaults only; no user/private npm configuration.
+# Empty, distinct config files also prevent inherited global/user settings.
+RUN mkdir -p /tmp/hdd-npm && touch /tmp/hdd-npm/user.conf /tmp/hdd-npm/global.conf
+ENV NPM_CONFIG_USERCONFIG=/tmp/hdd-npm/user.conf NPM_CONFIG_GLOBALCONFIG=/tmp/hdd-npm/global.conf NPM_CONFIG_REGISTRY=https://registry.npmjs.org NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false
 RUN npm ci
 COPY tsconfig*.json vite.config.ts ./
 COPY src ./src
+COPY scripts/openapi.mjs ./scripts/openapi.mjs
 COPY config/limits.json ./config/limits.json
 RUN npm run build && npm prune --omit=dev
 

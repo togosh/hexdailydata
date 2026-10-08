@@ -8,7 +8,6 @@ import { useResource, endpoint, useClock } from './api.ts';
 import { Metric } from './components.tsx';
 import { compactNumber, observationState, yearsFromDays, multiplyDecimals } from './format.ts';
 import { Icon, TokenLogo, type IconName } from './visuals.tsx';
-import HomeFaq from './HomeFaq.tsx';
 
 const HomeChart = lazy(() => import('./History.tsx').then((m) => ({ default: m.HomeChart })));
 export default function Home() {
@@ -311,7 +310,9 @@ export default function Home() {
           </a>
         ))}
       </nav>
-      <HomeFaq />
+      <a className="home-learn-link" href="/learn">
+        New to HEX? Learn the basics →
+      </a>
     </div>
   );
 }

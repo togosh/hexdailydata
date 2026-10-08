@@ -1,3 +1,8 @@
+import { SavedHoldersResponseSchema, SavedStakesResponseSchema, SavedStakeResponseSchema, SavedAddressResponseSchema } from '../contracts/source-update.ts';
+import { SourceStakesQuery, SourceStakeQuery, SourceStakesResponseSchema, SourceStakeResponseSchema } from '../contracts/source-stakes.ts';
+import { SourceAddressQuery, SourceAddressResponseSchema } from '../contracts/source-address.ts';
+import { SourceHoldersQuery, SourceHoldersResponseSchema } from '../contracts/source-holders.ts';
+import { StakeEventsQuery, StakeEventsResponseSchema } from '../contracts/stake-events.ts';
 import { z } from 'zod';
 import { HomeResponseSchema, StatusResponseSchema } from '../contracts/api.ts';
 import {
@@ -20,6 +25,7 @@ import {
   DownloadsResponseSchema,
 } from '../contracts/reads.ts';
 import { reportedHistoryResponseSchema } from '../contracts/history.ts';
+import { DailyLedgerResponseSchema } from '../contracts/daily-ledger.ts';
 import {
   ChartsQuery,
   ArchiveChartsSchema,
@@ -98,7 +104,7 @@ export const routes = [
     path: '/api/v2/daily',
     query: DailyQuery,
     params: none,
-    response: z.union([DailyResponseSchema, reportedHistoryResponseSchema]),
+    response: z.union([DailyResponseSchema, reportedHistoryResponseSchema, DailyLedgerResponseSchema]),
   },
   {
     id: 'markets',
@@ -110,37 +116,44 @@ export const routes = [
   {
     id: 'stakes',
     path: '/api/v2/stakes',
-    query: StakesQuery,
+    query: z.union([StakesQuery, SourceStakesQuery]),
     params: none,
-    response: StakesResponseSchema,
+    response: z.union([StakesResponseSchema, SavedStakesResponseSchema]),
+  },
+  {
+    id: 'stakeEvents',
+    path: '/api/v2/stake-events',
+    query: StakeEventsQuery,
+    params: none,
+    response: StakeEventsResponseSchema,
   },
   {
     id: 'stake',
     path: '/api/v2/stakes/:id',
-    query: StakeQuery,
+    query: z.union([StakeQuery, SourceStakeQuery]),
     params: z.strictObject({ id: StakeIdSchema }),
-    response: StakeResponseSchema,
+    response: z.union([StakeResponseSchema, SavedStakeResponseSchema]),
   },
   {
     id: 'address',
     path: '/api/v2/addresses/:address',
-    query: AddressQuery,
+    query: z.union([AddressQuery, SourceAddressQuery]),
     params: address,
-    response: AddressResultSchema,
+    response: z.union([AddressResultSchema, SavedAddressResponseSchema]),
   },
   {
     id: 'addressStakes',
     path: '/api/v2/addresses/:address/stakes',
-    query: AddressQuery,
+    query: z.union([AddressQuery, SourceAddressQuery]),
     params: address,
-    response: AddressResultSchema,
+    response: z.union([AddressResultSchema, SavedAddressResponseSchema]),
   },
   {
     id: 'holders',
     path: '/api/v2/holders',
-    query: HoldersQuery,
+    query: z.union([HoldersQuery, SourceHoldersQuery]),
     params: none,
-    response: HoldersResponseSchema,
+    response: z.union([HoldersResponseSchema, SavedHoldersResponseSchema]),
   },
   {
     id: 'calculator',

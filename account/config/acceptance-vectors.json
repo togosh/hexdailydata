@@ -1,0 +1,52 @@
+{
+  "kind": "synthetic-independent-acceptance-examples-not-prices-or-live-payments",
+  "prepaid": [
+    {
+      "now": "2026-09-19T00:00:00Z",
+      "existingEnd": null,
+      "purchasedDays": 30,
+      "expectedStart": "2026-09-19T00:00:00Z",
+      "expectedEnd": "2026-10-19T00:00:00Z"
+    },
+    {
+      "now": "2026-09-19T00:00:00Z",
+      "existingEnd": "2026-10-09T00:00:00Z",
+      "purchasedDays": 90,
+      "expectedStart": "2026-10-09T00:00:00Z",
+      "expectedEnd": "2027-01-07T00:00:00Z"
+    },
+    {
+      "now": "2026-09-19T00:00:00Z",
+      "existingEnd": "2026-09-16T00:00:00Z",
+      "purchasedDays": 365,
+      "expectedStart": "2026-09-19T00:00:00Z",
+      "expectedEnd": "2027-09-19T00:00:00Z"
+    }
+  ],
+  "cardExamples": [
+    {
+      "periodStart": "2028-02-01T00:00:00Z",
+      "periodEnd": "2028-03-01T00:00:00Z",
+      "expectedDurationDays": 29,
+      "mustNotTreatAsDays": 30
+    },
+    {
+      "periodStart": "2027-03-01T00:00:00Z",
+      "periodEnd": "2028-03-01T00:00:00Z",
+      "expectedDurationDays": 366,
+      "mustNotTreatAsDays": 365
+    }
+  ],
+  "idempotency": {
+    "samePaymentDistinctEventIDs": 2,
+    "expectedCredits": 1
+  },
+  "quota": {
+    "remaining": 1,
+    "concurrentKeys": 2,
+    "expectedAdmitted": 1,
+    "expectedDenied": 1
+  },
+  "rawPLSBaseUnits": "123456789012345678901",
+  "note": "Values constructed using integer seconds/date arithmetic by planner, not measured application results."
+}

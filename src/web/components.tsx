@@ -172,7 +172,10 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     window.history.pushState(
       null,
       '',
-      term.startsWith('0x') ? '/address/' + term : '/stake/' + term,
+      (term.startsWith('0x') ? '/address/' + term : '/stake/' + term) +
+        (new URLSearchParams(location.search).get('source') === 'subgraph'
+          ? '?' + new URLSearchParams([...new URLSearchParams(location.search)].filter(([k]) => k === 'source' || k === 'generation' || k === 'datasetVersion' || (term.startsWith('0x') && k === 'holderDatasetVersion')))
+          : ''),
     );
     window.dispatchEvent(new PopStateEvent('popstate'));
     setError('');

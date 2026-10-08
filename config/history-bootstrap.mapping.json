@@ -1,0 +1,642 @@
+{
+  "format": "hdd-history-bootstrap-mapping-1",
+  "version": 1,
+  "fields": [
+    {
+      "input": "circulatingHEX",
+      "target": "circulatingHEX",
+      "unit": "HEX",
+      "meaning": "Circulating amount reported by historical globalInfo.",
+      "kind": "observation",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "DailyStatHandler.getDailyData: globalInfo(currentDay+1).totalHeartsinCirculation / 10^8; original HEX token retained.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "stakedHEX",
+      "target": "stakedHEX",
+      "unit": "HEX",
+      "meaning": "Locked principal reported by globalInfo, including good-accounted subset.",
+      "kind": "observation",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "DailyStatHandler.getDailyData: globalInfo(currentDay+1).lockedHeartsTotal / 10^8; original HEX token retained.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "stakedHEXGA",
+      "target": "stakedHEXGA",
+      "unit": "HEX",
+      "meaning": "Good-accounted locked-principal subset.",
+      "kind": "observation",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "get_stakeStartGADataHistorical: sum good-accounted locked principal at source block / 10^8; original token retained.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "totalHEX",
+      "target": "totalHEX",
+      "unit": "HEX",
+      "meaning": "Circulating plus locked total; not ERC20 totalSupply.",
+      "kind": "derived",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": "circulatingHEX + stakedHEX",
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Exact arithmetic over admitted observations, not canonical closing state.",
+      "sourceMethod": "circulatingHEX + stakedHEX",
+      "conversion": "circulatingHEX + stakedHEX",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "tshareRateHEX",
+      "target": "tshareRateHEX",
+      "unit": "HEX/T-share",
+      "meaning": "Reported share-rate conversion; not raw shareRate.",
+      "kind": "observation",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "get_shareRateChangeByTimestamp: last timestamp_lt observation timestamp, published tShareRateHex; already HEX/T-share, no new scaling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "totalTshares",
+      "target": "totalTshares",
+      "unit": "T-share",
+      "meaning": "Shares from latest eligible source update; not a daily ledger denominator.",
+      "kind": "observation",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "get_dailyDataUpdate: latest timestamp with endDay<=currentDay; shares / 10^12. It does not identify exact day in daily row.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "dailyPayoutHEX",
+      "target": "dailyPayoutHEX",
+      "unit": "HEX",
+      "meaning": "Reserved for a period-qualified payout. Unaligned historical source update remains in raw input.",
+      "kind": "held",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "No inferred HDS-to-ledger period mapping.",
+      "sourceMethod": "Same latest-eligible update, payout / 10^8; source interval not in daily record, so no ledger join.",
+      "conversion": "Retained only in original; normalized null.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "payoutPerTshareHEX",
+      "target": "payoutPerTshareHEX",
+      "unit": "HEX/T-share",
+      "meaning": "Reserved for period-qualified payout ratio; immutable paired ledger remains preferred.",
+      "kind": "held",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "No inferred HDS-to-ledger period mapping.",
+      "sourceMethod": "Published dailyPayoutHEX / totalTshares, but interval unresolved; held.",
+      "conversion": "Retained only in original; normalized null.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "penaltiesHEX",
+      "target": "estimatedPenaltiesHEX",
+      "unit": "HEX",
+      "meaning": "Source estimate 2*(dailyPayoutHEX-(circulatingHEX+stakedHEX)*10000/100448995); not event penalties. Held because payout interval unaligned.",
+      "kind": "held",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "No inferred HDS-to-ledger period mapping.",
+      "sourceMethod": "Source estimate 2*(dailyPayoutHEX-(circulatingHEX+stakedHEX)*10000/100448995); not event penalties. Held because payout interval unaligned.",
+      "conversion": "Retained only in original; normalized null.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "averageStakeLength",
+      "target": "averageStakeLengthYears",
+      "unit": "365-day years",
+      "meaning": "Principal-weighted original duration in source no-end/no-GA stake set; not remaining length.",
+      "kind": "observation",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "sum(stakedDays * principalHEX) / sum(principalHEX) / 365 in no-end/no-GA source set.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "stakedHEXPercent",
+      "target": "stakedHEXPercent",
+      "unit": "percent",
+      "meaning": "Locked/(circulating+locked)*100; exact rational rounded half-up to 2 decimal places.",
+      "kind": "derived",
+      "signed": false,
+      "integer": false,
+      "maximum": "100",
+      "formula": "roundHalfUp(stakedHEX * 100 / totalHEX, 2)",
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Exact arithmetic over admitted observations, not canonical closing state.",
+      "sourceMethod": "roundHalfUp(stakedHEX * 100 / totalHEX, 2)",
+      "conversion": "roundHalfUp(stakedHEX * 100 / totalHEX, 2)",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "currentHolders",
+      "target": "currentHolders",
+      "unit": "addresses",
+      "meaning": "Reported distinct source addresses with positive token balance, not people or canonical balance proof.",
+      "kind": "observation",
+      "signed": false,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Positive tokenBalance query at source block; unique holderAddress set across pages.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "numberOfHolders",
+      "target": "holderIndexMaximum",
+      "unit": "source index",
+      "meaning": "Maximum numeralIndex proxy; never a measured holder population.",
+      "kind": "observation",
+      "signed": false,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "First tokenHolder ordered numeralIndex descending at source block; parseInt numeralIndex, not cardinality.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "currentStakerCount",
+      "target": "unendedUnaccountedStakerAddresses",
+      "unit": "addresses",
+      "meaning": "Distinct source addresses with no linked end and no linked Good Accounting; not active/earning-staker proof.",
+      "kind": "observation",
+      "signed": false,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Unique stakerAddr set for source stakeStarts with no end and no Good Accounting link.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "totalStakerCount",
+      "target": "historicalStakerAddresses",
+      "unit": "addresses",
+      "meaning": "Reported distinct stake-owner addresses over source starts.",
+      "kind": "observation",
+      "signed": false,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Unique stakerAddr set across source stakeStarts at source block.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "circulatingSupplyChange",
+      "target": "circulatingSupplyChange",
+      "unit": "HEX",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "stakedSupplyChange",
+      "target": "stakedSupplyChange",
+      "unit": "HEX",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "stakedHEXGAChange",
+      "target": "stakedHEXGAChange",
+      "unit": "HEX",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "totalTsharesChange",
+      "target": "totalTsharesChange",
+      "unit": "T-share",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "currentHoldersChange",
+      "target": "currentHoldersChange",
+      "unit": "addresses",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "numberOfHoldersChange",
+      "target": "holderIndexMaximumChange",
+      "unit": "source index",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "currentStakerCountChange",
+      "target": "unendedUnaccountedStakerAddressesChange",
+      "unit": "addresses",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "totalStakerCountChange",
+      "target": "historicalStakerAddressesChange",
+      "unit": "addresses",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": true,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "tshareRateIncrease",
+      "target": "tshareRateChangeHEX",
+      "unit": "HEX/T-share",
+      "meaning": "Signed reported difference from source-selected predecessor; no missing zero filled.",
+      "kind": "observation",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Reported historical observation; producer revision at each historic date not proved.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "None for reported already-denominated decimal tokens; exact string preserved.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "stakedHEXPercentChange",
+      "target": "stakedHEXPercentChange",
+      "unit": "percentage points",
+      "meaning": "Difference of locally derived percentages across consecutive valid source days.",
+      "kind": "derived",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": "stakedHEXPercent[day] - stakedHEXPercent[day-1]",
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Exact arithmetic over admitted observations, not canonical closing state.",
+      "sourceMethod": "Source-selected current minus previous currentDay-1 field; truthy guards can skip zero inputs. Preserve published signed token; no gap filling.",
+      "conversion": "stakedHEXPercent[day] - stakedHEXPercent[day-1]",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "dailyMintedInflationTotal",
+      "target": "netTotalSupplyChangeHEX",
+      "unit": "HEX",
+      "meaning": "Signed net circulating-plus-locked change across consecutive valid source days; not gross minting.",
+      "kind": "derived",
+      "signed": true,
+      "integer": false,
+      "maximum": null,
+      "formula": "totalHEX[day] - totalHEX[day-1]",
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "Exact arithmetic over admitted observations, not canonical closing state.",
+      "sourceMethod": "totalHEX[day] - totalHEX[day-1]",
+      "conversion": "totalHEX[day] - totalHEX[day-1]",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    },
+    {
+      "input": "actualAPYRate",
+      "target": "simpleAnnualizedPayoutRatePercent",
+      "unit": "percent/year",
+      "meaning": "Source dailyPayoutHEX/stakedHEX*365.25*100 rounded2; not compounded or realized APY. Held because payout interval unaligned.",
+      "kind": "held",
+      "signed": false,
+      "integer": false,
+      "maximum": null,
+      "formula": null,
+      "dayConvention": "Original currentDay and date retained; observation, not verified daily close.",
+      "validation": "Exact decimal token; field sign/integer/range rules; skeleton and conflicting duplicate projection refused.",
+      "limitation": "No inferred HDS-to-ledger period mapping.",
+      "sourceMethod": "Source dailyPayoutHEX/stakedHEX*365.25*100 rounded2; not compounded or realized APY. Held because payout interval unaligned.",
+      "conversion": "Retained only in original; normalized null.",
+      "sourceEvidence": [
+        "public-session/09.body: DailyStatHandler.js",
+        "public-session/10.body: TheGraph.js"
+      ]
+    }
+  ],
+  "priceSeries": [
+    {
+      "input": "pricePulseX",
+      "series": "pulsechain-hex-reference-usd",
+      "era": "pulsechain",
+      "unit": "USD/HEX",
+      "kind": "reference",
+      "body": "pulse",
+      "fromDate": "2023-05-14",
+      "toDate": null,
+      "method": "Captured getPulseXPrice(HEX,day): tokenDayDatas.priceUSD, exact source-day-derived date, rounded8 by producer. Historical reference, not close/spot.",
+      "guards": "Existing conservative PulseX guards; days1734/1735/1768 excluded; numeric positive, nonskeleton, no copied UV equality, no date conflict/future day.",
+      "limitation": "Exact market close, first trade and fork time unknown; no ROI/ATH/return splice."
+    },
+    {
+      "input": "priceUV2",
+      "series": "ethereum-origin-v2-reference-usd",
+      "era": "ethereum-origin-early",
+      "unit": "USD/HEX",
+      "kind": "reference",
+      "body": "ethereum",
+      "fromDate": "2019-12-03",
+      "toDate": "2022-12-31",
+      "method": "Saved getUniswapV2HEXDailyPrice/get_priceUV2 support reported tokenDayDatas.priceUSD; source helper nominal-day window [day-1 midnight,day midnight), rounded8.",
+      "guards": "Positive nonskeleton; reject equality with positive UV3 because captured later top-level caller copies UV3. End2022 is a deliberately early selection boundary, not a fork date.",
+      "limitation": "Historic producer revision/token configuration not independently proved. The captured top-level V2 call is commented out; unequal values are not independent verification. May2023 fork-adjacent interval is not admitted."
+    },
+    {
+      "input": "priceUV3",
+      "series": "ethereum-origin-v3-reference-usd",
+      "era": "ethereum-origin-early",
+      "unit": "USD/HEX",
+      "kind": "reference",
+      "body": "ethereum",
+      "fromDate": "2019-12-03",
+      "toDate": "2022-12-31",
+      "method": "Saved getUniswapV3HEXDailyPrice/get_priceUV3: tokenDayDatas.priceUSD, nominal-day window [day-1 midnight,day midnight), rounded8.",
+      "guards": "Positive nonskeleton; duplicate agreement; no future date; end2022 intentionally stays outside unresolved2023 fork boundary.",
+      "limitation": "Not verified close; source time and query window differ. Historical producer version unproved. No post-fork Ethereum product."
+    },
+    {
+      "input": "priceUV1",
+      "series": "ethereum-origin-v1-reference-usd",
+      "era": "ethereum-origin-early",
+      "unit": "USD/HEX",
+      "kind": "held",
+      "body": "ethereum",
+      "method": "Saved V1 helper requests tokenPriceUSD of exchange0x05cde89ccfa0ada8c88d5a23caaa79ef129e7883 at earliest timestamp_gt argument.",
+      "limitation": "Caller linking priceUV1 and its timestamp argument is absent. USD/helper mechanism alone does not bind the saved early row timing; retain154 positive originals without guessed AA/cutover."
+    },
+    {
+      "input": "priceUV2UV3",
+      "series": "ethereum-origin-composite-reference-usd",
+      "era": "ethereum-origin-early",
+      "unit": "USD/HEX",
+      "kind": "held",
+      "body": "ethereum",
+      "method": "Later source composite weights V2/V3 with selected USDC liquidity or falls back V3.",
+      "limitation": "Day1 positive quote predates captured component series; earliest mechanism/AA mapping unknown; V2 liquidity later0.1 placeholders. No early composite admission."
+    },
+    {
+      "input": "priceBTC",
+      "series": "bitcoin-benchmark-usd",
+      "era": "benchmark",
+      "unit": "USD/BTC (unqualified)",
+      "kind": "held",
+      "body": "pulse",
+      "method": "Captured timed CoinGecko caller; called implementation/currency argument not saved.",
+      "limitation": "Cannot infer USD or quote period; zeros unavailable."
+    },
+    {
+      "input": "priceETH",
+      "series": "ethereum-benchmark-usd",
+      "era": "benchmark",
+      "unit": "USD/ETH (unqualified)",
+      "kind": "held",
+      "body": "pulse",
+      "method": "Captured timed CoinGecko caller; called implementation/currency argument not saved.",
+      "limitation": "Cannot infer USD or quote period; zeros unavailable."
+    }
+  ],
+  "timeConvention": "day is original currentDay; recordedAtUtc is original date. No shifting; no verified closing state. Nominal2019-12-03+day used only for consistency guards. Duplicate date conflicts reject the entire normalized day; field conflicts reject only that field.",
+  "inputHashes": {
+    "pulse": "d687ab4b4af94366a2e3e5ce2d6c6d5329ed67d34453a80152b53308598b5d15",
+    "ethereum": "49bfa6eb956ffb7162af7b04c2121be2654ef310c6991e2f8b1e7673190b582b",
+    "ledger": "53dfed37d33f2bdc5a65200f097c2f322e6df000d333e5d9bf69c30c4894a190"
+  },
+  "capturedAtUtc": "2026-10-08T07:56:02.696Z",
+  "credits": "Historical observations: HEXDailyStats / togosh. Producer source revision066d848c91a079af38f17b8e45693bf5d2f7aa2e, code MIT. Feed redistribution authority unresolved; internal staging only.",
+  "limitations": [
+    "No day0 in HDS; day1/2 skeletons remain null.",
+    "No per-cell provenance wrappers; raw originals retained by immutable archive.",
+    "Daily ledger preferred but no unproved period alignment; ledger untouched.",
+    "No current prices, OHLC/returns, liquidity valuation, BTC/ETH USD or gas admitted.",
+    "2023 Ethereum-origin prices retained-only until boundary/provenance selection can be supported; no new on-chain replay prerequisite."
+  ]
+}

@@ -12,24 +12,68 @@ import { quoteStake, payoutScenario } from '../../src/domain/calculator.ts';
 import { HEX_LAUNCH_SECONDS } from '../../src/domain/day.ts';
 import { HomeResponseSchema } from '../../src/contracts/api.ts';
 
-test('five stable concepts share one short-answer source; Learn-only prose stays lazy', () => {
+test('five Learn questions preserve risk meanings; Home only links to the lazy route', () => {
   assert.deepEqual(
     concepts.map((c) => c.id),
-    ['hex', 'staking', 'tshares', 'payout', 'pulsechain'],
+    ['hex', 'staking', 'tshares', 'payout', 'tools'],
   );
   assert.equal(new Set(concepts.map((c) => c.anchor)).size, 5);
   assert.equal(concepts[1].anchor, 'staking-basics');
-  const home = readFileSync('src/web/HomeFaq.tsx', 'utf8');
-  assert.match(home, /concepts\.map/);
-  assert.match(home, /\{concept\.answer\}/);
-  assert.match(concepts[1].answer, /can't spend it while staked/);
+  const home = readFileSync('src/web/Home.tsx', 'utf8');
+  assert.match(home, /className="home-learn-link" href="\/learn"/);
+  assert.match(home, /New to HEX\? Learn the basics →/);
+  assert.doesNotMatch(home, /HomeFaq|home-faq|concepts|education\.ts|Learn\.tsx|learnResources/);
+  assert.match(concepts[1].answer, /cannot spend the committed amount while staked/);
   assert.match(
     concepts[1].answer,
-    /Ending early or too late can reduce your payout and starting HEX/,
+    /Ending early or too late can reduce the payout and starting amount/,
   );
-  assert.match(concepts[2].answer, /aren't a separate token you buy or trade/);
-  assert.match(concepts[3].answer, /amount varies; it isn't a daily deposit into your wallet/);
-  assert.doesNotMatch(home, /Information|Learn\.tsx|learnResources|fetch\(/);
+  assert.match(
+    concepts[1].answer,
+    /owner must use Stake End.*maturity does not pay it automatically/,
+  );
+  assert.match(concepts[2].answer, /one trillion stake shares/);
+  assert.match(concepts[2].answer, /not a separate token to buy or trade/);
+  assert.match(concepts[2].answer, /not an interest rate/);
+  assert.match(
+    concepts[3].answer,
+    /not a guaranteed future rate or a daily deposit into your wallet/,
+  );
+  assert.match(concepts[4].answer, /does not sell tokens or execute stakes/);
+  const learn = readFileSync('src/web/Learn.tsx', 'utf8');
+  assert.doesNotMatch(learn, /<details[^>]*\bopen[\s=>]/);
+  assert.match(learn, /HEXDailyData is read-only/);
+  assert.match(learn, /Maturity is not an automatic wallet payment/);
+  for (const id of [
+    'start',
+    'hex',
+    'pulsechain',
+    'staking-basics',
+    'staking',
+    'tshares',
+    'payout',
+    'example-title',
+    'data',
+    'project-resources',
+    'learn-depth-title',
+    'longer-stakes',
+    'maturity-questions',
+    'good-accounting',
+    'stake-states',
+    'using-tools',
+    'math',
+    'methodology',
+    'protocol-context',
+    'share-mechanics',
+    'site-pages',
+    'resources',
+  ]) {
+    assert.equal(
+      learn.split(`id="${id}"`).length - 1 - (concepts.some((c) => c.id === id) ? 1 : 0),
+      1,
+      `one DOM fragment ${id} (Summary props excluded)`,
+    );
+  }
   assert.match(
     readFileSync('src/web/App.tsx', 'utf8'),
     /lazy\(\(\) => import\('\.\/Learn\.tsx'\)\)/,

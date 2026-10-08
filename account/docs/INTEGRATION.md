@@ -1,0 +1,15 @@
+# Future integration boundary
+
+Reusable candidates are the verified-account flow, saved invoice model, immutable payment identities, serialized grant accounting, one-time random API keys, and authorizeAndConsume admission service. None has been merged into or tested against the main application. The only main context read was the supplied frozen text note.
+
+The protected handler currently returns one clearly synthetic data row. A future adapter could replace that handler after the account quota transaction admits one request. Authentication/expired/quota denials do not consume daily units; an admitted downstream failure may consume one attempt. Distinct HTTP requests each count. The query meter counts actual SQL statements including BEGIN/COMMIT, with an extra outbox write at the reminder threshold.
+
+Identity, billing and usage require a separate writable database/role. Never broaden the main data-read role. Keep public pages/downloads public; this lab is an optional paid API integration interface.
+
+PLS invoices use exact decimal-string base units and 30/90/365 × 86,400 UTC seconds. New compatible prepaid grants start at max(activation, last unrefunded compatible end). Card grants use stored half-open calendar intervals, never callback time + 30 days. An economic identity and a delivery identity are distinct unique records. Refunds invalidate only their linked grant; future intervals and keys survive, including possible gaps. Account locks serialize admission, revocation and fulfillment. Live time is sampled after acquiring that lock; explicitly supplied virtual time is limited to direct test calls. Collectible debt is stored per card invoice, so cancellation and payment of a different period cannot clear it. A request admitted before revocation commits can complete.
+
+The fake provider is an independent, append-only schema written through a separate role. Reconciliation reads it rather than inferring payment from app credits. A single process ticks bounded batches. SMTP delivery is at least once; the deterministic message ID helps identify retries but is not a claim of exactly-once mail. Delivery bodies are erased after successful SMTP acceptance. Short token TTLs, no-referrer policy and local-only inbox retention limit this lab's exposure; no external mail system is qualified.
+
+Unqualified: production hosting/security operations, provider signatures/APIs/sandboxes, merchant eligibility, price discovery, chain identity/finality/reorganizations, settlement/refund transfers, tax/receipt fields, grace/dispute policy, proration, production prices/quotas, year-long offers and upstream capacity. Card state here is a synthetic sequence, not a vendor contract. The restore test covers one private lab PostgreSQL instance, including the independent fake-provider schema; it does not establish real-vendor recovery or a production RPO.
+
+Runtime refuses production mode and remote-service knobs. There is no production toggle to activate this implementation. Loopback HTTP cookie settings and the Docker-stdio browser transport must never be copied into a deployment recipe.

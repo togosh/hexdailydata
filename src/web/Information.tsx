@@ -36,9 +36,14 @@ export function Downloads() {
       <div className="page-heading">
         <div>
           <h1>Downloads</h1>
-          <p>Grab the core HEX datasets in one tap.</p>
+          <p>Complete CSV files require current purchased access. Downloads do not spend JSON allowance.</p>
         </div>
       </div>
+      <section className="panel">
+        <p><strong>SYNTHETIC SAMPLE</strong>: fixed, partial demonstration data.</p>
+        <p>{(['daily','stakes','holders','maturities','markets'] as const).map(name => <span key={name}><a download href={`/samples/${name}.csv`}>Sample CSV: {name}</a>{' | '}</span>)}</p>
+        <p><a href="/account/">Sign in for complete downloads</a>. A signed-in customer can use the complete download actions below.</p>
+      </section>
       {data.loading && <p role="status">Loading downloads...</p>}
       {data.error && <p role="alert">{data.error}</p>}
       {bundle ? (
@@ -77,7 +82,7 @@ export function Downloads() {
                     aria-label={`Download ${name} CSV`}
                     href={`/api/v2/downloads/${bundle.id}/${name}`}
                   >
-                    <Icon name="download" /> Download CSV
+                    <Icon name="download" /> Complete CSV
                   </a>
                 </section>
               );

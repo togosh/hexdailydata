@@ -7,6 +7,84 @@ import {
 import { endpoint, request, RequestError } from './api.ts';
 import { dateShift, decimal } from './format.ts';
 import { DailyResponseSchema } from '../contracts/reads.ts';
+import { DailyLedgerResponseSchema, type DailyLedgerResponse } from '../contracts/daily-ledger.ts';
+import { displayRatio } from '../domain/units.ts';
+
+/** One immutable saved dataset across bounded windows; never mix a replacement into a chart. */
+export async function loadLedger(from: string, to: string, signal: AbortSignal, get = request) {
+  if (!validRange(from, to, 10000)) throw new Error('Invalid ledger range.');
+  let first: DailyLedgerResponse | undefined;
+  const items: DailyLedgerResponse['items'] = [],
+    missing: DailyLedgerResponse['coverage']['missing'] = [];
+  let pages = 0;
+  for (let start = from; start <= to; start = dateShift(start, 366)) {
+    signal.throwIfAborted();
+    const end = dateShift(start, 365) < to ? dateShift(start, 365) : to;
+    const page = await get(
+      endpoint('/daily', {
+        source: 'contract-ledger',
+        from: start,
+        to: end,
+        datasetVersion: first?.datasetVersion,
+      }),
+      DailyLedgerResponseSchema,
+      signal,
+    );
+    if (
+      first &&
+      (page.datasetVersion !== first.datasetVersion ||
+        page.manifestSha256 !== first.manifestSha256 ||
+        JSON.stringify(page.metadata) !== JSON.stringify(first.metadata))
+    )
+      throw new RequestError(409);
+    if (
+      page.coverage.from !== start ||
+      page.coverage.to !== end ||
+      page.coverage.returned !== page.items.length ||
+      page.items.length + page.coverage.missing.length !== page.coverage.requested
+    )
+      throw new RequestError(503);
+    const days = [
+      ...page.items.map((r) => [r.contractDay, r.nominalDateUtc] as const),
+      ...page.coverage.missing.map((r) => [r.contractDay, r.nominalDateUtc] as const),
+    ].sort((a, b) => a[0] - b[0]);
+    if (
+      new Set(days.map((d) => d[0])).size !== days.length ||
+      days.some((d, i) => d[1] !== dateShift(start, i)) ||
+      days.at(-1)?.[1] !== end
+    )
+      throw new RequestError(503);
+    first ??= page;
+    items.push(...page.items);
+    missing.push(...page.coverage.missing);
+    pages++;
+  }
+  signal.throwIfAborted();
+  return { first: first!, items, missing, pages };
+}
+export function ledgerPoints(data: Awaited<ReturnType<typeof loadLedger>>): Point[] {
+  return [
+    ...data.items.map((r): Point => ({
+      key: String(r.contractDay),
+      date: r.nominalDateUtc,
+      value: r.rate.rational
+        ? displayRatio({
+            numerator: BigInt(r.rate.rational.numerator),
+            denominator: BigInt(r.rate.rational.denominator),
+          })
+        : null,
+      status: r.rate.reason ?? 'saved contract storage',
+      detail: `Contract day ${r.contractDay} · payout ${r.payoutHearts} hearts · ${r.stakeShares} raw shares · ${r.rate.rational ? `exact ratio ${r.rate.rational.numerator}/${r.rate.rational.denominator}` : 'undefined: zero shares'}`,
+    })),
+    ...data.missing.map((r): Point => ({
+      key: String(r.contractDay),
+      date: r.nominalDateUtc,
+      value: null,
+      status: r.reason,
+      detail: `Contract day ${r.contractDay} · no captured ledger value`,
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date));
+}
 
 export type Archive = z.infer<typeof reportedHistoryResponseSchema>;
 /** Exact native windows share a cutoff; discard a moving index instead of splicing revisions. */

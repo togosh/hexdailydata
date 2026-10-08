@@ -1,0 +1,140 @@
+[
+  {
+    "id": "api-summary",
+    "title": "Summary & daily data",
+    "routes": [
+      {
+        "id": "home",
+        "title": "Home overview",
+        "description": "Summary with independently qualified price, share-rate and payout observations.",
+        "path": "/api/v2/home"
+      },
+      {
+        "id": "daily",
+        "title": "Daily history",
+        "description": "Native daily rows, HDS history or explicitly selected saved contract ledger.",
+        "path": "/api/v2/daily"
+      },
+      {
+        "id": "markets",
+        "title": "Daily markets",
+        "description": "Separate market sources, methods and interval coverage.",
+        "path": "/api/v2/markets/daily"
+      },
+      {
+        "id": "calculator",
+        "title": "Calculator inputs",
+        "description": "Qualified share rate and historical payout assumptions.",
+        "path": "/api/v2/calculator/inputs"
+      }
+    ]
+  },
+  {
+    "id": "api-stakes",
+    "title": "Stakes & addresses",
+    "routes": [
+      {
+        "id": "stakes",
+        "title": "Stake list",
+        "description": "Indexed stakes with address, lifecycle and bounded maturity/principal filters.",
+        "path": "/api/v2/stakes"
+      },
+      {
+        "id": "stakeEvents",
+        "title": "Stake activity",
+        "description": "Read stake lifecycle events since a saved, provable checkpoint.",
+        "path": "/api/v2/stake-events"
+      },
+      {
+        "id": "stake",
+        "title": "Stake detail",
+        "description": "Indexed stake and independently qualified recent observation.",
+        "path": "/api/v2/stakes/{id}"
+      },
+      {
+        "id": "holders",
+        "title": "Holder rankings",
+        "description": "Liquid or staker ranking at a recorded daily cutoff.",
+        "path": "/api/v2/holders"
+      },
+      {
+        "id": "address",
+        "title": "Address summary",
+        "description": "Indexed summary with separately pinned live information.",
+        "path": "/api/v2/addresses/{address}"
+      },
+      {
+        "id": "addressStakes",
+        "title": "Address stake page",
+        "description": "Address-result shape including its pinned live stake page.",
+        "path": "/api/v2/addresses/{address}/stakes"
+      }
+    ]
+  },
+  {
+    "id": "api-charts",
+    "title": "Charts",
+    "routes": [
+      {
+        "id": "nativeCharts",
+        "title": "Native charts",
+        "description": "Fixed native-ledger series with cutoff and truncation.",
+        "path": "/api/v2/charts/native"
+      },
+      {
+        "id": "archiveCharts",
+        "title": "Source-reported charts",
+        "description": "Fixed HDS archive series with source provenance.",
+        "path": "/api/v2/charts/archive"
+      },
+      {
+        "id": "maturities",
+        "title": "Scheduled maturities",
+        "description": "Principal, shares and counts by scheduled maturity day.",
+        "path": "/api/v2/charts/maturities"
+      }
+    ]
+  },
+  {
+    "id": "api-downloads",
+    "title": "Downloads",
+    "routes": [
+      {
+        "id": "downloads",
+        "title": "Download catalog",
+        "description": "Available immutable CSV bundles and their cutoffs.",
+        "path": "/api/v2/downloads"
+      },
+      {
+        "id": "download",
+        "title": "Download CSV",
+        "description": "A dataset from an available catalog-selected bundle.",
+        "path": "/api/v2/downloads/{bundle}/{dataset}"
+      }
+    ]
+  },
+  {
+    "id": "api-health",
+    "title": "Status & health",
+    "routes": [
+      {
+        "id": "status",
+        "title": "Data status",
+        "description": "Service metadata, coverage and observation status.",
+        "path": "/api/v2/status"
+      },
+      {
+        "id": "live",
+        "title": "Process liveness",
+        "description": "Whether the HTTP process is alive.",
+        "path": "/health/live"
+      },
+      {
+        "id": "ready",
+        "title": "Dependency readiness",
+        "description": "Whether the database readiness check succeeds.",
+        "path": "/health/ready"
+      }
+    ]
+  }
+]

@@ -48,14 +48,6 @@
 .learn-page [id] {
   scroll-margin-top: 1.25rem;
 }
-.learn-intro {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-}
-.learn-intro h3 {
-  margin-top: 0;
-}
 .stake-lifecycle {
   list-style: none;
   counter-reset: step;
@@ -145,10 +137,6 @@
 .learn-glossary dd {
   margin: 0.25rem 0 1rem;
 }
-.learn-source-link {
-  display: inline-block;
-  padding: 0.65rem 0;
-}
 .learn-destinations {
   padding-left: 1.25rem;
 }
@@ -160,16 +148,9 @@
   list-style: none;
   padding: 0;
 }
-.learn-resources {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
 .learn-resources li {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 1rem;
-  background: var(--panel);
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--line);
 }
 .learn-resources p,
 .learn-reading p {
@@ -210,11 +191,6 @@
   }
 }
 @media (max-width: 760px) {
-  .learn-intro,
-  .learn-resources {
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
   .learn-heading {
     margin-bottom: 1rem;
   }
@@ -226,4 +202,16 @@
     grid-template-columns: 1fr;
     gap: 0.15rem;
   }
+}
+
+.learn-page > .learn-basics {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 1rem;
+}
+.learn-basics > .learn-disclosure {
+  margin-top: 0;
+}
+.learn-page > .learn-page-links {
+  margin-top: 0.5rem;
 }

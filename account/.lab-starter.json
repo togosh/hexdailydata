@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "starter": "hexdailydata-paid-api-lab",
+  "revision": "2026-09-19",
+  "status": "STARTER_ONLY",
+  "workspaceName": "HEXDailyData-Paid-API-Lab-20260919",
+  "purpose": "Separate account/access/billing experiment with synthetic payments; not a deployed paid API",
+  "mainWorkspaceProtected": "C:\\Code\\HEXDailyData-v2",
+  "priorLabProtected": "C:\\Code\\HEXDailyData-Payments-Lab",
+  "appTarget": "Node24 LTS, TypeScript, Fastify, React, PostgreSQL17; resolve/test exact supported versions locally",
+  "authentication": "Email/password; email is username; verified local-inbox email; password reset",
+  "payments": "Internal synthetic PLS prepaid and card-period simulators only",
+  "livePayments": false,
+  "providerSandboxCalls": false,
+  "realEmail": false,
+  "rpc": false,
+  "mainRepoAccess": false,
+  "vendorChoice": "UNSELECTED_FOR_PRODUCTION",
+  "applicationTests": "NOT_RUN",
+  "independentApplicationReview": "NOT_RUN"
+}

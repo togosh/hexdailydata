@@ -1,0 +1,119 @@
+{
+  "daily": {
+    "contract_day": 10,
+    "origin_chain_id": 369,
+    "payout_status": "pending",
+    "payout_shares": "0",
+    "payout_hearts": "0",
+    "raw_share_rate": "100000",
+    "circulating_hearts": "900719925474099312345678",
+    "locked_hearts": "900719925474099312345678",
+    "weighted_days": "900719925474099312345678",
+    "accounted_hearts": "900719925474099312345678",
+    "holder_count": 1,
+    "staker_count": 1,
+    "starts": 1,
+    "ends": 0,
+    "penalty_hearts": "0"
+  },
+  "stakes": {
+    "stake_id": "1",
+    "address": {
+      "type": "Buffer",
+      "data": [
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171
+      ]
+    },
+    "principal_hearts": "900719925474099312345678",
+    "stake_shares": "900719925474099312345678",
+    "locked_day": 11,
+    "staked_days": 1,
+    "lifecycle": "unsettled",
+    "contract_day": 10,
+    "started_time": "1576195210",
+    "ended_time": null,
+    "end_block": null,
+    "payout_hearts": null,
+    "penalty_hearts": null,
+    "origin_chain_id": 369
+  },
+  "holders": {
+    "address": {
+      "type": "Buffer",
+      "data": [
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171,
+        171
+      ]
+    },
+    "liquid_hearts": "900719925474099312345678",
+    "accounted_hearts": "900719925474099312345678",
+    "stake_count": 1,
+    "liquid_rank": 1,
+    "staker_rank": 1,
+    "ranking_day": null
+  },
+  "maturities": {
+    "day": 12,
+    "count": "1",
+    "principal": "900719925474099312345678",
+    "shares": "900719925474099312345678"
+  },
+  "markets": {
+    "contract_day": 10,
+    "source": "synthetic-sample",
+    "method": "source-reported",
+    "observation": {
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": null,
+      "liquidity": null,
+      "intervals": 0,
+      "expectedIntervals": 1440,
+      "coverage": "missing",
+      "sourceTime": null,
+      "observedTime": null,
+      "blockNumber": null,
+      "blockHash": null,
+      "poolTime": null
+    }
+  }
+}

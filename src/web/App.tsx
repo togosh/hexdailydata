@@ -1,4 +1,4 @@
-﻿import { lazy, Suspense, useEffect, useState } from 'react';
+import { Component, type ReactNode, lazy, Suspense, useEffect, useState } from 'react';
 import Home from './Home.tsx';
 import { revealAnchor } from './anchors.ts';
 import { SearchForm } from './components.tsx';
@@ -8,6 +8,28 @@ const History = lazy(() => import('./History.tsx'));
 const Charts = lazy(() => import('./Charts.tsx'));
 const MaturityDetail = lazy(() => import('./MaturityDetail.tsx'));
 const Calculator = lazy(() => import('./Calculator.tsx'));
+const ApiReference = lazy(() => import('./ApiReference.tsx'));
+class ReferenceBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  render() {
+    return this.state.failed ? (
+      <section role="alert">
+        <h1>Reference could not load</h1>
+        <p>Try refreshing, or use the overview and schema.</p>
+        <a href="/api">API overview</a> ·{' '}
+        <a href="/openapi.json" download="hexdailydata-openapi.json">
+          Download OpenAPI
+        </a>
+      </section>
+    ) : (
+      this.props.children
+    );
+  }
+}
+const ApiGuide = lazy(() => import('./ApiGuide.tsx'));
 const Search = lazy(() => import('./Search.tsx'));
 const Downloads = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Downloads })));
 const Learn = lazy(() => import('./Learn.tsx'));
@@ -84,7 +106,11 @@ export default function App() {
       const url = new URL(link.href);
       if (
         url.origin !== location.origin ||
-        url.pathname.startsWith('/api/') ||
+        url.pathname === '/account' ||
+        url.pathname.startsWith('/account/') ||
+        (url.pathname.startsWith('/api/') && url.pathname !== '/api/reference') ||
+        (location.pathname === '/api/reference' && url.pathname === '/api/reference') ||
+        url.pathname === '/openapi.json' ||
         url.pathname.startsWith('/health/')
       )
         return;
@@ -102,14 +128,16 @@ export default function App() {
     };
   }, []);
   useEffect(() => {
-    document.title = `${path === '/' ? 'Home' : path.split('/')[1]} · HEXDailyData`;
+    document.title = `${path === '/' ? 'Home' : path === '/api' ? 'API Access' : path === '/api/reference' ? 'API reference' : path.split('/')[1]} · HEXDailyData`;
   }, [path]);
   const active =
     path.startsWith('/address/') || path.startsWith('/stake/')
       ? '/search'
       : path.startsWith('/charts')
         ? '/charts'
-        : path;
+        : path === '/api/reference'
+          ? '/api'
+          : path;
   return (
     <>
       <a className="skip" href="#content">
@@ -158,13 +186,16 @@ export default function App() {
       {menu && (
         <Dialog title="Navigation" onClose={() => setMenu(false)}>
           <nav className="menu-links" aria-label="All destinations">
-            {[...links, ['/learn', 'Learn', 'chart'], ['/status', 'Data status', 'chart']].map(
-              ([href, label]) => (
-                <a key={href} href={href} aria-current={active === href ? 'page' : undefined}>
-                  {label}
-                </a>
-              ),
-            )}
+            {[
+              ...links,
+              ['/learn', 'Learn', 'chart'],
+              ['/status', 'Data status', 'chart'],
+              ['/api', 'Developer API', 'chart'],
+            ].map(([href, label]) => (
+              <a key={href} href={href} aria-current={active === href ? 'page' : undefined}>
+                {label}
+              </a>
+            ))}
           </nav>
         </Dialog>
       )}
@@ -180,6 +211,12 @@ export default function App() {
             <History />
           ) : path === '/calculator' ? (
             <Calculator />
+          ) : path === '/api/reference' ? (
+            <ReferenceBoundary>
+              <ApiReference />
+            </ReferenceBoundary>
+          ) : path === '/api' ? (
+            <ApiGuide />
           ) : path === '/downloads' ? (
             <Downloads />
           ) : path === '/learn' ? (
@@ -187,14 +224,16 @@ export default function App() {
           ) : path === '/status' ? (
             <Status />
           ) : path === '/search' || /^\/(address|stake)\//.test(path) ? (
-            <Search key={path} path={path} />
+            <Search key={path + location.search} path={path} />
           ) : (
             <>
               <h1>Page not found</h1>
               <a href="/">Return Home</a>
             </>
           )}
-          <RoutePosition hash={location.hash} navigation={navigation} />
+          {path !== '/api/reference' && (
+            <RoutePosition hash={location.hash} navigation={navigation} />
+          )}
         </Suspense>
       </main>
       <footer className="site-footer">
@@ -207,7 +246,7 @@ export default function App() {
         <nav aria-label="More information">
           <a href="/learn#methodology">Learn &amp; methodology</a>
           <a href="/status">Data status</a>
-          <a href="/api/v2/status?chain=pulsechain">API metadata</a>
+          <a href="/api">Developer API</a>
         </nav>
       </footer>
       <nav className="bottom-nav" aria-label="Mobile destinations">

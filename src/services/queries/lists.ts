@@ -71,7 +71,11 @@ export function stakeRow(r: Record<string, any>) {
     penaltyHearts: r.penalty_hearts,
   });
 }
-export const stakesSql = (address: boolean, lifecycle?: 'open' | 'good_accounted' | 'ended') => {
+export const stakesSql = (
+  address: boolean,
+  lifecycle?: 'open' | 'good_accounted' | 'ended',
+  maturity = false,
+) => {
   const filter =
     lifecycle === 'open'
       ? "AND lifecycle='unsettled'"
@@ -80,7 +84,11 @@ export const stakesSql = (address: boolean, lifecycle?: 'open' | 'good_accounted
         : lifecycle === 'ended'
           ? "AND lifecycle IN('ended','cancelled')"
           : '';
-  return `WITH selected AS MATERIALIZED (SELECT * FROM hdd.stakes WHERE chain_id=$1 AND stake_id>$2 ${address ? 'AND address=$4' : ''} ${filter} ORDER BY stake_id LIMIT $3) ${stakeColumns}`;
+  const first = address ? 5 : 4;
+  const window = maturity
+    ? ` AND locked_day+staked_days BETWEEN $${first}::int AND $${first + 1}::int AND principal_hearts>=$${first + 2}::numeric`
+    : '';
+  return `WITH selected AS MATERIALIZED (SELECT * FROM hdd.stakes WHERE chain_id=$1 AND stake_id>$2 ${address ? 'AND address=$4' : ''} ${filter}${window} ORDER BY stake_id LIMIT $3) ${stakeColumns}`;
 };
 export async function stakes(
   db: ReadDatabase,
@@ -89,7 +97,11 @@ export async function stakes(
   cursors: PageCursors,
   now: number,
 ) {
-  const binding = `stakes/${q.chain}/${q.address ?? ''}/${q.limit}/${q.lifecycle ?? ''}`;
+  const maturity = q.maturityFromDay !== undefined;
+  // Keep old bindings byte-for-byte; filtered selections have a distinct namespace.
+  const binding = maturity
+    ? `stakes-maturity1/${q.chain}/${q.address ?? ''}/${q.limit}/${q.lifecycle}/${q.maturityFromDay}/${q.maturityToDay}/${q.minPrincipalHearts ?? '0'}`
+    : `stakes/${q.chain}/${q.address ?? ''}/${q.limit}/${q.lifecycle ?? ''}`;
   const cursor = cursors.decode(q.cursor, binding, now);
   return db.read(
     signal,
@@ -100,7 +112,8 @@ export async function stakes(
       if (cursor && cursor.identity !== identity) throw restart();
       const values: unknown[] = [chainId(q.chain), cursor?.key ?? '-1', q.limit + 1];
       if (q.address) values.push(Buffer.from(q.address.slice(2), 'hex'));
-      const { rows } = await c.query(stakesSql(Boolean(q.address), q.lifecycle), values);
+      if (maturity) values.push(q.maturityFromDay, q.maturityToDay, q.minPrincipalHearts ?? '0');
+      const { rows } = await c.query(stakesSql(Boolean(q.address), q.lifecycle, maturity), values);
       const page = rows.slice(0, q.limit);
       return StakesResponseSchema.parse({
         chain: q.chain,

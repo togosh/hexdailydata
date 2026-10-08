@@ -1,0 +1,8 @@
+node_modules
+.git
+.local
+work
+.env*
+dist
+evidence
+*.log

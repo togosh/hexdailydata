@@ -1,0 +1,64 @@
+{
+  "roots": [
+    ".",
+    "account",
+    "delivery",
+    "runtime",
+    "transport"
+  ],
+  "lockSha256": {
+    "serving": "938bf543e70e041988d45800b3c2ef45a71a832e505e1fb3dea2ffa711a5c92d",
+    "account": "e389a9fa51261e5548b1fef4ad4f6ab034d5af0084f611a49606fa2637b3ef43"
+  },
+  "requiredInputs": [
+    "serving/package.json",
+    "serving/package-lock.json",
+    "serving/tsconfig.json",
+    "serving/tsconfig.build.json",
+    "serving/vite.config.ts",
+    "serving/config/limits.json",
+    "serving/scripts/openapi.mjs",
+    "serving/src/documentation/home-example.json",
+    "serving/src/documentation/examples.mjs",
+    "serving/src/documentation/stake-events-examples.mjs",
+    "serving/src/documentation/metadata.mjs",
+    "serving/src/api/routes.ts",
+    "serving/src/api/data-access.ts",
+    "serving/src/contracts/api.ts",
+    "serving/docs/openapi.json",
+    "serving/src/web/api-catalog.json",
+    "account/package.json",
+    "account/package-lock.json",
+    "account/tsconfig.json",
+    "account/tsconfig.ui.json",
+    "account/vite.config.ts",
+    "account/src/ui/index.html",
+    "account/src/schema.sql",
+    "account/src/upgrade.sql",
+    "delivery/compose.mjs",
+    "delivery/authorizer.mjs",
+    "delivery/paid-reads.mjs",
+    "delivery/samples.mjs",
+    "delivery/samples/MANIFEST.json",
+    "runtime/paid-service.mjs",
+    "runtime/maintenance.mjs",
+    "runtime/maintenance-pool.mjs",
+    "transport/http-source.mjs"
+  ],
+  "sqlAssets": {
+    "account.sql": "account-install",
+    "calendar.sql": "calendar-install",
+    "hex.sql": "hex-install",
+    "payment-budget.sql": "hex-install",
+    "metering.sql": "metering-install",
+    "period.sql": "period-install"
+  },
+  "additionalSqlCopies": [
+    "schema.sql",
+    "upgrade.sql"
+  ],
+  "generatedContracts": [
+    "docs/openapi.json",
+    "src/web/api-catalog.json"
+  ]
+}

@@ -734,3 +734,15 @@ Report, review, receipts and NON-EXECUTED future procedure:
 `artifacts/task-10/target-only-audit-20260928/`. No real provider call, retained DB/state/
 quota access, operation, approval, image build, push or deployment. Task10/Task11 remain
 PENDING; productionReady=false. Stop for planner review. Status-only final entry.
+
+History bootstrap R2 (2026-10-08): owner-authorized offline feature integration from
+current committed main, preserving the original checkout and parked operations code.
+The accepted 563-file saved-data product is carried once into the root application
+layout; no ancestor patches are reapplied. Internal historical normalization uses
+scalar strings/nulls and shared method mapping, not a new public HDS product. The
+ordinary daily API is not switched. See docs/DATA_PARITY_STATUS.md and
+docs/history-bootstrap/ for exact semantics and the one future API handoff.
+Composed host build, focused history/access checks, saved-data browser views and a
+small file-package restore have task-local receipts. Independent review and final
+commit/package identities are recorded in the separate history-bootstrap R2 return.
+No external requests, SQL, main merge, push, deployment or indexer restart.

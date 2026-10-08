@@ -1,0 +1,11 @@
+# Data parity status — feature branch history bootstrap R2
+
+Superseding owner direction: one HEXDailyData product, with reviewed HDS observations used internally for historical bootstrap/reference. No new public HDS product, endpoint, source variant or selector. Old compatibility paths are preserved. Simple precise numeric strings/nulls, one shared mapping/receipt and sparse exceptions replace any proposed per-value provenance design. The future ordinary daily API is not activated.
+
+The accepted563-file product is integrated once at the root application layout with account/delivery/runtime/transport/build components alongside it. Complete B0 stores remain664,405 holders and954,680 starts. B1 stays accepted base plus observed updates:664,435/954,715 records in the local view, not a full B1 census or live state. Original source dates, exact decimals, access policy and immutable base/update identities remain intact. Daily ledger remains2,498 days at block27,720,851 with SHA25653dfed37d33f2bdc5a65200f097c2f322e6df000d333e5d9bf69c30c4894a190.
+
+Internal normalization covers2,501 source days from2,503 PulseChain-labelled originals. Day0 is missing; days1/2 have null statistics.23 of27 mapped candidates have non-null observations/calculations; unresolved payout, payout/T-share, estimated penalties and simple annualized payout rate stay null. The qualified ledger remains separate. All original tokens stay in the immutable parity archive; no source repair is made.
+
+Separate reference-price series admit1,237 PulseChain observations and early Ethereum-origin661 V2/600 V3 observations through end2022. These are reviewed source observations, not independently verified trades/closes. Earliest UV1/composite timing/mechanism and the2023 Ethereum boundary interval remain unresolved. Pre-fork history never becomes pHEX returns/ATH/ROI. Known price exclusions remain; BTC/ETH currency assumptions, liquidity placeholders and missing gas are not promoted.
+
+Current/live feeds, full beginning/fork provenance, earliest defensible prices, ordinary API activation, recurring refresh, data rights, SQL/payments and deployment qualification remain requirements. Pending SQL invariants are unperformed gates, not proved defects. Branch integration is not main merge or deployment. Indexer PARKED.

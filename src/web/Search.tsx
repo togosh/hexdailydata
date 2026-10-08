@@ -1,3 +1,4 @@
+import { SourceChoice, SourceStakes } from './SourceStakes.tsx';
 import { Address } from './Address.tsx';
 import { useState } from 'react';
 import type { z } from 'zod';
@@ -81,11 +82,18 @@ function Indexed({ address, order = 'stakes' }: { address?: string; order?: stri
       <h2>
         {ranks ? (order === 'staker' ? 'Staker ranks' : 'Liquid-holder ranks') : 'Indexed stakes'}
       </h2>
-      <Feedback {...data} refresh={data.status === 409 ? reset : data.refresh} />
+      {data.code === 'developer_access_required' ? (
+        <div role="status">
+          <p>Public browse limit reached. More records remain available with an active API key.</p>
+          <p><a href="/api">Developer access</a> | <a href="/downloads">Complete downloads</a> | <a href="/account/">Account</a></p>
+          <button onClick={() => { setCursor(previous.at(-1)); setPrevious(previous.slice(0, -1)); }}>Previous page</button>
+          <button onClick={reset}>Restart public pages</button>
+        </div>
+      ) : <Feedback {...data} refresh={data.status === 409 ? reset : data.refresh} />}
       {data.status === 409 ? (
         <button onClick={reset}>Restart indexed pages</button>
       ) : (
-        data.data && (
+        data.code !== 'developer_access_required' && data.data && (
           <>
             <p className="meta">
               Accepted index · block {data.data.cutoff.asOf.blockNumber} ·{' '}
@@ -246,7 +254,7 @@ function Stake({ id }: { id: string }) {
     </>
   );
 }
-export default function Search({ path }: { path: string }) {
+function NativeSearch({ path }: { path: string }) {
   const [order, setOrder] = useState('stakes');
   if (path.startsWith('/address/')) {
     const address = AddressSchema.safeParse(path.slice(9));
@@ -293,4 +301,10 @@ export default function Search({ path }: { path: string }) {
       <Indexed key={order} order={order} />
     </>
   );
+}
+
+export default function Search({ path }: { path: string }) {
+  return new URLSearchParams(location.search).get('source') === 'subgraph'
+    ? <SourceStakes path={path} />
+    : <><SourceChoice /><NativeSearch path={path} /></>;
 }

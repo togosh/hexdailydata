@@ -18,87 +18,121 @@ export default function Learn() {
     <article className="learn-page">
       <header className="learn-heading">
         <h1>Learn HEX</h1>
-        <p>Make sense of staking and the numbers.</p>
+        <p>Understand staking, T-Shares and the numbers on HEXDailyData.</p>
         <nav className="learn-jumps" aria-label="Learn sections">
           <a href="#start">The basics</a>
-          <a href="#staking">Staking</a>
-          <a href="#data">The data</a>
+          <a href="#data">Understand the data</a>
+          <a href="/calculator">Try the calculator →</a>
         </nav>
       </header>
+      <p className="learn-aside">
+        HEXDailyData is read-only. Staking commits your HEX; ending early or too late can reduce
+        your payout and starting amount. Maturity is not an automatic wallet payment.
+      </p>
 
-      <section id="start">
-        <h2>The basics</h2>
-        <div className="learn-intro">
-          <section id="hex">
-            <h3>What is HEX?</h3>
-            <Summary id="hex" />
-          </section>
-          <section id="pulsechain">
-            <h3>Why PulseChain?</h3>
-            <Summary id="pulsechain" />
-          </section>
-        </div>
-      </section>
-
-      <section id="staking-basics">
-        <h2>How a stake works</h2>
-        <ol className="stake-lifecycle">
-          <li>
-            <strong>Choose &amp; start</strong>
-            <p>Pick an amount and number of days. Starting the stake commits that HEX.</p>
-          </li>
-          <li>
-            <strong>While it runs</strong>
-            <p>Your T-Shares determine your part of each day's payout. The amount varies.</p>
-          </li>
-          <li>
-            <strong>End your stake</strong>
+      <section id="start" className="learn-basics" aria-label="The basics">
+        <details id="hex" className="learn-disclosure">
+          <summary>{concepts[0].question}</summary>
+          <Summary id="hex" />
+          <p id="pulsechain">
+            HEXDailyData follows HEX on PulseChain. PulseChain is the network, and PLS pays its
+            transaction fees. You do not need to connect a wallet to use this site.
+          </p>
+        </details>
+        <details id="staking-basics" className="learn-disclosure">
+          <summary>{concepts[1].question}</summary>
+          <Summary id="staking" />
+          <section id="staking">
+            <h3>The staking lifecycle</h3>
+            <ol className="stake-lifecycle">
+              <li>
+                <strong>Choose &amp; start</strong>
+                <p>Pick an amount and number of days. Starting the stake commits that HEX.</p>
+              </li>
+              <li>
+                <strong>While it runs</strong>
+                <p>Your T-Shares determine your part of each day's payout. The amount varies.</p>
+              </li>
+              <li>
+                <strong>End your stake</strong>
+                <p>
+                  After the term finishes, use Stake End to receive the result. Payment isn't
+                  automatic.
+                </p>
+              </li>
+            </ol>
             <p>
-              After the term finishes, use Stake End to receive the result. Payment isn't automatic.
+              Ending early or too late can reduce your payout and starting HEX. Reaching maturity
+              does not add extra earning days.
             </p>
-          </li>
-        </ol>
-        <p>
-          Ending early or too late can reduce your payout and starting HEX. Reaching maturity does
-          not add extra earning days.
-        </p>
-      </section>
-
-      <section id="staking">
-        <h2>Three terms you’ll see everywhere</h2>
-        <section id="tshares">
-          <h3>What are my T-Shares for?</h3>
+          </section>
+        </details>
+        <details id="tshares" className="learn-disclosure">
+          <summary>{concepts[2].question}</summary>
           <Summary id="tshares" />
-        </section>
-        <section>
-          <h3>What does the share rate tell me?</h3>
           <p>
-            It sets how many shares a new stake gets. For the same amount and length, a higher rate
-            means fewer T-Shares. It is not an interest rate.
+            For the same amount and length, a higher share rate means fewer T-Shares for a new
+            stake. An existing stake’s assigned shares do not increase with the share rate.
           </p>
-        </section>
-        <section id="payout">
-          <h3>What is payout per T-Share?</h3>
+        </details>
+        <details id="payout" className="learn-disclosure">
+          <summary>{concepts[3].question}</summary>
           <Summary id="payout" />
-        </section>
-        <section className="learn-example" aria-labelledby="example-title">
-          <h3 id="example-title">A simple example</h3>
-          <p>Suppose your stake is earning and the day’s payout is 6 HEX per T-Share.</p>
-          <p className="example-equation">
-            <strong>10 T-Shares × 6 HEX per T-Share ≈ 60 HEX</strong>
-          </p>
-          <p>
-            For that day, before any end-of-stake penalties. Example only—not a forecast. See the
-            exact rounding under <a href="#math">Show me the math</a>.
-          </p>
-        </section>
-        <a className="learn-source-link" href="/calculator">
-          Try the calculator →
-        </a>
+          <section className="learn-example" aria-labelledby="example-title">
+            <h3 id="example-title">A simple example</h3>
+            <p>Suppose your stake is earning and the day’s payout is 6 HEX per T-Share.</p>
+            <p className="example-equation">
+              <strong>10 T-Shares × 6 HEX per T-Share ≈ 60 HEX</strong>
+            </p>
+            <p>
+              For that day, before any end-of-stake penalties. Example only—not a forecast. See the
+              exact rounding under <a href="#math">Show me the math</a>.
+            </p>
+          </section>
+        </details>
+        <details id="buy-stake" className="learn-disclosure">
+          <summary>{concepts[4].question}</summary>
+          <Summary id="tools" />
+          <section aria-labelledby="project-resources">
+            <h3 id="project-resources">Project resources</h3>
+            <p>Project websites and tool entry points. These links leave HEXDailyData.</p>
+            <ul className="learn-resources" aria-labelledby="project-resources">
+              {primaryResources.map((resource) => (
+                <li key={resource.href}>
+                  <ExternalLink {...resource} />
+                  <p>{resource.description}</p>
+                </li>
+              ))}
+            </ul>
+            <p>
+              External tools can move funds. Check the URL, network and transaction details. Never
+              share your recovery phrase or private key. These links are not a safety guarantee.
+            </p>
+          </section>
+          <details id="using-tools" className="learn-disclosure">
+            <summary>Before using an external tool</summary>
+            <p>
+              HEXDailyData does not buy, sell or stake tokens. Using external tools generally
+              requires a compatible self-custody wallet, the correct network and enough PLS for
+              transaction fees. A token swap and a HEX stake are separate contract interactions.
+            </p>
+            <p>
+              Before signing elsewhere, check the destination domain, network, token address, quoted
+              amounts, slippage and any spending allowance or stake duration. Never give a website,
+              message or support agent your recovery phrase or private key.
+            </p>
+            <p>
+              <strong>External tools can move funds.</strong> Project-published links are starting
+              points for your own investigation, not a safety audit or investment recommendation.
+              Smart-contract, wallet, market and liquidity risks remain. This page offers education,
+              not a promise of returns or a recommendation of how much or how long to stake.
+            </p>
+          </details>
+        </details>
       </section>
 
-      <section id="data">
-        <h2>What the labels mean</h2>
+      <details id="data" className="learn-disclosure">
+        <summary>Understand the data</summary>
         <dl className="learn-labels">
           <div>
             <dt>Live</dt>
@@ -121,29 +155,12 @@ export default function Learn() {
           An estimate uses assumptions. Even after a day ends, its payout may still be waiting to be
           recorded.
         </p>
-        <div className="learn-page-links">
-          <a href="/charts">Explore charts</a>
-          <a href="/search">Find an address</a>
-          <a href="/downloads">Download data</a>
-        </div>
-      </section>
-
-      <section aria-labelledby="project-resources">
-        <h2 id="project-resources">Explore further</h2>
-        <p>Project websites and tool entry points. These links leave HEXDailyData.</p>
-        <ul className="learn-resources" aria-labelledby="project-resources">
-          {primaryResources.map((resource) => (
-            <li key={resource.href}>
-              <ExternalLink {...resource} />
-              <p>{resource.description}</p>
-            </li>
-          ))}
-        </ul>
-        <p>
-          External tools can move funds. Check the URL, network and transaction details. Never share
-          your recovery phrase or private key. These links are not a safety guarantee.
-        </p>
-      </section>
+      </details>
+      <nav className="learn-page-links" aria-label="Explore the data">
+        <a href="/charts">Explore charts</a>
+        <a href="/search">Find an address</a>
+        <a href="/downloads">Download data</a>
+      </nav>
 
       <section className="learn-depth" aria-labelledby="learn-depth-title">
         <h2 id="learn-depth-title">Go a little deeper</h2>
@@ -201,25 +218,6 @@ export default function Learn() {
             In Address, the <strong>Open</strong> tab groups queued, active and mature-open stakes;
             <strong> Good Accounted</strong> is separate. <strong>Ended</strong> includes cancelled
             rows, which retain their own label. “Current” means unended, not “currently earning.”
-          </p>
-        </details>
-        <details id="using-tools" className="learn-disclosure">
-          <summary>Before using an external tool</summary>
-          <p>
-            HEXDailyData does not buy, sell or stake tokens. Using external tools generally requires
-            a compatible self-custody wallet, the correct network and enough PLS for transaction
-            fees. A token swap and a HEX stake are separate contract interactions.
-          </p>
-          <p>
-            Before signing elsewhere, check the destination domain, network, token address, quoted
-            amounts, slippage and any spending allowance or stake duration. Never give a website,
-            message or support agent your recovery phrase or private key.
-          </p>
-          <p>
-            <strong>External tools can move funds.</strong> Project-published links are starting
-            points for your own investigation, not a safety audit or investment recommendation.
-            Smart-contract, wallet, market and liquidity risks remain. This page offers education,
-            not a promise of returns or a recommendation of how much or how long to stake.
           </p>
         </details>
         <details id="math" className="learn-disclosure">

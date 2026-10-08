@@ -1,14 +1,23 @@
+import type { SourceStakeReader } from '../services/source-stakes/store.ts';
+import type { SourceHolderReader } from '../services/source-holders/store.ts';
 import { databaseConfig } from '../db/connect.ts';
 import { ReadDatabase } from '../services/queries/database.ts';
 import { SqlAddressBaseline, type AddressBaseline } from '../services/live/baseline.ts';
 import { openAddressService } from '../services/live/factory.ts';
 import type { AddressService } from '../services/live/address.ts';
 import { ExportService } from '../worker/exports/service.ts';
+import type { DailyLedgerReader } from '../services/daily-ledger/store.ts';
+
+import type { SavedSourceGenerations } from '../services/source-update/generation.ts';
 
 export interface ApiDependencies {
+  sourceGenerations?: SavedSourceGenerations;
+  dailyLedger?: DailyLedgerReader;
+  sourceStakes?: SourceStakeReader;
+  sourceHolders?: SourceHolderReader;
   db?: ReadDatabase;
   addresses?: Pick<AddressService, 'get' | 'stake'>;
-  downloads?: Pick<ExportService, 'catalog' | 'openStream'>;
+  downloads?: Pick<ExportService, 'catalog' | 'openStream'> & Partial<Pick<ExportService, 'root'>>;
   close?: () => Promise<void>;
 }
 export function sqlBaseline(db: ReadDatabase): AddressBaseline {

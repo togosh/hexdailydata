@@ -1,0 +1,34 @@
+/* Saved source fields reuse the existing table, address cards and page layouts. */
+.source-disclosure {
+  margin-block: 1rem;
+}
+.source-disclosure details {
+  margin-block: 0.75rem;
+}
+.source-disclosure dd,
+.source-stakes .address,
+.source-stakes .full-address {
+  overflow-wrap: anywhere;
+}
+.source-record-evidence pre {
+  max-height: 32rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+.source-stakes .table-region td {
+  vertical-align: middle;
+}
+.source-stakes .stake-card .address-state {
+  white-space: normal;
+  text-align: right;
+}
+.source-stakes .summary-grid dd {
+  overflow-wrap: anywhere;
+}
+.holder-balance {
+  font-size: clamp(1.25rem, 4vw, 1.8rem);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}

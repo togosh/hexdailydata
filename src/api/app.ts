@@ -1,4 +1,9 @@
-﻿import Fastify from 'fastify';
+import { dataRoutes, suppliedKey, PublicAdmission, PublicBrowse, type PaidReads } from './data-access.ts';
+import { DownloadAdmission, type DownloadAuthorizer } from './download-access.ts';
+import { validateStaticRoots, checkStaticPath } from './static-boundary.ts';
+import type { FastifyInstance } from 'fastify';
+import { stakeEvents } from '../services/queries/stake-events.ts';
+import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import type { FastifyError, FastifyRequest, FastifyReply } from 'fastify';
 import { createHash } from 'node:crypto';
@@ -12,6 +17,8 @@ import { daily, markets, calculator } from '../services/queries/history.ts';
 import { archiveCharts, nativeCharts, maturities } from '../services/queries/charts.ts';
 import { stakes, holders, indexedStake } from '../services/queries/lists.ts';
 import { AddressSchema, StakeIdSchema } from '../contracts/reads.ts';
+import { DailyLedgerResponseSchema } from '../contracts/daily-ledger.ts';
+import { sourceAddress } from '../services/source-holders/address.ts';
 
 export function createApp(
   options: {
@@ -20,6 +27,12 @@ export function createApp(
     dependencies?: ApiDependencies;
     now?: () => number;
     admission?: { capacity: number; concurrent: number };
+    paidReads?: PaidReads;
+    publicLimits?: Partial<PublicAdmission['limits']>;
+    downloadAuthorizer?: DownloadAuthorizer;
+    exportRoot?: string;
+    account?: { register: (scope: FastifyInstance) => Promise<void>; webRoot?: string };
+    samples?: (scope: FastifyInstance) => Promise<void>;
   } = {},
 ) {
   const app = Fastify({
@@ -35,7 +48,8 @@ export function createApp(
       const invalid = ['FST_ERR_BAD_URL', 'FST_ERR_MAX_PARAM_LENGTH'].includes(error.code);
       reply
         .code(invalid ? 400 : 503)
-        .header('Cache-Control', 'no-store')
+        .header('Cache-Control', request.headers.authorization !== undefined || request.url.startsWith('/api/v2/downloads/') ? 'private, no-store' : 'no-store')
+        .header('Vary', 'Authorization, Cookie, Accept-Encoding')
         .header('X-Content-Type-Options', 'nosniff')
         .send(
           errorBody(
@@ -49,10 +63,32 @@ export function createApp(
   });
   const deps = options.dependencies ?? {},
     now = options.now ?? Date.now,
-    cursors = new PageCursors();
+    cursors = new PageCursors(), publicCursors = new PageCursors();
+  const publicAdmission = new PublicAdmission(options.publicLimits), browse = new PublicBrowse();
+  const routeIds = new Map<string, string>(routes.map(route => [route.path, route.id]));
+  const mixedHeaders = (request: FastifyRequest, reply: FastifyReply) => {
+    if (dataRoutes.has(routeIds.get(request.routeOptions.url ?? '') ?? '')) {
+      reply.header('Vary', 'Authorization, Cookie');
+      if (suppliedKey(request)) reply.header('Cache-Control', 'private, no-store');
+    }
+  };
+  const downloadAdmission = new DownloadAdmission();
+  const staticRoots = [options.webRoot, options.account?.webRoot].filter((r): r is string => Boolean(r));
+  app.addHook('onReady', async () => {
+    if (deps.downloads && staticRoots.length && !deps.downloads.root) throw Error('Actual export root required for static isolation.');
+    if (deps.downloads?.root && options.exportRoot && deps.downloads.root !== options.exportRoot) throw Error('Export root mismatch.');
+    await validateStaticRoots(staticRoots, deps.downloads?.root ?? options.exportRoot);
+    if (deps.sourceStakes) await validateStaticRoots(staticRoots, deps.sourceStakes.root);
+    if (deps.sourceHolders) await validateStaticRoots(staticRoots, deps.sourceHolders.root);
+    if (deps.sourceGenerations) for (const root of [deps.sourceGenerations.root, deps.sourceGenerations.holders.root, deps.sourceGenerations.stakes.root]) await validateStaticRoots(staticRoots, root);
+  });
+  const privateDownload = (request: FastifyRequest, reply: FastifyReply) => {
+    if (request.url.split('?')[0]?.startsWith('/api/v2/downloads/'))
+      reply.header('Cache-Control', 'private, no-store').header('Vary', 'Authorization, Cookie');
+  };
   const contexts = new Map<
     string,
-    { controller: AbortController; timer: NodeJS.Timeout; cleanup: () => void }
+    { controller: AbortController; deadline: number; timer: NodeJS.Timeout; cleanup: () => void }
   >();
   const capacity = options.admission?.capacity ?? 1200,
     concurrent = options.admission?.concurrent ?? 64;
@@ -62,7 +98,9 @@ export function createApp(
     ApiErrorSchema.parse({ error: { code, message, retryable }, requestId: id });
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Cache-Control', 'no-store').header('X-Content-Type-Options', 'nosniff');
-    if (!['GET', 'HEAD'].includes(request.method))
+    privateDownload(request, reply);
+    mixedHeaders(request, reply);
+    if (!['GET', 'HEAD'].includes(request.method) && !(request.routeOptions.config as { accountMutation?: boolean }).accountMutation)
       return reply
         .code(405)
         .header('Allow', 'GET, HEAD')
@@ -76,6 +114,16 @@ export function createApp(
       Buffer.byteLength(JSON.stringify(request.headers)) > 8192
     )
       throw new ApiFailure(400, 'invalid_request', 'Request exceeds input bounds.');
+    const matched = request.routeOptions.url;
+    const applicationRoute = routes.some(route => route.path === matched) ||
+      (request.routeOptions.config as { accountRoute?: boolean }).accountRoute ||
+      ['daily','stakes','holders','maturities','markets'].some(name => matched === `/samples/${name}.csv`);
+    if (!applicationRoute) {
+      const path = request.url.split('?')[0]!;
+      if (options.account?.webRoot && (path === '/account' || path.startsWith('/account/')))
+        await checkStaticPath(options.account.webRoot, path.slice('/account'.length) || '/');
+      else if (options.webRoot) await checkStaticPath(options.webRoot, path);
+    }
     const time = Date.now();
     tokens = Math.min(capacity, tokens + ((time - last) * capacity) / 60000);
     last = time;
@@ -87,10 +135,9 @@ export function createApp(
     const live =
       request.routeOptions.url?.includes('/addresses/') ||
       request.routeOptions.url === '/api/v2/stakes/:id';
-    const timer = setTimeout(
-      () => controller.abort(),
-      download ? 120000 : live ? 10000 : 8000,
-    ).unref();
+    const duration = download ? 120000 : live ? 10000 : 8000;
+    const deadline = performance.now() + duration;
+    const timer = setTimeout(() => controller.abort(), duration).unref();
     const aborted = () => controller.abort();
     const close = () => {
       if (!reply.raw.writableFinished) controller.abort();
@@ -104,7 +151,12 @@ export function createApp(
       contexts.delete(request.id);
     };
     reply.raw.once('close', cleanup);
-    contexts.set(request.id, { controller, timer, cleanup });
+    contexts.set(request.id, { controller, deadline, timer, cleanup });
+    if (dataRoutes.has(routeIds.get(matched ?? '') ?? '') && !suppliedKey(request)) {
+      const release = publicAdmission.acquire(request.raw.socket.remoteAddress);
+      reply.raw.once('finish', release);
+      reply.raw.once('close', release);
+    }
   });
   app.addHook('onResponse', async (request) => contexts.get(request.id)?.cleanup());
   app.addHook('onClose', async () => {
@@ -112,14 +164,21 @@ export function createApp(
       c.controller.abort();
       c.cleanup();
     }
+    publicAdmission.clear();
+    await options.paidReads?.close();
     await deps.close?.();
   });
   app.setErrorHandler((error, request, reply) => {
+    privateDownload(request, reply);
+    mixedHeaders(request, reply);
     const e = error instanceof ApiFailure ? error : unavailable();
     if (reply.raw.headersSent) {
       reply.raw.destroy();
       return;
     }
+    if (request.routeOptions.url === '/api/v2/downloads/:bundle/:dataset')
+      reply.removeHeader('Content-Length').removeHeader('Content-Disposition').removeHeader('ETag')
+        .type('application/json; charset=utf-8');
     if (e.status === 429) reply.header('Retry-After', '60');
     reply
       .code(e.status)
@@ -136,14 +195,31 @@ export function createApp(
         throw new ApiFailure(400, 'invalid_request', 'Invalid request.');
       const q: any = query.data,
         p: any = params.data;
-      const signal = contexts.get(request.id)!.controller.signal;
+      const context = contexts.get(request.id)!;
+      const signal = context.controller.signal;
+      const paid = dataRoutes.has(route.id) && suppliedKey(request);
+      let wrapCursor: ((inner: string | null) => string | null) | null = null;
+      if (dataRoutes.has(route.id)) {
+        if (paid) {
+          const count = request.raw.rawHeaders.filter((name, i) => i % 2 === 0 && name.toLowerCase() === 'authorization').length;
+          if (count !== 1 || typeof request.headers.authorization !== 'string' ||
+              !/^Bearer lab_[A-Za-z0-9_-]{43}$/.test(request.headers.authorization))
+            throw new ApiFailure(401, 'invalid_key', 'A valid API key is required.');
+          if (!options.paidReads) throw unavailable();
+          await options.paidReads.begin(request, reply, { route: route.id, signal, deadline: context.deadline });
+        } else wrapCursor = browse.prepare(route.id, q, now());
+      }
+      signal.throwIfAborted();
       const db = () => {
         if (!deps.db)
           throw new ApiFailure(503, 'not_initialized', 'Data dependencies are not configured.');
         return deps.db;
       };
       let body: unknown;
-      switch (route.id) {
+      if (q.source === 'subgraph' && q.generation && q.generation !== 'base' && !deps.sourceGenerations) throw unavailable();
+      if (q.source === 'subgraph' && deps.sourceGenerations && ['holders','stakes','stake','address','addressStakes'].includes(route.id)) {
+        body = await deps.sourceGenerations.read(route.id as 'holders'|'stakes'|'stake'|'address'|'addressStakes', q, p, signal, paid ? cursors : publicCursors, now());
+      } else switch (route.id) {
         case 'live':
           body = { status: 'live', mode: options.mode ?? 'development' };
           break;
@@ -173,7 +249,10 @@ export function createApp(
           break;
         }
         case 'daily':
-          body = await daily(db(), q, signal);
+          if (q.source === 'contract-ledger') {
+            if (!deps.dailyLedger) throw unavailable();
+            body = DailyLedgerResponseSchema.parse(await deps.dailyLedger.read(q, signal));
+          } else body = await daily(db(), q, signal);
           break;
         case 'archiveCharts':
           body = await archiveCharts(db(), signal);
@@ -188,16 +267,34 @@ export function createApp(
           body = await markets(db(), q, signal);
           break;
         case 'stakes':
-          body = await stakes(db(), q, signal, cursors, now());
+          if (q.source === 'subgraph') {
+            if (!deps.sourceStakes) throw unavailable();
+            body = await deps.sourceStakes.read('stakes', q, p, signal, paid ? cursors : publicCursors, now());
+            break;
+          }
+          body = await stakes(db(), q, signal, paid ? cursors : publicCursors, now());
+          break;
+        case 'stakeEvents':
+          body = await stakeEvents(db(), q, signal);
           break;
         case 'holders':
-          body = await holders(db(), q, signal, cursors, now());
+          if (q.source === 'subgraph') {
+            if (!deps.sourceHolders) throw unavailable();
+            body = await deps.sourceHolders.read(q, signal, paid ? cursors : publicCursors, now());
+            break;
+          }
+          body = await holders(db(), q, signal, paid ? cursors : publicCursors, now());
           break;
         case 'calculator':
           body = await calculator(db(), q.chain, signal, now());
           break;
         case 'address':
         case 'addressStakes': {
+          if (q.source === 'subgraph') {
+            if (!deps.sourceStakes) throw unavailable();
+            body = await sourceAddress(deps.sourceStakes, deps.sourceHolders, route.id, q, p.address, signal, paid ? cursors : publicCursors, now());
+            break;
+          }
           if (q.cursor && (q.chain !== 'pulsechain' || !deps.addresses))
             throw new ApiFailure(
               409,
@@ -234,6 +331,11 @@ export function createApp(
           break;
         }
         case 'stake': {
+          if (q.source === 'subgraph') {
+            if (!deps.sourceStakes) throw unavailable();
+            body = await deps.sourceStakes.read('stake', q, p, signal, paid ? cursors : publicCursors, now());
+            break;
+          }
           const known = await indexedStake(db(), q.chain, p.id, signal);
           if (q.address && known.indexed && q.address !== known.indexed.address)
             throw new ApiFailure(
@@ -275,8 +377,22 @@ export function createApp(
             : { status: 'rebuilding', bundles: [] };
           break;
         case 'download': {
+          if (!options.downloadAuthorizer) throw unavailable();
+          const authorization = await options.downloadAuthorizer(request, signal);
+          signal.throwIfAborted();
+          if ('status' in authorization) {
+            if (authorization.status === 401) throw new ApiFailure(401, 'login_required', 'Valid credentials are required.');
+            if (authorization.status === 403) throw new ApiFailure(403, 'purchased_access_required', 'Current purchased access is required.');
+            throw unavailable();
+          }
+          if (!authorization.accountId) throw unavailable();
           if (!deps.downloads) throw unavailable();
-          const opened = await deps.downloads.openStream(p.bundle, p.dataset, signal);
+          const release = downloadAdmission.acquire(authorization.accountId);
+          let opened;
+          try { opened = await deps.downloads.openStream(p.bundle, p.dataset, signal); }
+          catch (e) { release(); throw e; }
+          if (opened.status === 'available') void opened.released.then(release, release);
+          else release();
           if (opened.status !== 'available')
             throw opened.status === 'retired'
               ? new ApiFailure(410, 'bundle_retired', 'This immutable bundle is retired.')
@@ -287,31 +403,69 @@ export function createApp(
             .header('Content-Type', 'text/csv; charset=utf-8')
             .header('Content-Disposition', `attachment; filename="${p.dataset}-${p.bundle}.csv"`)
             .header('ETag', etag)
-            .header('Cache-Control', 'public, max-age=31536000, immutable')
+            .header('Cache-Control', 'private, no-store')
+            .header('Vary', 'Authorization, Cookie')
             .header('Accept-Ranges', 'none');
           if (matches(request.headers['if-none-match'], etag) || request.method === 'HEAD') {
             stream.destroy();
             await released;
             if (matches(request.headers['if-none-match'], etag)) return reply.code(304).send();
-            return reply.header('Content-Length', bytes).send();
+            // Fastify's empty-payload serializer replaces Content-Length with zero.
+            // The reader is already closed: send only the verified HEAD metadata.
+            reply.header('Content-Length', bytes).hijack();
+            reply.raw.writeHead(200, Object.fromEntries(Object.entries(reply.getHeaders())
+              .filter(([, value]) => value !== undefined)
+              .map(([name, value]) => [name, Array.isArray(value) ? value : String(value)])));
+            reply.raw.end();
+            return reply;
           }
           return reply.header('Content-Length', bytes).send(stream);
         }
       }
+      signal.throwIfAborted();
+      if (wrapCursor && body && typeof body === 'object' && 'nextCursor' in body)
+        body = { ...body, nextCursor: wrapCursor((body as { nextCursor: string | null }).nextCursor) };
       const parsed = route.response?.safeParse(body);
       if (parsed && !parsed.success) throw unavailable();
       const json = JSON.stringify(parsed?.data ?? body);
-      if (Buffer.byteLength(json) > 2 * 1024 * 1024) throw unavailable();
-      if (jsonRevalidation.has(route.id)) {
-        const etag = '"' + createHash('sha256').update(json).digest('hex') + '"';
-        reply.header('Cache-Control', 'no-cache, must-revalidate').header('ETag', etag);
+      const maxBytes = route.id === 'stakeEvents' ? 512 * 1024 : 2 * 1024 * 1024;
+      if (Buffer.byteLength(json) > maxBytes) throw unavailable();
+      if (jsonRevalidation.has(route.id) || (q.source === 'subgraph' && ['address', 'addressStakes', 'stake'].includes(route.id))) {
+        const updatedSource = q.source === 'subgraph' && body && typeof body === 'object' && 'generation' in body;
+        const representation = updatedSource
+          ? JSON.stringify(['saved-update-v1', route.id, q, p, paid ? 'paid' : 'public', json])
+          : json;
+        const etag = '"' + createHash('sha256').update(representation).digest('hex') + '"';
+        reply.header('Cache-Control', paid ? 'private, no-store' : 'no-cache, must-revalidate').header('ETag', etag);
         if (matches(request.headers['if-none-match'], etag)) return reply.code(304).send();
       }
       return reply.type('application/json; charset=utf-8').send(json);
     });
+  if (options.account) {
+    const account = options.account;
+    app.register(async (scope) => {
+      const post = new Set(['signup','login','logout','recover','recovery-code','password','contact','verify-contact','request-email-reset','email-reset','keys','keys/revoke','invoices','invoices/:id/cancel','invoices/:id/review'].map(p => '/api/account/' + p));
+      const get = new Set(['/api/account','/api/account/invoices/:id','/api/account/reviews/:id']);
+      scope.addHook('onRoute', route => {
+        for (const method of Array.isArray(route.method) ? route.method : [route.method]) {
+          if (method === 'POST' && post.has(route.url)) route.config = {...route.config, accountMutation: true, accountRoute: true};
+          else if (['GET','HEAD'].includes(method) && get.has(route.url)) route.config = {...route.config, accountRoute: true};
+          else throw Error('Account route outside allowlist.');
+        }
+      });
+      await account.register(scope);
+    });
+    if (account.webRoot) app.register(async scope => {
+      await scope.register(fastifyStatic, {root: account.webRoot!, prefix: '/account/', decorateReply: false, dotfiles: 'deny'});
+      scope.get('/account', (_request, reply) => reply.redirect('/account/'));
+    });
+  }
+  if (options.samples) app.register(options.samples);
   if (options.webRoot) {
     app.register(fastifyStatic, { root: options.webRoot, index: ['index.html'], dotfiles: 'deny' });
     for (const path of [
+      '/api',
+      '/api/reference',
       '/charts',
       '/charts/detail',
       '/charts/maturities',

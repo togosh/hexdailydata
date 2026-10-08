@@ -1,0 +1,89 @@
+Build the FIRST runnable paid-API foundation slice in THIS standalone lab.
+Use GPT-6 Astra Extra High. Fast mode is the owner's choice; Ultra off. One writer and
+one genuinely separate read-only reviewer. This does not alter the main v2 task graph.
+
+1. Read AGENTS.md, START_HERE.md, docs/PRODUCT_AND_DATA.md, ACCEPTANCE.md and ISOLATION.md.
+Run node tools/setup.mjs if this is an uninitialized pristine starter. It preserves an
+already set-up lab. Inspect only this lab's actual branch/dirty status and preserve work;
+never force-reset or reinitialize an existing project. Do not inspect main/prior labs.
+
+2. Spend no more than a short initial pass choosing versions and showing the first flow.
+Resolve/test a maintained Node24-compatible Better Auth + Fastify/PostgreSQL integration
+from official documentation. Pin the exact working root lockfile and images. The main's
+frozen versions in reference/MAIN_V2_CONTEXT.md are compatibility context, not an install
+mandate. No hidden main paths, copied credentials or dependency imports. If a required
+package/image cannot be obtained, report the actual block and finish other safe work;
+do not write a counterfeit auth library or report fixture PASS.
+
+3. Build isolation FIRST: app/DB/local inbox with new lab identity and exact run-owned
+resources. Use <=2CPU/2GiB for all simultaneously active runtime/test lab containers;
+only one expensive DB/browser test at a time. Compiler/build/control overhead is reported
+separately. Do not disrupt main's work. Create app/inbox loopback URLs from ephemeral/free
+ports; PostgreSQL unexposed on the private lab network. Actual runtime outbound denial,
+wrong-target DB refusal, role separation and ownership checks must precede integration.
+A missing DATABASE_URL must not default to the host's PostgreSQL or main app port4320.
+Only lab-local generated settings are read. Never read .env files outside this lab.
+
+4. Deliver the vertical slice before expanding the matrix:
+   register with email/password -> verification message in local inbox -> login ->
+   saved30dayPLS invoice -> internal verified-purchase simulation -> durable access ->
+   create key shown once -> protected synthetic data GET -> same-key early renewal.
+Real accounts/hash/session/SQL/browser/key enforcement; only provider+external-mail+data
+boundaries are simulated. Add password reset and authenticated account isolation. No
+legal name, wallet login or passkey prerequisite. Persist actual send attempts to a small
+local outbox and deliver only to the inbox; do not fake verification with a DB flag or
+show reset tokens in ordinary API JSON/logs.
+
+5. Apply PRODUCT_AND_DATA.md exactly where settled: prepaid30/90/365duration semantics,
+card period identities/calendar boundaries, no double credit, account quota across keys,
+expiry vs revocation, no quota reset on payment/key rotation, no accidental payment-method
+stacking and explicit review state for late/partial/excess/refund ambiguity. Configure
+fixture amounts only; no real plan price/quota or annual offer is approved. Build only
+internal fake-PLS and fake-card adapters, with separate event IDs/payment IDs and durable
+fake-provider records so a lost callback is recovered by reconciliation, not guessed.
+Use a bounded same-process worker for inbox/outbox/reconciliation/reminders; no daemon farm.
+Account-grant+payment-credit commit must be atomic; acknowledgement after durable receipt.
+
+6. Implement a small usable React dashboard: verify/signin/reset forms, account/access/
+quota status, invoice/purchase history, key create/revoke/rotate, synthetic30/90/365choices,
+simulated card subscription state and billing-mode changes. Clear LAB—NO REAL PAYMENTS
+banner; no pay-to wallet QR/address, credit-card collection or real provider branding as
+implemented. 365/annual available only as disabled-by-default test cases or explicit demo
+controls, not public offers. Native PLS quote amounts are labeled fixtures, never our HEX
+price/oracle. Use simple responsive layouts; no design-system/framework exploration.
+
+7. Run meaningful failures against production lab paths + real isolated PostgreSQL, not
+mocked grant results: duplicate and concurrent renewal, altered duplicate identity,
+missed callback reconciliation, crash before/after commit and uncertain ack, cross-account
+access, revoked key after renewal, last available quota raced by two keys, reset token replay,
+card older event after newer cancellation/payment, refund scoped to its grant, inbox outage
+without losing paid access, restart and guarded fresh-destination backup/restore. Tests
+with virtual time must say so. No million-row crypto dataset or main tests needed.
+
+8. Time priorities for this approximate45minute opportunity: get the core flow running
+first; around30minutes preserve a buildable commit and assess remaining work; reserve time
+for independent review. Around40minutes avoid starting optional features. If setup/testing
+requires longer, leave an honest reusable checkpoint and exact blockers rather than label
+an unfinished system PASS. Do not treat these as timer-based permission to stop during a
+transaction, skip safety or silently pass missing tests. Progress after the stated window
+requires only ordinary task continuation, not background promises by the web planner.
+
+9. At a frozen source commit request ONE separate reviewer using docs/REVIEW.md. Supply
+actual commit/diff/run commands and evidence, not full transcript. Reviewer can use own
+lab run IDs, never main's resources. Do not double runtime resource allocation; stop/park
+only your lab's active test run before the reviewer performs heavy tests. Same reviewer
+checks supported corrections, normally at most two rounds. If no separate context exists,
+return REVIEW_PENDING with handoff, not independentPASS. Source remains frozen in review.
+
+10. Return source-only ZIP via tools/package-source.mjs after final commit (or equivalent
+reviewed git archive), plus compact evidence ZIP and REPORT.md; exact bytes/SHA256. Exclude
+.env/.local/work/node_modules/DB/dumps/messages/secrets/token-filled browser profiles/raw
+keys. Screenshots use synthetic accounts and masked keys. Include actual test/SQL/browser
+checks, failures/corrections, reviewer report, dependency/auth choices, meaningful request
+latency/query count, restart/recovery result, resource limits/cleanup and missing provider
+contracts. README supplies exact tested start/demo/test/stop commands; .local secrets stay
+local. Finish docs/INTEGRATION.md with what can later be reused and what remains unqualified.
+
+Stop at this lab milestone. No main integration, main source inspection, live payments,
+provider sandbox/CLI, real SMTP, wallet/RPC, signup, vendor message, push, schedule change,
+VPS or deployment. Implement authorized local work rather than another research-only report.

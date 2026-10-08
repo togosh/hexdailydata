@@ -1,0 +1,912 @@
+{
+  "query": {
+    "holders": {
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "limit": "2"
+    },
+    "stakes": {
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "limit": "2"
+    },
+    "stake": {
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e"
+    },
+    "address": {
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "limit": "2"
+    },
+    "addressStakes": {
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "limit": "2"
+    }
+  },
+  "params": {
+    "holders": {},
+    "stakes": {},
+    "stake": {
+      "id": "83544"
+    },
+    "address": {
+      "address": "0x0000000000000000000000000000000000000369"
+    },
+    "addressStakes": {
+      "address": "0x0000000000000000000000000000000000000369"
+    }
+  },
+  "responses": {
+    "holders": {
+      "chain": "pulsechain",
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "familyVersions": {
+        "tokenHolders": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+        "stakeStarts": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489"
+      },
+      "baseSnapshot": {
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "number": 27720851,
+        "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+        "timestamp": 1791215285,
+        "observedAtUtc": "2026-10-05T15:48:05Z"
+      },
+      "snapshot": {
+        "number": 27724947,
+        "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+        "timestamp": 1791257475,
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "observedAtUtc": "2026-10-06T03:31:15Z"
+      },
+      "coverage": "accepted_base_plus_observed_updates",
+      "refreshEnabled": false,
+      "sourceOnly": true,
+      "fullB1InventoryProven": false,
+      "deletionsSupported": false,
+      "reorgSafetyProven": false,
+      "method": "inclusive_block_overlap_full_object_upserts",
+      "bundleRawSha256": "8336bfaa179c4de3f202bc4208f7c19d2af3b6f3afd5e11d32dea067ea939a0c",
+      "bundleSemanticSha256": "9ed3278a43a7a8fc19b541896a5ab60b96f6281b41e14e8441a05f5ef4c08ecf",
+      "selectionStatus": "accepted",
+      "datasetVersion": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+      "order": "source-id-asc",
+      "baseTotals": {
+        "sourceRows": 664405,
+        "representedAddresses": 664405,
+        "sourcePositiveAddressCountExcludingZeroAddress": 380242,
+        "zeroBalanceRows": 284162,
+        "negativeBalanceRows": 1,
+        "zeroAddressRows": 1,
+        "duplicateAddressGroups": 0,
+        "duplicateNumeralGroups": 0,
+        "ambiguousAddressGroups": 0,
+        "sourceOnly": true,
+        "balancesIndependentlyVerified": false,
+        "sumsAreTotalSupply": false,
+        "activeStakerCountAvailable": false
+      },
+      "localViewRowCount": 664435,
+      "items": [
+        {
+          "reported": {
+            "id": "0x0000000000000000000000000000000000000000",
+            "numeralIndex": "1",
+            "holderAddress": "0x0000000000000000000000000000000000000000",
+            "totalSent": "242108154527554340660",
+            "totalReceived": "236842906883877043078",
+            "tokenBalance": "-5265247643677297582",
+            "createdTimeStamp": "1575417701",
+            "createdBlocknumber": "9046423",
+            "createdHexDay": "1",
+            "lastModifiedHexDay": "2499",
+            "lastModifiedTimeStamp": "1791257475"
+          },
+          "anomaly": "negative_reported_balance",
+          "provenance": {
+            "segment": "HOLDER_R2",
+            "sourcePage": 1,
+            "sourceAttempt": 2,
+            "rowInPage": 0,
+            "originalPageSha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944"
+          },
+          "observation": {
+            "kind": "observed_update",
+            "snapshot": {
+              "number": 27724947,
+              "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+              "timestamp": 1791257475,
+              "source": "pulsechain/hex",
+              "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+              "observedAtUtc": "2026-10-06T03:31:15Z"
+            }
+          },
+          "update": {
+            "operation": "upsert",
+            "id": "0x0000000000000000000000000000000000000000",
+            "kind": "replacement",
+            "beforeProvenance": {
+              "baseDatasetVersion": "94906fb219cceb6476f9fb7373ffd8a752cc0e4b2f3d2bbc096ac84d6ce66014",
+              "ordinal": 0,
+              "sourcePage": {
+                "segment": "HOLDER_R2",
+                "globalPage": 1,
+                "localPage": 1,
+                "sourceAttempt": 2,
+                "firstOrdinal": 0,
+                "count": 100,
+                "path": "pages/00001.ndjson",
+                "sha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944",
+                "receiptSha256": "99f81643df007568ddc5a54ec94e51707bc3821ae33952e86611aa76c77ee9a2",
+                "requestSha256": "b1f1b6ee741d354f03040a661ec720a4fa197a367f624e94b042c020aa5650ec",
+                "responseSha256": "7aa3b330768f3086a1c91d6c3b1657872dfaab79d5eeaddac1bdd68ee098b841",
+                "part": "part-004.zip"
+              },
+              "rowInPage": 0,
+              "rowSha256": "e70769b0a9e3184084fc7a40d35425b10724a52dbf90382acdac76e6e4d3a154"
+            },
+            "afterProvenance": [
+              {
+                "segment": "SCHEMA_RUN_R1",
+                "attempt": 11,
+                "capture": "captures/00011/capture.json",
+                "responseSha256": "2191188837571de4529fda7581d200fe2bc13ba585565fe63f1525e592709007",
+                "family": "tokenHolders",
+                "page": 1,
+                "row": 0
+              }
+            ],
+            "changedFields": [
+              "totalSent",
+              "totalReceived",
+              "tokenBalance",
+              "lastModifiedHexDay",
+              "lastModifiedTimeStamp"
+            ],
+            "family": "tokenHolders",
+            "before": {
+              "id": "0x0000000000000000000000000000000000000000",
+              "numeralIndex": "1",
+              "holderAddress": "0x0000000000000000000000000000000000000000",
+              "totalSent": "242100584919555885928",
+              "totalReceived": "236839833958624279939",
+              "tokenBalance": "-5260750960931605989",
+              "createdTimeStamp": "1575417701",
+              "createdBlocknumber": "9046423",
+              "createdHexDay": "1",
+              "lastModifiedHexDay": "2498",
+              "lastModifiedTimeStamp": "1791215265"
+            },
+            "after": {
+              "id": "0x0000000000000000000000000000000000000000",
+              "numeralIndex": "1",
+              "holderAddress": "0x0000000000000000000000000000000000000000",
+              "totalSent": "242108154527554340660",
+              "totalReceived": "236842906883877043078",
+              "tokenBalance": "-5265247643677297582",
+              "createdTimeStamp": "1575417701",
+              "createdBlocknumber": "9046423",
+              "createdHexDay": "1",
+              "lastModifiedHexDay": "2499",
+              "lastModifiedTimeStamp": "1791257475"
+            }
+          }
+        },
+        {
+          "reported": {
+            "id": "0x0000000000000000000000000000000000000001",
+            "numeralIndex": "258249",
+            "holderAddress": "0x0000000000000000000000000000000000000001",
+            "totalSent": "0",
+            "totalReceived": "20100000000",
+            "tokenBalance": "20100000000",
+            "createdTimeStamp": "1618268010",
+            "createdBlocknumber": "12228081",
+            "createdHexDay": "496",
+            "lastModifiedHexDay": "1206",
+            "lastModifiedTimeStamp": "1679609099"
+          },
+          "anomaly": null,
+          "provenance": {
+            "segment": "HOLDER_R2",
+            "sourcePage": 1,
+            "sourceAttempt": 2,
+            "rowInPage": 1,
+            "originalPageSha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944"
+          },
+          "observation": {
+            "kind": "retained_base",
+            "snapshot": {
+              "source": "pulsechain/hex",
+              "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+              "number": 27720851,
+              "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+              "timestamp": 1791215285,
+              "observedAtUtc": "2026-10-05T15:48:05Z"
+            }
+          },
+          "update": null
+        }
+      ],
+      "nextCursor": null
+    },
+    "stakes": {
+      "chain": "pulsechain",
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "familyVersions": {
+        "tokenHolders": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+        "stakeStarts": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489"
+      },
+      "baseSnapshot": {
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "number": 27720851,
+        "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+        "timestamp": 1791215285,
+        "observedAtUtc": "2026-10-05T15:48:05Z"
+      },
+      "snapshot": {
+        "number": 27724947,
+        "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+        "timestamp": 1791257475,
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "observedAtUtc": "2026-10-06T03:31:15Z"
+      },
+      "coverage": "accepted_base_plus_observed_updates",
+      "refreshEnabled": false,
+      "sourceOnly": true,
+      "fullB1InventoryProven": false,
+      "deletionsSupported": false,
+      "reorgSafetyProven": false,
+      "method": "inclusive_block_overlap_full_object_upserts",
+      "bundleRawSha256": "8336bfaa179c4de3f202bc4208f7c19d2af3b6f3afd5e11d32dea067ea939a0c",
+      "bundleSemanticSha256": "9ed3278a43a7a8fc19b541896a5ab60b96f6281b41e14e8441a05f5ef4c08ecf",
+      "selectionStatus": "accepted",
+      "datasetVersion": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489",
+      "baseInventorySourceStartCount": 954680,
+      "localViewRowCount": 954715,
+      "address": null,
+      "sourceStartCount": 954715,
+      "items": [
+        {
+          "reported": {
+            "id": "0x1",
+            "stakerAddr": "0x494adf3036d67d42300abde1d2d336f91f73ec66",
+            "stakeId": "1",
+            "data0": "12161884612380837511191951614904038367756971642854603945910",
+            "timestamp": "1575417782",
+            "stakedHearts": "10468600000000",
+            "stakeShares": "13316559731452",
+            "stakedDays": "496",
+            "isAutoStake": false,
+            "stakeTShares": "13.316559731452",
+            "startDay": "3",
+            "endDay": "499",
+            "blockNumber": "9046425",
+            "transactionHash": "0x52e831330c9d5d97eba65f0525fc6b842b99f9835fa484c82db76d03e7d0f3c6",
+            "stakeEnd": {
+              "id": "0x1",
+              "stakerAddr": "0x494adf3036d67d42300abde1d2d336f91f73ec66",
+              "stakeId": "1",
+              "data0": "178338640387515958266986022052756482538899547900321076344695480010990",
+              "data1": "2342293775503344025993216",
+              "payout": "7273212043359",
+              "stakedHearts": "10468600000000",
+              "stakedShares": "13316559731452",
+              "timestamp": "1618364654",
+              "penalty": "0",
+              "blockNumber": "12235313",
+              "transactionHash": "0xff3a455286655592ebe0520757045d2911e7a2df29724c6d8c65751d6440a7ec",
+              "servedDays": "496",
+              "prevUnlocked": false,
+              "daysLate": "0",
+              "daysEarly": "0"
+            },
+            "stakeGoodAccounting": null
+          },
+          "recordState": "end_link_present",
+          "provenance": {
+            "segment": "R2",
+            "sourcePage": 1,
+            "sourceAttempt": 2,
+            "rowInPage": 0,
+            "originalPageSha256": "dc2dbe9f2da7824441616f91ef4abb3611612f6a9a6aad448d18563d18cf65f1"
+          },
+          "observation": {
+            "kind": "retained_base",
+            "snapshot": {
+              "source": "pulsechain/hex",
+              "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+              "number": 27720851,
+              "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+              "timestamp": 1791215285,
+              "observedAtUtc": "2026-10-05T15:48:05Z"
+            }
+          },
+          "update": null,
+          "discrepancies": [],
+          "discrepancyAssessment": "base_source_internal",
+          "historicalBaseDiscrepancies": []
+        },
+        {
+          "reported": {
+            "id": "0x10",
+            "stakerAddr": "0xf8656b3f2c0d0bed70d7276fdec6bd082263437a",
+            "stakeId": "16",
+            "data0": "8925254030016868081220639210608733244438982324150742743035",
+            "timestamp": "1575417851",
+            "stakedHearts": "2236900000000",
+            "stakeShares": "2683084292210",
+            "stakedDays": "364",
+            "isAutoStake": false,
+            "stakeTShares": "2.68308429221",
+            "startDay": "3",
+            "endDay": "367",
+            "blockNumber": "9046429",
+            "transactionHash": "0x419b65d5755374efce3b92808fb9605c8439d446d08c632eb883a4a732dbcbdb",
+            "stakeEnd": {
+              "id": "0x10",
+              "stakerAddr": "0xf8656b3f2c0d0bed70d7276fdec6bd082263437a",
+              "stakeId": "16",
+              "data0": "5151100136259205171352405507915064129284447484009730924401406251407",
+              "data1": "1459211243206809608746118",
+              "payout": "210078104589",
+              "stakedHearts": "2236900000000",
+              "stakedShares": "2683084292210",
+              "timestamp": "1602228623",
+              "penalty": "89237714054",
+              "blockNumber": "11019917",
+              "transactionHash": "0xab6e5fe89cd5d2270f03a05792cf4e29ff1b59fc93a71a4910389755254f58d1",
+              "servedDays": "309",
+              "prevUnlocked": false,
+              "daysLate": "0",
+              "daysEarly": "55"
+            },
+            "stakeGoodAccounting": null
+          },
+          "recordState": "end_link_present",
+          "provenance": {
+            "segment": "R2",
+            "sourcePage": 1,
+            "sourceAttempt": 2,
+            "rowInPage": 1,
+            "originalPageSha256": "dc2dbe9f2da7824441616f91ef4abb3611612f6a9a6aad448d18563d18cf65f1"
+          },
+          "observation": {
+            "kind": "retained_base",
+            "snapshot": {
+              "source": "pulsechain/hex",
+              "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+              "number": 27720851,
+              "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+              "timestamp": 1791215285,
+              "observedAtUtc": "2026-10-05T15:48:05Z"
+            }
+          },
+          "update": null,
+          "discrepancies": [],
+          "discrepancyAssessment": "base_source_internal",
+          "historicalBaseDiscrepancies": []
+        }
+      ],
+      "nextCursor": null
+    },
+    "stake": {
+      "chain": "pulsechain",
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "familyVersions": {
+        "tokenHolders": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+        "stakeStarts": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489"
+      },
+      "baseSnapshot": {
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "number": 27720851,
+        "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+        "timestamp": 1791215285,
+        "observedAtUtc": "2026-10-05T15:48:05Z"
+      },
+      "snapshot": {
+        "number": 27724947,
+        "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+        "timestamp": 1791257475,
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "observedAtUtc": "2026-10-06T03:31:15Z"
+      },
+      "coverage": "accepted_base_plus_observed_updates",
+      "refreshEnabled": false,
+      "sourceOnly": true,
+      "fullB1InventoryProven": false,
+      "deletionsSupported": false,
+      "reorgSafetyProven": false,
+      "method": "inclusive_block_overlap_full_object_upserts",
+      "bundleRawSha256": "8336bfaa179c4de3f202bc4208f7c19d2af3b6f3afd5e11d32dea067ea939a0c",
+      "bundleSemanticSha256": "9ed3278a43a7a8fc19b541896a5ab60b96f6281b41e14e8441a05f5ef4c08ecf",
+      "selectionStatus": "accepted",
+      "datasetVersion": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489",
+      "reportedStakeId": "83544",
+      "presence": "present_in_saved_view",
+      "item": {
+        "reported": {
+          "id": "0x14658",
+          "stakerAddr": "0xfc4407fe5828bd19b3955eb9a3dad3d9427d7002",
+          "stakeId": "83544",
+          "data0": "60343544417136457651249020997238689275496339797525809778254",
+          "timestamp": "1578290766",
+          "stakedHearts": "100000000000",
+          "stakeShares": "234571436097",
+          "stakedDays": "2461",
+          "isAutoStake": false,
+          "stakeTShares": "0.234571436097",
+          "startDay": "36",
+          "endDay": "2497",
+          "blockNumber": "9225135",
+          "transactionHash": "0xff37c18a7d23707d288ee6c5b689c8b7fec0ba82cfb80704f1cda76e759379f3",
+          "stakeEnd": {
+            "id": "0x14658",
+            "stakerAddr": "0xfc4407fe5828bd19b3955eb9a3dad3d9427d7002",
+            "stakeId": "83544",
+            "data0": "9009532640568472754484172791922041578845903514251322639279538327165",
+            "data1": "11621743914342196870905856",
+            "payout": "367437147463",
+            "stakedHearts": "100000000000",
+            "stakedShares": "234571436097",
+            "timestamp": "1791250045",
+            "penalty": "0",
+            "blockNumber": "27724227",
+            "transactionHash": "0x8b5ed4debeb717724a20ec052ee19496592815845283572c487616dbd199252b",
+            "servedDays": "2461",
+            "prevUnlocked": false,
+            "daysLate": "3",
+            "daysEarly": "0"
+          },
+          "stakeGoodAccounting": null
+        },
+        "recordState": "end_link_present",
+        "provenance": {
+          "segment": "R2",
+          "sourcePage": 41,
+          "sourceAttempt": 47,
+          "rowInPage": 11,
+          "originalPageSha256": "089e48ddd8f1c4694b740415d803bfe5bbb658dd68b52522109abd5c05527fe0"
+        },
+        "observation": {
+          "kind": "observed_update",
+          "snapshot": {
+            "number": 27724947,
+            "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+            "timestamp": 1791257475,
+            "source": "pulsechain/hex",
+            "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+            "observedAtUtc": "2026-10-06T03:31:15Z"
+          }
+        },
+        "update": {
+          "operation": "upsert",
+          "id": "0x14658",
+          "kind": "replacement",
+          "beforeProvenance": {
+            "baseDatasetVersion": "1078dc36dde165f35ad9c7f96faf77f8be078173818bd85af010314d339904b5",
+            "ordinal": 19211,
+            "sourcePage": {
+              "segment": "R2",
+              "globalPage": 41,
+              "localPage": 41,
+              "sourceAttempt": 47,
+              "firstOrdinal": 19200,
+              "count": 500,
+              "path": "pages/00041.ndjson",
+              "sha256": "089e48ddd8f1c4694b740415d803bfe5bbb658dd68b52522109abd5c05527fe0",
+              "receiptSha256": "11ccc04c36c65c1f4c772c77cf535e46a9ca452b8caf916e5095bf76a62e9e62",
+              "requestSha256": "440346910a746ba28e8cca4e2087ac1b7ccf4b62296a07619e56841f8c9bae12",
+              "responseSha256": "08d7e4ea523ec68b826fc0834a529c966b86f80b118c6462d73edb932ddb582b",
+              "part": "part-003.zip"
+            },
+            "rowInPage": 11,
+            "rowSha256": "f531e8e33c2ee14c5fceaf4b6a34554e7fa1f36654aa019397eec8f6a35b02ba"
+          },
+          "afterProvenance": [
+            {
+              "segment": "SCHEMA_RUN_R1",
+              "attempt": 33,
+              "capture": "captures/00033/capture.json",
+              "responseSha256": "6485e7f282bf4589b2c682bd43900798f7e468f3363c6af3a2880447ca32359a",
+              "family": "stakeStarts",
+              "page": 1,
+              "row": 13
+            },
+            {
+              "resolvedParent": {
+                "segment": "CONTINUATION_R1",
+                "attempt": 291,
+                "capture": "captures/00291/capture.json",
+                "responseSha256": "1603aca39c52a32dc688b04aafbb8ec048375e3c3bdb17020a4b766041d3c5ce",
+                "requestSha256": "ba19cc021323805b5e3b7f67d7457be96005b91639ad2ebc8e68dc3e3b7cdbb7"
+              }
+            }
+          ],
+          "changedFields": [
+            "stakeEnd"
+          ],
+          "family": "stakeStarts",
+          "before": {
+            "id": "0x14658",
+            "stakerAddr": "0xfc4407fe5828bd19b3955eb9a3dad3d9427d7002",
+            "stakeId": "83544",
+            "data0": "60343544417136457651249020997238689275496339797525809778254",
+            "timestamp": "1578290766",
+            "stakedHearts": "100000000000",
+            "stakeShares": "234571436097",
+            "stakedDays": "2461",
+            "isAutoStake": false,
+            "stakeTShares": "0.234571436097",
+            "startDay": "36",
+            "endDay": "2497",
+            "blockNumber": "9225135",
+            "transactionHash": "0xff37c18a7d23707d288ee6c5b689c8b7fec0ba82cfb80704f1cda76e759379f3",
+            "stakeEnd": null,
+            "stakeGoodAccounting": null
+          },
+          "after": {
+            "id": "0x14658",
+            "stakerAddr": "0xfc4407fe5828bd19b3955eb9a3dad3d9427d7002",
+            "stakeId": "83544",
+            "data0": "60343544417136457651249020997238689275496339797525809778254",
+            "timestamp": "1578290766",
+            "stakedHearts": "100000000000",
+            "stakeShares": "234571436097",
+            "stakedDays": "2461",
+            "isAutoStake": false,
+            "stakeTShares": "0.234571436097",
+            "startDay": "36",
+            "endDay": "2497",
+            "blockNumber": "9225135",
+            "transactionHash": "0xff37c18a7d23707d288ee6c5b689c8b7fec0ba82cfb80704f1cda76e759379f3",
+            "stakeEnd": {
+              "id": "0x14658",
+              "stakerAddr": "0xfc4407fe5828bd19b3955eb9a3dad3d9427d7002",
+              "stakeId": "83544",
+              "data0": "9009532640568472754484172791922041578845903514251322639279538327165",
+              "data1": "11621743914342196870905856",
+              "payout": "367437147463",
+              "stakedHearts": "100000000000",
+              "stakedShares": "234571436097",
+              "timestamp": "1791250045",
+              "penalty": "0",
+              "blockNumber": "27724227",
+              "transactionHash": "0x8b5ed4debeb717724a20ec052ee19496592815845283572c487616dbd199252b",
+              "servedDays": "2461",
+              "prevUnlocked": false,
+              "daysLate": "3",
+              "daysEarly": "0"
+            },
+            "stakeGoodAccounting": null
+          }
+        },
+        "discrepancies": null,
+        "discrepancyAssessment": "unassessed_after_update",
+        "historicalBaseDiscrepancies": []
+      }
+    },
+    "address": {
+      "chain": "pulsechain",
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "familyVersions": {
+        "tokenHolders": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+        "stakeStarts": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489"
+      },
+      "baseSnapshot": {
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "number": 27720851,
+        "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+        "timestamp": 1791215285,
+        "observedAtUtc": "2026-10-05T15:48:05Z"
+      },
+      "snapshot": {
+        "number": 27724947,
+        "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+        "timestamp": 1791257475,
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "observedAtUtc": "2026-10-06T03:31:15Z"
+      },
+      "coverage": "accepted_base_plus_observed_updates",
+      "refreshEnabled": false,
+      "sourceOnly": true,
+      "fullB1InventoryProven": false,
+      "deletionsSupported": false,
+      "reorgSafetyProven": false,
+      "method": "inclusive_block_overlap_full_object_upserts",
+      "bundleRawSha256": "8336bfaa179c4de3f202bc4208f7c19d2af3b6f3afd5e11d32dea067ea939a0c",
+      "bundleSemanticSha256": "9ed3278a43a7a8fc19b541896a5ab60b96f6281b41e14e8441a05f5ef4c08ecf",
+      "selectionStatus": "accepted",
+      "datasetVersion": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489",
+      "baseInventorySourceStartCount": 954680,
+      "localViewRowCount": 954715,
+      "address": "0x0000000000000000000000000000000000000369",
+      "sourceStartCount": 0,
+      "items": [],
+      "nextCursor": null,
+      "holder": {
+        "state": "present_in_saved_view",
+        "item": {
+          "reported": {
+            "id": "0x0000000000000000000000000000000000000369",
+            "numeralIndex": "559214",
+            "holderAddress": "0x0000000000000000000000000000000000000369",
+            "totalSent": "0",
+            "totalReceived": "27716830386473",
+            "tokenBalance": "27716830386473",
+            "createdTimeStamp": "1683978655",
+            "createdBlocknumber": "17252232",
+            "createdHexDay": "1257",
+            "lastModifiedHexDay": "2499",
+            "lastModifiedTimeStamp": "1791248635"
+          },
+          "anomaly": null,
+          "provenance": {
+            "segment": "HOLDER_R2",
+            "sourcePage": 1,
+            "sourceAttempt": 2,
+            "rowInPage": 2,
+            "originalPageSha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944"
+          },
+          "observation": {
+            "kind": "observed_update",
+            "snapshot": {
+              "number": 27724947,
+              "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+              "timestamp": 1791257475,
+              "source": "pulsechain/hex",
+              "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+              "observedAtUtc": "2026-10-06T03:31:15Z"
+            }
+          },
+          "update": {
+            "operation": "upsert",
+            "id": "0x0000000000000000000000000000000000000369",
+            "kind": "replacement",
+            "beforeProvenance": {
+              "baseDatasetVersion": "94906fb219cceb6476f9fb7373ffd8a752cc0e4b2f3d2bbc096ac84d6ce66014",
+              "ordinal": 2,
+              "sourcePage": {
+                "segment": "HOLDER_R2",
+                "globalPage": 1,
+                "localPage": 1,
+                "sourceAttempt": 2,
+                "firstOrdinal": 0,
+                "count": 100,
+                "path": "pages/00001.ndjson",
+                "sha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944",
+                "receiptSha256": "99f81643df007568ddc5a54ec94e51707bc3821ae33952e86611aa76c77ee9a2",
+                "requestSha256": "b1f1b6ee741d354f03040a661ec720a4fa197a367f624e94b042c020aa5650ec",
+                "responseSha256": "7aa3b330768f3086a1c91d6c3b1657872dfaab79d5eeaddac1bdd68ee098b841",
+                "part": "part-004.zip"
+              },
+              "rowInPage": 2,
+              "rowSha256": "0765972d37d2c2a70439c4264c6bfa4ac23cad41f6d6f47dab59d8c10e354cd8"
+            },
+            "afterProvenance": [
+              {
+                "segment": "SCHEMA_RUN_R1",
+                "attempt": 11,
+                "capture": "captures/00011/capture.json",
+                "responseSha256": "2191188837571de4529fda7581d200fe2bc13ba585565fe63f1525e592709007",
+                "family": "tokenHolders",
+                "page": 1,
+                "row": 1
+              }
+            ],
+            "changedFields": [
+              "totalReceived",
+              "tokenBalance",
+              "lastModifiedHexDay",
+              "lastModifiedTimeStamp"
+            ],
+            "family": "tokenHolders",
+            "before": {
+              "id": "0x0000000000000000000000000000000000000369",
+              "numeralIndex": "559214",
+              "holderAddress": "0x0000000000000000000000000000000000000369",
+              "totalSent": "0",
+              "totalReceived": "27714919955544",
+              "tokenBalance": "27714919955544",
+              "createdTimeStamp": "1683978655",
+              "createdBlocknumber": "17252232",
+              "createdHexDay": "1257",
+              "lastModifiedHexDay": "2497",
+              "lastModifiedTimeStamp": "1791137885"
+            },
+            "after": {
+              "id": "0x0000000000000000000000000000000000000369",
+              "numeralIndex": "559214",
+              "holderAddress": "0x0000000000000000000000000000000000000369",
+              "totalSent": "0",
+              "totalReceived": "27716830386473",
+              "tokenBalance": "27716830386473",
+              "createdTimeStamp": "1683978655",
+              "createdBlocknumber": "17252232",
+              "createdHexDay": "1257",
+              "lastModifiedHexDay": "2499",
+              "lastModifiedTimeStamp": "1791248635"
+            }
+          }
+        },
+        "reason": null
+      },
+      "holderDatasetVersion": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+      "liquidBalance": {
+        "sourceToken": "27716830386473",
+        "sourceReportedHex": "277168.30386473",
+        "attribution": "source_reported_at_saved_pin"
+      },
+      "ranks": null
+    },
+    "addressStakes": {
+      "chain": "pulsechain",
+      "source": "subgraph",
+      "generation": "8de9ee83bebd2be68c4d976eb355c646283af0c2b2544075b7d7372882ab039e",
+      "familyVersions": {
+        "tokenHolders": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+        "stakeStarts": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489"
+      },
+      "baseSnapshot": {
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "number": 27720851,
+        "hash": "0x8d7a9233e143884558511f15558a03d88567bc2255d63f670707ff45894b3fb8",
+        "timestamp": 1791215285,
+        "observedAtUtc": "2026-10-05T15:48:05Z"
+      },
+      "snapshot": {
+        "number": 27724947,
+        "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+        "timestamp": 1791257475,
+        "source": "pulsechain/hex",
+        "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+        "observedAtUtc": "2026-10-06T03:31:15Z"
+      },
+      "coverage": "accepted_base_plus_observed_updates",
+      "refreshEnabled": false,
+      "sourceOnly": true,
+      "fullB1InventoryProven": false,
+      "deletionsSupported": false,
+      "reorgSafetyProven": false,
+      "method": "inclusive_block_overlap_full_object_upserts",
+      "bundleRawSha256": "8336bfaa179c4de3f202bc4208f7c19d2af3b6f3afd5e11d32dea067ea939a0c",
+      "bundleSemanticSha256": "9ed3278a43a7a8fc19b541896a5ab60b96f6281b41e14e8441a05f5ef4c08ecf",
+      "selectionStatus": "accepted",
+      "datasetVersion": "909e57667419a7fe383d3cc10ebf3bad0208db0826db5adf4462687c1bce1489",
+      "baseInventorySourceStartCount": 954680,
+      "localViewRowCount": 954715,
+      "address": "0x0000000000000000000000000000000000000369",
+      "sourceStartCount": 0,
+      "items": [],
+      "nextCursor": null,
+      "holder": {
+        "state": "present_in_saved_view",
+        "item": {
+          "reported": {
+            "id": "0x0000000000000000000000000000000000000369",
+            "numeralIndex": "559214",
+            "holderAddress": "0x0000000000000000000000000000000000000369",
+            "totalSent": "0",
+            "totalReceived": "27716830386473",
+            "tokenBalance": "27716830386473",
+            "createdTimeStamp": "1683978655",
+            "createdBlocknumber": "17252232",
+            "createdHexDay": "1257",
+            "lastModifiedHexDay": "2499",
+            "lastModifiedTimeStamp": "1791248635"
+          },
+          "anomaly": null,
+          "provenance": {
+            "segment": "HOLDER_R2",
+            "sourcePage": 1,
+            "sourceAttempt": 2,
+            "rowInPage": 2,
+            "originalPageSha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944"
+          },
+          "observation": {
+            "kind": "observed_update",
+            "snapshot": {
+              "number": 27724947,
+              "hash": "0x688b4ce6c991cd8fa6d3012e3a6a063755e056e6e856aac7664dfb34046651e3",
+              "timestamp": 1791257475,
+              "source": "pulsechain/hex",
+              "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw",
+              "observedAtUtc": "2026-10-06T03:31:15Z"
+            }
+          },
+          "update": {
+            "operation": "upsert",
+            "id": "0x0000000000000000000000000000000000000369",
+            "kind": "replacement",
+            "beforeProvenance": {
+              "baseDatasetVersion": "94906fb219cceb6476f9fb7373ffd8a752cc0e4b2f3d2bbc096ac84d6ce66014",
+              "ordinal": 2,
+              "sourcePage": {
+                "segment": "HOLDER_R2",
+                "globalPage": 1,
+                "localPage": 1,
+                "sourceAttempt": 2,
+                "firstOrdinal": 0,
+                "count": 100,
+                "path": "pages/00001.ndjson",
+                "sha256": "8726224a47d9d4c3831e6d3b901f3edb63b3858230835faa327c164f9d317944",
+                "receiptSha256": "99f81643df007568ddc5a54ec94e51707bc3821ae33952e86611aa76c77ee9a2",
+                "requestSha256": "b1f1b6ee741d354f03040a661ec720a4fa197a367f624e94b042c020aa5650ec",
+                "responseSha256": "7aa3b330768f3086a1c91d6c3b1657872dfaab79d5eeaddac1bdd68ee098b841",
+                "part": "part-004.zip"
+              },
+              "rowInPage": 2,
+              "rowSha256": "0765972d37d2c2a70439c4264c6bfa4ac23cad41f6d6f47dab59d8c10e354cd8"
+            },
+            "afterProvenance": [
+              {
+                "segment": "SCHEMA_RUN_R1",
+                "attempt": 11,
+                "capture": "captures/00011/capture.json",
+                "responseSha256": "2191188837571de4529fda7581d200fe2bc13ba585565fe63f1525e592709007",
+                "family": "tokenHolders",
+                "page": 1,
+                "row": 1
+              }
+            ],
+            "changedFields": [
+              "totalReceived",
+              "tokenBalance",
+              "lastModifiedHexDay",
+              "lastModifiedTimeStamp"
+            ],
+            "family": "tokenHolders",
+            "before": {
+              "id": "0x0000000000000000000000000000000000000369",
+              "numeralIndex": "559214",
+              "holderAddress": "0x0000000000000000000000000000000000000369",
+              "totalSent": "0",
+              "totalReceived": "27714919955544",
+              "tokenBalance": "27714919955544",
+              "createdTimeStamp": "1683978655",
+              "createdBlocknumber": "17252232",
+              "createdHexDay": "1257",
+              "lastModifiedHexDay": "2497",
+              "lastModifiedTimeStamp": "1791137885"
+            },
+            "after": {
+              "id": "0x0000000000000000000000000000000000000369",
+              "numeralIndex": "559214",
+              "holderAddress": "0x0000000000000000000000000000000000000369",
+              "totalSent": "0",
+              "totalReceived": "27716830386473",
+              "tokenBalance": "27716830386473",
+              "createdTimeStamp": "1683978655",
+              "createdBlocknumber": "17252232",
+              "createdHexDay": "1257",
+              "lastModifiedHexDay": "2499",
+              "lastModifiedTimeStamp": "1791248635"
+            }
+          }
+        },
+        "reason": null
+      },
+      "holderDatasetVersion": "0a2a0b6c3e2aa37cc1574ed4140b072d39504a4e2c4934274c2bea1f295c8f7d",
+      "liquidBalance": {
+        "sourceToken": "27716830386473",
+        "sourceReportedHex": "277168.30386473",
+        "attribution": "source_reported_at_saved_pin"
+      },
+      "ranks": null
+    }
+  }
+}

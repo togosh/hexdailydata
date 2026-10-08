@@ -1,6 +1,5 @@
 node_modules/
 dist/
-build/
 coverage/
 .env
 .env.*
@@ -15,3 +14,5 @@ artifacts/
 *.zip
 .vscode/
 .DS_Store
+
+.build-check-*/

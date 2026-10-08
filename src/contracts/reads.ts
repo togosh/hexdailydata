@@ -35,11 +35,36 @@ const page = {
   limit: z.coerce.number().int().min(1).max(100).default(50),
   cursor: CursorSchema.optional(),
 };
+// HTTP query strings only: reject blank/duplicate/fractional days before coercion.
+const maturityDay = z
+  .string()
+  .min(1)
+  .max(5)
+  .regex(/^[0-9]+$/)
+  .pipe(z.coerce.number<string>().int().min(0).max(65535));
 export const StakesQuery = ChainQuery.extend({
   ...page,
   address: AddressSchema.optional(),
   lifecycle: z.enum(['open', 'good_accounted', 'ended']).optional(),
-});
+  maturityFromDay: maturityDay.optional(),
+  maturityToDay: maturityDay.optional(),
+  minPrincipalHearts: UIntStringSchema.optional(),
+}).refine((q) => {
+  if (
+    q.maturityFromDay === undefined &&
+    q.maturityToDay === undefined &&
+    q.minPrincipalHearts === undefined
+  )
+    return true;
+  return (
+    q.chain === 'pulsechain' &&
+    q.lifecycle === 'open' &&
+    q.maturityFromDay !== undefined &&
+    q.maturityToDay !== undefined &&
+    q.maturityToDay >= q.maturityFromDay &&
+    q.maturityToDay - q.maturityFromDay < 366
+  );
+}, 'Maturity filters require PulseChain, explicit lifecycle=open and an inclusive range of at most 366 days.');
 export const HoldersQuery = ChainQuery.extend({
   ...page,
   order: z.enum(['liquid', 'staker']).default('liquid'),
@@ -67,15 +92,24 @@ export const MarketQuery = RangeQuery.safeExtend({
     .optional(),
 });
 export const DailyQuery = RangeQuery.safeExtend({
-  source: z.literal('hexdailystats').optional(),
+  source: z.enum(['hexdailystats', 'contract-ledger']).optional(),
   afterSourceDay: z.coerce.number().int().min(0).max(65535).optional(),
   revision: z.uuid().optional(),
+  datasetVersion: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
 }).refine((q) =>
-  q.source
+  q.source === 'hexdailystats'
     ? q.chain === 'pulsechain' &&
+      q.datasetVersion === undefined &&
       ((q.afterSourceDay === undefined && q.revision === undefined) ||
         (q.afterSourceDay !== undefined && q.revision !== undefined))
-    : q.afterSourceDay === undefined && q.revision === undefined,
+    : q.source === 'contract-ledger'
+      ? q.chain === 'pulsechain' && q.afterSourceDay === undefined && q.revision === undefined
+      : q.afterSourceDay === undefined &&
+        q.revision === undefined &&
+        q.datasetVersion === undefined,
 );
 export const CutoffSchema = z.strictObject({
   asOf: BlockRefSchema,

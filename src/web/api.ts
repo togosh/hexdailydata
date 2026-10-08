@@ -3,9 +3,12 @@ import type { z } from 'zod';
 
 export class RequestError extends Error {
   status: number;
+  code: string;
   constructor(status: number, code = '') {
     super(
-      code === 'not_indexed'
+      code === 'developer_access_required'
+        ? 'Public browse limit reached. More records require an active API key.'
+        : code === 'not_indexed'
         ? 'The index is catching up; this bounded lookup is inconclusive.'
         : status === 409
           ? 'The observation changed or expired. Restart this selection.'
@@ -18,6 +21,7 @@ export class RequestError extends Error {
                 : 'Data is unavailable. Please try again.',
     );
     this.status = status;
+    this.code = code;
   }
 }
 export const endpoint = (path: string, query: Record<string, string | number | undefined> = {}) => {
@@ -78,6 +82,7 @@ export function useResource<T>(url: string | null, schema: z.ZodType<T>, poll = 
     data?: T;
     error?: string;
     status?: number;
+    code?: string;
     loading: boolean;
   }>({ url, loading: !!url });
   const [version, setVersion] = useState(0);
@@ -112,6 +117,7 @@ export function useResource<T>(url: string | null, schema: z.ZodType<T>, poll = 
                 ? e.message
                 : 'Connection unavailable. Refresh to try again.',
             status: e instanceof RequestError ? e.status : 503,
+            ...(e instanceof RequestError ? { code: e.code } : {}),
           }));
       } finally {
         pending = undefined;

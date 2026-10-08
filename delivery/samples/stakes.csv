@@ -1,0 +1,2 @@
+stake_id,address,principal_hex,tshares,locked_day,staked_days,maturity_utc,status,started_utc,ended_utc,payout_hex,penalty_hex,origin_chain_id
+1,0xabababababababababababababababababababab,9007199254740993.12345678,900719925474.099312345678,11,1,2019-12-15T00:00:00.000Z,queued,2019-12-13T00:00:10.000Z,,,,369

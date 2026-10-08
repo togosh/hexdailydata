@@ -1,0 +1,33 @@
+{
+  "kind": "synthetic-fixture-not-production-offer",
+  "currency": "USD",
+  "prepaid": [
+    {
+      "days": 30,
+      "fixtureCents": 100
+    },
+    {
+      "days": 90,
+      "fixtureCents": 250
+    },
+    {
+      "days": 365,
+      "fixtureCents": 900
+    }
+  ],
+  "nativePLS": {
+    "chainId": 369,
+    "decimals": 18,
+    "quoteSource": "synthetic-no-market-oracle",
+    "arbitraryTokens": false
+  },
+  "accountQuota": {
+    "utcDayUnits": 100,
+    "minuteRequests": 30,
+    "maxActiveKeys": 3,
+    "renewalResetsQuota": false
+  },
+  "yearLongPublicOfferApproved": false,
+  "liveProviderConfigured": false,
+  "deploymentEnabled": false
+}

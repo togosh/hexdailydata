@@ -1,0 +1,2 @@
+date_utc,price_open_usd,price_high_usd,price_low_usd,price_close_usd,volume_usd,liquidity_usd,source,method,coverage
+2019-12-13,,,,,,,synthetic-sample,source-reported,missing

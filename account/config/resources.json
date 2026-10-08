@@ -1,0 +1,31 @@
+{
+  "kind": "lab-only-proposed-bounds-not-observed",
+  "maxCombinedCpu": 2,
+  "maxCombinedMemoryMiB": 2048,
+  "services": {
+    "db": {
+      "cpu": 0.75,
+      "memoryMiB": 768
+    },
+    "app": {
+      "cpu": 0.5,
+      "memoryMiB": 512
+    },
+    "inbox": {
+      "cpu": 0.125,
+      "memoryMiB": 128
+    },
+    "runner": {
+      "cpu": 0.625,
+      "memoryMiB": 640
+    }
+  },
+  "maxConcurrentHeavyRuns": 1,
+  "network": "new internal lab network only",
+  "httpHost": "127.0.0.1",
+  "dbHostPublished": false,
+  "emailRelay": false,
+  "mainRepoMounts": false,
+  "runtimeExternalEgress": false,
+  "installationDownloads": "legitimate dependencies, official images and browser distributions only"
+}

@@ -1,0 +1,51 @@
+.calculator-page {
+  max-width: 56rem;
+  margin-inline: auto;
+}
+.calculator-page .calculator-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.calculator-page .future-price-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.amount-unit-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+}
+.amount-unit-toggle button {
+  padding: 0.35rem 0.65rem;
+  min-width: 3.25rem;
+  font-size: 1rem;
+}
+.amount-unit-toggle button[aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--notice);
+}
+.calculator-page .calculator-panel-heading {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.calculator-amount-help,
+.calculator-amount-error,
+.calculator-price-source {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+.calculator-amount-help {
+  margin: 0.75rem 0;
+}
+.calculator-amount-help p {
+  margin: 0.25rem 0;
+}
+.calculator-amount-help .meta {
+  font-size: 1rem;
+}
+.calculator-amount-error {
+  color: var(--feedback);
+  margin: 0.75rem 0;
+}
+.calculator-exact dd {
+  overflow-wrap: anywhere;
+}

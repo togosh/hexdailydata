@@ -1,0 +1,15 @@
+CREATE TABLE customer(id text PRIMARY KEY REFERENCES "user"(id), disabled boolean NOT NULL DEFAULT false, card_active boolean NOT NULL DEFAULT false, card_due boolean NOT NULL DEFAULT false, card_version bigint NOT NULL DEFAULT 0);
+CREATE TABLE invoice(id uuid PRIMARY KEY, account_id text NOT NULL REFERENCES customer(id), mode text NOT NULL CHECK(mode IN ('pls','card')), days int CHECK(days IN(30,90,365)), amount text NOT NULL CHECK(amount ~ '^[0-9]{1,78}$'), expires_at timestamptz NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), status text NOT NULL DEFAULT 'open', collectible boolean NOT NULL DEFAULT false, period_start timestamptz, period_end timestamptz, period_id text UNIQUE, CHECK ((mode='pls' AND days IS NOT NULL) OR (mode='card' AND period_start<period_end)));
+CREATE TABLE event(id text PRIMARY KEY, digest text NOT NULL, payment_id text NOT NULL, result text NOT NULL, received_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE payment_identity(payment_id text PRIMARY KEY, fingerprint text NOT NULL);
+CREATE TABLE credit(payment_id text PRIMARY KEY, invoice_id uuid NOT NULL UNIQUE REFERENCES invoice(id), account_id text NOT NULL REFERENCES customer(id), fingerprint text NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE grant_record(id uuid PRIMARY KEY, payment_id text NOT NULL UNIQUE REFERENCES credit(payment_id), account_id text NOT NULL REFERENCES customer(id), mode text NOT NULL, starts_at timestamptz NOT NULL, ends_at timestamptz NOT NULL, refunded boolean NOT NULL DEFAULT false, CHECK(starts_at<ends_at));
+CREATE INDEX grant_coverage ON grant_record(account_id,ends_at);
+CREATE TABLE api_key(id uuid PRIMARY KEY, account_id text NOT NULL REFERENCES customer(id), verifier text NOT NULL UNIQUE, label text NOT NULL, prefix text NOT NULL, revoked boolean NOT NULL DEFAULT false, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE usage_bucket(account_id text NOT NULL REFERENCES customer(id), day date NOT NULL, units int NOT NULL CHECK(units BETWEEN 0 AND 100), PRIMARY KEY(account_id,day));
+CREATE TABLE burst_bucket(account_id text PRIMARY KEY REFERENCES customer(id), minute timestamptz NOT NULL, units int NOT NULL);
+CREATE TABLE outbox(id uuid PRIMARY KEY, dedup text NOT NULL UNIQUE, recipient text NOT NULL CHECK(recipient ~ '^[^@]+@example[.]test$'), subject text NOT NULL, body text NOT NULL, attempts int NOT NULL DEFAULT 0, delivered_at timestamptz, next_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE used_link(digest text PRIMARY KEY, expires_at timestamptz NOT NULL);
+CREATE TABLE fake_provider.record(event_id text PRIMARY KEY, payment_id text NOT NULL, payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now());
+GRANT SELECT ON fake_provider.record TO lab_runtime;
+GRANT SELECT,INSERT ON fake_provider.record TO lab_provider;

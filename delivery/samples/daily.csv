@@ -1,0 +1,2 @@
+date_utc,display_day,origin_chain_id,payout_hex_per_tshare,payout_status,tshare_rate_hex,staked_percent,weighted_stake_length_days,circulating_hex,staked_hex,liquid_holders,active_stakers,stakes_started,stakes_ended,penalties_hex
+2019-12-13,11,369,,pending,10000,50,1,9007199254740993.12345678,9007199254740993.12345678,1,1,1,0,0

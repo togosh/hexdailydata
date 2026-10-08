@@ -1,0 +1,160 @@
+{
+  "kind": "starter-boundary-only",
+  "files": [
+    {
+      "path": ".dockerignore",
+      "bytes": 78,
+      "sha256": "58678750d17dddf020d47480fa3d037587adc73e4d0a49e339926505fad1b03d"
+    },
+    {
+      "path": ".editorconfig",
+      "bytes": 114,
+      "sha256": "78dc11bb60364cbb65afecce40c965fa2e395491632a96a5be330a37fe8daad8"
+    },
+    {
+      "path": ".gitattributes",
+      "bytes": 43,
+      "sha256": "7e9267da279a89acef866c56d577d498bccaaab6ea33f902a5ef38a0831f7e39"
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 111,
+      "sha256": "e5b11801fefad16072e22ba52d29578a9b323051f59e06ec23b854bfa44fcc35"
+    },
+    {
+      "path": ".lab-starter.json",
+      "bytes": 947,
+      "sha256": "18a15d43b83d45e483473d8d1f29d4567f0e738290343125c0fc9e7a04380709"
+    },
+    {
+      "path": ".npmrc",
+      "bytes": 45,
+      "sha256": "124f4a8713d0ebddc126496859aa6f538188f34576a7526a57c7cfa0d0e0b8b6"
+    },
+    {
+      "path": "AGENTS.md",
+      "bytes": 3809,
+      "sha256": "b162ca12f5543c91d8dcad68185f39b8ecdca92cf51ad3eb493b4f30b7cda7eb"
+    },
+    {
+      "path": "CODEX_PROMPT.txt",
+      "bytes": 6826,
+      "sha256": "fb21cac7fea14e92ff77645d9dd57890d3784b63217410f5908cfbcfe73cffc1"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1244,
+      "sha256": "eb645e55efa45740a3018dcb9258dd2f6de9fb01b9bd4745c15891187db30634"
+    },
+    {
+      "path": "STARTER_VALIDATION.md",
+      "bytes": 1926,
+      "sha256": "6d56943164ce8d53cc9af5725c2dd3b10aeb2f1c66421c5fa75657808476b6ac"
+    },
+    {
+      "path": "START_HERE.md",
+      "bytes": 4127,
+      "sha256": "40b7b55e2528e8130a0018a984965535e2316753110108e8e49ea20a71cfb65d"
+    },
+    {
+      "path": "config/acceptance-vectors.json",
+      "bytes": 1448,
+      "sha256": "07d65f132b48a8e21686c86a0180977907b8a17b3914770db4fa69864e70ef26"
+    },
+    {
+      "path": "config/resources.json",
+      "bytes": 700,
+      "sha256": "f53af80640ec9c38890fdd05bb28f4ff5d7fce259e16b31a0a1bf4e34db40355"
+    },
+    {
+      "path": "config/test-plan.json",
+      "bytes": 643,
+      "sha256": "b6508bdd1c5a441a520040af3755ebe8ffffb1547baf13da5bfcf9d98dae959d"
+    },
+    {
+      "path": "docs/ACCEPTANCE.md",
+      "bytes": 7447,
+      "sha256": "5671702e95b49644d07450f373b90f0b5c8e5a3fe00e290f4e9f7273fb559b51"
+    },
+    {
+      "path": "docs/INTEGRATION.md",
+      "bytes": 2297,
+      "sha256": "4bf72a5880fb3198e97603094ddd19be9f9612b492c177836f11c3d722c454b3"
+    },
+    {
+      "path": "docs/ISOLATION.md",
+      "bytes": 3844,
+      "sha256": "993e8c88abc4a4837c2c43ae18e9db2be691ded5a6f56f0567119c25dbec3db1"
+    },
+    {
+      "path": "docs/PRODUCT_AND_DATA.md",
+      "bytes": 10330,
+      "sha256": "f63276d2b5162d1a3359192c612515abb42fd79ae3dc5f3fa256aad7e0b4619f"
+    },
+    {
+      "path": "docs/REPORT_TEMPLATE.md",
+      "bytes": 1280,
+      "sha256": "acc8fd1b7065646f757fa49331e47e6129984c3c464fa0484f120123631f76e1"
+    },
+    {
+      "path": "docs/RESEARCH.md",
+      "bytes": 3557,
+      "sha256": "cfc5cdf2fdf697d82917fc9b90165dee90b31de2f85564707cff087ebf5a3503"
+    },
+    {
+      "path": "docs/REVIEW.md",
+      "bytes": 1888,
+      "sha256": "5cd5da0b2b26cdbb6f62401a914c1d5033ae59b5859fee8ea4725cb0d26d5be4"
+    },
+    {
+      "path": "docs/SOURCE_BASIS.md",
+      "bytes": 2794,
+      "sha256": "90a2b9abad9b0f6d221623b881bd2e2a3e2c4848e4589ba400a360155f137b1a"
+    },
+    {
+      "path": "package.json",
+      "bytes": 652,
+      "sha256": "a9ec2eb7a397f934fd3c2c605641340ddd6dbe3ea337a483f1f74bf92d794f7f"
+    },
+    {
+      "path": "reference/MAIN_V2_CONTEXT.md",
+      "bytes": 2248,
+      "sha256": "10c6329030669c0a26faf71d4135eb49467026ee1c6bc54aec8f5d4749e90ba4"
+    },
+    {
+      "path": "src/README.md",
+      "bytes": 265,
+      "sha256": "63d81c154a2a1947594aa8d34bf482da6644211ee659d46e21be33470f90de14"
+    },
+    {
+      "path": "tests/starter.test.mjs",
+      "bytes": 6133,
+      "sha256": "df06245acac88d6917957698d4809eb2cd63246e3bf79554a6c43b0d058857bd"
+    },
+    {
+      "path": "tools/lab.mjs",
+      "bytes": 7866,
+      "sha256": "138318933ce0b33897401a5ce3c5fedf1aea653d98979d589ce3a0f161d3d9c9"
+    },
+    {
+      "path": "tools/not-implemented.mjs",
+      "bytes": 148,
+      "sha256": "3e42063b69ffefe1b497b2bb85488c51b167e77a8fdc1fed49a8994cddfb6835"
+    },
+    {
+      "path": "tools/package-source.mjs",
+      "bytes": 330,
+      "sha256": "d8e4dc0bfbf5270199bc7f72bb4ace2ad1c56affafed018351b704f5c7d1f2d1"
+    },
+    {
+      "path": "tools/preflight.mjs",
+      "bytes": 322,
+      "sha256": "9e942bf3e7f006d73cd93546f61659b5d64053051f7d0d58a1b7ceac3d30cd34"
+    },
+    {
+      "path": "tools/setup.mjs",
+      "bytes": 314,
+      "sha256": "527fc7aff0ce839c1332d9749c8e06d2e27351d54355237c5d9edea88609cbc2"
+    }
+  ]
+}

@@ -1,0 +1,277 @@
+.api-guide {
+  max-width: 72rem;
+  margin-inline: auto;
+}
+.api-guide .api-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+}
+.api-guide .api-eyebrow {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--link);
+  font-weight: 650;
+  margin: 0 0 0.4rem;
+}
+.api-guide h1 {
+  font-size: 2.6rem;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+.api-guide h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+.api-guide h3 {
+  font-size: 1rem;
+  margin: 0 0 0.7rem;
+}
+.api-guide .api-hero p:not(.api-eyebrow) {
+  margin: 0.4rem 0 0;
+  color: var(--muted);
+}
+.api-guide .api-hero nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+.api-guide .api-hero nav div {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+}
+.api-guide .api-connection {
+  padding: 0.8rem 1rem;
+  margin-bottom: 1.5rem;
+}
+.api-guide .api-connection > div {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.api-guide .api-connection p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.api-guide code {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+.api-guide .api-copy {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+}
+.api-guide .api-copy [role='status'] {
+  color: var(--feedback);
+}
+.api-guide .api-copy button {
+  min-height: 34px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.8rem;
+}
+.api-guide .api-quickstart {
+  padding: 1rem;
+  margin-bottom: 2rem;
+}
+.api-guide .api-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.api-guide .api-section-heading .meta {
+  font-size: 0.8rem;
+}
+.api-guide .api-code-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 1rem;
+}
+.api-guide .api-code-grid > div {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--input);
+  overflow: hidden;
+}
+.api-guide .api-code-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.8rem;
+  min-height: 57px;
+}
+.api-guide [role='tablist'] {
+  display: flex;
+  gap: 0.2rem;
+}
+.api-guide [role='tab'] {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.8rem;
+  min-height: 34px;
+  border-color: transparent;
+  background: transparent;
+}
+.api-guide [role='tab'][aria-selected='true'] {
+  color: var(--link);
+  border-color: var(--accent);
+  background: var(--notice);
+}
+.api-guide pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.6;
+  margin: 0;
+  padding: 0.9rem;
+  user-select: text;
+  max-height: 20rem;
+  overflow: auto;
+}
+.api-guide pre code {
+  font-size: 0.78rem;
+}
+.api-guide .api-quick-help {
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.api-guide .api-quick-help summary {
+  padding: 0.2rem 0;
+}
+.api-guide .api-directory-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.api-guide .api-endpoint {
+  display: grid;
+  grid-template-columns: 2.75rem 1fr 1rem;
+  align-items: start;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  text-decoration: none;
+  min-width: 0;
+  color: var(--ink);
+}
+.api-guide .api-endpoint + .api-endpoint {
+  border-top: 1px solid var(--line);
+}
+.api-guide .api-endpoint:hover {
+  background: var(--notice);
+}
+.api-guide .api-endpoint strong {
+  display: block;
+  font-size: 0.9rem;
+}
+.api-guide .api-endpoint code {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin: 0.15rem 0;
+}
+.api-guide .api-purpose {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.api-guide .api-method {
+  color: var(--link);
+  font-size: 0.65rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  margin-top: 0.15rem;
+  text-align: center;
+}
+.api-guide .api-essentials {
+  margin-top: 2rem;
+}
+.api-guide .api-essentials > div {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 1.5rem;
+}
+.api-guide .api-essentials details {
+  border-top: 1px solid var(--line);
+  font-size: 0.875rem;
+  padding: 0.75rem 0;
+}
+.api-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.api-guide [id] {
+  scroll-margin-top: 1rem;
+}
+.api-guide .api-mobile-panes {
+  display: none;
+}
+@media (max-width: 700px) {
+  .api-guide .api-hero {
+    display: block;
+  }
+  .api-guide h1 {
+    font-size: 2.1rem;
+  }
+  .api-guide .api-hero nav {
+    margin-top: 1rem;
+    align-items: start;
+  }
+  .api-guide .api-code-grid,
+  .api-guide .api-directory-groups,
+  .api-guide .api-essentials > div {
+    grid-template-columns: 1fr;
+  }
+  .api-guide .api-section-heading {
+    align-items: start;
+  }
+  .api-guide .api-mobile-panes {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.7rem;
+  }
+  .api-guide .api-mobile-panes button {
+    padding: 0.3rem 0.75rem;
+    font-size: 0.85rem;
+    min-height: 36px;
+  }
+  .api-guide [data-pane='request'] .api-response,
+  .api-guide [data-pane='response'] .api-request {
+    display: none;
+  }
+  .api-guide .api-connection > div {
+    gap: 0.4rem 0.75rem;
+  }
+  .api-guide .api-quickstart {
+    padding: 0.8rem;
+  }
+  .api-guide pre {
+    min-height: 7rem;
+  }
+  .api-guide .api-endpoint {
+    padding: 0.75rem;
+    grid-template-columns: 2.5rem 1fr 0.8rem;
+    gap: 0.5rem;
+  }
+}

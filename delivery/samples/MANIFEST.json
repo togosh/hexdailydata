@@ -1,0 +1,247 @@
+{
+  "label": "SYNTHETIC SAMPLE: fixed partial demonstration; not chain captured",
+  "fixture": "paid-csv-fixed-v1",
+  "sourceFormatter": "serving388 src/worker/exports/datasets.ts (unchanged)",
+  "schemaHash": "ed36e0f08e45bc1f5c2a8893b23b4d3b42414b78f05e8207bfa3b32e747406db",
+  "files": {
+    "daily": {
+      "bytes": 330,
+      "sha256": "50f2fb0b8e84e2c49f2ffa285b26edae7d8eb6032e102d33085938b486e7eaf6",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "date_utc",
+          "unit": "UTC date"
+        },
+        {
+          "name": "display_day",
+          "unit": "one-based day"
+        },
+        {
+          "name": "origin_chain_id",
+          "unit": "source chain"
+        },
+        {
+          "name": "payout_hex_per_tshare",
+          "unit": "rounded ratio,12dp"
+        },
+        {
+          "name": "payout_status",
+          "unit": "materialized/pending"
+        },
+        {
+          "name": "tshare_rate_hex",
+          "unit": "HEX per T-share before bonuses"
+        },
+        {
+          "name": "staked_percent",
+          "unit": "rounded ratio,8dp"
+        },
+        {
+          "name": "weighted_stake_length_days",
+          "unit": "rounded ratio,8dp"
+        },
+        {
+          "name": "circulating_hex",
+          "unit": "exact HEX,8dp max"
+        },
+        {
+          "name": "staked_hex",
+          "unit": "exact HEX,8dp max"
+        },
+        {
+          "name": "liquid_holders",
+          "unit": "count"
+        },
+        {
+          "name": "active_stakers",
+          "unit": "count"
+        },
+        {
+          "name": "stakes_started",
+          "unit": "count"
+        },
+        {
+          "name": "stakes_ended",
+          "unit": "count"
+        },
+        {
+          "name": "penalties_hex",
+          "unit": "exact HEX,8dp max"
+        }
+      ]
+    },
+    "stakes": {
+      "bytes": 309,
+      "sha256": "990ca6f3bd64e30a0bc0abe73c36fabf8e51407297e5221d47f4aec2aa137be6",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "stake_id",
+          "unit": "integer string"
+        },
+        {
+          "name": "address",
+          "unit": "0x address"
+        },
+        {
+          "name": "principal_hex",
+          "unit": "exact HEX,8dp max"
+        },
+        {
+          "name": "tshares",
+          "unit": "exact T-shares,12dp max"
+        },
+        {
+          "name": "locked_day",
+          "unit": "zero-based contract day"
+        },
+        {
+          "name": "staked_days",
+          "unit": "days"
+        },
+        {
+          "name": "maturity_utc",
+          "unit": "UTC timestamp"
+        },
+        {
+          "name": "status",
+          "unit": "queued/open/mature_open/good_accounted/ended/cancelled"
+        },
+        {
+          "name": "started_utc",
+          "unit": "UTC timestamp"
+        },
+        {
+          "name": "ended_utc",
+          "unit": "UTC timestamp or empty"
+        },
+        {
+          "name": "payout_hex",
+          "unit": "exact settled HEX or empty"
+        },
+        {
+          "name": "penalty_hex",
+          "unit": "exact settled HEX or empty"
+        },
+        {
+          "name": "origin_chain_id",
+          "unit": "source of start event"
+        }
+      ]
+    },
+    "holders": {
+      "bytes": 229,
+      "sha256": "b90c83ae97e68b90bd6225f13edaf806902fa2cdafb32ada8fb33df03cef5d75",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "address",
+          "unit": "0x address"
+        },
+        {
+          "name": "liquid_hex",
+          "unit": "exact HEX"
+        },
+        {
+          "name": "accounted_staked_hex",
+          "unit": "exact HEX under named accounted-set definition"
+        },
+        {
+          "name": "total_hex",
+          "unit": "liquid+accounted staked, not claimable yield"
+        },
+        {
+          "name": "stake_count",
+          "unit": "count under same set"
+        },
+        {
+          "name": "liquid_rank",
+          "unit": "integer or empty"
+        },
+        {
+          "name": "staker_rank",
+          "unit": "integer or empty"
+        },
+        {
+          "name": "rank_date_utc",
+          "unit": "UTC date or empty"
+        }
+      ]
+    },
+    "maturities": {
+      "bytes": 123,
+      "sha256": "bcd30fa530c8d471fb7172cd9b97d445a370a2702310306301b9279cbd51fea2",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "date_utc",
+          "unit": "UTC date"
+        },
+        {
+          "name": "display_day",
+          "unit": "one-based scheduled maturity day"
+        },
+        {
+          "name": "stake_count",
+          "unit": "count"
+        },
+        {
+          "name": "principal_hex",
+          "unit": "exact HEX"
+        },
+        {
+          "name": "tshares",
+          "unit": "exact T-shares"
+        }
+      ]
+    },
+    "markets": {
+      "bytes": 175,
+      "sha256": "655ac848787f8779d8ecc7344c11848b4e52bcd1bf476d1e0b6ea2a73bc0e34a",
+      "rows": 1,
+      "columns": [
+        {
+          "name": "date_utc",
+          "unit": "UTC date"
+        },
+        {
+          "name": "price_open_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "price_high_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "price_low_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "price_close_usd",
+          "unit": "decimal or empty"
+        },
+        {
+          "name": "volume_usd",
+          "unit": "source-reported decimal or empty"
+        },
+        {
+          "name": "liquidity_usd",
+          "unit": "source-estimated decimal or empty"
+        },
+        {
+          "name": "source",
+          "unit": "named venue/source"
+        },
+        {
+          "name": "method",
+          "unit": "sampled-ohlc or source-reported"
+        },
+        {
+          "name": "coverage",
+          "unit": "complete/partial/missing under stated method"
+        }
+      ]
+    }
+  }
+}
