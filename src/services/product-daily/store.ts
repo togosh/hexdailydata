@@ -17,7 +17,8 @@ import {
 } from '../../contracts/product-daily.ts';
 import { PageCursors } from '../queries/cursor.ts';
 import { restart } from '../../api/errors.ts';
-import { columns, validateReadings } from './project.ts';
+import { columns, validateReadings, readingKey } from './project.ts';
+import { validateMarketHistory, preserveMarketHistory } from './market.ts';
 
 const names = ['daily.ndjson', 'daily.csv', 'metadata.json', 'exceptions.ndjson'];
 const manifestSchema = z.strictObject({
@@ -119,6 +120,7 @@ export async function admitProduct(
   }
   if (!files['daily.csv']!.equals(Buffer.from(csv(rows, columns))))
     throw Error('PRODUCT_CSV_MISMATCH');
+  validateMarketHistory(rows, metadata);
   const v = manifest.version,
     bundleId = `${v.slice(0, 8)}-${v.slice(8, 12)}-4${v.slice(13, 16)}-8${v.slice(17, 20)}-${v.slice(20, 32)}`;
   const csvBytes = files['daily.csv']!;
@@ -261,11 +263,11 @@ export class ProductDailyStore {
         )
           throw Error('PRODUCT_COVERAGE_REGRESSION');
         for (const old of previous.metadata.readings) {
-          const key = (r: typeof old) => (r.kind === 'market' ? r.kind + ':' + r.asset : r.kind);
-          const fresh = next.metadata.readings.find((r) => key(r) === key(old));
+          const fresh = next.metadata.readings.find((r) => readingKey(r) === readingKey(old));
           if (!fresh || Date.parse(fresh.observedAtUtc) < Date.parse(old.observedAtUtc))
             throw Error('READING_REGRESSION');
         }
+        preserveMarketHistory(previous, next);
       }
       mutationStarted = true;
       const stage = join(this.root, 'selection-' + randomUUID() + '.json');
@@ -409,6 +411,12 @@ export class ProductDailyStore {
       liquidity: freshness(null, 300, 'Pool valuation not qualified.'),
     };
     let pool: { chainId: 369; address: string; dex: string; version: string } | null = null;
+    let trackedSet: {
+      id: string;
+      poolCount: number;
+      measure: 'two-sided source reserveUSD estimate';
+      coverage: 'bounded contemporary HEX-pool cohort';
+    } | null = null;
     for (const r of m.readings) {
       if (r.kind === 'market') {
         values[
@@ -435,6 +443,19 @@ export class ProductDailyStore {
           60,
           'wei per gas, not transaction gas used or total fee.',
         );
+      } else if (r.kind === 'tracked-liquidity') {
+        values.trackedLiquidityUsd = r.value;
+        groups.liquidity = freshness(
+          r.observedAtUtc,
+          300,
+          'Source-derived two-sided USD estimate for an identified bounded HEX-pool cohort; not all HEX liquidity.',
+        );
+        trackedSet = {
+          id: r.set.id,
+          poolCount: r.set.pools.length,
+          measure: r.set.measure,
+          coverage: r.set.coverage,
+        };
       } else {
         values.trackedLiquidityUsd = r.value;
         groups.liquidity = freshness(
@@ -460,6 +481,7 @@ export class ProductDailyStore {
       coverage: m.pair.coverage,
       freshness: groups,
       pool,
+      trackedSet,
     };
   }
   home(snapshot: AdmittedProduct, now: number) {
@@ -467,10 +489,14 @@ export class ProductDailyStore {
       schemaVersion: productSchemaVersion,
       datasetVersion: snapshot.version,
       chain: 'pulsechain' as const,
-      daily: snapshot.rows.at(-1)!,
+      daily:
+        snapshot.rows.findLast((r) => r.snapshotRecordedAtUtc !== null) ?? snapshot.rows.at(-1)!,
       live: this.live(snapshot, now),
       methods: snapshot.metadata.methods,
       credits: snapshot.metadata.credits,
+      liquidityHistory: snapshot.rows
+        .slice(-90)
+        .map((r) => ({ dateUtc: r.dateUtc, value: r.trackedLiquidityUsd })),
     };
   }
   catalog(snapshot: AdmittedProduct) {

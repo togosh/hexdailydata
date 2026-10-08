@@ -45,7 +45,7 @@ export const productMetrics = {
   btcPriceUsd: ['Bitcoin price', 'USD/BTC', 'market'],
   ethPriceUsd: ['Ethereum price', 'USD/ETH', 'market'],
   plsPriceUsd: ['PulseChain price', 'USD/PLS', 'market'],
-  trackedLiquidityUsd: ['Tracked pool liquidity', 'USD', 'liquidity'],
+  trackedLiquidityUsd: ['Tracked HEX liquidity (USD estimate)', 'USD', 'liquidity'],
   gasPriceWei: ['Suggested gas price', 'wei/gas', 'gas'],
   baseFeeWei: ['Base fee', 'wei/gas', 'gas'],
   priorityFeeWei: ['Priority fee', 'wei/gas', 'gas'],
@@ -136,6 +136,28 @@ export const PairSchema = z.strictObject({
   stakeStartRecordCount: z.number().int().nonnegative(),
 });
 export type ProductPair = z.infer<typeof PairSchema>;
+export const TrackedSetSchema = z.strictObject({
+  id: digest,
+  measure: z.literal('two-sided source reserveUSD estimate'),
+  coverage: z.literal('bounded contemporary HEX-pool cohort'),
+  pools: z
+    .array(
+      z.strictObject({
+        address: AddressSchema,
+        dex: z.literal('PulseX'),
+        version: z.enum(['V1', 'V2']),
+        valueUsd: precise,
+      }),
+    )
+    .min(1)
+    .max(12),
+});
+export const LiquidityBucketSchema = z.strictObject({
+  dateUtc: z.iso.date(),
+  value: precise.nullable(),
+  setId: digest,
+  meaning: z.literal('source UTC-day bucket, not a verified close'),
+});
 export const ReadingSchema = z.discriminatedUnion('kind', [
   z.strictObject({
     kind: z.literal('market'),
@@ -165,6 +187,14 @@ export const ReadingSchema = z.discriminatedUnion('kind', [
     value: precise,
     observedAtUtc: utc,
   }),
+  z.strictObject({
+    kind: z.literal('tracked-liquidity'),
+    chainId: z.literal(369),
+    quote: z.literal('USD'),
+    value: precise,
+    observedAtUtc: utc,
+    set: TrackedSetSchema,
+  }),
 ]);
 export type ProductReading = z.infer<typeof ReadingSchema>;
 export const ProductMetadataSchema = z.strictObject({
@@ -178,6 +208,8 @@ export const ProductMetadataSchema = z.strictObject({
   rows: z.number().int().min(1).max(65536),
   effectiveAtUtc: utc,
   readings: z.array(ReadingSchema).max(8),
+  observations: z.array(ReadingSchema).max(4096).optional(),
+  liquidityHistory: z.array(LiquidityBucketSchema).max(4096).optional(),
   coverage: z.strictObject({
     snapshotDates: z.number().int().nonnegative(),
     ledgerDates: z.number().int().nonnegative(),
@@ -253,6 +285,15 @@ export const ProductLiveResponseSchema = z.strictObject({
       version: z.string(),
     })
     .nullable(),
+  trackedSet: z
+    .strictObject({
+      id: digest,
+      poolCount: z.number().int().min(1).max(12),
+      measure: z.literal('two-sided source reserveUSD estimate'),
+      coverage: z.literal('bounded contemporary HEX-pool cohort'),
+    })
+    .nullable()
+    .optional(),
 });
 export const ProductHomeResponseSchema = z.strictObject({
   schemaVersion: z.literal(productSchemaVersion),
@@ -262,6 +303,10 @@ export const ProductHomeResponseSchema = z.strictObject({
   live: ProductLiveResponseSchema,
   methods: z.array(z.string()),
   credits: z.string(),
+  liquidityHistory: z
+    .array(z.strictObject({ dateUtc: z.iso.date(), value: precise.nullable() }))
+    .max(90)
+    .optional(),
 });
 export const ProductDownloadsSchema = z.strictObject({
   status: z.literal('release_gated'),

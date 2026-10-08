@@ -7,6 +7,8 @@ import { useResource, endpoint } from './api.ts';
 import { Feedback } from './components.tsx';
 import { numberText } from './format.ts';
 import './product-daily.css';
+import { useState } from 'react';
+import ChartGraphic from './ChartGraphic.tsx';
 
 function Reading({
   label,
@@ -46,8 +48,18 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
         <Reading label="Ethereum price" value={data.ethPriceUsd} unit="USD / ETH" />
         <Reading label="PulseChain price" value={data.plsPriceUsd} unit="USD / PLS" />
         <Reading label="Suggested gas price" value={data.gasPriceWei} unit="wei / gas" />
-        <Reading label="Tracked pool liquidity" value={data.trackedLiquidityUsd} unit="USD" />
+        <Reading
+          label="Tracked HEX liquidity"
+          value={data.trackedLiquidityUsd}
+          unit="USD estimate"
+        />
       </div>
+      {data.trackedSet && (
+        <p>
+          {data.trackedSet.poolCount} identified HEX pools · bounded tracked set, not all HEX
+          liquidity. Source-derived two-sided USD estimate.
+        </p>
+      )}
       <div className="product-readings saved-readings">
         <Reading label="Saved holder records" value={data.savedHolderRecordCount} />
         <Reading label="Saved stake-start records" value={data.savedStakeStartRecordCount} />
@@ -103,6 +115,7 @@ export function Live() {
 export default function Home() {
   const resource = useResource(endpoint('/home'), ProductHomeResponseSchema);
   const h = resource.data;
+  const [liquidityDays, setLiquidityDays] = useState(90);
   return (
     <div className="daily-product">
       <div className="page-heading">
@@ -151,6 +164,40 @@ export default function Home() {
             </p>
           </section>
           <LiveValues data={h.live} />
+          <section className="panel daily-chart">
+            <div className="daily-chart-heading">
+              <h2>Tracked HEX liquidity (USD estimate)</h2>
+              <div>
+                <button onClick={() => setLiquidityDays(30)} aria-pressed={liquidityDays === 30}>
+                  30 days
+                </button>{' '}
+                <button onClick={() => setLiquidityDays(90)} aria-pressed={liquidityDays === 90}>
+                  90 days
+                </button>
+              </div>
+            </div>
+            {h.liquidityHistory?.some((p) => p.value !== null) ? (
+              <ChartGraphic
+                title="Tracked HEX liquidity observations"
+                points={h.liquidityHistory
+                  .slice(-liquidityDays)
+                  .map((p) => ({
+                    key: p.dateUtc,
+                    date: p.dateUtc,
+                    value: p.value,
+                    detail: 'USD estimate · fixed contemporary cohort · not a verified close',
+                    status: p.value === null ? 'unavailable' : 'recorded',
+                  }))}
+              />
+            ) : (
+              <p>No qualified tracked-liquidity history is available.</p>
+            )}
+            <p className="meta">
+              Fixed contemporary pool set. Daily buckets are source observations, not verified
+              closes. Missing pools produce gaps; no forward filling.
+            </p>
+            <a href="/daily?metric=trackedLiquidityUsd">View exact daily values</a>
+          </section>
           <section className="panel">
             <h2>Explore saved records</h2>
             <p>

@@ -751,3 +751,16 @@ No external requests, SQL, main merge, push, deployment or indexer restart.
 ### 2026-10-08 — Unified daily/latest local milestone
 
 Implemented normal daily/live/Home/CSV selection over the immutable bootstrap and ledger, automatically selected paired saved Search/address/stake readers, strict selector migration, precise UTC reporting and primary reference prices. File-backed publication/rollback and small restore passed; actual application/access and bounded desktop/mobile preview evidence retained. Live feeds remain null/stale, complete export release remains gated, and main/indexer/old stores remain untouched. See UNIFIED_DAILY.md and the task return for review, exact identities and limitations.
+
+### 2026-10-08 — Bounded PulseX market proof
+
+Added retained market observations and bounded tracked-pool liquidity to the same
+Daily/Live/Home service, with exact arithmetic, unchanged historical reference
+prices, protected CSV and a gap-aware Home chart. Focused publication, access,
+composed build and desktop/mobile checks have task-local receipts. The single
+public session closed PARTIAL after 89 attempts: a source USD formula check failed
+during the second round, and final identity repeats were not reached. Separate
+saved-data review rejected promotion; the selected saved product remains byte-
+identical and market values remain unavailable. Raw observations and all failures
+are retained in the pulsex-market-feed-r1 return. No main merge, deployment,
+scheduler, database access or indexer restart.

@@ -78,7 +78,7 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
   const readings = input.map((r) => ReadingSchema.parse(r));
   const keys = new Set<string>();
   for (const r of readings) {
-    const key = r.kind === 'market' ? r.kind + ':' + r.asset : r.kind;
+    const key = readingKey(r);
     if (keys.has(key) || Date.parse(r.observedAtUtc) > now)
       throw Error('READING_DUPLICATE_OR_FUTURE');
     keys.add(key);
@@ -87,6 +87,20 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
       (['HEX', 'PLS'].includes(r.asset) ? r.chainId !== 369 : r.chainId !== undefined)
     )
       throw Error('MARKET_CHAIN_IDENTITY');
+    if (r.kind === 'tracked-liquidity') {
+      const addresses = r.set.pools.map((p) => p.address);
+      if (
+        new Set(addresses).size !== addresses.length ||
+        r.set.pools.some((p) => compare(p.valueUsd, '0') < 0)
+      )
+        throw Error('TRACKED_SET_IDENTITY_OR_VALUE');
+      const sum = r.set.pools.reduce((total, p) => add(total, p.valueUsd), '0');
+      if (compare(sum, r.value) !== 0) throw Error('TRACKED_SET_TOTAL');
+      const identity = [...r.set.pools]
+        .sort((a, b) => a.address.localeCompare(b.address))
+        .map((p) => ({ address: p.address, venue: p.version === 'V1' ? 0 : 1 }));
+      if (hash(JSON.stringify(identity)) !== r.set.id) throw Error('TRACKED_SET_DIGEST');
+    }
     const values = r.kind === 'gas' ? [r.gasPriceWei, r.baseFeeWei, r.priorityFeeWei] : [r.value];
     for (const value of values)
       if (
@@ -98,6 +112,13 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
         throw Error('READING_UNITS_OR_VALUE');
   }
   return readings;
+}
+export function readingKey(r: ProductReading) {
+  return r.kind === 'market'
+    ? r.kind + ':' + r.asset
+    : r.kind === 'tracked-liquidity'
+      ? 'liquidity'
+      : r.kind;
 }
 export function projectDaily(input: {
   daily: Daily[];

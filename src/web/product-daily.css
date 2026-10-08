@@ -132,10 +132,11 @@
   }
   .product-readings,
   .live-product > .product-readings:first-of-type {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .daily-chart-heading {
     align-items: flex-start;
+    flex-wrap: wrap;
   }
   .daily-product .page-heading {
     display: block;
@@ -183,5 +184,6 @@
   }
   .product-reading strong {
     font-size: 0.95rem;
+    white-space: normal;
   }
 }

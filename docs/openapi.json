@@ -323,6 +323,42 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "trackedSet": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "pattern": "^[0-9a-f]{64}$"
+                            },
+                            "poolCount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 12
+                            },
+                            "measure": {
+                              "type": "string",
+                              "const": "two-sided source reserveUSD estimate"
+                            },
+                            "coverage": {
+                              "type": "string",
+                              "const": "bounded contemporary HEX-pool cohort"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "poolCount",
+                            "measure",
+                            "coverage"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     }
                   },
                   "required": [
@@ -4414,6 +4450,42 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "trackedSet": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[0-9a-f]{64}$"
+                                },
+                                "poolCount": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 12
+                                },
+                                "measure": {
+                                  "type": "string",
+                                  "const": "two-sided source reserveUSD estimate"
+                                },
+                                "coverage": {
+                                  "type": "string",
+                                  "const": "bounded contemporary HEX-pool cohort"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "poolCount",
+                                "measure",
+                                "coverage"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -4449,6 +4521,37 @@
                     },
                     "credits": {
                       "type": "string"
+                    },
+                    "liquidityHistory": {
+                      "maxItems": 90,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "dateUtc": {
+                            "type": "string",
+                            "format": "date",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "maxLength": 160,
+                                "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "dateUtc",
+                          "value"
+                        ],
+                        "additionalProperties": false
+                      }
                     }
                   },
                   "required": [

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { validatePackage } from '../dist/history-bootstrap/package.js';
 import { hash } from '../dist/history-bootstrap/normalize.js';
 import { projectDaily, productFiles } from '../dist/services/product-daily/project.js';
+import { applyMarketUpdate } from '../dist/services/product-daily/market.js';
 import {
   writeProductGeneration,
   ProductDailyStore,
@@ -20,6 +21,7 @@ for (let i = 0; i < args.length; i += 2) {
 }
 const allowed = {
   build: ['--profile'],
+  extend: ['--profile', '--update'],
   select: ['--profile', '--version', '--manifest'],
   rollback: ['--profile', '--version', '--manifest'],
   verify: ['--directory', '--manifest'],
@@ -34,7 +36,30 @@ if (command === 'verify') {
   console.log(JSON.stringify({ status: 'VERIFIED', version: p.version, rows: p.rows.length }));
 } else {
   const p = await readProductProfile(values['--profile']);
-  if (command === 'build') {
+  if (command === 'extend') {
+    const store = new ProductDailyStore(p.productRoot, p.pair);
+    await store.load();
+    const base = store.capture();
+    const input = await readFile(values['--update']);
+    if (input.length > 1024 * 1024) throw Error('MARKET_INPUT_BOUND');
+    const exceptions = (
+      await readFile(join(p.productRoot, base.version, 'exceptions.ndjson'), 'utf8')
+    )
+      .trimEnd()
+      .split('\n')
+      .filter(Boolean)
+      .map(JSON.parse);
+    const files = productFiles(applyMarketUpdate({ ...base, exceptions }, JSON.parse(input)));
+    const result = await writeProductGeneration(p.productRoot, files);
+    console.log(
+      JSON.stringify({
+        status: 'BUILT_UNSELECTED',
+        version: result.version,
+        manifestSha256: result.manifestSha256,
+        rows: result.rows.length,
+      }),
+    );
+  } else if (command === 'build') {
     const history = await validatePackage(p.history, p.historyManifestSha256);
     const ledger = await readFile(p.ledger);
     if (hash(ledger) !== p.ledgerSha256) throw Error('LEDGER_DIGEST');

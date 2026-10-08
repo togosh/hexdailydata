@@ -65,6 +65,12 @@ export function productPoints(rows: readonly ProductRow[], metric: ProductMetric
   }));
 }
 export function productObservation(row: ProductRow, metric: ProductMetric) {
+  if (
+    metric === 'trackedLiquidityUsd' &&
+    row.trackedLiquidityUsd !== null &&
+    row.liquidityRecordedAtUtc === null
+  )
+    return 'Source UTC-day reserve bucket; exact update time unavailable, not a verified close';
   if (metric === 'hexPriceUsd')
     return `${row.priceEra ?? 'No admitted market'} · ${row.priceRecordedAtUtc ?? 'Unavailable'}`;
   const kind = productMetrics[metric][2];
@@ -239,9 +245,11 @@ export default function History() {
             <p className="meta">
               {productMetrics[actualMetric][2] === 'daily-total'
                 ? 'Ledger totals use their contract day; the payout denominator is separate from snapshot T-shares.'
-                : productMetrics[actualMetric][2] === 'reference-price'
-                  ? 'Historical reference quotes are not live spot prices or verified daily closes.'
-                  : 'Snapshot time is the original recorded observation time, not a verified UTC daily close.'}
+                : actualMetric === 'trackedLiquidityUsd'
+                  ? 'Fixed contemporary HEX-pool cohort. Source daily reserve buckets are not verified closes; missing constituent pools produce gaps.'
+                  : productMetrics[actualMetric][2] === 'reference-price'
+                    ? 'Historical reference quotes are not live spot prices or verified daily closes.'
+                    : 'Snapshot time is the original recorded observation time, not a verified UTC daily close.'}
             </p>
           </section>
           <section className="panel">
