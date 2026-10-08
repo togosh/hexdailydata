@@ -1,30 +1,36 @@
 [
   {
     "id": "api-summary",
-    "title": "Summary & daily data",
+    "title": "Daily & latest",
     "routes": [
       {
         "id": "home",
         "title": "Home overview",
-        "description": "Summary with independently qualified price, share-rate and payout observations.",
+        "description": "Latest Daily context and independently aged latest readings.",
         "path": "/api/v2/home"
       },
       {
         "id": "daily",
         "title": "Daily history",
-        "description": "Native daily rows, HDS history or explicitly selected saved contract ledger.",
+        "description": "One selected reporting-date dataset.",
         "path": "/api/v2/daily"
       },
       {
+        "id": "latest",
+        "title": "Latest observations",
+        "description": "Latest qualified readings with their actual observation ages.",
+        "path": "/api/v2/live"
+      },
+      {
         "id": "markets",
-        "title": "Daily markets",
-        "description": "Separate market sources, methods and interval coverage.",
+        "title": "Daily market projection",
+        "description": "Convenience alias of the same Daily service.",
         "path": "/api/v2/markets/daily"
       },
       {
         "id": "calculator",
         "title": "Calculator inputs",
-        "description": "Qualified share rate and historical payout assumptions.",
+        "description": "Existing qualified calculation contract.",
         "path": "/api/v2/calculator/inputs"
       }
     ]
@@ -35,62 +41,50 @@
     "routes": [
       {
         "id": "stakes",
-        "title": "Stake list",
-        "description": "Indexed stakes with address, lifecycle and bounded maturity/principal filters.",
+        "title": "Stake records",
+        "description": "Selected saved stake-start list with original relationships.",
         "path": "/api/v2/stakes"
       },
       {
         "id": "stakeEvents",
         "title": "Stake activity",
-        "description": "Read stake lifecycle events since a saved, provable checkpoint.",
+        "description": "Existing canonical event contract, backend not activated here.",
         "path": "/api/v2/stake-events"
       },
       {
         "id": "stake",
         "title": "Stake detail",
-        "description": "Indexed stake and independently qualified recent observation.",
+        "description": "Original selected saved record and source links.",
         "path": "/api/v2/stakes/{id}"
       },
       {
         "id": "holders",
-        "title": "Holder rankings",
-        "description": "Liquid or staker ranking at a recorded daily cutoff.",
+        "title": "Holder records",
+        "description": "Selected saved holder-source rows.",
         "path": "/api/v2/holders"
       },
       {
         "id": "address",
         "title": "Address summary",
-        "description": "Indexed summary with separately pinned live information.",
+        "description": "Compatible selected holder balance and stake page.",
         "path": "/api/v2/addresses/{address}"
       },
       {
         "id": "addressStakes",
-        "title": "Address stake page",
-        "description": "Address-result shape including its pinned live stake page.",
+        "title": "Address stakes",
+        "description": "Same selected address/holder/stake projection.",
         "path": "/api/v2/addresses/{address}/stakes"
       }
     ]
   },
   {
     "id": "api-charts",
-    "title": "Charts",
+    "title": "Schedule",
     "routes": [
       {
-        "id": "nativeCharts",
-        "title": "Native charts",
-        "description": "Fixed native-ledger series with cutoff and truncation.",
-        "path": "/api/v2/charts/native"
-      },
-      {
-        "id": "archiveCharts",
-        "title": "Source-reported charts",
-        "description": "Fixed HDS archive series with source provenance.",
-        "path": "/api/v2/charts/archive"
-      },
-      {
         "id": "maturities",
-        "title": "Scheduled maturities",
-        "description": "Principal, shares and counts by scheduled maturity day.",
+        "title": "Maturity schedule",
+        "description": "Existing native schedule contract, backend not activated here.",
         "path": "/api/v2/charts/maturities"
       }
     ]
@@ -101,14 +95,14 @@
     "routes": [
       {
         "id": "downloads",
-        "title": "Download catalog",
-        "description": "Available immutable CSV bundles and their cutoffs.",
+        "title": "Complete export status",
+        "description": "Selected daily CSV implementation and release gate.",
         "path": "/api/v2/downloads"
       },
       {
         "id": "download",
-        "title": "Download CSV",
-        "description": "A dataset from an available catalog-selected bundle.",
+        "title": "Complete CSV",
+        "description": "Purchased-access protected selected daily file.",
         "path": "/api/v2/downloads/{bundle}/{dataset}"
       }
     ]
@@ -119,20 +113,20 @@
     "routes": [
       {
         "id": "status",
-        "title": "Data status",
-        "description": "Service metadata, coverage and observation status.",
+        "title": "System qualification",
+        "description": "Existing parked-indexer/system status.",
         "path": "/api/v2/status"
       },
       {
         "id": "live",
         "title": "Process liveness",
-        "description": "Whether the HTTP process is alive.",
+        "description": "Process health only.",
         "path": "/health/live"
       },
       {
         "id": "ready",
-        "title": "Dependency readiness",
-        "description": "Whether the database readiness check succeeds.",
+        "title": "Readiness",
+        "description": "Configured data dependency readiness.",
         "path": "/health/ready"
       }
     ]

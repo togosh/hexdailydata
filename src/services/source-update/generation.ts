@@ -32,7 +32,7 @@ const totals = SourceHolderTotalsSchema.parse({sourceRows:664405,representedAddr
   zeroBalanceRows:284162,negativeBalanceRows:1,zeroAddressRows:1,duplicateAddressGroups:0,duplicateNumeralGroups:0,ambiguousAddressGroups:0,
   sourceOnly:true,balancesIndependentlyVerified:false,sumsAreTotalSupply:false,activeStakerCountAvailable:false});
 type Route = 'holders'|'stakes'|'stake'|'address'|'addressStakes';
-type Query = {source:'subgraph';chain:'pulsechain';generation?:GenerationSelection;datasetVersion?:string;holderDatasetVersion?:string;limit?:number;cursor?:string;address?:string;order?:'source-id-asc'};
+type Query = {productVersion?:string;source:'subgraph';chain:'pulsechain';generation?:GenerationSelection;datasetVersion?:string;holderDatasetVersion?:string;limit?:number;cursor?:string;address?:string;order?:'source-id-asc'};
 type NewRow = {id:string;at:number;ownerAt?:number};
 type Overlay = {
   holders:Map<string,UpdatedHolderRecord>; stakes:Map<string,UpdatedStakeRecord>;
@@ -272,7 +272,7 @@ export class SavedSourceGenerations {
       const address=params.address??q.address??null,limit=q.limit??50;
       if(!Number.isInteger(limit)||limit<1||limit>100||address&&!/^0x[0-9a-f]{40}$/.test(address))throw unavailable();
       const count=route==='holders'?664435:address?this.stakes.ownerCount(address)+(this.overlay!.owners.get(address)?.length??0):954715;
-      const binding=sha(canonical([generation,ACCEPTED.familyVersions,route,q.source,q.chain,address,limit,'source-id-asc']));
+      const binding=sha(canonical([generation,ACCEPTED.familyVersions,route,q.source,q.chain,address,limit,'source-id-asc',q.productVersion??null]));
       const cursor=cursors.decode(q.cursor,binding,now);
       if(cursor&&(cursor.identity!==generation||!/^(0|[1-9][0-9]{0,6})$/.test(cursor.key)))throw restart();
       const offset=cursor?Number(cursor.key):0;if(offset>count)throw restart();

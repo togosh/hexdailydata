@@ -10,76 +10,48 @@ import {
   essentials,
   rules,
 } from '../src/documentation/metadata.mjs';
-import { responseExamples, savedStakeExamples, savedHolderExamples, savedUpdateExamples, errors as errorExamples } from '../src/documentation/examples.mjs';
+import {
+  responseExamples,
+  savedStakeExamples,
+  savedHolderExamples,
+  savedUpdateExamples,
+  errors as errorExamples,
+} from '../src/documentation/examples.mjs';
 
 const schema = (value) => {
   const { $schema, ...result } = z.toJSONSchema(value, { io: 'input', target: 'draft-2020-12' });
   return result;
 };
 
+const productExamples = JSON.parse(
+  readFileSync(new URL('../src/documentation/product-examples.json', import.meta.url)),
+);
+for (const id of ['daily', 'home', 'markets', 'latest', 'downloads'])
+  responseExamples[id] = productExamples[id];
+for (const id of ['stakes', 'stake', 'holders', 'address', 'addressStakes'])
+  responseExamples[id] = { accepted: savedUpdateExamples.responses[id] };
 function requestExamples(route) {
-  const date = { from: '2023-05-16', to: '2023-05-16' },
-    chain = { chain: 'pulsechain' };
-  const query = ['live', 'ready', 'download'].includes(route.id)
-    ? {}
-    : { ...chain, ...(['daily', 'markets'].includes(route.id) ? date : {}) };
+  const query = ['daily', 'markets'].includes(route.id)
+    ? { from: '2020-01-01', to: '2020-01-31' }
+    : {};
   const params =
     route.id === 'stake'
-      ? { id: '123' }
+      ? { id: '83544' }
       : route.id.startsWith('address')
-        ? { address: '0x' + '1'.repeat(40) }
+        ? { address: '0x' + '0'.repeat(36) + '0369' }
         : route.id === 'download'
           ? { bundle: '11111111-1111-4111-8111-111111111111', dataset: 'daily' }
           : {};
-  const samples = [
+  route.query.parse(query);
+  route.params.parse(params);
+  const path = route.path.replace(/:([a-z]+)/g, (_, key) => encodeURIComponent(params[key]));
+  return [
     {
-      label: route.id === 'daily' ? 'Native history' : 'GET example',
-      query,
-      params,
-      variant: route.id === 'daily' ? 'native' : undefined,
+      label: 'Normal request',
+      path: path + (Object.keys(query).length ? '?' + new URLSearchParams(query) : ''),
+      ...(route.id === 'download' ? { template: true } : {}),
     },
   ];
-  if (route.id === 'daily')
-    samples.push({
-      label: 'Source-reported HDS',
-      query: { ...query, source: 'hexdailystats' },
-      params,
-      variant: 'sourceReported',
-    });
-  if (route.id === 'stakes')
-    samples.push({
-      label: 'Synthetic maturity/5-HEX minimum example — not live data',
-      query: {
-        ...chain,
-        lifecycle: 'open',
-        limit: '3',
-        maturityFromDay: '2001',
-        maturityToDay: '2007',
-        minPrincipalHearts: '500000000',
-      },
-      params,
-    });
-  if (['stakes', 'stake', 'address', 'addressStakes'].includes(route.id))
-    samples.push({ label: 'Saved subgraph snapshot (opt-in)', query: { ...chain, ...savedStakeExamples.query[route.id] }, params: savedStakeExamples.params[route.id] ?? {}, variant: 'savedSubgraph' });
-  if (route.id === 'holders') samples.push({ label: 'Saved holder snapshot (opt-in)', query: { ...chain, ...savedHolderExamples.query }, params: {}, variant: 'savedSubgraph' });
-  if (savedUpdateExamples.responses[route.id]) samples.push({label:'Saved source update · 6 October 2026 (base plus observed updates)',query:savedUpdateExamples.query[route.id],params:savedUpdateExamples.params[route.id],variant:'savedUpdate'});
-  return samples.map((sample) => {
-    route.query.parse(sample.query);
-    route.params.parse(sample.params);
-    const path = route.path.replace(/:([a-z]+)/g, (_, name) =>
-      encodeURIComponent(sample.params[name]),
-    );
-    const search = new URLSearchParams(sample.query).toString();
-    return {
-      label: sample.label,
-      path: path + (search ? '?' + search : ''),
-      ...(sample.variant ? { variant: sample.variant } : {}),
-      ...(route.id === 'download' ? { template: true } : {}),
-      ...(['stake', 'address', 'addressStakes'].includes(route.id)
-        ? { note: sample.variant === 'savedUpdate' ? 'Actual base plus observed update example; fixed historical target, full B1 inventory unproved.' : sample.variant === 'savedSubgraph' ? 'Actual saved source example at the disclosed fixed block; not current data.' : 'Synthetic ID/address: replace with the record you need.' }
-        : {}),
-    };
-  });
 }
 
 const paths = {};
@@ -93,9 +65,21 @@ const header = (description) => ({ description, schema: { type: 'string' } });
 for (const route of routes) {
   const [summary, purpose, detail] = metadata[route.id];
   const sourceAddressOnly = ['address', 'addressStakes', 'stake'].includes(route.id);
-  const revalidates = jsonRevalidation.has(route.id) || route.id === 'download' || sourceAddressOnly;
-  const description = `${purpose}\n\n${detail}` + (dataRoutes.has(route.id) ? '\n\n' + essentials.errors + '\n\n' + essentials.access : route.id === 'download' ? '\n\n' + essentials.downloads : '\n\nPublic unmetered metadata. Authorization is ignored.');
-  const security = route.id === 'stakeEvents' || route.id === 'download' ? [{ bearerKey: [] }] : dataRoutes.has(route.id) ? [{}, { bearerKey: [] }] : [];
+  const revalidates =
+    jsonRevalidation.has(route.id) || route.id === 'download' || sourceAddressOnly;
+  const description =
+    `${purpose}\n\n${detail}` +
+    (dataRoutes.has(route.id)
+      ? '\n\n' + essentials.errors + '\n\n' + essentials.access
+      : route.id === 'download'
+        ? '\n\n' + essentials.downloads
+        : '\n\nPublic unmetered metadata. Authorization is ignored.');
+  const security =
+    route.id === 'stakeEvents' || route.id === 'download'
+      ? [{ bearerKey: [] }]
+      : dataRoutes.has(route.id)
+        ? [{}, { bearerKey: [] }]
+        : [];
   const headers = {
     'Content-Type': header(
       route.response
@@ -106,7 +90,9 @@ for (const route of routes) {
       route.id === 'download'
         ? 'private, no-store. Authorization is required before HEAD/304.'
         : revalidates
-          ? (sourceAddressOnly ? 'Saved subgraph only: public no-cache, must-revalidate; paid private, no-store. Native address responses retain no-store.' : 'Public JSON: no-cache, must-revalidate. Paid JSON: private, no-store.')
+          ? sourceAddressOnly
+            ? 'Public no-cache,must-revalidate; paid private,no-store.'
+            : 'Public JSON: no-cache, must-revalidate. Paid JSON: private, no-store.'
           : 'no-store',
     ),
     'Content-Length': header(
@@ -120,7 +106,8 @@ for (const route of routes) {
       'Content-Disposition': header('attachment; filename="{dataset}-{bundle}.csv"'),
       'Accept-Ranges': header('none; Range is ignored and the complete representation is sent.'),
     });
-  if (dataRoutes.has(route.id) || route.id === 'download') headers.Vary = header('Authorization, Cookie');
+  if (dataRoutes.has(route.id) || route.id === 'download')
+    headers.Vary = header('Authorization, Cookie');
   const parameters = [];
   for (const [location, object] of [
     ['query', route.query],
@@ -130,12 +117,17 @@ for (const route of routes) {
     // The four additive saved-source query variants keep native validation intact.
     if (json.anyOf) {
       const variants = json.anyOf;
-      const keys = [...new Set(variants.flatMap(v => Object.keys(v.properties ?? {})))];
-      json = { properties: Object.fromEntries(keys.map(key => {
-        const choices = variants.map(v => v.properties?.[key]).filter(Boolean);
-        const unique = [...new Map(choices.map(v => [JSON.stringify(v), v])).values()];
-        return [key, unique.length === 1 ? unique[0] : { anyOf: unique }];
-      })), required: keys.filter(key => variants.every(v => (v.required ?? []).includes(key))) };
+      const keys = [...new Set(variants.flatMap((v) => Object.keys(v.properties ?? {})))];
+      json = {
+        properties: Object.fromEntries(
+          keys.map((key) => {
+            const choices = variants.map((v) => v.properties?.[key]).filter(Boolean);
+            const unique = [...new Map(choices.map((v) => [JSON.stringify(v), v])).values()];
+            return [key, unique.length === 1 ? unique[0] : { anyOf: unique }];
+          }),
+        ),
+        required: keys.filter((key) => variants.every((v) => (v.required ?? []).includes(key))),
+      };
     }
     for (const [name, value] of Object.entries(json.properties ?? {}))
       parameters.push({
@@ -158,14 +150,26 @@ for (const route of routes) {
     },
   };
   if (jsonRevalidation.has(route.id) || route.id === 'download' || sourceAddressOnly)
-    responses[304] = { description: (sourceAddressOnly ? 'Saved subgraph variant only. ' : '') + 'Available identity and unchanged representation. No body.' };
+    responses[304] = {
+      description:
+        (sourceAddressOnly ? 'Saved subgraph variant only. ' : '') +
+        'Available identity and unchanged representation. No body.',
+    };
   if (route.response) {
     if (!responseExamples[route.id]) throw new Error(`Missing complete example: ${route.id}`);
     responses[200].content['application/json'].examples = Object.fromEntries(
       Object.entries(responseExamples[route.id]).map(([name, value]) => [
         name,
         {
-          summary: name === 'savedUpdate' ? 'Actual saved base-plus-observed-updates view — 6 October 2026, full B1 inventory unproved' : name === 'savedSubgraph' && ['holders', 'address', 'addressStakes'].includes(route.id) ? 'Actual saved subgraph example — 5 October 2026, not live data' : `Synthetic ${name} example — not live data`,
+          summary:
+            name === 'accepted'
+              ? 'Accepted historical local data; not live or deployed'
+              : name === 'savedUpdate'
+                ? 'Actual saved base-plus-observed-updates view — 6 October 2026, full B1 inventory unproved'
+                : name === 'savedSubgraph' &&
+                    ['holders', 'address', 'addressStakes'].includes(route.id)
+                  ? 'Actual saved subgraph example — 5 October 2026, not live data'
+                  : `Synthetic ${name} example — not live data`,
           value: route.response.parse(value),
         },
       ]),
@@ -266,9 +270,9 @@ const output =
       openapi: '3.1.0',
       info: {
         title: 'HEXDailyData API reference',
-        version: '2.0.0',
+        version: '2.1.0-unified-daily',
         description:
-          'Read-only HEX data for apps, scripts and dashboards. Native examples are synthetic; saved-source examples disclose their historical pin. No public deployment or current data claim.\n\n' +
+          'Read-only HEX data for apps, scripts and dashboards. The normal Daily/Live contract is version daily-product-1; provider/view selectors have retired. Accepted examples are saved historical data; other backend examples are labelled synthetic. No public deployment or current data claim.\n\n' +
           essentials.exact +
           '\n\n' +
           essentials.freshness +
@@ -277,7 +281,16 @@ const output =
       servers: [{ url: '/', description: 'Current origin; no hosted service is implied.' }],
       tags: groups.map((g) => ({ name: g.title })),
       paths,
-      components: { securitySchemes: { bearerKey: { type: 'http', scheme: 'bearer', description: 'Existing account API key in Authorization only. Complete CSV also accepts the actual same-origin account session.' } } },
+      components: {
+        securitySchemes: {
+          bearerKey: {
+            type: 'http',
+            scheme: 'bearer',
+            description:
+              'Existing account API key in Authorization only. Complete CSV also accepts the actual same-origin account session.',
+          },
+        },
+      },
       'x-essentials': essentials,
     },
     null,

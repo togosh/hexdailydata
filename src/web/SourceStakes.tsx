@@ -1,4 +1,9 @@
-import { SavedStakeResponseSchema, SavedStakesResponseSchema, SavedAddressResponseSchema, type UpdatedStakeRecord } from '../contracts/source-update.ts';
+import {
+  SavedStakeResponseSchema,
+  SavedStakesResponseSchema,
+  SavedAddressResponseSchema,
+  type UpdatedStakeRecord,
+} from '../contracts/source-update.ts';
 import { ACCEPTED } from '../contracts/saved-generation.ts';
 import { SourceUpdateDisclosure } from './SourceUpdateDisclosure.tsx';
 import type { z } from 'zod';
@@ -27,28 +32,16 @@ const navigate = (url: string) => {
   history.pushState(null, '', url);
   window.dispatchEvent(new PopStateEvent('popstate'));
 };
-export function sourceHref(path: string, version?: string) {
-  const generation = version === ACCEPTED.familyVersions.stakeStarts ? ACCEPTED.generation
-    : version === ACCEPTED.baseBindings.stakeStarts.datasetVersion ? 'base' : selection().get('generation') ?? 'base';
-  const q = new URLSearchParams({ source: 'subgraph', generation });
-  if (version) q.set('datasetVersion', version);
-  q.set('holderDatasetVersion', generation === 'base' ? ACCEPTED.baseBindings.tokenHolders.datasetVersion : ACCEPTED.familyVersions.tokenHolders);
-  return path + '?' + q;
+export function sourceHref(path: string, _version?: string) {
+  return path;
 }
 export function SourceChoice() {
-  const q = selection(), saved = q.get('source') === 'subgraph';
-  return <label className="view-picker">Source<select aria-label="Stake source"
-    value={saved ? q.get('generation') ?? 'base' : 'native'} onChange={e => {
-      if (e.target.value === 'native') navigate(location.pathname);
-      else { const next = new URLSearchParams({source:'subgraph',generation:e.target.value});
-        if(q.get('view') === 'holders') next.set('view','holders'); navigate(location.pathname+'?'+next); }
-    }}><option value="native">Native / recent observations</option>
-      <option value="base">Saved subgraph · 5 Oct 2026</option>
-      <option value={ACCEPTED.generation}>Saved source update · 6 Oct 2026</option>
-    </select></label>;
+  return null;
 }
 
-type Envelope = Pick<z.infer<typeof SavedStakesResponseSchema>, 'snapshot' | 'datasetVersion'> & { generation?: string };
+type Envelope = Pick<z.infer<typeof SavedStakesResponseSchema>, 'snapshot' | 'datasetVersion'> & {
+  generation?: string;
+};
 function Disclosure({ data }: { data: Envelope }) {
   if (data.generation) return <SourceUpdateDisclosure />;
   return (
@@ -98,7 +91,13 @@ function Amount({ value, unit }: { value: string; unit: 'HEX' | 'T-shares' }) {
     </span>
   );
 }
-function SourceRows({ items, version }: { items: (SourceStakeRecord | UpdatedStakeRecord)[]; version: string }) {
+function SourceRows({
+  items,
+  version,
+}: {
+  items: (SourceStakeRecord | UpdatedStakeRecord)[];
+  version: string;
+}) {
   return (
     <>
       <div className="stake-desktop">
@@ -178,15 +177,13 @@ function SourceRows({ items, version }: { items: (SourceStakeRecord | UpdatedSta
 function SavedList({ address }: { address?: string }) {
   const q = selection(),
     cursor = q.get('cursor') ?? undefined,
-    version = q.get('datasetVersion') ?? undefined;
-  const data = useResource<z.infer<typeof SavedAddressResponseSchema> | z.infer<typeof SavedStakesResponseSchema>>(
+    version = undefined;
+  const data = useResource<
+    z.infer<typeof SavedAddressResponseSchema> | z.infer<typeof SavedStakesResponseSchema>
+  >(
     endpoint(address ? '/addresses/' + address + '/stakes' : '/stakes', {
-      source: 'subgraph',
-      generation: selection().get('generation') ?? 'base',
       limit: 20,
       cursor,
-      datasetVersion: version,
-      ...(address ? { holderDatasetVersion: q.get('holderDatasetVersion') ?? undefined } : {}),
     }),
     address ? SavedAddressResponseSchema : SavedStakesResponseSchema,
   );
@@ -206,7 +203,9 @@ function SavedList({ address }: { address?: string }) {
       </div>
       <SourceChoice />
       {!address && <SavedBrowseChoice view="stakes" />}
-      {body && 'holder' in body && <SavedHolderBalance holder={body.holder} liquidBalance={body.liquidBalance} />}
+      {body && 'holder' in body && (
+        <SavedHolderBalance holder={body.holder} liquidBalance={body.liquidBalance} />
+      )}
       <section
         className="panel source-stakes"
         data-testid="source-stake-list"
@@ -229,9 +228,12 @@ function SavedList({ address }: { address?: string }) {
             <Disclosure data={body} />
             <p>
               {numberText(String(body.sourceStartCount))} source start records
-              {address ? ' for this address' : 'generation' in body ? ' in this local base-plus-updates view; complete B1 population is unproved' : ' in this saved inventory'}.{' '}
-              {address &&
-                'This is not an active-stake count. Ranks are unavailable.'}
+              {address
+                ? ' for this address'
+                : 'generation' in body
+                  ? ' in this local base-plus-updates view; complete B1 population is unproved'
+                  : ' in this saved inventory'}
+              . {address && 'This is not an active-stake count. Ranks are unavailable.'}
             </p>
             <SourceRows items={body.items} version={body.datasetVersion} />
             {!body.items.length && (
@@ -245,14 +247,7 @@ function SavedList({ address }: { address?: string }) {
               <button
                 disabled={!body.nextCursor || data.loading}
                 onClick={() => {
-                  const next = new URLSearchParams({
-                    source: 'subgraph',
-      generation: selection().get('generation') ?? 'base',
-                    cursor: body.nextCursor!,
-                  });
-                  next.set('datasetVersion', body.datasetVersion);
-                  next.set('generation', 'generation' in body ? body.generation : 'base');
-                  if (address && q.has('holderDatasetVersion')) next.set('holderDatasetVersion', q.get('holderDatasetVersion')!);
+                  const next = new URLSearchParams({ cursor: body.nextCursor! });
                   navigate(location.pathname + '?' + next);
                 }}
               >
@@ -268,14 +263,7 @@ function SavedList({ address }: { address?: string }) {
 }
 
 function SavedStake({ id }: { id: string }) {
-  const data = useResource(
-    endpoint('/stakes/' + id, {
-      source: 'subgraph',
-      generation: selection().get('generation') ?? 'base',
-      datasetVersion: selection().get('datasetVersion') ?? undefined,
-    }),
-    SavedStakeResponseSchema,
-  );
+  const data = useResource(endpoint('/stakes/' + id, {}), SavedStakeResponseSchema);
   const body = data.data,
     item = body?.item,
     s = item?.reported;
@@ -347,8 +335,22 @@ function SavedStake({ id }: { id: string }) {
                   record. See original evidence below.
                 </p>
               )}
-              {'observation' in item && <p>Record observation: {item.observation.kind === 'retained_base' ? 'retained from base' : 'directly observed update'} · {item.observation.snapshot.observedAtUtc}.</p>}
-              {'discrepancyAssessment' in item && item.discrepancyAssessment === 'unassessed_after_update' && <p className="notice">Updated packed-field differences are unassessed. Historical base findings are retained separately in the evidence.</p>}
+              {'observation' in item && (
+                <p>
+                  Record observation:{' '}
+                  {item.observation.kind === 'retained_base'
+                    ? 'retained from base'
+                    : 'directly observed update'}{' '}
+                  · {item.observation.snapshot.observedAtUtc}.
+                </p>
+              )}
+              {'discrepancyAssessment' in item &&
+                item.discrepancyAssessment === 'unassessed_after_update' && (
+                  <p className="notice">
+                    Updated packed-field differences are unassessed. Historical base findings are
+                    retained separately in the evidence.
+                  </p>
+                )}
               <details className="source-record-evidence">
                 <summary>Original source values and evidence</summary>
                 <p>
@@ -394,5 +396,5 @@ export function SourceStakes({ path }: { path: string }) {
       </>
     );
   }
-  return selection().get('view') === 'holders' ? <SourceHolders /> : <SavedList />;
+  return selection().get('kind') === 'holders' ? <SourceHolders /> : <SavedList />;
 }

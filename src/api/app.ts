@@ -78,6 +78,7 @@ export function createApp(
     if (deps.downloads && staticRoots.length && !deps.downloads.root) throw Error('Actual export root required for static isolation.');
     if (deps.downloads?.root && options.exportRoot && deps.downloads.root !== options.exportRoot) throw Error('Export root mismatch.');
     await validateStaticRoots(staticRoots, deps.downloads?.root ?? options.exportRoot);
+    if (deps.productDaily) await validateStaticRoots(staticRoots, deps.productDaily.root);
     if (deps.sourceStakes) await validateStaticRoots(staticRoots, deps.sourceStakes.root);
     if (deps.sourceHolders) await validateStaticRoots(staticRoots, deps.sourceHolders.root);
     if (deps.sourceGenerations) for (const root of [deps.sourceGenerations.root, deps.sourceGenerations.holders.root, deps.sourceGenerations.stakes.root]) await validateStaticRoots(staticRoots, root);
@@ -189,6 +190,9 @@ export function createApp(
   );
   for (const route of routes)
     app.get(route.path, async (request, reply) => {
+      const incoming = request.query as Record<string, unknown>;
+      if (route.path.startsWith('/api/v2/') && ['source','view','series','generation','datasetVersion','holderDatasetVersion','revision','afterSourceDay'].some(k => Object.hasOwn(incoming,k)))
+        throw new ApiFailure(400, 'selection_migrated', 'Provider/view/version selection has retired. Use the normal route; restart pagination.');
       const query = route.query.safeParse(request.query),
         params = route.params.safeParse(request.params);
       if (!query.success || !params.success)
@@ -215,16 +219,27 @@ export function createApp(
           throw new ApiFailure(503, 'not_initialized', 'Data dependencies are not configured.');
         return deps.db;
       };
+      const productRoutes = ['home','daily','markets','latest','stakes','stake','holders','address','addressStakes','downloads','download'];
+      let product = productRoutes.includes(route.id) && route.id !== 'download' ? deps.productDaily?.capture() : undefined;
+      if (productRoutes.includes(route.id) && route.id !== 'download' && !product) throw unavailable();
+      if (product && ['holders','stakes','stake','address','addressStakes'].includes(route.id)) {
+        if (!deps.sourceGenerations || deps.sourceGenerations.descriptor.generation !== product.metadata.pair.generation || deps.sourceGenerations.descriptor.holderDatasetVersion !== product.metadata.pair.holderDatasetVersion || deps.sourceGenerations.descriptor.stakeDatasetVersion !== product.metadata.pair.stakeDatasetVersion) throw unavailable();
+        q.source='subgraph'; q.generation=product.metadata.pair.generation; q.productVersion=product.version;
+      }
       let body: unknown;
       if (q.source === 'subgraph' && q.generation && q.generation !== 'base' && !deps.sourceGenerations) throw unavailable();
       if (q.source === 'subgraph' && deps.sourceGenerations && ['holders','stakes','stake','address','addressStakes'].includes(route.id)) {
         body = await deps.sourceGenerations.read(route.id as 'holders'|'stakes'|'stake'|'address'|'addressStakes', q, p, signal, paid ? cursors : publicCursors, now());
       } else switch (route.id) {
+        case 'latest':
+          body = deps.productDaily!.live(product!, now());
+          break;
         case 'live':
           body = { status: 'live', mode: options.mode ?? 'development' };
           break;
         case 'ready':
-          await db().read(signal, (c) => c.query('SELECT 1'));
+          if (deps.productDaily) deps.productDaily.capture();
+          else await db().read(signal, (c) => c.query('SELECT 1'));
           body = { status: 'ready' };
           break;
         case 'status':
@@ -238,33 +253,17 @@ export function createApp(
           );
           break;
         case 'home': {
-          body = await home(db(), q.chain, signal, now(), options.mode);
-          const h = body as Awaited<ReturnType<typeof home>>;
-          if (!h.current && !h.daily && Object.values(h.live).every((o) => o.value === null))
-            throw new ApiFailure(
-              503,
-              'not_initialized',
-              'No useful Home observations are available.',
-            );
+          body = deps.productDaily!.home(product!, now());
           break;
         }
         case 'daily':
-          if (q.source === 'contract-ledger') {
-            if (!deps.dailyLedger) throw unavailable();
-            body = DailyLedgerResponseSchema.parse(await deps.dailyLedger.read(q, signal));
-          } else body = await daily(db(), q, signal);
-          break;
-        case 'archiveCharts':
-          body = await archiveCharts(db(), signal);
-          break;
-        case 'nativeCharts':
-          body = await nativeCharts(db(), signal, now());
+          body = deps.productDaily!.read(product!, q, route.id, paid ? cursors : publicCursors, now(), paid ? 'paid' : 'public');
           break;
         case 'maturities':
           body = await maturities(db(), signal);
           break;
         case 'markets':
-          body = await markets(db(), q, signal);
+          body = deps.productDaily!.read(product!, q, route.id, paid ? cursors : publicCursors, now(), paid ? 'paid' : 'public');
           break;
         case 'stakes':
           if (q.source === 'subgraph') {
@@ -372,9 +371,7 @@ export function createApp(
           break;
         }
         case 'downloads':
-          body = deps.downloads
-            ? await deps.downloads.catalog(chainId(q.chain))
-            : { status: 'rebuilding', bundles: [] };
+          body = deps.productDaily!.catalog(product!);
           break;
         case 'download': {
           if (!options.downloadAuthorizer) throw unavailable();
@@ -386,10 +383,11 @@ export function createApp(
             throw unavailable();
           }
           if (!authorization.accountId) throw unavailable();
-          if (!deps.downloads) throw unavailable();
+          if (!deps.productDaily) throw unavailable();
+          product = deps.productDaily.capture();
           const release = downloadAdmission.acquire(authorization.accountId);
           let opened;
-          try { opened = await deps.downloads.openStream(p.bundle, p.dataset, signal); }
+          try { opened = deps.productDaily.openExport(product!, p.bundle, p.dataset, signal); }
           catch (e) { release(); throw e; }
           if (opened.status === 'available') void opened.released.then(release, release);
           else release();
@@ -432,8 +430,8 @@ export function createApp(
       if (Buffer.byteLength(json) > maxBytes) throw unavailable();
       if (jsonRevalidation.has(route.id) || (q.source === 'subgraph' && ['address', 'addressStakes', 'stake'].includes(route.id))) {
         const updatedSource = q.source === 'subgraph' && body && typeof body === 'object' && 'generation' in body;
-        const representation = updatedSource
-          ? JSON.stringify(['saved-update-v1', route.id, q, p, paid ? 'paid' : 'public', json])
+        const representation = product || updatedSource
+          ? JSON.stringify(['unified-product-v1', route.id, q, p, paid ? 'paid' : 'public', json])
           : json;
         const etag = '"' + createHash('sha256').update(representation).digest('hex') + '"';
         reply.header('Cache-Control', paid ? 'private, no-store' : 'no-cache, must-revalidate').header('ETag', etag);
@@ -466,6 +464,8 @@ export function createApp(
     for (const path of [
       '/api',
       '/api/reference',
+      '/daily',
+      '/live',
       '/charts',
       '/charts/detail',
       '/charts/maturities',

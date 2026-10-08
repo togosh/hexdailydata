@@ -9,3 +9,8 @@ Internal normalization covers2,501 source days from2,503 PulseChain-labelled ori
 Separate reference-price series admit1,237 PulseChain observations and early Ethereum-origin661 V2/600 V3 observations through end2022. These are reviewed source observations, not independently verified trades/closes. Earliest UV1/composite timing/mechanism and the2023 Ethereum boundary interval remain unresolved. Pre-fork history never becomes pHEX returns/ATH/ROI. Known price exclusions remain; BTC/ETH currency assumptions, liquidity placeholders and missing gas are not promoted.
 
 Current/live feeds, full beginning/fork provenance, earliest defensible prices, ordinary API activation, recurring refresh, data rights, SQL/payments and deployment qualification remain requirements. Pending SQL invariants are unperformed gates, not proved defects. Branch integration is not main merge or deployment. Indexer PARKED.
+
+
+## Unified daily/live candidate, 8 October 2026
+
+The candidate now serves one `daily-product-1` reporting projection and one latest response, described in UNIFIED_DAILY.md. This supersedes earlier public source/view/generation-selection guidance, while preserving original input evidence. There are 2,501 reporting dates, 2,498 independently pinned payout periods and 2,194 non-null primary historical HEX references. Calendar changes are recomputed on consecutive dates; held penalties/yield remain null. Live market/gas/liquidity inputs remain unavailable, and the saved B0-plus-observed-B1 holder/stake pair is stale, not a complete target census. Main, original ledger/bases, native operator code and the parked indexer are unchanged. No external acquisition, SQL, production activation, merge or deployment occurred.

@@ -9,8 +9,8 @@ export const operationLink = (id: string) => {
 export const examples = {
   home: '/api/v2/home?chain=pulsechain',
   daily: '/api/v2/daily?chain=pulsechain&from=2023-05-15&to=2023-05-16',
-  stakes: '/api/v2/stakes?chain=pulsechain&lifecycle=open&limit=25',
-  hds: '/api/v2/daily?chain=pulsechain&source=hexdailystats&from=2023-05-15&to=2023-05-16',
+  stakes: '/api/v2/stakes?limit=25',
+  latest: '/api/v2/live',
   catalog: '/api/v2/downloads?chain=pulsechain',
 } as const;
 export type ExampleId = keyof typeof examples;
@@ -23,11 +23,14 @@ export function requestCode(origin: string, language: ExampleLanguage, path: str
   if (!['http:', 'https:'].includes(base.protocol)) throw new Error('An HTTP origin is required.');
   const url = new URL(path, base.origin).href;
   const accept = csv ? 'text/csv' : 'application/json';
-  const paid = csv || path.startsWith('/api/v2/stake-events') || /maturityFromDay|minPrincipalHearts/.test(path);
+  const paid =
+    csv ||
+    path.startsWith('/api/v2/stake-events') ||
+    /maturityFromDay|minPrincipalHearts/.test(path);
   if (language === 'cURL')
     return `curl --fail-with-body --silent --show-error ${paid ? '--header "Authorization: Bearer $HDD_API_KEY" ' : ''}--header 'Accept: ${accept}' '${url.replaceAll("'", "'\\''")}'`;
   if (language === 'Python')
-    return `import json${paid ? ", os" : ""}
+    return `import json${paid ? ', os' : ''}
 from urllib.request import Request, urlopen
 
 request = Request(${JSON.stringify(url)}, headers={"Accept": "${accept}"${paid ? ', "Authorization": "Bearer " + os.environ["HDD_API_KEY"]' : ''}})
@@ -44,26 +47,10 @@ const data = await response.${csv ? 'text' : 'json'}();
 // Keep exact numeric strings; check component status before use.
 console.log(data);`;
 }
-// Projection of the archived schema-valid Home fixture, not a complete response.
+// Small explicitly synthetic shape excerpt; real examples are in the generated reference.
 export const homeExcerpt = {
-  live: {
-    price: { status: 'unavailable', value: null },
-    shareRate: {
-      status: 'fresh',
-      value: { rawShareRate: '100001', hexPerTShareBeforeBonuses: '10000.1' },
-    },
-    latestCompletedPayout: {
-      status: 'stale',
-      value: {
-        contractDay: 1000,
-        displayDay: 1001,
-        hexPerTShare: '0.33333333',
-        payoutHearts: '1',
-        stakeShares: '30000',
-        kind: 'completed',
-      },
-    },
-  },
+  daily: { dateUtc: '2020-01-01', circulatingHEX: '100.00' },
+  live: { hexPriceUsd: null, freshness: { HEX: { status: 'unavailable' } } },
 } as const;
 export const errorExample = {
   error: { code: 'invalid_request', message: 'Invalid request.', retryable: false },
@@ -71,7 +58,10 @@ export const errorExample = {
 };
 export const errorGuidance = [
   [401, 'Supplied key is invalid; never retry as public access.'],
-  [403, 'An active API key is required for this selection. Restart pagination when changing access mode.'],
+  [
+    403,
+    'An active API key is required for this selection. Restart pagination when changing access mode.',
+  ],
   [400, 'Malformed input: check paths, query fields and bounds.'],
   [
     409,

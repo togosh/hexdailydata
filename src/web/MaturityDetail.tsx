@@ -3,7 +3,7 @@ import { MaturitiesSchema } from '../contracts/charts.ts';
 import { formatUnits } from '../domain/units.ts';
 import { endpoint, useResource } from './api.ts';
 import { Feedback } from './components.tsx';
-import { Chart } from './History.tsx';
+import Chart from './ChartGraphic.tsx';
 import { dayDate } from './format.ts';
 import { validRange } from './history.ts';
 import type { MaturityUnit } from './charts.ts';
@@ -39,12 +39,6 @@ export default function MaturityDetail() {
       <a href="/charts">← All charts</a>
       <h1>Upcoming Maturities</h1>
       <div className="panel controls">
-        <label>
-          Source
-          <select aria-label="Source">
-            <option>Native indexed stakes</option>
-          </select>
-        </label>
         <label>
           Metric
           <select
@@ -117,7 +111,7 @@ export default function MaturityDetail() {
           </details>
           {rows.length ? (
             <section className="panel">
-              <Chart points={points} title="Indexed maturity schedule" unit={unit} schedule />
+              <Chart points={points} title="Indexed maturity schedule" bars />
             </section>
           ) : (
             <p className="notice">

@@ -3,7 +3,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { ApiFailure, restart } from './errors.ts';
 
 export const dataRoutes = new Set([
-  'home', 'daily', 'markets', 'stakes', 'stakeEvents', 'stake', 'address',
+  'home', 'latest', 'daily', 'markets', 'stakes', 'stakeEvents', 'stake', 'address',
   'addressStakes', 'holders', 'calculator', 'archiveCharts', 'nativeCharts', 'maturities',
 ]);
 export interface PaidReads {

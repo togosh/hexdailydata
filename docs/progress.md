@@ -746,3 +746,8 @@ Composed host build, focused history/access checks, saved-data browser views and
 small file-package restore have task-local receipts. Independent review and final
 commit/package identities are recorded in the separate history-bootstrap R2 return.
 No external requests, SQL, main merge, push, deployment or indexer restart.
+
+
+### 2026-10-08 — Unified daily/latest local milestone
+
+Implemented normal daily/live/Home/CSV selection over the immutable bootstrap and ledger, automatically selected paired saved Search/address/stake readers, strict selector migration, precise UTC reporting and primary reference prices. File-backed publication/rollback and small restore passed; actual application/access and bounded desktop/mobile preview evidence retained. Live feeds remain null/stale, complete export release remains gated, and main/indexer/old stores remain untouched. See UNIFIED_DAILY.md and the task return for review, exact identities and limitations.

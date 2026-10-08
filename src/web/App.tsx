@@ -1,5 +1,5 @@
 import { Component, type ReactNode, lazy, Suspense, useEffect, useState } from 'react';
-import Home from './Home.tsx';
+import Home, { Live } from './Home.tsx';
 import { revealAnchor } from './anchors.ts';
 import { SearchForm } from './components.tsx';
 import { Dialog, HexMark, Icon, type IconName } from './visuals.tsx';
@@ -36,7 +36,8 @@ const Learn = lazy(() => import('./Learn.tsx'));
 const Status = lazy(() => import('./Information.tsx').then((m) => ({ default: m.Status })));
 const links = [
   ['/', 'Home', 'home'],
-  ['/charts', 'Charts', 'chart'],
+  ['/daily', 'Daily', 'chart'],
+  ['/live', 'Live', 'chart'],
   ['/calculator', 'Calculator', 'calendar'],
   ['/downloads', 'Data', 'database'],
   ['/search', 'Search', 'search'],
@@ -57,8 +58,40 @@ function RoutePosition({ hash, navigation }: { hash: string; navigation: number 
   }, [hash, navigation]);
   return null;
 }
+function migrateSelection() {
+  const q = new URLSearchParams(location.search);
+  let changed = false;
+  if (location.pathname === '/search' && q.get('view') === 'holders') q.set('kind', 'holders');
+  for (const key of [
+    'source',
+    'view',
+    'series',
+    'generation',
+    'datasetVersion',
+    'holderDatasetVersion',
+    'revision',
+    'afterSourceDay',
+  ]) {
+    if (q.has(key)) {
+      q.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) {
+    q.delete('cursor');
+    history.replaceState(null, '', location.pathname + (q.size ? '?' + q : '') + location.hash);
+  }
+  try {
+    sessionStorage.removeItem('history-selection');
+  } catch {
+    /* Restricted storage does not change the selected service. */
+  }
+}
 export default function App() {
-  const [path, setPath] = useState(location.pathname);
+  const [path, setPath] = useState(() => {
+    migrateSelection();
+    return location.pathname;
+  });
   const [navigation, setNavigation] = useState(0);
   const [menu, setMenu] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -84,6 +117,7 @@ export default function App() {
     const changed = (event?: Event) => {
       // Traversing a fragment history entry can emit both events for one navigation.
       if (event?.type === 'hashchange' && lastHref === location.href) return;
+      migrateSelection();
       lastHref = location.href;
       setMenu(false);
       setPath(location.pathname);
@@ -203,8 +237,10 @@ export default function App() {
         <Suspense fallback={<p role="status">Loading page…</p>}>
           {path === '/' ? (
             <Home />
-          ) : path === '/charts' ? (
+          ) : path === '/charts' || path === '/daily' ? (
             <Charts />
+          ) : path === '/live' ? (
+            <Live />
           ) : path === '/charts/maturities' ? (
             <MaturityDetail />
           ) : path === '/charts/detail' ? (

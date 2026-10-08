@@ -10,7 +10,10 @@ import type { DailyLedgerReader } from '../services/daily-ledger/store.ts';
 
 import type { SavedSourceGenerations } from '../services/source-update/generation.ts';
 
+import type { ProductDailyStore } from '../services/product-daily/store.ts';
+
 export interface ApiDependencies {
+  productDaily?: ProductDailyStore;
   sourceGenerations?: SavedSourceGenerations;
   dailyLedger?: DailyLedgerReader;
   sourceStakes?: SourceStakeReader;
@@ -30,6 +33,11 @@ export function sqlBaseline(db: ReadDatabase): AddressBaseline {
 }
 /** Connection setup is bounded; file verification runs independently of serving native data. */
 export async function openDependencies(env = process.env): Promise<ApiDependencies> {
+  if (env.HDD_V2_PRODUCT_PROFILE) {
+    const { readProductProfile, openProductDependencies } =
+      await import('../services/product-daily/open.ts');
+    return openProductDependencies(await readProductProfile(env.HDD_V2_PRODUCT_PROFILE));
+  }
   if (!env.HDD_V2_DB_HOST) return {};
   const db = new ReadDatabase(databaseConfig('api', env));
   let addresses: Awaited<ReturnType<typeof openAddressService>> | undefined;
