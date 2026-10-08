@@ -220,6 +220,10 @@ export function createApp(
         return deps.db;
       };
       const productRoutes = ['home','daily','markets','latest','stakes','stake','holders','address','addressStakes','downloads','download'];
+      if (productRoutes.includes(route.id) && route.id !== 'download') {
+        await deps.productDaily?.refresh();
+        signal.throwIfAborted();
+      }
       let product = productRoutes.includes(route.id) && route.id !== 'download' ? deps.productDaily?.capture() : undefined;
       if (productRoutes.includes(route.id) && route.id !== 'download' && !product) throw unavailable();
       if (product && ['holders','stakes','stake','address','addressStakes'].includes(route.id)) {
@@ -384,6 +388,8 @@ export function createApp(
           }
           if (!authorization.accountId) throw unavailable();
           if (!deps.productDaily) throw unavailable();
+          await deps.productDaily.refresh();
+          signal.throwIfAborted();
           product = deps.productDaily.capture();
           const release = downloadAdmission.acquire(authorization.accountId);
           let opened;

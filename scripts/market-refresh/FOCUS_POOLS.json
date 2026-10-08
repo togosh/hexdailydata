@@ -1,0 +1,167 @@
+{
+  "status": "PROPOSED_NEW_FOCUS_SET_NOT_LIVE_QUALIFIED",
+  "selectionBasis": "Material HEX inventories and three precisely identified quote addresses in the saved378-candidate capture; no whole-market ranking/coverage claim. Fixed before fresh acquisition; not chosen by historical completeness.",
+  "rawSource": "hdd-pulsex-market-feed-r1-return.zip",
+  "observationBlock": 27745570,
+  "pools": [
+    {
+      "venue": "V1",
+      "graphEndpointIndex": 0,
+      "address": "0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65",
+      "quoteAddress": "0xa1077a294dde1b09bb078844df40758a5d0f9a27",
+      "quoteLabel": "WPLS",
+      "attempt": 19,
+      "originalResponseSha256": "6b5d4e3dcfdbb5e92292b02e12c863df308c470224567a3f560908d4ebbea291",
+      "originalPool": {
+        "id": "0xf1f4ee610b2babb05c635f726ef8b0c568c8dc65",
+        "reserve0": "114680758.84071819",
+        "reserve1": "28021804285.207003709456315118",
+        "reserveUSD": "496539.1499025255340196590027614797",
+        "trackedReservePLS": "56043733330.1042618037328272413922",
+        "token0": {
+          "id": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+          "decimals": "8",
+          "symbol": "HEX",
+          "name": "HEX",
+          "derivedUSD": "0.002164870766332548809007724646954877",
+          "derivedPLS": "244.3461707829026842970769989994311"
+        },
+        "token1": {
+          "id": "0xa1077a294dde1b09bb078844df40758a5d0f9a27",
+          "decimals": "18",
+          "symbol": "WPLS",
+          "name": "Wrapped Pulse",
+          "derivedUSD": "0.000008859851412429126086746981975125423",
+          "derivedPLS": "1"
+        }
+      },
+      "bundles": [
+        {
+          "id": "1",
+          "plsPrice": "0.000008859851412429126086746981975125423"
+        }
+      ]
+    },
+    {
+      "venue": "V2",
+      "graphEndpointIndex": 1,
+      "address": "0x19bb45a7270177e303dee6eaa6f5ad700812ba98",
+      "quoteAddress": "0xa1077a294dde1b09bb078844df40758a5d0f9a27",
+      "quoteLabel": "WPLS",
+      "attempt": 21,
+      "originalResponseSha256": "da2f7da56b088c87529f1421ee603c1c5b441b4bb21d8a5c9bef7848e8ca6989",
+      "originalPool": {
+        "id": "0x19bb45a7270177e303dee6eaa6f5ad700812ba98",
+        "reserve0": "142893929.59384711",
+        "reserve1": "34918938560.844169652413943095",
+        "reserveUSD": "618528.2713105360094318204881054668",
+        "trackedReservePLS": "69837894421.35311685752484686640669",
+        "token0": {
+          "id": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+          "decimals": "8",
+          "symbol": "HEX",
+          "name": "HEX",
+          "derivedUSD": "0.002164291092882327930219859609353799",
+          "derivedPLS": "244.3696429939018850041806958902709"
+        },
+        "token1": {
+          "id": "0xa1077a294dde1b09bb078844df40758a5d0f9a27",
+          "decimals": "18",
+          "symbol": "WPLS",
+          "name": "Wrapped Pulse",
+          "derivedUSD": "0.000008857080137597889740965414965823568",
+          "derivedPLS": "1"
+        }
+      },
+      "bundles": [
+        {
+          "id": "1",
+          "plsPrice": "0.000008857080137597889740965414965823568"
+        }
+      ]
+    },
+    {
+      "venue": "V1",
+      "graphEndpointIndex": 0,
+      "address": "0x6f1747370b1cacb911ad6d4477b718633db328c8",
+      "quoteAddress": "0xefd766ccb38eaf1dfd701853bfce31359239f305",
+      "quoteLabel": "DAI (source label; backing not certified)",
+      "attempt": 19,
+      "originalResponseSha256": "6b5d4e3dcfdbb5e92292b02e12c863df308c470224567a3f560908d4ebbea291",
+      "originalPool": {
+        "id": "0x6f1747370b1cacb911ad6d4477b718633db328c8",
+        "reserve0": "19488140.36259266",
+        "reserve1": "42278.051928562013254013",
+        "reserveUSD": "84461.36060327365121695024984715907",
+        "trackedReservePLS": "9533044818.876559845295310710549323",
+        "token0": {
+          "id": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+          "decimals": "8",
+          "symbol": "HEX",
+          "name": "HEX",
+          "derivedUSD": "0.002164870766332548809007724646954877",
+          "derivedPLS": "244.3461707829026842970769989994311"
+        },
+        "token1": {
+          "id": "0xefd766ccb38eaf1dfd701853bfce31359239f305",
+          "decimals": "18",
+          "symbol": "DAI",
+          "name": "Dai Stablecoin from Ethereum",
+          "derivedUSD": "0.9998581607671814630004708352556918",
+          "derivedPLS": "112852.7008212035040750003783906394"
+        }
+      },
+      "bundles": [
+        {
+          "id": "1",
+          "plsPrice": "0.000008859851412429126086746981975125423"
+        }
+      ]
+    },
+    {
+      "venue": "V2",
+      "graphEndpointIndex": 1,
+      "address": "0xc475332e92561cd58f278e4e2ed76c17d5b50f05",
+      "quoteAddress": "0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07",
+      "quoteLabel": "USDC (source label; backing not certified)",
+      "attempt": 22,
+      "originalResponseSha256": "e71708fdc6f367fc9139ea54e3fe72c77722bca43583ed31141ebad737804e34",
+      "originalPool": {
+        "id": "0xc475332e92561cd58f278e4e2ed76c17d5b50f05",
+        "reserve0": "119009.349541",
+        "reserve1": "54860378.8896234",
+        "reserveUSD": "237730.799399262354027612575164793",
+        "trackedReservePLS": "26848281408.04778023069935390515381",
+        "token0": {
+          "id": "0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07",
+          "decimals": "6",
+          "symbol": "USDC",
+          "name": "USD Coin from Ethereum",
+          "derivedUSD": "0.9999932715540530386327111654503869",
+          "derivedPLS": "112909.0257635016571438660425083103"
+        },
+        "token1": {
+          "id": "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+          "decimals": "8",
+          "symbol": "HEX",
+          "name": "HEX",
+          "derivedUSD": "0.002164291092882327930219859609353799",
+          "derivedPLS": "244.3696429939018850041806958902709"
+        }
+      },
+      "bundles": [
+        {
+          "id": "1",
+          "plsPrice": "0.000008857080137597889740965414965823568"
+        }
+      ]
+    }
+  ],
+  "tokenAddresses": [
+    "0x15d38573d2feeb82e7ad5187ab8c1d52810b1f07",
+    "0x2b591e99afe9f32eaa6214f7b7629768c40eeb39",
+    "0xa1077a294dde1b09bb078844df40758a5d0f9a27",
+    "0xefd766ccb38eaf1dfd701853bfce31359239f305"
+  ],
+  "prohibitedInference": "Source symbols/names and matching decimals do not establish bridged-asset backing, USD peg, USD accuracy, transferability or executable depth."
+}

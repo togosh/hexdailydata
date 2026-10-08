@@ -38,6 +38,7 @@ const manifestSchema = z.strictObject({
 });
 const pointerSchema = z.strictObject({ version: digest, manifestSha256: digest });
 type Pointer = z.infer<typeof pointerSchema>;
+export type ProductWriter = { readonly token: symbol; readonly root: string };
 export type AdmittedProduct = {
   version: string;
   manifestSha256: string;
@@ -180,8 +181,13 @@ export async function writeProductGeneration(
 export class ProductDailyStore {
   readonly root: string;
   private current: AdmittedProduct | undefined;
-  private admitted = new Map<string, AdmittedProduct>();
   private selecting = false;
+  private writer:
+    | { lease: ProductWriter; handle: Awaited<ReturnType<typeof open>>; uncertain: boolean }
+    | undefined;
+  private reloading: Promise<void> | undefined;
+  private checkedAt = -Infinity;
+  private reloadError: string | null = null;
   constructor(
     root: string,
     private readonly pair: ProductPair,
@@ -207,16 +213,107 @@ export class ProductDailyStore {
     );
     const next = await admitProduct(join(this.root, p.version), p.manifestSha256);
     this.checkPair(next);
-    this.admitted.set(next.version, next);
     this.current = next;
     return next;
   }
   private checkPair(next: AdmittedProduct) {
     if (!same(next.metadata.pair, this.pair)) throw Error('PRODUCT_MIXED_PAIR');
   }
+  /** One small local pointer check per second. Failed/unknown candidates retain LKG. */
+  async refresh(now = performance.now()) {
+    if (this.reloading) return this.reloading;
+    if (this.selecting || this.writer || now - this.checkedAt < 1000) return;
+    this.checkedAt = now;
+    this.reloading = (async () => {
+      try {
+        if (
+          await lstat(join(this.root, 'SELECTION.lock')).catch((e: NodeJS.ErrnoException) => {
+            if (e.code === 'ENOENT') return null;
+            throw e;
+          })
+        )
+          return;
+        const raw = await bounded(join(this.root, 'CURRENT.json'), 4096);
+        const p = pointerSchema.parse(JSON.parse(raw.toString()));
+        if (p.version === this.current?.version && p.manifestSha256 === this.current.manifestSha256)
+          return;
+        const receipt = await bounded(join(this.root, 'admitted-' + p.version + '.json'), 4096);
+        if (!same(JSON.parse(receipt.toString()), p)) throw Error('PRODUCT_NOT_ADMITTED');
+        const next = await admitProduct(join(this.root, p.version), p.manifestSha256);
+        this.checkPair(next);
+        if (!this.current) throw Error('PRODUCT_NOT_INITIALIZED');
+        if (
+          Date.parse(next.metadata.effectiveAtUtc) <=
+          Date.parse(this.current.metadata.effectiveAtUtc)
+        )
+          throw Error('PRODUCT_NOT_NEWER');
+        preserveMarketHistory(this.current, next);
+        if (!(await bounded(join(this.root, 'CURRENT.json'), 4096)).equals(raw))
+          throw Error('PRODUCT_POINTER_CHANGED');
+        if (
+          await lstat(join(this.root, 'SELECTION.lock')).catch((e: NodeJS.ErrnoException) => {
+            if (e.code === 'ENOENT') return null;
+            throw e;
+          })
+        )
+          return;
+        this.current = next;
+        this.reloadError = null;
+      } catch (e) {
+        this.reloadError = e instanceof Error ? e.message : String(e);
+      }
+    })();
+    try {
+      await this.reloading;
+    } finally {
+      this.reloading = undefined;
+    }
+  }
+  reloadStatus() {
+    return { error: this.reloadError, retainedGenerations: this.current ? 1 : 0 };
+  }
+  /** Shared with manual selectors: acquire before any refresh-provider work. */
+  async acquireWriter(): Promise<ProductWriter> {
+    if (this.selecting || this.writer) throw Error('PRODUCT_SELECTION_BUSY');
+    const handle = await open(join(this.root, 'SELECTION.lock'), 'wx');
+    try {
+      const disk = pointerSchema.parse(
+        JSON.parse((await bounded(join(this.root, 'CURRENT.json'), 4096)).toString()),
+      );
+      if (
+        !this.current ||
+        disk.version !== this.current.version ||
+        disk.manifestSha256 !== this.current.manifestSha256
+      )
+        throw Error('PRODUCT_POINTER_CHANGED');
+      const lease = Object.freeze({ token: Symbol('product-writer'), root: this.root });
+      await handle.writeFile(stable({ pid: process.pid, version: disk.version }));
+      await handle.sync();
+      this.writer = { lease, handle, uncertain: false };
+      return lease;
+    } catch (e) {
+      await handle.close();
+      await unlink(join(this.root, 'SELECTION.lock'));
+      throw e;
+    }
+  }
+  async releaseWriter(lease: ProductWriter, retainUncertain = false) {
+    if (this.writer?.lease !== lease) throw Error('PRODUCT_WRITER_OWNERSHIP');
+    const owned = this.writer;
+    this.writer = undefined;
+    await owned.handle.close();
+    if (owned.uncertain || retainUncertain)
+      throw Error('PRODUCT_PUBLICATION_UNCERTAIN_LOCK_RETAINED');
+    await unlink(join(this.root, 'SELECTION.lock'));
+  }
   async select(
     pointer: Pointer,
-    options: { rollback?: boolean; beforePublish?: () => Promise<void> } = {},
+    options: {
+      rollback?: boolean;
+      beforePublish?: () => Promise<void>;
+      beforeCommit?: () => void;
+      writer?: ProductWriter;
+    } = {},
   ) {
     if (this.selecting) throw Error('PRODUCT_SELECTION_BUSY');
     this.selecting = true;
@@ -225,7 +322,12 @@ export class ProductDailyStore {
       mutationStarted = false;
     try {
       await ownedRoot(this.root);
-      lock = await open(join(this.root, 'SELECTION.lock'), 'wx');
+      if (options.writer) {
+        if (this.writer?.lease !== options.writer) throw Error('PRODUCT_WRITER_OWNERSHIP');
+      } else {
+        if (this.writer) throw Error('PRODUCT_SELECTION_BUSY');
+        lock = await open(join(this.root, 'SELECTION.lock'), 'wx');
+      }
       pointerSchema.parse(pointer);
       const next = await admitProduct(join(this.root, pointer.version), pointer.manifestSha256);
       this.checkPair(next);
@@ -270,6 +372,7 @@ export class ProductDailyStore {
         preserveMarketHistory(previous, next);
       }
       mutationStarted = true;
+      if (options.writer && this.writer) this.writer.uncertain = true;
       const stage = join(this.root, 'selection-' + randomUUID() + '.json');
       const f = await open(stage, 'wx');
       try {
@@ -293,9 +396,17 @@ export class ProductDailyStore {
       } else if (!same(JSON.parse((await bounded(admission, 4096)).toString()), pointer))
         throw Error('ADMISSION_COLLISION');
       await options.beforePublish?.();
+      const still = await bounded(join(this.root, 'CURRENT.json'), 4096).catch(
+        (e: NodeJS.ErrnoException) => {
+          if (e.code === 'ENOENT') return null;
+          throw e;
+        },
+      );
+      if (disk ? !still?.equals(disk) : still !== null) throw Error('PRODUCT_POINTER_CHANGED');
+      options.beforeCommit?.();
       await rename(stage, join(this.root, 'CURRENT.json'));
-      this.admitted.set(next.version, next);
       this.current = next;
+      if (options.writer && this.writer) this.writer.uncertain = false;
       completed = true;
       return { changed: true, version: next.version };
     } finally {

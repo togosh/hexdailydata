@@ -1,0 +1,7 @@
+# Preserve exact executed/preflight-bound bytes; do not normalize this frozen extraction.
+audit_market.py -text
+capture_client.py -text
+current.py -text
+response_caps.py -text
+schema.py -text
+task_queries.py -text

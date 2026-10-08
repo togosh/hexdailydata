@@ -776,3 +776,17 @@ access/CSV checks and desktop/mobile preview passed; the 503-versus-500 fixture
 failure remains recorded with its focused correction. The observations are
 qualified but stale under the unchanged 300-second rule. Original R1 remains
 PARTIAL_NOT_PROMOTABLE; main, prior datasets and parked indexer are unchanged.
+
+### 2026-10-08 — Finite automatic market refresh
+
+Maintained the accepted current-only collector and automatic validated publication
+in tracked feature code. The same running local API adopted three generations at
+217.297, 201.920 and 200.141 seconds of observation age without manual selection or
+restart. The one trial closed normally after 148 POSTs, 109,306 charged wire bytes
+and 508 objects, with no retries. Frozen original-capture audit, exact update replay,
+five-file restore, focused access/failure tests and desktop/mobile preview passed.
+The accepted 90 historical buckets and 112,590 non-market field comparisons remain
+exact. Initial stale service lasted 94.032 seconds before the first adoption; this
+finite result is not continuous or indefinite operation. The 4,096-object bound and
+retention prerequisite remain. Separate review and commit/archive identities are in
+the market-refresh-job-r1 return. No scheduler, main merge, deployment or indexer work.

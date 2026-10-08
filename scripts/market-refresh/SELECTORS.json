@@ -1,0 +1,10 @@
+{
+  "implementation": "Locked local @noble/hashes 2.0.1 keccak_256, UTF-8 signatures, first four bytes",
+  "selectors": {
+    "token0()": "0x0dfe1681",
+    "token1()": "0xd21220a7",
+    "factory()": "0xc45a0155",
+    "getReserves()": "0x0902f1ac",
+    "decimals()": "0x313ce567"
+  }
+}

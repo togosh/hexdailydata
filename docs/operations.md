@@ -512,3 +512,28 @@ corrected release or compatible rollback. It does not claim zero downtime, data 
 container reboot equivalence to host reboot, automatic future-schema compatibility, or
 Task06 support for new operator commands. Keep only current and needed previous image;
 remove older explicitly identified task-owned images without global prune.
+
+## Bounded local market refresh
+
+`node scripts/market-refresh.mjs once|trial --profile FILE --output NEW_DIRECTORY
+--preflight FILE` maintains the qualified fixed four-pool market method. No argument
+means no requests. The reviewed binding identifies the new local data root, unused
+session output, exact runtime and bounded authority. It is not a permanent scheduler
+or permission to reuse a closed trial. See the market-refresh-job-r1 return's
+OPERATING_NOTES.md, REQUEST_PLAN.md and original receipts for the tested command.
+
+A single-writer lease precedes provider work. Captured-response/accounting checks
+must pass before the small immutable generation is selected. The running API checks
+its local pointer after access admission, at most once per second, validates a new
+admitted generation, and keeps one generation per response. No handler calls a
+provider or exposes publication. Unknown closure/publication retains locks; later
+recovery needs investigation rather than deleting them or automatically retrying.
+
+The finite local trial automatically delivered three observations within the existing
+300-second freshness threshold. This is not continuous freshness or production
+qualification. The unchanged 4,096-observation bound allows two objects per cycle;
+the final ten-object generation has room for 2,043 more such cycles. Retention,
+backup/recovery and explicit scheduling/release authority are required before
+indefinite operation. Do not prune original evidence to hide that limit. Protocol,
+holder/stake and daily data retain their separate old observation times; gas and
+independent benchmark feeds remain unavailable. Main and the indexer are unchanged.
