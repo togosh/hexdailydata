@@ -11,6 +11,7 @@ import { validateLedgerSegments } from '../dist/services/product-daily/market.js
 import { durableJson, publishCycle } from './market-refresh.mjs';
 import { publishGas } from './gas-publication.mjs';
 import { publishProtocol } from './protocol-publication.mjs';
+import { publishReference } from './reference-publication.mjs';
 import { prepareWindow } from './participant-refresh.mjs';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const taskId = 'HDD-UNIFIED-REFRESH-OPERATION-R1';
@@ -358,6 +359,9 @@ export async function runJob({
   deadline,
   storageGuard = async () => {},
 }) {
+  const reference = admission.family === 'reference';
+  if (reference && admission.task !== 'HDD-BTC-ETH-REFERENCE-FEED-R1')
+    throw Error('EXACT_REFERENCE_TASK_REQUIRED');
   const env = Object.fromEntries(
     ['SystemRoot', 'WINDIR', 'COMSPEC']
       .filter((k) => process.env[k])
@@ -370,7 +374,15 @@ export async function runJob({
   });
   const child = spawnChild(
     'python',
-    ['-I', '-S', join(repo, 'scripts/unified-refresh/job.py'), jobRoot],
+    [
+      '-I',
+      '-S',
+      join(
+        repo,
+        reference ? 'scripts/reference-feed/collector.py' : 'scripts/unified-refresh/job.py',
+      ),
+      jobRoot,
+    ],
     { cwd: repo, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
   );
   let exited = false,
@@ -384,6 +396,7 @@ export async function runJob({
     exitObserved = true;
   });
   const publications = [];
+  let begunCycle = 0;
   const completion = new Promise((done, reject) => {
     child.once('error', reject);
     child.once('close', (code, signal) => {
@@ -468,7 +481,11 @@ export async function runJob({
           ...(admission.family === 'participants' ? { window: m.window } : { cycle: m.cycle }),
         };
         if (m.type === 'begin') {
-          if (m.cycle !== 1) throw Error('ONE_CYCLE_ONLY');
+          if (reference) {
+            if (m.cycle !== begunCycle + 1 || m.cycle > 2 || publications.length !== begunCycle)
+              throw Error('REFERENCE_CYCLE_ORDER');
+            begunCycle = m.cycle;
+          } else if (m.cycle !== 1) throw Error('ONE_CYCLE_ONLY');
         } else if (m.type === 'prepare' && admission.family === 'participants') {
           await storageGuard(512 * 1024 ** 2);
           check();
@@ -482,6 +499,8 @@ export async function runJob({
           check();
           await durableJson(join(jobRoot, 'WINDOW_1_DRAFT.json'), draft);
         } else if (m.type === 'qualified') {
+          if (reference && (m.cycle !== begunCycle || publications.length !== begunCycle - 1))
+            throw Error('REFERENCE_QUALIFICATION_ORDER');
           await storageGuard(512 * 1024 ** 2);
           check();
           let selected, publication;
@@ -520,9 +539,12 @@ export async function runJob({
               productVersion: selected.product.version,
             };
           } else {
-            const publish = { market: publishCycle, gas: publishGas, protocol: publishProtocol }[
-              admission.family
-            ];
+            const publish = {
+              market: publishCycle,
+              gas: publishGas,
+              protocol: publishProtocol,
+              reference: publishReference,
+            }[admission.family];
             publication = await publish(
               registry.productDaily,
               null,
@@ -541,7 +563,10 @@ export async function runJob({
           const adoption = await onAdoption(selected, check, admission.job);
           check();
           const receipt = { selected, publication, adoption, adoptedAt: new Date().toISOString() };
-          await durableJson(join(jobRoot, 'ADOPTION.json'), receipt);
+          await durableJson(
+            join(jobRoot, reference ? `ADOPTION_${m.cycle}.json` : 'ADOPTION.json'),
+            receipt,
+          );
           publications.push(receipt);
         } else throw Error('UNEXPECTED_COLLECTOR_PHASE');
         check();
@@ -577,7 +602,9 @@ export async function runJob({
       throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + stderr);
     if (error) throw Error(error);
     const qualified =
-      exit.code === 0 && source.status.startsWith('COMPLETE_') && publications.length === 1;
+      exit.code === 0 &&
+      source.status.startsWith('COMPLETE_') &&
+      publications.length === (reference ? 2 : 1);
     return {
       status: qualified ? 'QUALIFIED_ADOPTED' : 'PARTIAL',
       source,

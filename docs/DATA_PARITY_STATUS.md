@@ -14,3 +14,22 @@ Current/live feeds, full beginning/fork provenance, earliest defensible prices, 
 ## Unified daily/live candidate, 8 October 2026
 
 The candidate now serves one `daily-product-1` reporting projection and one latest response, described in UNIFIED_DAILY.md. This supersedes earlier public source/view/generation-selection guidance, while preserving original input evidence. There are 2,501 reporting dates, 2,498 independently pinned payout periods and 2,194 non-null primary historical HEX references. Calendar changes are recomputed on consecutive dates; held penalties/yield remain null. Live market/gas/liquidity inputs remain unavailable, and the saved B0-plus-observed-B1 holder/stake pair is stale, not a complete target census. Main, original ledger/bases, native operator code and the parked indexer are unchanged. No external acquisition, SQL, production activation, merge or deployment occurred.
+
+## BTC/ETH reference milestone, 9 October 2026
+
+The accepted unified operation now supplies 2,503 reporting dates, 2,502 ledger
+periods, 90 liquidity dates and the participant view through PulseChain block
+27,754,425. This task preserves those observations and their times. It adds one
+qualified paired BTC/ETH reference update, corroborated by two public Ethereum
+nodes at numbered blocks 26,156,903 and 26,156,908. BTC is `82522.51513356` USD
+at `2026-10-09T18:21:47.000Z`; ETH is `2483.18` USD at
+`2026-10-09T19:10:59.000Z`. Both were already stale at publication. The second
+cycle repeated both rounds and did not renew freshness or history.
+
+Normal Daily/Live/Home/CSV use the same selection and exact decimal strings.
+References project only onto their own observed UTC date, without filling gaps
+or claiming daily closes. Two nodes corroborate one oracle state, not two
+independent market oracles. Historical BTC/ETH coverage from HEX origin, source
+redistribution rights, uninterrupted freshness and production qualification remain
+open. No old HDS quote ambiguity was resolved by assumption. Main and all accepted
+roots remain unchanged; no scheduler, SQL, deployment or indexer restart occurred.

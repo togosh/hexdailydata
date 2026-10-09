@@ -24,6 +24,7 @@ import {
   preserveMarketHistory,
   validateLedgerSegments,
   preserveParticipantProduct,
+  referenceOnlyAdvance,
 } from './market.ts';
 import { verifyMarketCertificate } from './storage.ts';
 
@@ -311,7 +312,8 @@ export class ProductDailyStore {
         if (
           !authorizedRollback &&
           Date.parse(next.metadata.effectiveAtUtc) <=
-            Date.parse(this.current.metadata.effectiveAtUtc)
+            Date.parse(this.current.metadata.effectiveAtUtc) &&
+          !referenceOnlyAdvance(this.current.metadata, next.metadata)
         )
           throw Error('PRODUCT_NOT_NEWER');
         if (!authorizedRollback) preserveMarketHistory(this.current, next);
@@ -427,7 +429,8 @@ export class ProductDailyStore {
         if (
           Date.parse(next.metadata.effectiveAtUtc) <=
             Date.parse(previous.metadata.effectiveAtUtc) &&
-          !this.participantPair
+          !this.participantPair &&
+          !referenceOnlyAdvance(previous.metadata, next.metadata)
         )
           throw Error('PRODUCT_NOT_NEWER');
         if (
@@ -609,7 +612,7 @@ export class ProductDailyStore {
       coverage: 'bounded contemporary HEX-pool cohort';
     } | null = null;
     for (const r of m.readings) {
-      if (r.kind === 'market') {
+      if (r.kind === 'market' || r.kind === 'reference') {
         values[
           (
             {
@@ -623,7 +626,9 @@ export class ProductDailyStore {
         groups[r.asset] = freshness(
           r.observedAtUtc,
           300,
-          'Admitted spot observation; served time is not observation time.',
+          r.kind === 'reference'
+            ? 'Chainlink USD reference on Ethereum; age uses the oracle updatedAt. Not a streaming or guaranteed executable quote.'
+            : 'Admitted spot observation; served time is not observation time.',
         );
       } else if (r.kind === 'protocol') {
         Object.assign(values, protocolValues(r));

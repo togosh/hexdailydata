@@ -841,3 +841,20 @@ remain unchanged. Focused tests, original-capture replay, same-server adoption,
 one genuine compact restore and four desktop/mobile views passed. The reviewed
 source/evidence identity is in participant-catchup-refresh-r2; main is unmerged,
 all owned processes are closed and the indexer remains PARKED.
+
+### 2026-10-09 — BTC and ETH saved reference feed
+
+Added the two standard Ethereum Chainlink USD references through the existing
+coordinated participant/product publisher. One finite session closed after 62
+RPC requests, no retries, 420,755 charged bytes and 302 objects in 103.544 seconds.
+The running API adopted one paired publication; the second cycle confirmed the
+same rounds and made no new selection. BTC/ETH were already 3,554.377/602.377
+seconds old at publication and remain stale under the unchanged 300-second rule.
+All 2,503 reporting dates, 2,502 ledger periods, 90 liquidity dates, participants
+and unrelated fields/times were preserved. Focused client/access/rotation checks,
+real isolated restore and four final views passed; earlier fixture failures and
+narrow corrections remain in btc-eth-reference-feed-r1. These are reference
+observations, not streaming trades, daily closes or a historical backfill.
+Source-rights, full benchmark history and continuous operation remain open.
+The task return records separate review and commit identity. Main is unmerged,
+old roots unchanged and indexer PARKED.

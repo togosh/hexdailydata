@@ -46,8 +46,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
       </p>
       <div className="product-readings">
         <Reading label="HEX spot price" value={data.hexPriceUsd} unit="USD / HEX" />
-        <Reading label="Bitcoin price" value={data.btcPriceUsd} unit="USD / BTC" />
-        <Reading label="Ethereum price" value={data.ethPriceUsd} unit="USD / ETH" />
+        <Reading label="Bitcoin reference price" value={data.btcPriceUsd} unit="USD / BTC" />
+        <Reading label="Ethereum reference price" value={data.ethPriceUsd} unit="USD / ETH" />
         <Reading label="PulseChain price" value={data.plsPriceUsd} unit="USD / PLS" />
         <Reading
           label="PulseChain suggested gas price"
@@ -60,6 +60,10 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
           unit="USD estimate"
         />
       </div>
+      <p className="meta">
+        BTC/ETH are oracle reference prices, not guaranteed executable quotes. Each retains its own
+        update time.
+      </p>
       <section data-testid="protocol-availability">
         <h3>HEX protocol at its saved block</h3>
         <p className="meta">

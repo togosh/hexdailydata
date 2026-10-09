@@ -43,8 +43,8 @@ export const productMetrics = {
   stakedHEXPercentChange: ['Change in locked percentage', 'percentage points', 'change'],
   netTotalSupplyChangeHEX: ['Net change in circulating plus locked HEX', 'HEX', 'change'],
   hexPriceUsd: ['HEX reference price', 'USD/HEX', 'reference-price'],
-  btcPriceUsd: ['Bitcoin price', 'USD/BTC', 'market'],
-  ethPriceUsd: ['Ethereum price', 'USD/ETH', 'market'],
+  btcPriceUsd: ['Bitcoin reference price', 'USD/BTC', 'market'],
+  ethPriceUsd: ['Ethereum reference price', 'USD/ETH', 'market'],
   plsPriceUsd: ['PulseChain price', 'USD/PLS', 'market'],
   trackedLiquidityUsd: ['Tracked HEX liquidity (USD estimate)', 'USD', 'liquidity'],
   gasPriceWei: ['Suggested gas price', 'PulseChain smallest units/gas', 'gas'],
@@ -173,6 +173,20 @@ export const LiquidityBucketSchema = z.strictObject({
 });
 export const ReadingSchema = z.discriminatedUnion('kind', [
   ProtocolReadingSchema,
+  z.strictObject({
+    kind: z.literal('reference'),
+    asset: z.enum(['BTC', 'ETH']),
+    quote: z.literal('USD'),
+    observation: z.literal('oracle-reference'),
+    chainId: z.literal(1),
+    method: z.literal('chainlink-standard-usd-1'),
+    roundId: z
+      .string()
+      .regex(/^[1-9]\d{0,24}$/)
+      .refine((v) => BigInt(v) < 2n ** 80n),
+    value: precise,
+    observedAtUtc: utc,
+  }),
   z.strictObject({
     kind: z.literal('market'),
     asset: z.enum(['HEX', 'BTC', 'ETH', 'PLS']),
