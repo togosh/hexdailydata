@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ProtocolReadingSchema, LedgerSegmentSchema } from './protocol-daily.ts';
 import { contractDayAt } from '../domain/day.ts';
 import { AddressSchema, CursorSchema } from './reads.ts';
 
@@ -171,6 +172,7 @@ export const LiquidityBucketSchema = z.strictObject({
   meaning: z.literal('source UTC-day bucket, not a verified close'),
 });
 export const ReadingSchema = z.discriminatedUnion('kind', [
+  ProtocolReadingSchema,
   z.strictObject({
     kind: z.literal('market'),
     asset: z.enum(['HEX', 'BTC', 'ETH', 'PLS']),
@@ -215,6 +217,7 @@ export const ProductMetadataSchema = z.strictObject({
   inputHashes: z.record(z.string(), digest),
   pair: PairSchema,
   ledgerObservedAtUtc: utc,
+  ledgerSegments: z.array(LedgerSegmentSchema).max(10000).optional(),
   from: z.iso.date(),
   through: z.iso.date(),
   rows: z.number().int().min(1).max(65536),
@@ -294,6 +297,20 @@ export const ProductLiveResponseSchema = z.strictObject({
   priorityFeeWei: precise.nullable(),
   tshareRateHEX: precise.nullable(),
   currentDayPayoutHEX: precise.nullable(),
+  circulatingHEX: precise.nullable(),
+  lockedPrincipalHEX: precise.nullable(),
+  totalHEX: precise.nullable(),
+  activeTshares: precise.nullable(),
+  queuedTshares: precise.nullable(),
+  latestMaterializedPayout: z
+    .strictObject({
+      contractDay: z.number().int().nonnegative(),
+      dateUtc: z.iso.date(),
+      dailyPayoutHEX: precise,
+      payoutPerTshareHEX: precise.nullable(),
+      observedAtUtc: utc,
+    })
+    .nullable(),
   savedHolderRecordCount: z.number().int().nonnegative(),
   savedStakeStartRecordCount: z.number().int().nonnegative(),
   positiveBalanceAddressCount: z.null(),
@@ -324,6 +341,7 @@ export const ProductHomeResponseSchema = z.strictObject({
   datasetVersion: digest,
   chain: z.literal('pulsechain'),
   daily: ProductRowSchema,
+  dailyThroughDateUtc: z.iso.date(),
   live: ProductLiveResponseSchema,
   methods: z.array(z.string()),
   credits: z.string(),

@@ -107,7 +107,7 @@ export default function History() {
     [tablePage, setTablePage] = useState(0);
   useEffect(() => {
     if (!latest.data || selection) return;
-    const end = to || latest.data.daily.dateUtc,
+    const end = to || latest.data.dailyThroughDateUtc,
       start = from || shift(end, -90);
     setFrom(start);
     setTo(end);
@@ -204,7 +204,7 @@ export default function History() {
           Apply dates
         </button>
         <div className="daily-presets">
-          <button onClick={() => apply('2019-12-03', latest.data?.daily.dateUtc ?? to)}>
+          <button onClick={() => apply('2019-12-03', latest.data?.dailyThroughDateUtc ?? to)}>
             All admitted dates
           </button>
           <button onClick={() => choose('payoutPerTshareHEX')}>Daily payout rate</button>

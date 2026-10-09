@@ -127,9 +127,18 @@ export async function runRefresh(
 ) {
   const { mode, profilePath, output, preflightPath } = config;
   const gas = config.feed === 'gas';
-  if (config.feed && !['gas', 'market'].includes(config.feed)) throw Error('FEED_KIND');
-  const selectedRuntime = gas ? join(repository, 'scripts/gas-feed') : runtime;
-  const publish = gas ? (await import('./gas-publication.mjs')).publishGas : publishCycle;
+  const protocol = config.feed === 'protocol';
+  if (config.feed && !['gas', 'market', 'protocol'].includes(config.feed)) throw Error('FEED_KIND');
+  const selectedRuntime = protocol
+    ? join(repository, 'scripts/protocol-feed')
+    : gas
+      ? join(repository, 'scripts/gas-feed')
+      : runtime;
+  const publish = protocol
+    ? (await import('./protocol-publication.mjs')).publishProtocol
+    : gas
+      ? (await import('./gas-publication.mjs')).publishGas
+      : publishCycle;
   if (!['once', 'trial'].includes(mode)) throw Error('EXPLICIT_MODE_REQUIRED');
   const preBytes = await readFile(preflightPath),
     pre = JSON.parse(preBytes),
@@ -138,7 +147,11 @@ export async function runRefresh(
     throw Error('SYNTHETIC_BINDING_REQUIRES_INJECTED_OFFLINE_COLLECTOR');
   if (
     pre.verdict !== 'PASS' ||
-    (gas ? pre.feed !== 'gas' : pre.feed && pre.feed !== 'market') ||
+    (protocol
+      ? pre.feed !== 'protocol'
+      : gas
+        ? pre.feed !== 'gas'
+        : pre.feed && pre.feed !== 'market') ||
     hash(profileBytes) !== pre.profileSha256 ||
     resolve(output) !== pre.trialRoot ||
     resolve(profilePath) !== pre.profilePath
@@ -155,9 +168,10 @@ export async function runRefresh(
   )
     throw Error('EXISTING_OR_UNCERTAIN_TRIAL');
   if (profileBytes.length > 16384) throw Error('PROFILE_BOUND');
-  const profile = gas
-    ? ProductProfileSchema.pick({ productRoot: true, pair: true }).parse(JSON.parse(profileBytes))
-    : await readProductProfile(profilePath);
+  const profile =
+    gas || protocol
+      ? ProductProfileSchema.pick({ productRoot: true, pair: true }).parse(JSON.parse(profileBytes))
+      : await readProductProfile(profilePath);
   if (
     profile.productRoot !== pre.productRoot ||
     resolve(profile.productRoot) === resolve(pre.acceptedProductRoot)
@@ -240,7 +254,7 @@ export async function runRefresh(
           killer.once('close', (code, signal) => resolve({ code, signal }));
         });
       },
-      gas ? 1196000 : 2696000,
+      protocol ? 1796000 : gas ? 1196000 : 2696000,
     );
     let stderr = '';
     child.stderr.on('data', (b) => {

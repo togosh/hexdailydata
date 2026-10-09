@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  LedgerAppendSchema,
+  baseLedgerTail,
+  decodeDailyWord,
+  ledgerDate,
+} from '../../contracts/protocol-daily.ts';
 import { contractDayAt } from '../../domain/day.ts';
 import { compare, stable, hash } from '../../history-bootstrap/normalize.ts';
 import {
@@ -19,6 +25,7 @@ export const MarketUpdateSchema = z.strictObject({
   readings: z.array(ReadingSchema).max(8),
   liquidityHistory: z.array(LiquidityBucketSchema).max(90),
   receiptSha256: digest,
+  ledgerAppend: LedgerAppendSchema.optional(),
   methodRevision: z.literal(marketMethodRevision).optional(),
 });
 const same = (a: unknown, b: unknown) => stable(a) === stable(b);
@@ -184,7 +191,7 @@ function apply(row: ProductRow, r: ProductReading) {
     row.baseFeeWei = r.baseFeeWei;
     row.priorityFeeWei = r.priorityFeeWei;
     row.gasRecordedAtUtc = r.observedAtUtc;
-  } else {
+  } else if (r.kind !== 'protocol') {
     row.trackedLiquidityUsd = r.value;
     row.liquidityRecordedAtUtc = r.observedAtUtc;
   }
@@ -238,6 +245,65 @@ export function applyMarketUpdate(
 ) {
   const update = MarketUpdateSchema.parse(unknownUpdate);
   validateReadings(update.readings);
+  const protocol = update.readings.find((r) => r.kind === 'protocol');
+  if (Boolean(protocol) !== Boolean(update.ledgerAppend))
+    throw Error('PROTOCOL_LEDGER_ATOMIC_REQUIRED');
+  if (
+    protocol &&
+    (update.readings.length !== 1 || update.liquidityHistory.length || update.methodRevision)
+  )
+    throw Error('PROTOCOL_ONLY_UPDATE');
+  const oldProtocol = base.metadata.readings.find((r) => r.kind === 'protocol');
+  if (
+    protocol &&
+    oldProtocol &&
+    !same(protocol, oldProtocol) &&
+    protocol.blockNumber <= oldProtocol.blockNumber
+  )
+    throw Error('PROTOCOL_PIN_REGRESSION');
+  const segments = [...(base.metadata.ledgerSegments ?? [])];
+  const acceptedEnd = segments.reduce((end, s) => {
+    if (s.from !== end) throw Error('LEDGER_SEGMENT_ORDER');
+    return end + s.words.length;
+  }, 2498);
+  let repeated = false;
+  if (protocol && update.ledgerAppend) {
+    const a = update.ledgerAppend,
+      tail = [...baseLedgerTail, ...segments.flatMap((s) => s.words)].slice(-2);
+    // Exact replay of an already published transaction is a no-op; altered overlap/receipt is not.
+    const last = segments.at(-1);
+    repeated = Boolean(
+      last &&
+      same(last, {
+        from: a.from,
+        words: a.words,
+        blockNumber: protocol.blockNumber,
+        blockHash: protocol.blockHash,
+        observedAtUtc: protocol.observedAtUtc,
+        receiptSha256: update.receiptSha256,
+      }) &&
+      same(protocol, oldProtocol),
+    );
+    const expectedTail = repeated
+      ? [...baseLedgerTail, ...segments.slice(0, -1).flatMap((s) => s.words)].slice(-2)
+      : tail;
+    if (
+      !same(a.overlap, expectedTail) ||
+      (!repeated && a.from !== acceptedEnd) ||
+      BigInt(a.from + a.words.length) !== BigInt(protocol.globalWords[4]!)
+    )
+      throw Error('LEDGER_OVERLAP_OR_BOUNDARY');
+    a.words.forEach(decodeDailyWord);
+    if (!repeated && a.words.length)
+      segments.push({
+        from: a.from,
+        words: a.words,
+        blockNumber: protocol.blockNumber,
+        blockHash: protocol.blockHash,
+        observedAtUtc: protocol.observedAtUtc,
+        receiptSha256: update.receiptSha256,
+      });
+  }
   let prior = base.metadata.observations ?? base.metadata.readings;
   let storage = base.metadata.marketStorage;
   for (const r of update.readings) {
@@ -300,6 +366,16 @@ export function applyMarketUpdate(
   }
   const liquidityHistory = [...buckets.values()].sort((a, b) => a.dateUtc.localeCompare(b.dateUtc));
   replay(rows, evidence, liquidityHistory);
+  if (update.ledgerAppend && !repeated)
+    for (const [i, word] of update.ledgerAppend.words.entries()) {
+      const day = update.ledgerAppend.from + i,
+        row = rows.find((r) => r.contractDay === day);
+      if (!row) throw Error('LEDGER_APPEND_OUTSIDE_DOMAIN');
+      const fields = decodeDailyWord(word);
+      for (const k of Object.keys(fields) as (keyof typeof fields)[])
+        if (row[k] !== null) throw Error('LEDGER_OVERWRITE');
+      Object.assign(row, fields);
+    }
   const gaps: { field: string; from: string; to: string }[] = [];
   for (const field of metricKeys) {
     let gap: (typeof gaps)[number] | undefined;
@@ -317,6 +393,7 @@ export function applyMarketUpdate(
   const metadata = ProductMetadataSchema.parse({
     ...base.metadata,
     observations,
+    ...(protocol ? { ledgerSegments: segments } : {}),
     ...(storage ? { marketStorage: storage } : {}),
     liquidityHistory,
     readings: latestReadings(evidence),
@@ -333,6 +410,7 @@ export function applyMarketUpdate(
     ).toISOString(),
     coverage: {
       ...base.metadata.coverage,
+      ledgerDates: protocol ? Number(protocol.globalWords[4]) : base.metadata.coverage.ledgerDates,
       structuralDates: rows.filter((r) => r.snapshotRecordedAtUtc === null).length,
       gaps,
     },
@@ -354,6 +432,7 @@ export function applyMarketUpdate(
         ' Market observations: PulseX subgraphs on PulseChain; paired public RPC pool checks. USD pricing shares source inputs.',
   });
   validateMarketHistory(rows, metadata);
+  validateLedgerSegments(rows, metadata);
   return { rows, metadata, exceptions: base.exceptions };
 }
 
@@ -399,9 +478,55 @@ export function preserveMarketHistory(
   for (const b of previous.metadata.liquidityHistory ?? [])
     if (!next.metadata.liquidityHistory?.some((n) => same(n, b)))
       throw Error('LIQUIDITY_HISTORY_REGRESSION');
+  const oldSegments = previous.metadata.ledgerSegments ?? [],
+    newSegments = next.metadata.ledgerSegments ?? [];
+  if (!same(oldSegments, newSegments.slice(0, oldSegments.length)))
+    throw Error('LEDGER_HISTORY_REGRESSION');
+  validateLedgerSegments(next.rows, next.metadata);
+  const previousEnd = 2498 + oldSegments.reduce((n, s) => n + s.words.length, 0);
+  const nextEnd = 2498 + newSegments.reduce((n, s) => n + s.words.length, 0);
+  const payoutFields = new Set([
+    'payoutHearts',
+    'payoutStakeShares',
+    'dailyPayoutHEX',
+    'payoutPerTshareHEX',
+  ]);
   const market = new Set<string>(marketFields);
   for (let i = 0; i < previous.rows.length; i++)
     for (const [k, v] of Object.entries(previous.rows[i]!))
-      if (!market.has(k) && next.rows[i]?.[k as keyof ProductRow] !== v)
+      if (
+        !market.has(k) &&
+        !(
+          payoutFields.has(k) &&
+          v === null &&
+          previous.rows[i]!.contractDay >= previousEnd &&
+          previous.rows[i]!.contractDay < nextEnd
+        ) &&
+        next.rows[i]?.[k as keyof ProductRow] !== v
+      )
         throw Error('ACCEPTED_DAILY_FIELD_CHANGED');
+}
+
+export function validateLedgerSegments(rows: readonly ProductRow[], metadata: ProductMetadata) {
+  let end = 2498,
+    block = 27720851;
+  for (const s of metadata.ledgerSegments ?? []) {
+    if (s.from !== end || s.blockNumber <= block) throw Error('LEDGER_SEGMENT_ORDER');
+    for (const word of s.words) {
+      const row = rows.find((r) => r.contractDay === end),
+        fields = decodeDailyWord(word);
+      if (
+        !row ||
+        row.dateUtc !== ledgerDate(end) ||
+        Object.entries(fields).some(([k, v]) => row[k as keyof ProductRow] !== v)
+      )
+        throw Error('LEDGER_SEGMENT_VALUE');
+      end++;
+    }
+    block = s.blockNumber;
+  }
+  if (metadata.ledgerSegments && metadata.coverage.ledgerDates !== end)
+    throw Error('LEDGER_COVERAGE');
+  const r = metadata.readings.find((r) => r.kind === 'protocol');
+  if (r && Number(r.globalWords[4]) !== end) throw Error('PROTOCOL_LEDGER_BOUNDARY');
 }

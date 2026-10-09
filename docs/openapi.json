@@ -201,6 +201,118 @@
                         }
                       ]
                     },
+                    "circulatingHEX": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "lockedPrincipalHEX": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "totalHEX": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "activeTshares": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "queuedTshares": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 160,
+                          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "latestMaterializedPayout": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "contractDay": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "dateUtc": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            },
+                            "dailyPayoutHEX": {
+                              "type": "string",
+                              "maxLength": 160,
+                              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            "payoutPerTshareHEX": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 160,
+                                  "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "observedAtUtc": {
+                              "type": "string",
+                              "format": "date-time",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                            }
+                          },
+                          "required": [
+                            "contractDay",
+                            "dateUtc",
+                            "dailyPayoutHEX",
+                            "payoutPerTshareHEX",
+                            "observedAtUtc"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "savedHolderRecordCount": {
                       "type": "integer",
                       "minimum": 0,
@@ -383,6 +495,12 @@
                     "priorityFeeWei",
                     "tshareRateHEX",
                     "currentDayPayoutHEX",
+                    "circulatingHEX",
+                    "lockedPrincipalHEX",
+                    "totalHEX",
+                    "activeTshares",
+                    "queuedTshares",
+                    "latestMaterializedPayout",
                     "savedHolderRecordCount",
                     "savedStakeStartRecordCount",
                     "positiveBalanceAddressCount",
@@ -411,6 +529,12 @@
                       "priorityFeeWei": null,
                       "tshareRateHEX": null,
                       "currentDayPayoutHEX": null,
+                      "circulatingHEX": null,
+                      "lockedPrincipalHEX": null,
+                      "totalHEX": null,
+                      "activeTshares": null,
+                      "queuedTshares": null,
+                      "latestMaterializedPayout": null,
                       "savedHolderRecordCount": 664435,
                       "savedStakeStartRecordCount": 954715,
                       "positiveBalanceAddressCount": null,
@@ -4195,6 +4319,11 @@
                       ],
                       "additionalProperties": false
                     },
+                    "dailyThroughDateUtc": {
+                      "type": "string",
+                      "format": "date",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                    },
                     "live": {
                       "type": "object",
                       "properties": {
@@ -4329,6 +4458,118 @@
                               "type": "string",
                               "maxLength": 160,
                               "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "circulatingHEX": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 160,
+                              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "lockedPrincipalHEX": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 160,
+                              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "totalHEX": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 160,
+                              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "activeTshares": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 160,
+                              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "queuedTshares": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "maxLength": 160,
+                              "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "latestMaterializedPayout": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "contractDay": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "dateUtc": {
+                                  "type": "string",
+                                  "format": "date",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                                },
+                                "dailyPayoutHEX": {
+                                  "type": "string",
+                                  "maxLength": 160,
+                                  "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                                },
+                                "payoutPerTshareHEX": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "maxLength": 160,
+                                      "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "observedAtUtc": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                                }
+                              },
+                              "required": [
+                                "contractDay",
+                                "dateUtc",
+                                "dailyPayoutHEX",
+                                "payoutPerTshareHEX",
+                                "observedAtUtc"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -4517,6 +4758,12 @@
                         "priorityFeeWei",
                         "tshareRateHEX",
                         "currentDayPayoutHEX",
+                        "circulatingHEX",
+                        "lockedPrincipalHEX",
+                        "totalHEX",
+                        "activeTshares",
+                        "queuedTshares",
+                        "latestMaterializedPayout",
                         "savedHolderRecordCount",
                         "savedStakeStartRecordCount",
                         "positiveBalanceAddressCount",
@@ -4573,6 +4820,7 @@
                     "datasetVersion",
                     "chain",
                     "daily",
+                    "dailyThroughDateUtc",
                     "live",
                     "methods",
                     "credits"
@@ -4635,6 +4883,7 @@
                         "baseFeeWei": null,
                         "priorityFeeWei": null
                       },
+                      "dailyThroughDateUtc": "2026-10-07",
                       "live": {
                         "schemaVersion": "daily-product-1",
                         "datasetVersion": "d4db07e0e68119faba37a4c6d350801d8a98e04adb0c9a0f72cee6c67b0e4e4a",
@@ -4650,6 +4899,12 @@
                         "priorityFeeWei": null,
                         "tshareRateHEX": null,
                         "currentDayPayoutHEX": null,
+                        "circulatingHEX": null,
+                        "lockedPrincipalHEX": null,
+                        "totalHEX": null,
+                        "activeTshares": null,
+                        "queuedTshares": null,
+                        "latestMaterializedPayout": null,
                         "savedHolderRecordCount": 664435,
                         "savedStakeStartRecordCount": 954715,
                         "positiveBalanceAddressCount": null,

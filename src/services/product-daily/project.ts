@@ -1,3 +1,4 @@
+import { ProtocolReadingSchema } from '../../contracts/protocol-daily.ts';
 import { contractDayAt, dayStartSeconds } from '../../domain/day.ts';
 import {
   exact,
@@ -111,6 +112,10 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
       } else if (r.set.methodRevision !== undefined) throw Error('TRACKED_SET_METHOD_COHORT');
       const binding = reserveBased ? { method: r.set.methodRevision, pools: identity } : identity;
       if (hash(JSON.stringify(binding)) !== r.set.id) throw Error('TRACKED_SET_DIGEST');
+    }
+    if (r.kind === 'protocol') {
+      ProtocolReadingSchema.parse(r);
+      continue;
     }
     const values = r.kind === 'gas' ? [r.gasPriceWei, r.baseFeeWei, r.priorityFeeWei] : [r.value];
     for (const value of values)
@@ -286,7 +291,7 @@ export function projectDaily(input: {
         row.baseFeeWei = reading.baseFeeWei;
         row.priorityFeeWei = reading.priorityFeeWei;
         row.gasRecordedAtUtc = reading.observedAtUtc;
-      } else {
+      } else if (reading.kind !== 'protocol') {
         row.trackedLiquidityUsd = reading.value;
         row.liquidityRecordedAtUtc = reading.observedAtUtc;
       }

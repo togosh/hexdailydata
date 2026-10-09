@@ -30,6 +30,8 @@ function Reading({
   );
 }
 function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> }) {
+  const compact = (value: string | null) =>
+    value === null ? null : (Number(value) / 1e9).toFixed(6);
   return (
     <section className="panel live-product" data-testid="live-product">
       <p className="eyebrow">Latest / live availability</p>
@@ -58,6 +60,67 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
           unit="USD estimate"
         />
       </div>
+      <section data-testid="protocol-availability">
+        <h3>HEX protocol at its saved block</h3>
+        <p className="meta">
+          {data.freshness.protocol?.status} ·{' '}
+          {data.freshness.protocol?.observedAtUtc ?? 'Unavailable'}
+        </p>
+        <div className="product-readings">
+          <Reading
+            label="Circulating HEX"
+            value={compact(data.circulatingHEX)}
+            unit="billion HEX · rounded display"
+          />
+          <Reading
+            label="Locked principal"
+            value={compact(data.lockedPrincipalHEX)}
+            unit="billion HEX · rounded display"
+          />
+          <Reading
+            label="Circulating plus locked"
+            value={compact(data.totalHEX)}
+            unit="billion HEX · rounded display"
+          />
+          <Reading
+            label="T-share rate before bonuses"
+            value={data.tshareRateHEX}
+            unit="HEX / T-share"
+          />
+          <Reading label="Reported active shares" value={data.activeTshares} unit="T-shares" />
+          <Reading label="Reported queued shares" value={data.queuedTshares} unit="T-shares" />
+        </div>
+        <p>
+          Queued shares are reported separately. These are block observations, not a count of active
+          stakers.
+        </p>
+        {data.latestMaterializedPayout && (
+          <div data-testid="materialized-payout">
+            <h3>Latest materialized daily payout</h3>
+            <p>
+              {data.latestMaterializedPayout.dateUtc} · contract day{' '}
+              {data.latestMaterializedPayout.contractDay}. Observed{' '}
+              {data.latestMaterializedPayout.observedAtUtc}.
+            </p>
+            <div className="product-readings">
+              <Reading
+                label="Completed daily payout"
+                value={data.latestMaterializedPayout.dailyPayoutHEX}
+                unit="HEX"
+              />
+              <Reading
+                label="Payout per T-share"
+                value={data.latestMaterializedPayout.payoutPerTshareHEX}
+                unit="HEX / T-share"
+              />
+            </div>
+            <p>
+              Not the unfinished current-day payout.{' '}
+              <a href="/daily?metric=dailyPayoutHEX">Daily payout history</a>
+            </p>
+          </div>
+        )}
+      </section>
       <p className="meta" data-testid="gas-availability">
         Gas: {data.freshness.gas?.status ?? 'unavailable'} · observed{' '}
         {data.freshness.gas?.observedAtUtc ?? 'unavailable'}.{' '}

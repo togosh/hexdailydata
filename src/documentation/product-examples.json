@@ -3787,7 +3787,13 @@
             "reason": "Pool valuation not qualified."
           }
         },
-        "pool": null
+        "pool": null,
+        "circulatingHEX": null,
+        "lockedPrincipalHEX": null,
+        "totalHEX": null,
+        "activeTshares": null,
+        "queuedTshares": null,
+        "latestMaterializedPayout": null
       },
       "methods": [
         "Daily recorded snapshots use their original UTC record date and latest whole observation on that date; not verified closing or measurement time. No carry-forward.",
@@ -3796,7 +3802,8 @@
         "HEX reference price: admitted early V3, otherwise eligible V2; admitted PulseChain in its separate domain. Explicitly conflicted/excluded primary quotes never fall back. No close/spot/ATH/ROI or cross-era returns.",
         "Ethereum-origin prices stop at the conservative 2022 cap; this is not a fork date. The unqualified 2023 gap remains. Live markets, liquidity and gas are separate meanings."
       ],
-      "credits": "Historical observations: HEXDailyStats / togosh. Producer source revision066d848c91a079af38f17b8e45693bf5d2f7aa2e, code MIT. Feed redistribution authority unresolved; internal staging only."
+      "credits": "Historical observations: HEXDailyStats / togosh. Producer source revision066d848c91a079af38f17b8e45693bf5d2f7aa2e, code MIT. Feed redistribution authority unresolved; internal staging only.",
+      "dailyThroughDateUtc": "2026-10-07"
     }
   },
   "latest": {
@@ -3894,16 +3901,20 @@
           "reason": "Pool valuation not qualified."
         }
       },
-      "pool": null
+      "pool": null,
+      "circulatingHEX": null,
+      "lockedPrincipalHEX": null,
+      "totalHEX": null,
+      "activeTshares": null,
+      "queuedTshares": null,
+      "latestMaterializedPayout": null
     }
   },
   "downloads": {
     "recorded": {
       "status": "release_gated",
       "datasetVersion": "d4db07e0e68119faba37a4c6d350801d8a98e04adb0c9a0f72cee6c67b0e4e4a",
-      "datasets": [
-        "daily"
-      ],
+      "datasets": ["daily"],
       "reason": "Selected daily CSV is implemented; public release requires account/backend and redistribution qualification."
     }
   }

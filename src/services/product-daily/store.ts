@@ -18,7 +18,8 @@ import {
 import { PageCursors } from '../queries/cursor.ts';
 import { restart } from '../../api/errors.ts';
 import { columns, validateReadings, readingKey } from './project.ts';
-import { validateMarketHistory, preserveMarketHistory } from './market.ts';
+import { protocolValues } from '../../contracts/protocol-daily.ts';
+import { validateMarketHistory, preserveMarketHistory, validateLedgerSegments } from './market.ts';
 import { verifyMarketCertificate } from './storage.ts';
 
 const names = ['daily.ndjson', 'daily.csv', 'metadata.json', 'exceptions.ndjson'];
@@ -123,6 +124,7 @@ export async function admitProduct(
   if (!files['daily.csv']!.equals(Buffer.from(csv(rows, columns))))
     throw Error('PRODUCT_CSV_MISMATCH');
   validateMarketHistory(rows, metadata);
+  validateLedgerSegments(rows, metadata);
   const v = manifest.version,
     bundleId = `${v.slice(0, 8)}-${v.slice(8, 12)}-4${v.slice(13, 16)}-8${v.slice(17, 20)}-${v.slice(20, 32)}`;
   const csvBytes = files['daily.csv']!;
@@ -538,6 +540,12 @@ export class ProductDailyStore {
       gasPriceWei: null,
       baseFeeWei: null,
       priorityFeeWei: null,
+      tshareRateHEX: null,
+      circulatingHEX: null,
+      lockedPrincipalHEX: null,
+      totalHEX: null,
+      activeTshares: null,
+      queuedTshares: null,
     } as Record<string, string | null>;
     const groups: Record<string, ReturnType<typeof freshness>> = {
       savedState: freshness(
@@ -548,7 +556,7 @@ export class ProductDailyStore {
       ),
       protocol: freshness(null, 300, 'No qualified current global/share-rate observation.'),
       payout: freshness(
-        m.ledgerObservedAtUtc,
+        m.ledgerSegments?.at(-1)?.observedAtUtc ?? m.ledgerObservedAtUtc,
         86400,
         'Historical materialized ledger; no current-day estimate.',
       ),
@@ -583,6 +591,13 @@ export class ProductDailyStore {
           r.observedAtUtc,
           300,
           'Admitted spot observation; served time is not observation time.',
+        );
+      } else if (r.kind === 'protocol') {
+        Object.assign(values, protocolValues(r));
+        groups.protocol = freshness(
+          r.observedAtUtc,
+          300,
+          'Paired hash-pinned protocol observation; two-block lag is not finality. Queued shares remain separate.',
         );
       } else if (r.kind === 'gas') {
         values.gasPriceWei = r.gasPriceWei;
@@ -623,8 +638,19 @@ export class ProductDailyStore {
       chain: 'pulsechain' as const,
       servedAtUtc: new Date(Math.floor(now / 1000) * 1000).toISOString(),
       ...values,
-      tshareRateHEX: null,
       currentDayPayoutHEX: null,
+      latestMaterializedPayout: (() => {
+        const row = snapshot.rows.findLast((r) => r.payoutHearts !== null);
+        return row
+          ? {
+              contractDay: row.contractDay,
+              dateUtc: row.dateUtc,
+              dailyPayoutHEX: row.dailyPayoutHEX!,
+              payoutPerTshareHEX: row.payoutPerTshareHEX,
+              observedAtUtc: m.ledgerSegments?.at(-1)?.observedAtUtc ?? m.ledgerObservedAtUtc,
+            }
+          : null;
+      })(),
       savedHolderRecordCount: m.pair.holderRecordCount,
       savedStakeStartRecordCount: m.pair.stakeStartRecordCount,
       positiveBalanceAddressCount: null,
@@ -640,6 +666,7 @@ export class ProductDailyStore {
       schemaVersion: productSchemaVersion,
       datasetVersion: snapshot.version,
       chain: 'pulsechain' as const,
+      dailyThroughDateUtc: snapshot.metadata.through,
       daily:
         snapshot.rows.findLast((r) => r.snapshotRecordedAtUtc !== null) ?? snapshot.rows.at(-1)!,
       live: this.live(snapshot, now),
