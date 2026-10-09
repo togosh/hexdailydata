@@ -221,6 +221,17 @@ export const ProductMetadataSchema = z.strictObject({
   effectiveAtUtc: utc,
   readings: z.array(ReadingSchema).max(8),
   observations: z.array(ReadingSchema).max(4096).optional(),
+  // Internal storage only. Public Daily/Live/CSV contracts do not expose this.
+  marketStorage: z
+    .strictObject({
+      format: z.literal('market-journal-1'),
+      seedVersion: digest,
+      seedMetadataSha256: digest,
+      sequence: z.number().int().min(0).max(1000000),
+      head: digest,
+      checkpoints: z.array(ReadingSchema).max(60006),
+    })
+    .optional(),
   liquidityHistory: z.array(LiquidityBucketSchema).max(4096).optional(),
   coverage: z.strictObject({
     snapshotDates: z.number().int().nonnegative(),

@@ -27,6 +27,7 @@ def save(path,obj):
 class Storage:
     def __init__(self,root,limit=8*1024**3,free_floor=10*1024**3,used=0):
         self.root=Path(root);self.limit=limit;self.free_floor=free_floor;self.used=used;self.bytes_written=0
+        self.entries=set()
     def check(self,n,acquisition=False):
         if n<0 or self.used+n>self.limit:raise ValueError('Storage ceiling')
         if acquisition and 2*(self.used+n)+512*1024**2>self.limit:raise ValueError('Storage reserved for summary and bounded parts')
@@ -52,5 +53,10 @@ class Storage:
     def target(self,path):
         path=Path(path)
         if path.is_symlink() or not path.resolve().is_relative_to(self.root.resolve()):raise ValueError('Write escaped new session root')
+        current=path
+        additions=set()
+        while current!=self.root:
+            additions.add(str(current.relative_to(self.root)));current=current.parent
+        if len(self.entries|additions)>8192:raise ValueError('Capture entry ceiling')
+        self.entries.update(additions)
         return path
-

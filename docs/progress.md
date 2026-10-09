@@ -790,3 +790,16 @@ exact. Initial stale service lasted 94.032 seconds before the first adoption; th
 finite result is not continuous or indefinite operation. The 4,096-object bound and
 retention prerequisite remain. Separate review and commit/archive identities are in
 the market-refresh-job-r1 return. No scheduler, main merge, deployment or indexer work.
+
+### 2026-10-09 — Bounded market storage and offline recovery
+
+Implemented a compact recent window, daily/key checkpoints, full retained update
+journal, identity-checked generation retention, backup/restore and conservative
+local recovery. The full saved 2,502-row/90-bucket seed is unchanged; ordinary API,
+CSV and running-reader adoption retain existing access and freshness semantics.
+Virtual-clock scale, interruption, corruption, ownership, exact-manifest bounds,
+operation accounting and isolated-restore evidence are in market-storage-recovery-r1.
+The earlier finite public trial remains closed; this milestone makes zero provider
+requests. Native filesystem failure evidence remains retained. Permanent scheduling,
+physical power-loss qualification and a later live soak remain NOT_RUN. Main stays
+unmerged, accepted data stays unchanged, and indexer remains PARKED.

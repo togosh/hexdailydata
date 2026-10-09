@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { contractDayAt } from '../../domain/day.ts';
-import { compare, stable } from '../../history-bootstrap/normalize.ts';
+import { compare, stable, hash } from '../../history-bootstrap/normalize.ts';
 import {
   ReadingSchema,
   LiquidityBucketSchema,
@@ -23,6 +23,88 @@ export const MarketUpdateSchema = z.strictObject({
 });
 const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 const dateOf = (time: string) => new Date(time).toISOString().slice(0, 10);
+export const activeMarketBound = 512;
+const dayKey = (r: ProductReading) => dateOf(r.observedAtUtc) + ':' + readingKey(r);
+const order = (a: ProductReading, b: ProductReading) =>
+  Date.parse(a.observedAtUtc) - Date.parse(b.observedAtUtc) ||
+  readingKey(a).localeCompare(readingKey(b));
+
+/** At most one exact last reading per independent key/date, never a fabricated close. */
+export function marketCheckpoints(readings: ProductReading[]) {
+  const days = new Map<string, ProductReading>();
+  for (const r of readings) {
+    validateReadings([r]);
+    const key = dayKey(r),
+      old = days.get(key);
+    if (old && Date.parse(old.observedAtUtc) === Date.parse(r.observedAtUtc) && !same(old, r))
+      throw Error('SAME_TIME_MARKET_CONFLICT');
+    if (!old || Date.parse(r.observedAtUtc) > Date.parse(old.observedAtUtc)) days.set(key, r);
+  }
+  if (days.size > 60006) throw Error('MARKET_CHECKPOINT_BOUND');
+  return [...days.values()].sort(order);
+}
+export function marketEvidence(metadata: ProductMetadata): ProductReading[] {
+  if (!metadata.marketStorage)
+    return mergeObservations([], metadata.observations ?? metadata.readings);
+  const cp = metadata.marketStorage.checkpoints,
+    recent = metadata.observations ?? [];
+  if (
+    recent.length > activeMarketBound ||
+    !same(marketCheckpoints(cp), cp) ||
+    !same(mergeObservations([], recent), recent)
+  )
+    throw Error('MARKET_STORAGE_SHAPE');
+  // A compact checkpoint and the recent window may overlap a day, not an exact instant.
+  const watermarks = latestReadings(cp);
+  for (const r of recent) {
+    const old = watermarks.find((p) => readingKey(p) === readingKey(r));
+    if (old && Date.parse(r.observedAtUtc) <= Date.parse(old.observedAtUtc))
+      throw Error('MARKET_CHECKPOINT_OVERLAP');
+  }
+  const evidence = [...cp, ...recent].sort(order);
+  const cohorts = new Set(
+    evidence
+      .filter((r) => r.kind === 'tracked-liquidity' || r.kind === 'liquidity')
+      .map((r) =>
+        r.kind === 'tracked-liquidity'
+          ? r.set.id
+          : stable(r.kind === 'liquidity' && [r.poolAddress, r.dex, r.version]),
+      ),
+  );
+  if (cohorts.size > 1) throw Error('LIQUIDITY_COHORT_DRIFT');
+  return evidence;
+}
+export function marketJournalEntry(metadata: ProductMetadata, update: unknown) {
+  const s = metadata.marketStorage;
+  if (!s || s.sequence >= 1000000) throw Error('MARKET_JOURNAL_BOUND');
+  const body = {
+    sequence: s.sequence + 1,
+    previous: s.head,
+    update: MarketUpdateSchema.parse(update),
+  };
+  return { ...body, head: hash(stable(body)) };
+}
+export function migrateMarketMetadata(metadata: ProductMetadata, seedVersion: string) {
+  if (metadata.marketStorage) return metadata;
+  digest.parse(seedVersion);
+  const original = mergeObservations([], metadata.observations ?? metadata.readings);
+  const seedMetadataSha256 = hash(stable(metadata));
+  const head = hash(stable({ seedVersion, seedMetadataSha256 }));
+  // Migration keeps the entire original window in the one seed receipt. Large old
+  // windows compact as a whole so an update pair is never split by an arbitrary slice.
+  return ProductMetadataSchema.parse({
+    ...metadata,
+    observations: original.length <= activeMarketBound ? original : [],
+    marketStorage: {
+      format: 'market-journal-1',
+      seedVersion,
+      seedMetadataSha256,
+      sequence: 0,
+      head,
+      checkpoints: original.length <= activeMarketBound ? [] : marketCheckpoints(original),
+    },
+  });
+}
 const marketFields = [
   'btcPriceUsd',
   'ethPriceUsd',
@@ -128,9 +210,9 @@ function replay(
 }
 export function validateMarketHistory(rows: readonly ProductRow[], metadata: ProductMetadata) {
   if (!metadata.observations && !metadata.liquidityHistory) return; // Accepted earlier generation.
-  const observations = mergeObservations([], metadata.observations ?? []);
+  const observations = marketEvidence(metadata);
   if (
-    !same(observations, metadata.observations ?? []) ||
+    (!metadata.marketStorage && !same(observations, metadata.observations ?? [])) ||
     !same(latestReadings(observations), metadata.readings)
   )
     throw Error('MARKET_LATEST_HISTORY_MISMATCH');
@@ -156,16 +238,37 @@ export function applyMarketUpdate(
 ) {
   const update = MarketUpdateSchema.parse(unknownUpdate);
   validateReadings(update.readings);
-  const prior = base.metadata.observations ?? base.metadata.readings;
-  const observations = mergeObservations(prior, update.readings);
+  let prior = base.metadata.observations ?? base.metadata.readings;
+  let storage = base.metadata.marketStorage;
   for (const r of update.readings) {
     const old = base.metadata.readings.find((p) => readingKey(p) === readingKey(r));
     if (old && Date.parse(r.observedAtUtc) < Date.parse(old.observedAtUtc))
       throw Error('OLDER_MARKET_OBSERVATION');
+    if (old && Date.parse(r.observedAtUtc) === Date.parse(old.observedAtUtc) && !same(old, r))
+      throw Error('SAME_TIME_MARKET_CONFLICT');
   }
+  if (
+    storage &&
+    update.readings.every((r) => base.metadata.readings.some((p) => same(p, r))) &&
+    update.liquidityHistory.every((b) => base.metadata.liquidityHistory?.some((p) => same(p, b)))
+  )
+    return base;
+  const additions = storage
+    ? update.readings.filter((r) => !base.metadata.readings.some((p) => same(p, r)))
+    : update.readings;
+  if (storage && prior.length + additions.length > activeMarketBound) {
+    storage = { ...storage, checkpoints: marketCheckpoints([...storage.checkpoints, ...prior]) };
+    prior = [];
+  }
+  const observations = mergeObservations(prior, additions);
+  if (storage) {
+    const entry = marketJournalEntry(base.metadata, update);
+    storage = { ...storage, sequence: entry.sequence, head: entry.head };
+  }
+  const evidence = [...(storage?.checkpoints ?? []), ...observations].sort(order);
   const buckets = new Map((base.metadata.liquidityHistory ?? []).map((b) => [b.dateUtc, b]));
-  const latestTime = Math.max(...observations.map((r) => Date.parse(r.observedAtUtc)));
-  validateBuckets(observations, update.liquidityHistory);
+  const latestTime = Math.max(...evidence.map((r) => Date.parse(r.observedAtUtc)));
+  validateBuckets(evidence, update.liquidityHistory);
   for (const b of update.liquidityHistory) {
     const old = buckets.get(b.dateUtc);
     if (old && !same(old, b)) throw Error('HISTORY_BUCKET_CONFLICT');
@@ -173,7 +276,7 @@ export function applyMarketUpdate(
   }
   const end = Math.max(
     Date.parse(base.metadata.through),
-    ...observations.map((r) => Date.parse(dateOf(r.observedAtUtc))),
+    ...evidence.map((r) => Date.parse(dateOf(r.observedAtUtc))),
   );
   if ((end - Date.parse(base.metadata.from)) / 86400000 > 10000) throw Error('MARKET_DATE_BOUND');
   const rows = base.rows.map((r) => ({ ...r }));
@@ -196,7 +299,7 @@ export function applyMarketUpdate(
     );
   }
   const liquidityHistory = [...buckets.values()].sort((a, b) => a.dateUtc.localeCompare(b.dateUtc));
-  replay(rows, observations, liquidityHistory);
+  replay(rows, evidence, liquidityHistory);
   const gaps: { field: string; from: string; to: string }[] = [];
   for (const field of metricKeys) {
     let gap: (typeof gaps)[number] | undefined;
@@ -214,11 +317,14 @@ export function applyMarketUpdate(
   const metadata = ProductMetadataSchema.parse({
     ...base.metadata,
     observations,
+    ...(storage ? { marketStorage: storage } : {}),
     liquidityHistory,
-    readings: latestReadings(observations),
+    readings: latestReadings(evidence),
     inputHashes: {
       ...base.metadata.inputHashes,
-      ['market-' + update.receiptSha256]: update.receiptSha256,
+      [storage ? 'market-journal' : 'market-' + update.receiptSha256]: storage
+        ? storage.head
+        : update.receiptSha256,
     },
     through: rows.at(-1)!.dateUtc,
     rows: rows.length,
@@ -256,9 +362,40 @@ export function preserveMarketHistory(
   previous: { rows: readonly ProductRow[]; metadata: ProductMetadata },
   next: { rows: readonly ProductRow[]; metadata: ProductMetadata },
 ) {
-  const nextObservations = next.metadata.observations ?? next.metadata.readings;
-  for (const r of previous.metadata.observations ?? previous.metadata.readings)
-    if (!nextObservations.some((n) => same(n, r))) throw Error('MARKET_HISTORY_REGRESSION');
+  if (previous.metadata.marketStorage || next.metadata.marketStorage) {
+    const a = previous.metadata.marketStorage,
+      b = next.metadata.marketStorage;
+    if (
+      !b ||
+      (a &&
+        (a.seedVersion !== b.seedVersion ||
+          a.seedMetadataSha256 !== b.seedMetadataSha256 ||
+          b.sequence < a.sequence ||
+          (b.sequence === a.sequence && b.head !== a.head)))
+    )
+      throw Error('MARKET_JOURNAL_REGRESSION');
+    if (!a && b.seedMetadataSha256 !== hash(stable(previous.metadata)))
+      throw Error('MARKET_SEED_MISMATCH');
+    const nextDays = new Map(
+      marketCheckpoints(marketEvidence(next.metadata)).map((r) => [dayKey(r), r]),
+    );
+    for (const old of marketCheckpoints(marketEvidence(previous.metadata))) {
+      const n = nextDays.get(dayKey(old));
+      if (
+        !n ||
+        Date.parse(n.observedAtUtc) < Date.parse(old.observedAtUtc) ||
+        (Date.parse(n.observedAtUtc) === Date.parse(old.observedAtUtc) && !same(n, old))
+      )
+        throw Error('MARKET_HISTORY_REGRESSION');
+      const latest = previous.metadata.readings.find((r) => readingKey(r) === readingKey(old));
+      if (!same(n, old) && (!latest || dateOf(latest.observedAtUtc) !== dateOf(old.observedAtUtc)))
+        throw Error('MARKET_CLOSED_DATE_CHANGED');
+    }
+  } else {
+    const nextObservations = next.metadata.observations ?? next.metadata.readings;
+    for (const r of previous.metadata.observations ?? previous.metadata.readings)
+      if (!nextObservations.some((n) => same(n, r))) throw Error('MARKET_HISTORY_REGRESSION');
+  }
   for (const b of previous.metadata.liquidityHistory ?? [])
     if (!next.metadata.liquidityHistory?.some((n) => same(n, b)))
       throw Error('LIQUIDITY_HISTORY_REGRESSION');

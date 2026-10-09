@@ -345,10 +345,12 @@ export function projectDaily(input: {
   });
   return { rows, metadata, exceptions };
 }
-export function productFiles(product: ReturnType<typeof projectDaily>) {
+export function productFiles(
+  product: Omit<ReturnType<typeof projectDaily>, 'rows'> & { rows: readonly ProductRow[] },
+) {
   const files: Record<string, Buffer> = {
     'daily.ndjson': Buffer.from(product.rows.map(stable).join('')),
-    'daily.csv': Buffer.from(csv(product.rows, columns)),
+    'daily.csv': Buffer.from(csv([...product.rows], columns)),
     'metadata.json': Buffer.from(stable(product.metadata)),
     'exceptions.ndjson': Buffer.from(product.exceptions.map(stable).join('')),
   };

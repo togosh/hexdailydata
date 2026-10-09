@@ -537,3 +537,44 @@ backup/recovery and explicit scheduling/release authority are required before
 indefinite operation. Do not prune original evidence to hide that limit. Protocol,
 holder/stake and daily data retain their separate old observation times; gas and
 independent benchmark feeds remain unavailable. Main and the indexer are unchanged.
+
+## Bounded market storage and offline recovery
+
+The market-storage-recovery-r1 extension replaces the preceding short raw-window
+horizon for NEW marked roots. Existing accepted roots remain read-only. Exact
+successful updates are retained in hash-chained 16-record journal segments; serving
+generations hold at most 512 recent objects plus one last observation per key/UTC
+date. Whole update pairs rotate together. Daily checkpoints are bounded to 60,006
+objects and the existing 10,000-day span. No observation becomes a verified close,
+and restoring files does not refresh their times or the 300-second freshness rule.
+
+Publication retains current, one distinct rollback and explicit pins; redundant
+five-file generations are removed only with a rechecked identity/ownership plan.
+In-memory API and CSV snapshots own independent bytes. Historical journal facts,
+the original seed and uncertain work remain retained. There is no age-based unlock.
+New capture reservations and settlements use immutable operation identities with
+bounded direct lookups; a full audit is an explicit maintenance/restore action.
+
+`node scripts/market-storage.mjs` prints read-only usage. The offline modes are
+`inspect`, `plan-retention`, `apply-retention`, `plan-rollback`, `apply-rollback`,
+`backup`, `restore`, and `reconcile-ack`; use the exact arguments shown by usage.
+Apply modes require the current exact local plan. A backup goes to a new path and
+refuses a manifest above restore's 4 MiB bound before destination creation. Restore
+requires its SHA-256 and a new marked root. Missing acknowledgement is reconciled
+only from complete pointer/journal/receipt evidence. Corrupt-current rollback keeps
+the unresolved newer journal and blocks subsequent publication pending integrity
+resolution. Unknown locks, orphan events or partial writes remain blocked.
+
+Finite ceilings remain: 8 GiB, 100,000 entries, 10 GiB protected free space,
+1,000,000 journal updates, 8,192 local-operation events, 16 retained generations
+and 8 pins. New finite capture output reserves 1 GiB/8,192 entries; known complete
+closure can settle to conservative actual charges, but unknown work keeps the full
+reservation. Backups consume conservative additional allowance. Stop before a
+ceiling; retention of full snapshots does not make historical storage constant.
+
+Qualification is offline with virtual-clock data and process-interruption fixtures,
+including a running loopback API and isolated restore. Physical power-loss and
+indefinite unattended operation are unqualified. A native Windows rename refusal
+was preserved as a stopped synthetic run with uncertainty retained. No retry or
+force-unlock workaround is approved. Any future public trial needs a new build,
+preflight and explicit finite authority; no old command or allowance is revived.

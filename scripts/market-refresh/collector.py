@@ -60,6 +60,9 @@ def execute(mode,output,binding_path,test_transport=None,test_clock=None,test_sl
     root.mkdir();(root/'temp').mkdir();nonce=secrets.token_hex(32)
     save(root/'ADMISSION.json',{'task':SCOPE['taskId'],'nonce':nonce,'recordedAt':utc(),'sourceFiles':source_binding(),'preflightSha256':digest(Path(binding_path).read_bytes()),'mode':mode})
     s=Session(root,test_transport,test_clock,test_sleep,True) if synthetic else Session(root,WorkerTransport(nonce))
+    # One finite output has a conservative 1 GiB reservation in the local serving
+    # store before this worker starts. Unknown charges are never refunded.
+    s.storage.limit=min(s.storage.limit,1024**3)
     incoming=queue.Queue()
     def reader():
         try:

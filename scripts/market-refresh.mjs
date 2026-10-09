@@ -1,34 +1,20 @@
 // Explicit finite current refresh. No timers/services installed and no default requests.
-import { readFile, open, unlink, lstat, readdir, statfs } from 'node:fs/promises';
+import { readFile, open, unlink, lstat } from 'node:fs/promises';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { hash } from '../dist/history-bootstrap/normalize.js';
-import { applyMarketUpdate } from '../dist/services/product-daily/market.js';
-import { productFiles } from '../dist/services/product-daily/project.js';
-import { ProductDailyStore, writeProductGeneration } from '../dist/services/product-daily/store.js';
+import { ProductDailyStore } from '../dist/services/product-daily/store.js';
 import { readProductProfile } from '../dist/services/product-daily/open.js';
+import {
+  publishStoredMarket,
+  checkMarketCapacity,
+  reserveCaptureStorage,
+  settleCaptureStorage,
+} from '../dist/services/product-daily/storage.js';
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const runtime = join(repository, 'scripts/market-refresh');
-export async function checkTaskStorage(root, reservation = 512 * 1024 ** 2) {
-  const disk = await statfs(root);
-  if (disk.bavail * disk.bsize - reservation < 10 * 1024 ** 3) throw Error('PROTECTED_FREE_SPACE');
-  const pending = [root];
-  let bytes = 0,
-    entries = 0;
-  while (pending.length) {
-    const path = pending.pop(),
-      s = await lstat(path);
-    if (s.isSymbolicLink()) throw Error('TASK_STORAGE_ALIAS');
-    if (++entries > 100000) throw Error('TASK_STORAGE_ENTRIES');
-    if (s.isDirectory()) for (const name of await readdir(path)) pending.push(join(path, name));
-    else bytes += s.size;
-    if (bytes + reservation > 8 * 1024 ** 3) throw Error('TASK_OUTPUT_STORAGE_BOUND');
-  }
-  return { bytes, reservation, freeBytes: disk.bavail * disk.bsize };
-}
-
 export async function durableJson(path, value) {
   const f = await open(path, 'wx');
   try {
@@ -100,18 +86,14 @@ export async function publishCycle(store, writer, output, message, active = () =
   )
     throw Error('CURRENT_ONLY_PAIRED_UPDATE');
   const base = store.capture();
-  const exceptions = (await readFile(join(store.root, base.version, 'exceptions.ndjson'), 'utf8'))
-    .trimEnd()
-    .split('\n')
-    .filter(Boolean)
-    .map(JSON.parse);
-  const files = productFiles(applyMarketUpdate({ ...base, exceptions }, update));
-  await checkTaskStorage(dirname(output));
-  assertCurrent();
-  await writeProductGeneration(store.root, files);
-  assertCurrent();
-  const selected = { version: files.version, manifestSha256: files.manifestSha256 };
-  const result = await store.select(selected, { writer, beforeCommit: assertCurrent });
+  const result = await publishStoredMarket(store, writer, update, assertCurrent, undefined, {
+    output: resolve(output),
+    update: message.update,
+    updateSha256: hash(bytes),
+    audit: `ROUND_${message.cycle}_AUDIT.json`,
+    auditSha256: hash(await readFile(join(output, `ROUND_${message.cycle}_AUDIT.json`))),
+  });
+  const selected = result.selected;
   try {
     assertCurrent();
   } catch (e) {
@@ -132,6 +114,8 @@ export async function publishCycle(store, writer, output, message, active = () =
     ageAtPublicationSeconds: (Date.parse(publishedAt) - Date.parse(observedAtUtc)) / 1000,
     observations: store.capture().metadata.observations.length,
     historicalBuckets: store.capture().metadata.liquidityHistory.length,
+    retainedStorage: result.storage,
+    retention: result.retention ?? null,
   };
   await durableJson(join(output, `PUBLICATION_${message.cycle}.json`), receipt);
   return receipt;
@@ -174,7 +158,7 @@ export async function runRefresh(
   const store = new ProductDailyStore(profile.productRoot, profile.pair);
   await store.load();
   if (store.capture().version !== pre.seedVersion) throw Error('SEED_CHANGED');
-  await checkTaskStorage(dirname(resolve(output)));
+  await checkMarketCapacity(store.root);
   const lockPath = join(profile.productRoot, 'MARKET_REFRESH.lock'),
     lock = await open(lockPath, 'wx');
   let writer,
@@ -187,6 +171,7 @@ export async function runRefresh(
     closedMessage,
     error,
     unknownPublication = false;
+  let captureReservation;
   const publications = [],
     began = new Date().toISOString();
   try {
@@ -196,6 +181,7 @@ export async function runRefresh(
     await lock.sync();
     // Both locks precede spawning any provider worker. Held until cycle publication settles.
     writer = await store.acquireWriter();
+    captureReservation = await reserveCaptureStorage(store, writer, output);
     const env = Object.fromEntries(
       Object.entries(process.env).filter(([k]) =>
         ['SYSTEMROOT', 'WINDIR', 'PATH', 'PATHEXT', 'COMSPEC', 'TEMP', 'TMP'].includes(
@@ -296,7 +282,8 @@ export async function runRefresh(
         } else throw Error('UNEXPECTED_COLLECTOR_MESSAGE');
       } catch (e) {
         error = e;
-        unknownPublication ||= e.publicationUncertain === true;
+        unknownPublication ||=
+          e.publicationUncertain === true || Boolean(writer && store.writerUncertain(writer));
         child.stdin.write(
           JSON.stringify({ ok: false, cycle: message?.cycle, error: String(e) }) + '\n',
         );
@@ -317,6 +304,17 @@ export async function runRefresh(
     );
     settled = completionProof.settled;
     if (completionProof.error) error ??= Error(completionProof.error);
+    let captureStorage = null;
+    if (settled && !unknownPublication) {
+      writer ??= await store.acquireWriter();
+      captureStorage = await settleCaptureStorage(
+        store,
+        writer,
+        output,
+        closedMessage.accounting.storageChargedBytes,
+        captureReservation,
+      );
+    }
     const result = {
       status: error ? 'PARTIAL' : (closedMessage?.status ?? 'UNKNOWN'),
       began,
@@ -329,6 +327,7 @@ export async function runRefresh(
       externalSessionCount: testLaunchCollector ? 0 : 1,
       synthetic: Boolean(testLaunchCollector),
       automaticRestart: false,
+      captureStorage,
     };
     await durableJson(join(output, 'JOB_RESULT.json'), result);
     return result;

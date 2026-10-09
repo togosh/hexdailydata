@@ -19,6 +19,7 @@ import { PageCursors } from '../queries/cursor.ts';
 import { restart } from '../../api/errors.ts';
 import { columns, validateReadings, readingKey } from './project.ts';
 import { validateMarketHistory, preserveMarketHistory } from './market.ts';
+import { verifyMarketCertificate } from './storage.ts';
 
 const names = ['daily.ndjson', 'daily.csv', 'metadata.json', 'exceptions.ndjson'];
 const manifestSchema = z.strictObject({
@@ -198,6 +199,21 @@ export class ProductDailyStore {
     if (!this.current) throw Error('PRODUCT_NOT_INITIALIZED');
     return this.current;
   }
+  assertWriter(lease: ProductWriter) {
+    if (this.writer?.lease !== lease) throw Error('PRODUCT_WRITER_OWNERSHIP');
+  }
+  markWriterUncertain(lease: ProductWriter) {
+    this.assertWriter(lease);
+    this.writer!.uncertain = true;
+  }
+  settleWriter(lease: ProductWriter) {
+    this.assertWriter(lease);
+    this.writer!.uncertain = false;
+  }
+  writerUncertain(lease: ProductWriter) {
+    this.assertWriter(lease);
+    return this.writer!.uncertain;
+  }
   async load() {
     if (this.selecting) throw Error('PRODUCT_SELECTION_BUSY');
     this.selecting = true;
@@ -213,6 +229,7 @@ export class ProductDailyStore {
     );
     const next = await admitProduct(join(this.root, p.version), p.manifestSha256);
     this.checkPair(next);
+    await verifyMarketCertificate(this.root, next);
     this.current = next;
     return next;
   }
@@ -242,12 +259,32 @@ export class ProductDailyStore {
         const next = await admitProduct(join(this.root, p.version), p.manifestSha256);
         this.checkPair(next);
         if (!this.current) throw Error('PRODUCT_NOT_INITIALIZED');
+        await verifyMarketCertificate(this.root, next, this.current);
+        let authorizedRollback = false;
+        const recovery = await bounded(join(this.root, 'RECOVERY.json'), 4096).catch(
+          (e: NodeJS.ErrnoException) => {
+            if (e.code === 'ENOENT') return null;
+            throw e;
+          },
+        );
+        if (recovery) {
+          const r = JSON.parse(recovery.toString());
+          const owner = await bounded(join(this.root, 'STORAGE_OWNER.json'), 4096);
+          authorizedRollback =
+            r.format === 'market-rollback-1' &&
+            r.root === this.root &&
+            r.owner === hash(owner) &&
+            r.from?.version === this.current.version &&
+            r.from?.manifestSha256 === this.current.manifestSha256 &&
+            same(r.selected, p);
+        }
         if (
+          !authorizedRollback &&
           Date.parse(next.metadata.effectiveAtUtc) <=
-          Date.parse(this.current.metadata.effectiveAtUtc)
+            Date.parse(this.current.metadata.effectiveAtUtc)
         )
           throw Error('PRODUCT_NOT_NEWER');
-        preserveMarketHistory(this.current, next);
+        if (!authorizedRollback) preserveMarketHistory(this.current, next);
         if (!(await bounded(join(this.root, 'CURRENT.json'), 4096)).equals(raw))
           throw Error('PRODUCT_POINTER_CHANGED');
         if (
@@ -347,6 +384,7 @@ export class ProductDailyStore {
           throw Error('PRODUCT_POINTER_CHANGED');
       }
       const previous = this.current;
+      await verifyMarketCertificate(this.root, next, previous, Boolean(options.writer));
       if (previous?.version === next.version) {
         completed = true;
         return { changed: false, version: next.version };
