@@ -15,7 +15,7 @@ import {
 import { prepareWindow } from '../../scripts/participant-refresh.mjs';
 import { fixture as makeFixture, auth, charge, wire } from '../market-feed/access-fixture.mjs';
 
-export async function finalize({ R, real, base, fixture, origin, save, seed }) {
+export async function finalize({ R, real, base, fixture, origin, save, seed, skipUnchanged = false, previewSeconds = 900 }) {
   const held = real.capture(),
     product = held.product;
   try {
@@ -149,6 +149,15 @@ export async function finalize({ R, real, base, fixture, origin, save, seed }) {
       csv: { bytes: Buffer.byteLength(csv.body), sha256: sha(csv.body) },
       observation: product.metadata.pair.observedAtUtc,
     });
+    if (skipUnchanged && changes.length === 0) {
+      await save('UNCHANGED_SEED_RESULT', {
+        status: 'UNCHANGED_NO_NEW_BACKUP_OR_BROWSER_REQUIRED',
+        selected: real.status(), qualifiedWindows: 0,
+        genuineSeed: JSON.parse(await readFile(join(R, 'INPUTS.json'))).bundledGenuineSeed,
+        newRestore: false, newScreenshots: 0,
+      });
+      return;
+    }
     let backup;
     if (existsSync(join(R, 'participant-product-backup'))) {
       backup = JSON.parse(await readFile(join(R, 'evidence/BACKUP_IDENTITY.json')));
@@ -291,7 +300,7 @@ export async function finalize({ R, real, base, fixture, origin, save, seed }) {
     const preview = join(R, 'evidence/preview');
     await mkdir(preview);
     const started = Date.now(),
-      deadline = started + 900000,
+      deadline = started + previewSeconds * 1000,
       result = {
         screenshots: [],
         browserErrors: [],
@@ -305,7 +314,7 @@ export async function finalize({ R, real, base, fixture, origin, save, seed }) {
       'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
     ].find(existsSync);
     assert(executable);
-    const timer = setTimeout(() => void browser?.close(), 900000);
+    const timer = setTimeout(() => void browser?.close(), previewSeconds * 1000);
     try {
       browser = await chromium.launch({
         headless: true,

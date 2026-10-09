@@ -1,8 +1,9 @@
 """Finite participant policy over the maintained durable serial transport."""
-import time
+import time, copy
 from capture_client import Session as CaptureSession, Stop, LimitReached
 from durable import strict_json
 from queries import validate_job, validate_rpc, validate_data, capacity, objects, plan_valid
+from retry_schedule import enabled, VERSION, WAITS, COUNTERS, slow_eligible, requirements
 
 class ParticipantSession(CaptureSession):
     capacity = staticmethod(capacity)
@@ -17,12 +18,16 @@ class ParticipantSession(CaptureSession):
     def __init__(self, root, transport, plan, clock=time.monotonic, sleep=time.sleep, synthetic=False):
         plan_valid(plan)
         self.plan = plan
+        self.slow_schedule = enabled(plan)
+        self.retry_ordinal = 0
         self.job_validator = lambda q: validate_job(q, self.plan)
         super().__init__(root, transport, clock, sleep, synthetic)
         self.deadline = self.started + 5400
         self.storage.entry_limit = 24000
         self.storage.limit = 4 * 1024 ** 3
         self.state.update(graphExtraAttempts=0, rpcExtraAttempts=0, retryPolicyVersion='HOLDER_R3', retryPolicy={'maximumAfterInitialPerLogicalPage': 2, 'maximumExtraAttemptsSession': 100, 'graphExtras': 88, 'rpcExtras': 12, 'minimumDelaysSeconds': [15, 60]})
+        if self.slow_schedule:
+            self.state.update(retryScheduleVersion=VERSION, retrySchedule=copy.deepcopy(plan['retry']))
         self.persist()
 
     def attempt(self, *args, **kwargs):
@@ -52,11 +57,27 @@ class ParticipantSession(CaptureSession):
 
     def phase_check(self, q, tail, delay=0):
         now = self.clock() + delay
-        finish = now + (1 + len(tail)) * 31 + 75 * (1 + len(self.controls))
+        query_waits = sum(WAITS[self.retry_ordinal:2]) if self.slow_schedule else 75
+        finish = now + (1 + len(tail)) * 31 + query_waits + 75 * len(self.controls)
         if now + 30 >= self.started + 5100 or finish >= self.started + 5100 or finish + 180 >= self.deadline:
             raise LimitReached('Current-window controls/retries/publication deadline reserve')
 
     def budget(self, q, tail, cutoff=None, is_retry=False):
+        if self.slow_schedule:
+            if self.closed or self.failed or self.state['pending'] is not None:
+                raise Stop('Closed/uncertain session')
+            offset = self.clock() - self.started
+            counters = copy.deepcopy({k: self.state[k] for k in COUNTERS})
+            try:
+                reserved = requirements(q, self.controls, self.retry_ordinal, counters, offset)
+            except ValueError as e:
+                raise LimitReached(str(e)) from e
+            self.storage.check(2 * reserved['bodyBytesReserved'] + 262144, acquisition=True)
+            self.storage.json(self.root / 'reservations' / f"{self.state['attempts'] + 1:05d}.json", {
+                'scheduleVersion': VERSION, 'attempt': self.state['attempts'] + 1,
+                'query': q, 'ordinal': self.retry_ordinal, 'offset': offset,
+                'controls': self.controls, 'countersBefore': counters, 'reserved': reserved})
+            return
         s = self.state
         jobs = [q, *tail]
         if self.closed or self.failed or s['pending'] is not None:
@@ -93,12 +114,21 @@ class ParticipantSession(CaptureSession):
     def request(self, q, optional=False):
         original = self.state['attempts'] + 1
         prior = None
+        cap = None
         try:
-            for ordinal in range(3):
-                tail = self.liabilities(q, 2 - ordinal)
+            for ordinal in range(6 if self.slow_schedule else 3):
+                self.retry_ordinal = ordinal
+                if ordinal > 2 and not slow_eligible(q, cap):
+                    raise Stop('Exact query exhausted ordinary retries; slow tier ineligible')
+                tail = self.liabilities(q, max(0, 2 - ordinal))
                 if ordinal:
-                    delay = [15, 60][ordinal - 1]
+                    delay = WAITS[ordinal - 1]
                     self.phase_check(q, tail, delay)
+                    if self.slow_schedule:
+                        try:
+                            requirements(q, self.controls, ordinal, self.state, self.clock() - self.started, delay)
+                        except ValueError as e:
+                            raise LimitReached(str(e)) from e
                     self.sleep(delay)
                 cap, data = self.attempt(q, tail, is_retry=ordinal > 0, original=original, prior=prior, retry_index=ordinal)
                 if cap['usable']:

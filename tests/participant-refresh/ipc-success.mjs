@@ -39,16 +39,19 @@ base.overlay = {
 };
 const inputs = JSON.parse(await readFile(join(R, 'INPUTS.json')));
 await restoreStorage(
-  join(R, 'seed-backup'),
+  join(R, 'seed-backup', inputs.bundledGenuineSeed ? 'product' : ''),
   join(root, 'product'),
-  inputs.bundledBackup.originalBackupManifestSha256,
+  inputs.bundledGenuineSeed
+    ? JSON.parse(await readFile(join(R, 'seed-backup/BACKUP.json'))).productBackupSha256
+    : inputs.bundledBackup.originalBackupManifestSha256,
 );
 const store = new ProductDailyStore(join(root, 'product'), participantPair(base));
 await store.load();
 const reg = await ParticipantRegistry.initialize(join(root, 'participants'), store, base);
 const plan = JSON.parse(await readFile(join(R, 'SCOPE.json')));
-plan.windows = plan.windows.slice(0, 1);
-const n = plan.windows[0].targetNumber;
+const windows = inputs.bundledGenuineSeed ? 2 : 1;
+plan.windows = plan.windows.slice(0, windows);
+const n = plan.windows.at(-1).targetNumber;
 plan.finalTarget = {
   number: n,
   hash: '0x' + n.toString(16).padStart(64, '0'),
@@ -92,8 +95,8 @@ try {
     },
   });
   assert.equal(report.status, 'COMPLETE_SCOPED_CATCHUP');
-  assert.equal(report.source.completedWindows, 1);
-  assert.equal(report.publications.length, 1);
+  assert.equal(report.source.completedWindows, windows);
+  assert.equal(report.publications.length, windows);
   assert.equal(report.error, null);
   assert.equal(report.externalSessionCount, 0);
   const held = reg.capture(),

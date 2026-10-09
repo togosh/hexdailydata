@@ -7,17 +7,15 @@ sys.path[:0] = [str(HERE), str(HERE.parent / 'market-refresh')]
 from durable import strict_json, encode, digest, selected_digest, utc, save
 from capture_client import WorkerTransport, Stop
 from session import ParticipantSession
-from queries import make_job, FAMILIES, validate_data
+from queries import make_job, FAMILIES, validate_data, validate_job
+from retry_schedule import control_template, enabled
 
 def controls(window):
-    graph = [{'kind': 'changes', 'family': f, 'first': 500, 'endpoint': 0, 'maxRows': 1504 if f == 'stakeStarts' else 504} for f in FAMILIES for _ in range(2)]
-    graph += [{'kind': 'witness', 'family': f, 'first': 32, 'endpoint': 0, 'maxRows': 100} for f in ('tokenHolders', 'stakeStarts') for _ in range(2)]
-    graph += [{'kind': 'meta', 'endpoint': 0, 'maxRows': 4} for _ in range(2)]
-    return graph + [{'kind': 'rpc', 'method': 'eth_getBlockByNumber', 'endpoint': ep, 'maxRows': 4096} for ep in (0, 1) for _ in range(2 if window == 1 else 1)]
+    return control_template(window)
 
-def remove_controls(s, kind, family=None, n=1):
+def remove_controls(s, kind, family=None, n=1, endpoint=None):
     for _ in range(n):
-        at = next((i for i, c in enumerate(s.controls) if c['kind'] == kind and (family is None or c.get('family') == family)))
+        at = next((i for i, c in enumerate(s.controls) if c['kind'] == kind and (family is None or c.get('family') == family) and (endpoint is None or c.get('endpoint') == endpoint)))
         s.controls.pop(at)
 
 def pin(header):
@@ -53,6 +51,9 @@ def run_window(s, index, base, exchange, seen):
         agree(opening_base, plan['base'])
     opening = rpc('target-open', w['targetNumber'])
     target = agree(opening, plan['finalTarget'] if index == len(plan['windows']) else None)
+    reference = getattr(s, 'reference', None) if index == 1 else None
+    if reference is not None and target != reference['target']:
+        raise Stop('R1 first-target header drift')
     if target['timestamp'] <= base['timestamp'] or target['timestamp'] > time.time() + 30:
         raise Stop('Header time order/future')
     s.storage.json(s.root / f'WINDOW_{index}_BINDING.json', {'base': base, 'target': target, 'openingHeaders': opening, 'openingBaseHeaders': opening_base})
@@ -74,10 +75,18 @@ def run_window(s, index, base, exchange, seen):
         family_root.mkdir()
         while True:
             q = make_job(plan, index, 'changes', pin=target, family=family, first=first, cursor=cursor)
+            if reference is not None and family == 'tokenHolders' and number < 2:
+                expected = reference['firstPageRequestSha256'] if number == 0 else reference['failedSecondPageRequestSha256']
+                if digest(validate_job(q, plan)[2]) != expected:
+                    raise Stop('R1 exact first/second query drift')
             began = s.clock()
             start_offset = began - s.started
             cap, data = ask(family + '-page', q)
             page = validate_data(q, data)
+            if reference is not None and family == 'tokenHolders' and number == 0:
+                if page != reference['rows']:
+                    raise Stop('R1 first-page full-object mismatch')
+                s.storage.json(s.root / 'R1_FIRST_PAGE_COMPARISON.json', {'status': 'PASS', 'rows': len(page), 'inheritedCoverage': 0, 'oldPageSha256': reference['pageSha256'], 'freshAttempt': cap['attempt'], 'fullSelectedObjectsEqual': True})
             number += 1
             raw = b''.join((encode(r) for r in page))
             s.storage.put(family_root / f'{number:05d}.ndjson', raw)
@@ -207,7 +216,7 @@ def run_window(s, index, base, exchange, seen):
         ask(label + '-meta-close', make_job(plan, index, 'meta', 'control', pin=p))
     for role, number, expected in [('target-close', target['number'], opening)] + ([('base-close', base['number'], opening_base)] if index == 1 else []):
         for ep in (0, 1):
-            remove_controls(s, 'rpc')
+            remove_controls(s, 'rpc', endpoint=ep)
             _, actual = ask(role + str(ep), make_job(plan, index, 'rpc', 'control', endpoint=ep, method='eth_getBlockByNumber', number=number))
             if actual != expected[ep]:
                 raise Stop('Closing header drift')
@@ -231,7 +240,7 @@ def execute(output, preflight, test_transport=None, test_clock=None, test_sleep=
     preflight = Path(preflight).resolve()
     binding = strict_json(preflight.read_bytes())
     synthetic = test_transport is not None
-    if binding['verdict'] != 'PASS' or binding['taskId'] != 'HDD-PARTICIPANT-CATCHUP-REFRESH-R1' or binding['trialRoot'] != str(root) or (bool(binding.get('synthetic')) != synthetic):
+    if binding['verdict'] != 'PASS' or binding['taskId'] not in ('HDD-PARTICIPANT-CATCHUP-REFRESH-R1', 'HDD-PARTICIPANT-CATCHUP-REFRESH-R2') or binding['trialRoot'] != str(root) or (bool(binding.get('synthetic')) != synthetic):
         raise ValueError('Preflight authority/root')
     for name, h in binding['runtimeFiles'].items():
         if digest((REPOSITORY / name).read_bytes()) != h:
@@ -245,12 +254,24 @@ def execute(output, preflight, test_transport=None, test_clock=None, test_sleep=
         raise ValueError('Admission disk space')
     plan_raw = (preflight.parent / 'SCOPE.json').read_bytes()
     plan = strict_json(plan_raw)
+    if plan['taskId'] != binding['taskId']:
+        raise ValueError('Task/plan identity')
+    reference = None
+    reference_raw = None
+    if enabled(plan) and not synthetic:
+        reference_raw = (preflight.parent / 'R1_COMPARISON.json').read_bytes()
+        reference = strict_json(reference_raw)
+        if digest(reference_raw) != binding['inputFiles'].get('R1_COMPARISON.json'):
+            raise ValueError('Unbound R1 comparison')
     root.mkdir()
     (root / 'temp').mkdir()
     (root / 'PLAN.json').write_bytes(plan_raw)
     nonce = secrets.token_hex(32)
     save(root / 'ADMISSION.json', {'task': binding['taskId'], 'nonce': nonce, 'recordedAt': utc(), 'runtimeFiles': binding['runtimeFiles'], 'planSha256': digest(plan_raw), 'preflightSha256': digest(preflight.read_bytes())})
     s = ParticipantSession(root, test_transport, plan, test_clock, test_sleep, True) if synthetic else ParticipantSession(root, WorkerTransport(nonce, worker_path=HERE / 'worker.py'), plan)
+    if reference is not None:
+        s.reference = reference
+        s.storage.put(root / 'R1_COMPARISON.json', reference_raw)
     s.storage.json(root / 'FRONTIER.json', {'completedWindows': 0, 'pin': plan['base'], 'generation': binding['initialGeneration'], 'productVersion': binding['initialProductVersion']})
     incoming = queue.Queue()
 

@@ -821,3 +821,23 @@ injected-settlement evidence findings were corrected and independently rechecked
 Gas becomes stale after 300 seconds; no scheduler is installed. BTC/ETH feeds,
 broader gas/history coverage and holder/stake/protocol refresh remain pending.
 Main remains unmerged, prior roots unchanged and indexer PARKED.
+
+### 2026-10-09 — Participant catch-up R2
+
+Completed the seven bounded source windows through block 27,750,329 and published
+each compatible holder/stake/product selection to the same running local API.
+The one session closed normally after 318 POSTs (284 graph / 34 header RPC),
+14 graph extras, 9,646,815 charged bytes and 22,302 objects in 1,053.104 seconds.
+The participant-only optional slow tier passed actual-client/page/auditor fixtures;
+all real queries recovered within the ordinary tier. The prior R1 failure and
+spending remain unchanged. A local pre-admission API wiring failure and its narrow
+reviewed correction are retained separately.
+
+The saved local view has 664,584 holder rows and 954,886 stake-start rows at
+2026-10-09 04:00:25 UTC, with accepted-base-plus-observed-updates coverage.
+It is not a full target census, live population, deletion or reorg proof. Exact
+daily/CSV/exception bytes, 90 liquidity buckets, ledger and quiet-feed readings
+remain unchanged. Focused tests, original-capture replay, same-server adoption,
+one genuine compact restore and four desktop/mobile views passed. The reviewed
+source/evidence identity is in participant-catchup-refresh-r2; main is unmerged,
+all owned processes are closed and the indexer remains PARKED.

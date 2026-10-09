@@ -5,9 +5,19 @@ from durable import strict_json, digest, selected_digest, encode
 from http_framing import verify_framing
 from retry_policy import classify_error_only, CLASSIFICATIONS
 from queries import validate_job, validate_data, validate_rpc, capacity, objects, make_job, FAMILIES, DEPLOYMENT
+from retry_schedule import enabled, VERSION, WAITS, COUNTERS, ControlReplay, slow_eligible, requirements
 
 def audit_captures(root, plan, state, window=None, terminal=False):
     root = Path(root)
+    r2 = enabled(plan)
+    if r2 and (state.get('retryScheduleVersion') != VERSION or state.get('retrySchedule') != plan['retry']):
+        raise ValueError('Schedule identity')
+    control_replay = ControlReplay()
+    reference = strict_json((root / 'R1_COMPARISON.json').read_bytes()) if r2 and state['mode'] == 'OWNER_AUTHORIZED_PUBLIC' else None
+    if reference is not None:
+        binding = strict_json((root.parent / 'PREFLIGHT.json').read_bytes())
+        if digest((root / 'R1_COMPARISON.json').read_bytes()) != binding['inputFiles'].get('R1_COMPARISON.json'):
+            raise ValueError('Frozen R1 comparison identity')
     lines = (root / 'LEDGER.jsonl').read_bytes().splitlines(keepends=True)
     caps = []
     totals = {'attempts': 0, 'extraAttempts': 0, 'chargedBytes': 0, 'observedBytes': 0, 'chargedEntities': 0, 'returnedEntities': 0, 'unknownEntityReservations': 0, 'graphAttempts': 0, 'rpcAttempts': 0, 'graphChargedBytes': 0, 'rpcChargedBytes': 0, 'graphExtraAttempts': 0, 'rpcExtraAttempts': 0}
@@ -18,6 +28,18 @@ def audit_captures(root, plan, state, window=None, terminal=False):
     for number, line in enumerate(lines, 1):
         cap = strict_json(line)
         q = cap['job']
+        if r2:
+            controls = control_replay.before(q, cap['retry'])
+            reservation = strict_json((root / 'reservations' / f'{number:05d}.json').read_bytes())
+            counters = {k: (list(endpoints) if k == 'rpcEndpointAttempts' else totals[k]) for k in COUNTERS}
+            if reservation['scheduleVersion'] != VERSION or reservation['attempt'] != number or reservation['query'] != q or reservation['ordinal'] != cap['retryIndex'] or reservation['controls'] != controls or reservation['countersBefore'] != counters:
+                raise ValueError('Independent dispatch reservation')
+            if not 0 <= reservation['offset'] <= cap['startOffsetSeconds']:
+                raise ValueError('Reservation must precede dispatch')
+            reserved = requirements(q, controls, cap['retryIndex'], counters, reservation['offset'])
+            if reserved != reservation['reserved']:
+                raise ValueError('Reservation quantities')
+            requirements(q, controls, cap['retryIndex'], counters, cap['startOffsetSeconds'])
         if not 0 <= cap['startOffsetSeconds'] < 5100 or not 0 <= cap['durationSeconds'] <= 30.01 or cap['startOffsetSeconds'] + cap['durationSeconds'] > 5220:
             raise ValueError('Physical clock bound')
         if last is None or q['window'] != last['job']['window']:
@@ -36,6 +58,9 @@ def audit_captures(root, plan, state, window=None, terminal=False):
         method, url, body = validate_job(q, plan)
         if req['job'] != q or req['url'] != url or req['method'] != method or (body != (folder / 'request.body').read_bytes()) or (digest(body) != cap['requestSha256']):
             raise ValueError('Exact physical request')
+        if reference is not None and q['window'] == 1 and q['kind'] == 'changes' and q['family'] == 'tokenHolders' and q['phase'] == 'data' and q['cursor'] in (None, reference['lastId']):
+            expected = reference['firstPageRequestSha256'] if q['cursor'] is None else reference['failedSecondPageRequestSha256']
+            if digest(body) != expected:raise ValueError('R1 exact query comparison')
         raw = (folder / 'response.body').read_bytes()
         if len(raw) != cap['responseBytes'] or digest(raw) != cap['responseSha256']:
             raise ValueError('Saved body identity')
@@ -92,12 +117,18 @@ def audit_captures(root, plan, state, window=None, terminal=False):
                 raise ValueError('Unrecognized retry')
             value = None
         if cap['retry']:
-            if last is None or last['usable'] or (not last['retryable']) or (last['job'] != q) or (cap['retryOf'] != last['attempt']) or (cap['originalAttempt'] != last['originalAttempt']) or (cap['retryIndex'] != last['retryIndex'] + 1) or (not 1 <= cap['retryIndex'] <= 2):
+            maximum = 5 if r2 and slow_eligible(q, last) else 2
+            if last is None or last['usable'] or (not last['retryable']) or (last['job'] != q) or (cap['retryOf'] != last['attempt']) or (cap['originalAttempt'] != last['originalAttempt']) or (cap['retryIndex'] != last['retryIndex'] + 1) or (not 1 <= cap['retryIndex'] <= maximum):
                 raise ValueError('One exact retry ordinal')
-            if cap['startOffsetSeconds'] + 0.002 < last['startOffsetSeconds'] + last['durationSeconds'] + [15, 60][cap['retryIndex'] - 1]:
+            if cap['startOffsetSeconds'] + 0.002 < last['startOffsetSeconds'] + last['durationSeconds'] + WAITS[cap['retryIndex'] - 1]:
                 raise ValueError('Retry wait')
         elif cap['retryIndex'] or cap['retryOf'] is not None or cap['originalAttempt'] != number or (last is not None and (not last['usable'])):
             raise ValueError('Skipped exhausted query or original ordinal')
+        if reference is not None and cap['usable'] and q['window'] == 1:
+            if q['kind'] == 'rpc' and q['number'] == reference['target']['number'] and any(value[k] != reference['target'][k] for k in reference['target']):
+                raise ValueError('R1 opening target comparison')
+            if q['kind'] == 'changes' and q['phase'] == 'data' and q['family'] == 'tokenHolders' and q['cursor'] is None and value['tokenHolders'] != reference['rows']:
+                raise ValueError('R1 first-page values')
         totals['attempts'] += 1
         totals['extraAttempts'] += int(cap['retry'])
         totals['chargedBytes'] += wire
@@ -112,6 +143,7 @@ def audit_captures(root, plan, state, window=None, terminal=False):
             endpoints[q['endpoint']] += 1
         caps.append((cap, value if window is None or q['window'] == window else None, line))
         last = cap
+        if r2:control_replay.observe(q, value)
     if state['pending'] is not None or any((state[k] != v for k, v in totals.items())) or state['rpcEndpointAttempts'] != endpoints:
         raise ValueError('Closed accounting reconciliation')
     if totals['attempts'] > 2248 or totals['graphAttempts'] > 2200 or totals['rpcAttempts'] > 48 or (max(endpoints) > 24) or (totals['extraAttempts'] > 100) or (totals['graphExtraAttempts'] > 88) or (totals['rpcExtraAttempts'] > 12) or (totals['graphChargedBytes'] > 256 * 1024 ** 2) or (totals['rpcChargedBytes'] > 8 * 1024 ** 2) or (totals['chargedEntities'] > 500000):

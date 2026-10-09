@@ -105,7 +105,7 @@ export async function runParticipantRefresh({
   const preflight = JSON.parse(await bounded(preflightPath, 1024 * 1024));
   if (
     preflight.verdict !== 'PASS' ||
-    preflight.taskId !== 'HDD-PARTICIPANT-CATCHUP-REFRESH-R1' ||
+    !['HDD-PARTICIPANT-CATCHUP-REFRESH-R1', 'HDD-PARTICIPANT-CATCHUP-REFRESH-R2'].includes(preflight.taskId) ||
     preflight.trialRoot !== output ||
     Boolean(preflight.synthetic) !== synthetic
   )
