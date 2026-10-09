@@ -66,6 +66,12 @@ export function productPoints(rows: readonly ProductRow[], metric: ProductMetric
 }
 export function productObservation(row: ProductRow, metric: ProductMetric) {
   if (
+    (metric === 'btcPriceUsd' || metric === 'ethPriceUsd') &&
+    row[metric] !== null &&
+    row[metric === 'btcPriceUsd' ? 'btcRecordedAtUtc' : 'ethRecordedAtUtc'] === null
+  )
+    return 'Recorded-date USD reference; exact sample time unavailable, not a daily close';
+  if (
     metric === 'trackedLiquidityUsd' &&
     row.trackedLiquidityUsd !== null &&
     row.liquidityRecordedAtUtc === null

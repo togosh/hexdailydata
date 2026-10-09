@@ -395,7 +395,11 @@ async function assertWriter(store: ProductDailyStore, writer: ProductWriter) {
 }
 async function appendRecord(root: string, s: State, record: unknown, fault: Fault) {
   const bytes = Buffer.from(stable(record));
-  if (bytes.length > 65536) throw Error('MARKET_RECORD_BOUND');
+  // One bounded history import may carry the actual saved buckets. A 1 MiB
+  // history record plus fifteen ordinary 64 KiB records still fits one 2 MiB
+  // segment, preserving sequence-to-segment lookup and the existing 16-record rule.
+  const history = (record as { update?: { benchmarkHistory?: unknown } }).update?.benchmarkHistory;
+  if (bytes.length > (history ? 1024 ** 2 : 65536)) throw Error('MARKET_RECORD_BOUND');
   let segment = s.segment,
     count = s.segmentRecords,
     old = Buffer.alloc(0);
@@ -501,7 +505,10 @@ export async function verifyMarketCertificate(
   )
     throw Error('MARKET_CERTIFICATE');
   if (prepared && !same(state.current, ptr(next))) {
-    const pending = JSON.parse((await storageBytes(root, 'PENDING.json', 131072)).toString());
+    const pendingRaw = await storageBytes(root, 'PENDING.json', 1024 ** 2 + 131072),
+      pending = JSON.parse(pendingRaw.toString());
+    if (pendingRaw.length > 131072 && !pending.record?.update?.benchmarkHistory)
+      throw Error('MARKET_PENDING_BOUND');
     if (
       !previous ||
       !same(state.current, ptr(previous)) ||

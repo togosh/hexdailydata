@@ -25,6 +25,7 @@ import {
   validateLedgerSegments,
   preserveParticipantProduct,
   referenceOnlyAdvance,
+  benchmarkHistoryOnlyAdvance,
 } from './market.ts';
 import { verifyMarketCertificate } from './storage.ts';
 
@@ -313,7 +314,8 @@ export class ProductDailyStore {
           !authorizedRollback &&
           Date.parse(next.metadata.effectiveAtUtc) <=
             Date.parse(this.current.metadata.effectiveAtUtc) &&
-          !referenceOnlyAdvance(this.current.metadata, next.metadata)
+          !referenceOnlyAdvance(this.current.metadata, next.metadata) &&
+          !benchmarkHistoryOnlyAdvance(this.current.metadata, next.metadata)
         )
           throw Error('PRODUCT_NOT_NEWER');
         if (!authorizedRollback) preserveMarketHistory(this.current, next);
@@ -430,7 +432,8 @@ export class ProductDailyStore {
           Date.parse(next.metadata.effectiveAtUtc) <=
             Date.parse(previous.metadata.effectiveAtUtc) &&
           !this.participantPair &&
-          !referenceOnlyAdvance(previous.metadata, next.metadata)
+          !referenceOnlyAdvance(previous.metadata, next.metadata) &&
+          !benchmarkHistoryOnlyAdvance(previous.metadata, next.metadata)
         )
           throw Error('PRODUCT_NOT_NEWER');
         if (

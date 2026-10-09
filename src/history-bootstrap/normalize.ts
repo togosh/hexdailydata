@@ -60,7 +60,7 @@ const validDate = (v: unknown): v is string =>
   Number.isFinite(Date.parse(v)) &&
   new Date(v).toISOString().replace('.000Z', 'Z') === v.replace('.000Z', 'Z');
 
-export function parseRows(bytes: Buffer): RawRow[] {
+export function parseScalarRows(bytes: Buffer): RawRow[] {
   if (bytes.length > 16 * 1024 * 1024) throw Error('SOURCE_BYTES');
   const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   let depth = 0,
@@ -103,6 +103,11 @@ export function parseRows(bytes: Buffer): RawRow[] {
       } else if (raw === null || (typeof raw === 'string' && raw.length <= 1024)) row[key] = raw;
       else throw Error('SOURCE_SCALAR');
     }
+    return row;
+  });
+}
+export function parseRows(bytes: Buffer): RawRow[] {
+  return parseScalarRows(bytes).map((row) => {
     if (
       !/^(0|[1-9]\d{0,4})$/.test(row.currentDay ?? '') ||
       Number(row.currentDay) > 65535 ||

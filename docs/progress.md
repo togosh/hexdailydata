@@ -858,3 +858,16 @@ observations, not streaming trades, daily closes or a historical backfill.
 Source-rights, full benchmark history and continuous operation remain open.
 The task return records separate review and commit identity. Main is unmerged,
 old roots unchanged and indexer PARKED.
+
+### 2026-10-09 - Historical BTC/ETH references
+
+Integrated the qualified saved historical subset into the normal daily service:
+2,097 BTC dates and 2,172 ETH dates, exact string values with unknown quote times.
+The paired import keeps every current feed and participant selection unchanged.
+One immutable code-artifact GET closed after 3,774 bytes; no price/source data
+session occurred. Focused full-row/CSV, access, journal, genuine restore and UI
+checks passed after narrow bounded-control-reader and legacy-seed corrections.
+Original failures are preserved in btc-eth-historical-backfill-r1, alongside
+coverage, method/source identities, separate review and final archive identity.
+Missing dates, conflict holds, exact-time uncertainty and rights remain explicit.
+No main merge, production activation, scheduler or indexer restart.

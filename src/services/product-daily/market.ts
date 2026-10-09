@@ -19,8 +19,11 @@ import {
   type ProductRow,
   type ProductReading,
   marketMethodRevision,
+  BenchmarkHistorySchema,
+  type BenchmarkHistory,
 } from '../../contracts/product-daily.ts';
 import { readingKey, validateReadings } from './project.ts';
+import { benchmarkDisclosure } from '../../history-bootstrap/benchmarks.ts';
 
 export const MarketUpdateSchema = z.strictObject({
   readings: z.array(ReadingSchema).max(8),
@@ -28,11 +31,76 @@ export const MarketUpdateSchema = z.strictObject({
   receiptSha256: digest,
   ledgerAppend: LedgerAppendSchema.optional(),
   methodRevision: z.literal(marketMethodRevision).optional(),
+  benchmarkHistory: BenchmarkHistorySchema.optional(),
   participantPair: z
     .strictObject({ previous: PairSchema, next: PairSchema, descriptorSha256: digest })
     .optional(),
 });
 const same = (a: unknown, b: unknown) => stable(a) === stable(b);
+const benchmarkFields = { BTC: 'btcPriceUsd', ETH: 'ethPriceUsd' } as const;
+const benchmarkCredit =
+  ' Historical BTC/ETH references: HEXDailyStats (togosh), CoinGecko USD method; exact sample times unavailable.';
+function validateBenchmarkHistory(history: BenchmarkHistory) {
+  BenchmarkHistorySchema.parse(history);
+  if (hash(stable(history.buckets)) !== history.selectionSha256)
+    throw Error('BENCHMARK_SELECTION_IDENTITY');
+  let previous = '';
+  for (const b of history.buckets) {
+    const key = b.dateUtc + ':' + b.asset;
+    if (key <= previous || compare(b.value, '0') <= 0)
+      throw Error('BENCHMARK_BUCKET_ORDER_OR_VALUE');
+    previous = key;
+  }
+}
+function marketGaps(rows: readonly ProductRow[]) {
+  const gaps: ProductMetadata['coverage']['gaps'] = [];
+  for (const field of metricKeys) {
+    let gap: (typeof gaps)[number] | undefined;
+    for (const row of rows) {
+      if (row[field] === null) {
+        if (gap) gap.to = row.dateUtc;
+        else gap = { field, from: row.dateUtc, to: row.dateUtc };
+      } else if (gap) {
+        gaps.push(gap);
+        gap = undefined;
+      }
+    }
+    if (gap) gaps.push(gap);
+  }
+  return gaps;
+}
+/** One certified history fill has no new observation clock; all quiet metadata stays exact. */
+export function benchmarkHistoryOnlyAdvance(a: ProductMetadata, b: ProductMetadata) {
+  if (!b.marketStorage) return false;
+  // A newly created bounded store still serves its unmodified legacy seed until
+  // the first certified journal entry. Compare its deterministic migration too.
+  const before = a.marketStorage ? a : migrateMarketMetadata(a, b.marketStorage.seedVersion);
+  const quiet = (m: ProductMetadata) => {
+    const { benchmarkHistory, methods, credits, inputHashes, coverage, marketStorage, ...rest } = m;
+    return {
+      ...rest,
+      coverage: { ...coverage, gaps: [] },
+      marketStorage: marketStorage ? { ...marketStorage, sequence: 0, head: '' } : null,
+      inputHashes: Object.fromEntries(
+        Object.entries(inputHashes).filter(
+          ([k]) => !['market-journal', 'benchmark-history'].includes(k),
+        ),
+      ),
+    };
+  };
+  return (
+    !a.benchmarkHistory &&
+    !!b.benchmarkHistory &&
+    !!before.marketStorage &&
+    !!b.marketStorage &&
+    b.marketStorage.sequence === before.marketStorage.sequence + 1 &&
+    b.marketStorage.head !== before.marketStorage.head &&
+    same(quiet(before), quiet(b)) &&
+    same(b.methods, [...a.methods, benchmarkDisclosure]) &&
+    b.credits === a.credits + benchmarkCredit &&
+    b.inputHashes['benchmark-history'] === hash(stable(b.benchmarkHistory))
+  );
+}
 /** A later round may retain the exact same quote and timestamp; no value is invented. */
 const sameTimeReferenceAdvance = (a: ProductReading, b: ProductReading) =>
   a.kind === 'reference' &&
@@ -247,8 +315,18 @@ function replay(
   rows: ProductRow[],
   observations: ProductReading[],
   buckets: z.infer<typeof LiquidityBucketSchema>[],
+  history?: BenchmarkHistory,
 ) {
   const byDate = new Map(rows.map((r) => [r.dateUtc, r]));
+  if (history) {
+    validateBenchmarkHistory(history);
+    for (const b of history.buckets) {
+      const row = byDate.get(b.dateUtc);
+      if (!row) throw Error('BENCHMARK_HISTORY_OUTSIDE_DOMAIN');
+      row[benchmarkFields[b.asset]] = b.value;
+      row[b.asset === 'BTC' ? 'btcRecordedAtUtc' : 'ethRecordedAtUtc'] = null;
+    }
+  }
   for (const b of buckets) {
     const r = byDate.get(b.dateUtc);
     if (!r) throw Error('MARKET_HISTORY_OUTSIDE_DOMAIN');
@@ -263,7 +341,7 @@ function replay(
   }
 }
 export function validateMarketHistory(rows: readonly ProductRow[], metadata: ProductMetadata) {
-  if (!metadata.observations && !metadata.liquidityHistory) return; // Accepted earlier generation.
+  if (!metadata.observations && !metadata.liquidityHistory && !metadata.benchmarkHistory) return; // Accepted earlier generation.
   const observations = marketEvidence(metadata);
   if (
     (!metadata.marketStorage && !same(observations, metadata.observations ?? [])) ||
@@ -275,7 +353,7 @@ export function validateMarketHistory(rows: readonly ProductRow[], metadata: Pro
   const expected = rows.map(
     (r) => ({ ...r, ...Object.fromEntries(marketFields.map((k) => [k, null])) }) as ProductRow,
   );
-  replay(expected, observations, buckets);
+  replay(expected, observations, buckets, metadata.benchmarkHistory);
   for (let i = 0; i < rows.length; i++)
     for (const k of marketFields)
       if (rows[i]![k] !== expected[i]![k]) throw Error('MARKET_ROW_HISTORY_MISMATCH');
@@ -292,6 +370,58 @@ export function applyMarketUpdate(
 ) {
   const update = MarketUpdateSchema.parse(unknownUpdate);
   validateReadings(update.readings);
+  if (update.benchmarkHistory) {
+    if (
+      update.readings.length ||
+      update.liquidityHistory.length ||
+      update.ledgerAppend ||
+      update.methodRevision ||
+      update.participantPair
+    )
+      throw Error('BENCHMARK_HISTORY_ONLY_UPDATE');
+    const history = update.benchmarkHistory;
+    validateBenchmarkHistory(history);
+    if (base.metadata.benchmarkHistory) {
+      if (!same(base.metadata.benchmarkHistory, history))
+        throw Error('BENCHMARK_REPLACEMENT_REFUSED');
+      return base;
+    }
+    const rows = base.rows.map((r) => ({ ...r })),
+      dates = new Map(rows.map((r) => [r.dateUtc, r]));
+    for (const b of history.buckets) {
+      const row = dates.get(b.dateUtc),
+        field = benchmarkFields[b.asset];
+      if (
+        !row ||
+        row[field] !== null ||
+        row[b.asset === 'BTC' ? 'btcRecordedAtUtc' : 'ethRecordedAtUtc'] !== null
+      )
+        throw Error('BENCHMARK_NON_NULL_OVERLAP_OR_DOMAIN');
+      row[field] = b.value;
+    }
+    const entry = marketJournalEntry(base.metadata, update);
+    const metadata = ProductMetadataSchema.parse({
+      ...base.metadata,
+      benchmarkHistory: history,
+      marketStorage: {
+        ...base.metadata.marketStorage!,
+        sequence: entry.sequence,
+        head: entry.head,
+      },
+      inputHashes: {
+        ...base.metadata.inputHashes,
+        'market-journal': entry.head,
+        'benchmark-history': hash(stable(history)),
+      },
+      coverage: { ...base.metadata.coverage, gaps: marketGaps(rows) },
+      methods: [...base.metadata.methods, benchmarkDisclosure],
+      credits: base.metadata.credits + benchmarkCredit,
+    });
+    if (!benchmarkHistoryOnlyAdvance(base.metadata, metadata))
+      throw Error('BENCHMARK_QUIET_METADATA_CHANGED');
+    validateMarketHistory(rows, metadata);
+    return { rows, metadata, exceptions: base.exceptions };
+  }
   const references = update.readings.filter((r) => r.kind === 'reference');
   if (
     references.length &&
@@ -477,7 +607,7 @@ export function applyMarketUpdate(
     );
   }
   const liquidityHistory = [...buckets.values()].sort((a, b) => a.dateUtc.localeCompare(b.dateUtc));
-  replay(rows, evidence, liquidityHistory);
+  replay(rows, evidence, liquidityHistory, base.metadata.benchmarkHistory);
   if (update.ledgerAppend && !repeated)
     for (const [i, word] of update.ledgerAppend.words.entries()) {
       const day = update.ledgerAppend.from + i,
@@ -488,20 +618,7 @@ export function applyMarketUpdate(
         if (row[k] !== null) throw Error('LEDGER_OVERWRITE');
       Object.assign(row, fields);
     }
-  const gaps: { field: string; from: string; to: string }[] = [];
-  for (const field of metricKeys) {
-    let gap: (typeof gaps)[number] | undefined;
-    for (const row of rows) {
-      if (row[field] === null) {
-        if (gap) gap.to = row.dateUtc;
-        else gap = { field, from: row.dateUtc, to: row.dateUtc };
-      } else if (gap) {
-        gaps.push(gap);
-        gap = undefined;
-      }
-    }
-    if (gap) gaps.push(gap);
-  }
+  const gaps = marketGaps(rows);
   const metadata = ProductMetadataSchema.parse({
     ...base.metadata,
     observations,
@@ -562,6 +679,34 @@ export function preserveMarketHistory(
   previous: { rows: readonly ProductRow[]; metadata: ProductMetadata },
   next: { rows: readonly ProductRow[]; metadata: ProductMetadata },
 ) {
+  if (
+    previous.metadata.benchmarkHistory &&
+    !same(previous.metadata.benchmarkHistory, next.metadata.benchmarkHistory)
+  )
+    throw Error('BENCHMARK_HISTORY_CHANGED');
+  if (!previous.metadata.benchmarkHistory && next.metadata.benchmarkHistory) {
+    if (!benchmarkHistoryOnlyAdvance(previous.metadata, next.metadata))
+      throw Error('BENCHMARK_UNCERTIFIED_QUIET_CHANGE');
+    const admitted = new Map(
+      next.metadata.benchmarkHistory.buckets.map((b) => [
+        b.dateUtc + ':' + benchmarkFields[b.asset],
+        b.value,
+      ]),
+    );
+    for (let i = 0; i < previous.rows.length; i++) {
+      const old = previous.rows[i]!,
+        fresh = next.rows[i]!;
+      for (const key of marketFields) {
+        if (old[key] === fresh[key]) continue;
+        if (
+          !['btcPriceUsd', 'ethPriceUsd'].includes(key) ||
+          old[key] !== null ||
+          admitted.get(old.dateUtc + ':' + key) !== fresh[key]
+        )
+          throw Error('BENCHMARK_QUIET_CELL_CHANGED');
+      }
+    }
+  }
   if (previous.metadata.marketStorage || next.metadata.marketStorage) {
     const a = previous.metadata.marketStorage,
       b = next.metadata.marketStorage;

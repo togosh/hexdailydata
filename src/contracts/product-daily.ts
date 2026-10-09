@@ -171,6 +171,28 @@ export const LiquidityBucketSchema = z.strictObject({
   setId: digest,
   meaning: z.literal('source UTC-day bucket, not a verified close'),
 });
+// Internal recorded-date inputs. Exact provider quote times are unavailable;
+// these buckets must never become live ReadingSchema observations.
+export const benchmarkHistoryMethod = 'legacy-recorded-date-usd-1' as const;
+export const BenchmarkHistorySchema = z.strictObject({
+  methodRevision: z.literal(benchmarkHistoryMethod),
+  sourceBodySha256: digest,
+  diagnosticBodySha256: digest,
+  helperGitBlob: z.literal('2e0c6268c0bd2b0de3582e23511639991b1443f8'),
+  callerSha256: digest,
+  selectionSha256: digest,
+  buckets: z
+    .array(
+      z.strictObject({
+        dateUtc: z.iso.date().refine((s) => s >= '2019-12-03' && s <= '2026-10-07'),
+        asset: z.enum(['BTC', 'ETH']),
+        value: precise,
+      }),
+    )
+    .min(1)
+    .max(6000),
+});
+export type BenchmarkHistory = z.infer<typeof BenchmarkHistorySchema>;
 export const ReadingSchema = z.discriminatedUnion('kind', [
   ProtocolReadingSchema,
   z.strictObject({
@@ -250,6 +272,7 @@ export const ProductMetadataSchema = z.strictObject({
     })
     .optional(),
   liquidityHistory: z.array(LiquidityBucketSchema).max(4096).optional(),
+  benchmarkHistory: BenchmarkHistorySchema.optional(),
   coverage: z.strictObject({
     snapshotDates: z.number().int().nonnegative(),
     ledgerDates: z.number().int().nonnegative(),

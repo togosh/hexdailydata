@@ -33,3 +33,30 @@ independent market oracles. Historical BTC/ETH coverage from HEX origin, source
 redistribution rights, uninterrupted freshness and production qualification remain
 open. No old HDS quote ambiguity was resolved by assumption. Main and all accepted
 roots remain unchanged; no scheduler, SQL, deployment or indexer restart occurred.
+
+## BTC/ETH recorded-date history, 9 October 2026
+
+The ordinary Daily/Charts/protected CSV now admits 2,097 BTC/USD and 2,172
+ETH/USD historical dates from the saved PulseChain-labelled HDS body, spanning
+2019-12-04 through 2026-10-07. The defined 2019-12-03 through 2026-10-07 domain retains
+404 BTC gaps and 329 ETH gaps, including five held asset/date conflicts.
+Every historical exact quote timestamp remains null. These are recorded-date
+USD references, not closes, timestamp-aligned returns or complete history.
+
+The exact 3,774-byte CoinGecko helper was verified against the saved Git tree
+and caller using one code-only GET; no price data was fetched. The Ethereum
+body is diagnostic only. Lossless lexical values, all contributors and sparse
+exceptions are retained. Code identity does not prove every old record used
+that revision; commercial redistribution rights remain a release gate.
+
+A method-bound history-only journal update fills previously null cells, preserves
+all original latest readings/rounds/timestamps and is idempotent. The actual
+paired registry and already-running API adopted it; all 2,503 Daily rows and
+117,641 CSV cells reconciled. The 2,502 payout periods, 90 liquidity dates and
+664,616-holder/954,921-start observed-update view are unchanged. BTC and ETH
+latest references remain stale under the same 300-second policy. Compact
+backup/restore, original paid-hold checks, rejection preservation, journal
+rotation, later-feed preservation and desktop/mobile views passed. Account
+seams are synthetic; SQL, unattended operation and physical power loss are not
+qualified. All failed fixtures remain in the task evidence. Main is unmerged,
+accepted roots untouched, owned processes closed and indexer PARKED.

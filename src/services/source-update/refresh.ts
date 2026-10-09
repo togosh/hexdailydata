@@ -541,8 +541,16 @@ export class ParticipantRegistry {
   async recoverOwnedFailure() {
     if (!this.failedOwner) throw Error('UNKNOWN_PARTICIPANT_WRITER_OWNERSHIP');
     const owner = this.failedOwner,
-      raw = await bytes(this.root, 'INTENT.json'),
+      // The one bounded historical-input update can exceed an ordinary control
+      // record. Preserve the old bound for all other intents; ownership and
+      // exact certified-transition checks below remain required.
+      raw = await bytes(this.root, 'INTENT.json', 1024 ** 2 + 65536),
       intent = JSON.parse(raw.toString());
+    if (
+      raw.length > 65536 &&
+      (intent.kind !== 'product' || !intent.productUpdate?.benchmarkHistory)
+    )
+      throw Error('PARTICIPANT_INTENT_BOUND');
     const lock = JSON.parse((await bytes(this.root, 'SELECTION.lock')).toString());
     if (
       intent.owner !== owner ||
