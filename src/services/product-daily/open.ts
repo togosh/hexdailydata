@@ -1,3 +1,4 @@
+import { ParticipantRegistry } from '../source-update/refresh.ts';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { z } from 'zod';
@@ -17,6 +18,7 @@ export const ProductProfileSchema = z.strictObject({
   stakesRoot: z.string().min(1),
   overlayRoot: z.string().min(1),
   pair: PairSchema,
+  participantRoot: z.string().min(1).optional(),
 });
 export type ProductProfile = z.infer<typeof ProductProfileSchema>;
 export async function readProductProfile(path: string) {
@@ -35,6 +37,7 @@ export async function openProductDependencies(profile: ProductProfile): Promise<
   try {
     const admission = await sourceGenerations.admit(
       join(profile.overlayRoot, profile.pair.generation),
+      { readOnly: Boolean(profile.participantRoot) },
     );
     await sourceGenerations.loadSelection();
     const descriptor = sourceGenerations.descriptor;
@@ -45,6 +48,22 @@ export async function openProductDependencies(profile: ProductProfile): Promise<
     )
       throw Error('PRODUCT_PROFILE_PAIR');
     validateAdmittedPair(profile.pair, admission);
+    if (profile.participantRoot) {
+      const participants = await ParticipantRegistry.open(
+        profile.participantRoot,
+        profile.productRoot,
+        sourceGenerations,
+      );
+      return {
+        participants,
+        productDaily: participants.productDaily,
+        sourceGenerations,
+        close: async () => {
+          await participants.close();
+          await sourceGenerations.close();
+        },
+      };
+    }
     const productDaily = new ProductDailyStore(profile.productRoot, profile.pair);
     await productDaily.load();
     return { productDaily, sourceGenerations, close: () => sourceGenerations.close() };

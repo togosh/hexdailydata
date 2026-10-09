@@ -12,7 +12,10 @@ import type { SavedSourceGenerations } from '../services/source-update/generatio
 
 import type { ProductDailyStore } from '../services/product-daily/store.ts';
 
+import type { ParticipantRegistry } from '../services/source-update/refresh.ts';
+
 export interface ApiDependencies {
+  participants?: ParticipantRegistry;
   productDaily?: ProductDailyStore;
   sourceGenerations?: SavedSourceGenerations;
   dailyLedger?: DailyLedgerReader;

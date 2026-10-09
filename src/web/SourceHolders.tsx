@@ -2,7 +2,6 @@ import {
   SavedHoldersResponseSchema,
   UpdatedHolderLookupSchema,
 } from '../contracts/source-update.ts';
-import { ACCEPTED } from '../contracts/saved-generation.ts';
 import { SourceUpdateDisclosure } from './SourceUpdateDisclosure.tsx';
 import type { z } from 'zod';
 import {
@@ -49,6 +48,10 @@ export function SavedHolderBalance({
   holder: z.infer<typeof SourceHolderLookupSchema> | z.infer<typeof UpdatedHolderLookupSchema>;
   liquidBalance: z.infer<typeof SourceLiquidBalanceSchema> | null;
 }) {
+  const observationDate =
+    'holderDatasetVersion' in holder
+      ? holder.snapshot?.observedAtUtc
+      : holder.item?.observation.snapshot.observedAtUtc;
   const label =
     (holder.state === 'present_in_saved_inventory' || holder.state === 'present_in_saved_view') &&
     liquidBalance
@@ -66,9 +69,15 @@ export function SavedHolderBalance({
       data-state={holder.state}
     >
       <p className="eyebrow">
-        {'holderDatasetVersion' in holder
-          ? 'Saved subgraph · 5 Oct 2026'
-          : 'Saved source update · 6 Oct 2026'}
+        {'holderDatasetVersion' in holder ? 'Saved subgraph' : 'Saved source record'} /{' '}
+        {observationDate
+          ? new Intl.DateTimeFormat('en-GB', {
+              day: 'numeric',
+              month: 'short',
+              year: 'numeric',
+              timeZone: 'UTC',
+            }).format(new Date(observationDate))
+          : 'Observation unavailable'}
       </p>
       <h2>Reported liquid balance</h2>
       <p className="holder-balance" title={liquidBalance?.sourceReportedHex}>
@@ -90,7 +99,7 @@ export function SavedHolderBalance({
         <p>
           {'holderDatasetVersion' in holder
             ? 'Source-reported values at block 27,720,851, observed 2026-10-05T15:48:05Z.'
-            : 'Base plus observed updates through block 27,724,947. Individual evidence preserves the record observation; this is not a full B1 inventory.'}{' '}
+            : 'Base plus observed updates. Individual evidence preserves the record observation; this is not a full inventory at the update target.'}{' '}
           Display uses 100,000,000 source hearts per HEX. Balances are not independently verified
           on-chain. Refresh is disabled; reload only rereads local saved data.
         </p>
@@ -99,7 +108,7 @@ export function SavedHolderBalance({
           <code>
             {'holderDatasetVersion' in holder
               ? (holder.holderDatasetVersion ?? 'Unavailable')
-              : ACCEPTED.familyVersions.tokenHolders}
+              : 'See the selected holder version in the enclosing address response'}
           </code>
           . Individual record timestamps below are separate from this observation.
         </p>
@@ -154,14 +163,14 @@ export function SourceHolders() {
         {body && (
           <>
             {'generation' in body ? (
-              <SourceUpdateDisclosure />
+              <SourceUpdateDisclosure snapshot={body.snapshot} generation={body.generation} />
             ) : (
               <p className="eyebrow">Saved subgraph · 5 Oct 2026</p>
             )}
             {'generation' in body ? (
               <p>
                 {numberText(String(body.localViewRowCount))} records in this local base-plus-updates
-                view. A complete B1 holder population and updated positive count are unproved.
+                view. A complete target holder population and updated positive count are unproved.
               </p>
             ) : (
               <p>
@@ -183,7 +192,7 @@ export function SourceHolders() {
                 These are source records and represented addresses, not people or active stakers.
                 Positive counts exclude the zero address. The original 5 October base census
                 includes 284,162 reported zero balances and one negative zero-address anomaly. These
-                counts are not an updated B1 census. Signed source sums are not token supply.
+                counts are not an updated target census. Signed source sums are not token supply.
               </p>
               <p>
                 Reported display values use 100,000,000 source hearts per HEX. Original tokens and

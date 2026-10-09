@@ -584,9 +584,9 @@ export async function publishStoredMarket(
   const reference = z
     .strictObject({
       output: z.string().min(1).max(2048),
-      update: z.string().regex(/^ROUND_[123]_UPDATE\.json$/),
+      update: z.string().regex(/^(?:ROUND_[123]|WINDOW_[1-9][0-9]{0,3})_UPDATE\.json$/),
       updateSha256: digest,
-      audit: z.string().regex(/^ROUND_[123]_AUDIT\.json$/),
+      audit: z.string().regex(/^(?:ROUND_[123]|WINDOW_[1-9][0-9]{0,3})_AUDIT\.json$/),
       auditSha256: digest,
     })
     .nullable()

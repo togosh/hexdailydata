@@ -27,7 +27,7 @@ def save(path,obj):
 class Storage:
     def __init__(self,root,limit=8*1024**3,free_floor=10*1024**3,used=0):
         self.root=Path(root);self.limit=limit;self.free_floor=free_floor;self.used=used;self.bytes_written=0
-        self.entries=set()
+        self.entries=set();self.entry_limit=8192
     def check(self,n,acquisition=False):
         if n<0 or self.used+n>self.limit:raise ValueError('Storage ceiling')
         if acquisition and 2*(self.used+n)+512*1024**2>self.limit:raise ValueError('Storage reserved for summary and bounded parts')
@@ -57,6 +57,6 @@ class Storage:
         additions=set()
         while current!=self.root:
             additions.add(str(current.relative_to(self.root)));current=current.parent
-        if len(self.entries|additions)>8192:raise ValueError('Capture entry ceiling')
+        if len(self.entries|additions)>self.entry_limit:raise ValueError('Capture entry ceiling')
         self.entries.update(additions)
         return path

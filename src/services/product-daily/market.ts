@@ -9,6 +9,7 @@ import { contractDayAt } from '../../domain/day.ts';
 import { compare, stable, hash } from '../../history-bootstrap/normalize.ts';
 import {
   ReadingSchema,
+  PairSchema,
   LiquidityBucketSchema,
   ProductMetadataSchema,
   ProductRowSchema,
@@ -27,6 +28,9 @@ export const MarketUpdateSchema = z.strictObject({
   receiptSha256: digest,
   ledgerAppend: LedgerAppendSchema.optional(),
   methodRevision: z.literal(marketMethodRevision).optional(),
+  participantPair: z
+    .strictObject({ previous: PairSchema, next: PairSchema, descriptorSha256: digest })
+    .optional(),
 });
 const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 const dateOf = (time: string) => new Date(time).toISOString().slice(0, 10);
@@ -245,6 +249,46 @@ export function applyMarketUpdate(
 ) {
   const update = MarketUpdateSchema.parse(unknownUpdate);
   validateReadings(update.readings);
+  if (update.participantPair) {
+    const change = update.participantPair;
+    if (
+      update.readings.length ||
+      update.liquidityHistory.length ||
+      update.ledgerAppend ||
+      update.methodRevision
+    )
+      throw Error('PARTICIPANT_QUIET_FEEDS');
+    if (same(base.metadata.pair, change.next)) {
+      if (base.metadata.inputHashes['participant-descriptor'] !== change.descriptorSha256)
+        throw Error('PARTICIPANT_REPLAY_CONFLICT');
+      return base;
+    }
+    if (
+      !same(base.metadata.pair, change.previous) ||
+      change.next.generation === change.previous.generation ||
+      change.next.baseObservedAtUtc !== change.previous.baseObservedAtUtc ||
+      Date.parse(change.next.observedAtUtc) <= Date.parse(change.previous.observedAtUtc) ||
+      change.next.holderRecordCount < change.previous.holderRecordCount ||
+      change.next.stakeStartRecordCount < change.previous.stakeStartRecordCount
+    )
+      throw Error('PARTICIPANT_PRODUCT_PREDECESSOR');
+    const entry = marketJournalEntry(base.metadata, update);
+    const metadata = ProductMetadataSchema.parse({
+      ...base.metadata,
+      pair: change.next,
+      marketStorage: {
+        ...base.metadata.marketStorage!,
+        sequence: entry.sequence,
+        head: entry.head,
+      },
+      inputHashes: {
+        ...base.metadata.inputHashes,
+        'market-journal': entry.head,
+        'participant-descriptor': change.descriptorSha256,
+      },
+    });
+    return { rows: base.rows, metadata, exceptions: base.exceptions };
+  }
   const protocol = update.readings.find((r) => r.kind === 'protocol');
   if (Boolean(protocol) !== Boolean(update.ledgerAppend))
     throw Error('PROTOCOL_LEDGER_ATOMIC_REQUIRED');
@@ -529,4 +573,25 @@ export function validateLedgerSegments(rows: readonly ProductRow[], metadata: Pr
     throw Error('LEDGER_COVERAGE');
   const r = metadata.readings.find((r) => r.kind === 'protocol');
   if (r && Number(r.globalWords[4]) !== end) throw Error('PROTOCOL_LEDGER_BOUNDARY');
+}
+
+/** A paired participant transition changes no quiet value, row, observation or coverage. */
+export function preserveParticipantProduct(
+  previous: { rows: readonly ProductRow[]; metadata: ProductMetadata },
+  next: { rows: readonly ProductRow[]; metadata: ProductMetadata },
+) {
+  const quiet = (m: ProductMetadata) => {
+    const { pair, marketStorage, inputHashes, ...rest } = m;
+    return {
+      ...rest,
+      marketStorage: marketStorage ? { ...marketStorage, sequence: 0, head: '' } : null,
+      inputHashes: Object.fromEntries(
+        Object.entries(inputHashes).filter(
+          ([k]) => !['market-journal', 'participant-descriptor'].includes(k),
+        ),
+      ),
+    };
+  };
+  if (!same(previous.rows, next.rows) || !same(quiet(previous.metadata), quiet(next.metadata)))
+    throw Error('PARTICIPANT_QUIET_DATA_CHANGED');
 }

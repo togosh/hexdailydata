@@ -1,0 +1,800 @@
+{
+  "stakeStarts": {
+    "kind": "OBJECT",
+    "name": "_StakeStart",
+    "description": null,
+    "fields": [
+      {
+        "name": "id",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "ID",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakerAddr",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakeId",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "data0",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "timestamp",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakedHearts",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakeShares",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakedDays",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "isAutoStake",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Boolean",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakeTShares",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "startDay",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "endDay",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakeEnd",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "OBJECT",
+          "name": "_StakeEnd",
+          "ofType": null
+        }
+      },
+      {
+        "name": "stakeGoodAccounting",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "OBJECT",
+          "name": "_StakeGoodAccounting",
+          "ofType": null
+        }
+      },
+      {
+        "name": "blockNumber",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "transactionHash",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      }
+    ],
+    "inputFields": null,
+    "enumValues": null
+  },
+  "stakeEnds": {
+    "kind": "OBJECT",
+    "name": "_StakeEnd",
+    "description": null,
+    "fields": [
+      {
+        "name": "id",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "ID",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakerAddr",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakeId",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "data0",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "data1",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "payout",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakedHearts",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakedShares",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "timestamp",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "penalty",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "servedDays",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "prevUnlocked",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Boolean",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "daysLate",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "daysEarly",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "blockNumber",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "transactionHash",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      }
+    ],
+    "inputFields": null,
+    "enumValues": null
+  },
+  "stakeGoodAccountings": {
+    "kind": "OBJECT",
+    "name": "_StakeGoodAccounting",
+    "description": null,
+    "fields": [
+      {
+        "name": "id",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "ID",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakerAddr",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakeId",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "data0",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "data1",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "payout",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakedHearts",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "stakedShares",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "timestamp",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "penalty",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "blockNumber",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "transactionHash",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      }
+    ],
+    "inputFields": null,
+    "enumValues": null
+  },
+  "tokenHolders": {
+    "kind": "OBJECT",
+    "name": "_TokenHolder",
+    "description": null,
+    "fields": [
+      {
+        "name": "id",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "ID",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "numeralIndex",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "holderAddress",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Bytes",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "totalSent",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "totalReceived",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "tokenBalance",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigDecimal",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "createdTimeStamp",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "createdBlocknumber",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "createdHexDay",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "lastModifiedHexDay",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      },
+      {
+        "name": "lastModifiedTimeStamp",
+        "description": null,
+        "args": [],
+        "type": {
+          "kind": "NON_NULL",
+          "name": null,
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "BigInt",
+            "ofType": null
+          }
+        }
+      }
+    ],
+    "inputFields": null,
+    "enumValues": null
+  }
+}

@@ -4,7 +4,6 @@ import {
   SavedAddressResponseSchema,
   type UpdatedStakeRecord,
 } from '../contracts/source-update.ts';
-import { ACCEPTED } from '../contracts/saved-generation.ts';
 import { SourceUpdateDisclosure } from './SourceUpdateDisclosure.tsx';
 import type { z } from 'zod';
 import {
@@ -43,7 +42,8 @@ type Envelope = Pick<z.infer<typeof SavedStakesResponseSchema>, 'snapshot' | 'da
   generation?: string;
 };
 function Disclosure({ data }: { data: Envelope }) {
-  if (data.generation) return <SourceUpdateDisclosure />;
+  if (data.generation)
+    return <SourceUpdateDisclosure snapshot={data.snapshot} generation={data.generation} />;
   return (
     <div className="source-disclosure">
       <p className="eyebrow">Saved subgraph · as of 5 Oct 2026</p>
@@ -231,7 +231,7 @@ function SavedList({ address }: { address?: string }) {
               {address
                 ? ' for this address'
                 : 'generation' in body
-                  ? ' in this local base-plus-updates view; complete B1 population is unproved'
+                  ? ' in this local base-plus-updates view; complete target population is unproved'
                   : ' in this saved inventory'}
               . {address && 'This is not an active-stake count. Ranks are unavailable.'}
             </p>

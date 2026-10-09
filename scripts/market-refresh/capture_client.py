@@ -62,6 +62,8 @@ class Session:
     capacity=staticmethod(response_capacity)
     rpc_validator=staticmethod(validate_rpc)
     object_counter=staticmethod(entity_rows)
+    graph_validator=staticmethod(validate_data)
+    maximum_extras=24
     request_seconds=30
     native_reserve=5
     segment_label='MARKET_REFRESH'
@@ -149,7 +151,7 @@ class Session:
         method,url,body=self.job_validator(q)
         rpc=q['kind']=='rpc';docs=q['kind']=='docs';protocol='rpc' if rpc else 'docs' if docs else 'graph';capacity=self.capacity(q)
         if self.last_closed is not None:self.sleep(max(0,1-(self.clock()-self.last_closed)))
-        if is_retry and self.state['extraAttempts']>=24:raise Stop('Shared extra retry ceiling')
+        if is_retry and self.state['extraAttempts']>=self.maximum_extras:raise Stop('Shared extra retry ceiling')
         self.budget(q,tail,cutoff,is_retry)
         s=self.state;s['attempts']+=1;s['extraAttempts']+=bool(is_retry)
         s[protocol+'Attempts']+=1
@@ -221,7 +223,7 @@ class Session:
             if count is not None and (count>q['maxRows']):cap['validationError']='Entity overrun'
             access=status in (401,402,403,429) or any(word in raw.lower() for word in [b'payment required',b'authentication required',b'unauthorized',b'api key required'])
             if not rpc and not docs and parsed and isinstance(parsed.get('data'),dict):
-                try:validate_data(q,parsed['data'])
+                try:self.graph_validator(q,parsed['data'])
                 except ValueError as exc:cap['validationError']=str(exc)
             if status==200 and cap.get('complete') and not cap.get('parseError') and not cap.get('graphqlErrors') and not cap.get('validationError'):
                 try:
@@ -229,7 +231,7 @@ class Session:
                     elif docs:pass
                     else:
                         if set(parsed)-{'data','extensions'}:raise ValueError('Unexpected GraphQL envelope')
-                        validate_data(q,parsed.get('data'))
+                        self.graph_validator(q,parsed.get('data'))
                     if count>q['maxRows']:raise ValueError('Entity overrun')
                     cap['usable']=True
                 except (ValueError,TypeError,KeyError) as exc:cap['validationError']=str(exc)

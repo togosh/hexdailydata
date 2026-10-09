@@ -19,7 +19,12 @@ import { PageCursors } from '../queries/cursor.ts';
 import { restart } from '../../api/errors.ts';
 import { columns, validateReadings, readingKey } from './project.ts';
 import { protocolValues } from '../../contracts/protocol-daily.ts';
-import { validateMarketHistory, preserveMarketHistory, validateLedgerSegments } from './market.ts';
+import {
+  validateMarketHistory,
+  preserveMarketHistory,
+  validateLedgerSegments,
+  preserveParticipantProduct,
+} from './market.ts';
 import { verifyMarketCertificate } from './storage.ts';
 
 const names = ['daily.ndjson', 'daily.csv', 'metadata.json', 'exceptions.ndjson'];
@@ -184,6 +189,7 @@ export async function writeProductGeneration(
 export class ProductDailyStore {
   readonly root: string;
   private current: AdmittedProduct | undefined;
+  private participantPair: ProductPair | undefined;
   private selecting = false;
   private writer:
     | { lease: ProductWriter; handle: Awaited<ReturnType<typeof open>>; uncertain: boolean }
@@ -193,7 +199,7 @@ export class ProductDailyStore {
   private reloadError: string | null = null;
   constructor(
     root: string,
-    private readonly pair: ProductPair,
+    private pair: ProductPair,
   ) {
     this.root = resolve(root);
   }
@@ -216,6 +222,13 @@ export class ProductDailyStore {
     this.assertWriter(lease);
     return this.writer!.uncertain;
   }
+  /** Only the coordinated publisher holding this writer can authorize a validated pair. */
+  authorizeParticipantPair(lease: ProductWriter, previous: ProductPair, next: ProductPair) {
+    this.assertWriter(lease);
+    if (!same(this.pair, previous) || !same(this.capture().metadata.pair, previous))
+      throw Error('PARTICIPANT_WRITER_PAIR');
+    this.participantPair = next;
+  }
   async load() {
     if (this.selecting) throw Error('PRODUCT_SELECTION_BUSY');
     this.selecting = true;
@@ -236,7 +249,8 @@ export class ProductDailyStore {
     return next;
   }
   private checkPair(next: AdmittedProduct) {
-    if (!same(next.metadata.pair, this.pair)) throw Error('PRODUCT_MIXED_PAIR');
+    if (!same(next.metadata.pair, this.participantPair ?? this.pair))
+      throw Error('PRODUCT_MIXED_PAIR');
   }
   /** One small local pointer check per second. Failed/unknown candidates retain LKG. */
   async refresh(now = performance.now()) {
@@ -340,6 +354,7 @@ export class ProductDailyStore {
     if (this.writer?.lease !== lease) throw Error('PRODUCT_WRITER_OWNERSHIP');
     const owned = this.writer;
     this.writer = undefined;
+    this.participantPair = undefined;
     await owned.handle.close();
     if (owned.uncertain || retainUncertain)
       throw Error('PRODUCT_PUBLICATION_UNCERTAIN_LOCK_RETAINED');
@@ -396,7 +411,9 @@ export class ProductDailyStore {
         if (!same(JSON.parse(receipt.toString()), pointer)) throw Error('ROLLBACK_NOT_ADMITTED');
       } else if (previous) {
         if (
-          Date.parse(next.metadata.effectiveAtUtc) <= Date.parse(previous.metadata.effectiveAtUtc)
+          Date.parse(next.metadata.effectiveAtUtc) <=
+            Date.parse(previous.metadata.effectiveAtUtc) &&
+          !this.participantPair
         )
           throw Error('PRODUCT_NOT_NEWER');
         if (
@@ -410,6 +427,7 @@ export class ProductDailyStore {
             throw Error('READING_REGRESSION');
         }
         preserveMarketHistory(previous, next);
+        if (this.participantPair) preserveParticipantProduct(previous, next);
       }
       mutationStarted = true;
       if (options.writer && this.writer) this.writer.uncertain = true;
@@ -446,6 +464,7 @@ export class ProductDailyStore {
       options.beforeCommit?.();
       await rename(stage, join(this.root, 'CURRENT.json'));
       this.current = next;
+      this.pair = next.metadata.pair;
       if (options.writer && this.writer) this.writer.uncertain = false;
       completed = true;
       return { changed: true, version: next.version };
