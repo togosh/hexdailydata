@@ -871,3 +871,17 @@ Original failures are preserved in btc-eth-historical-backfill-r1, alongside
 coverage, method/source identities, separate review and final archive identity.
 Missing dates, conflict holds, exact-time uncertainty and rights remain explicit.
 No main merge, production activation, scheduler or indexer restart.
+
+### 2026-10-09 - Independent historical BTC/ETH reference candidate
+
+Added a narrow bounded Bitstamp collector and exact saved-body comparator.
+The separately reviewed one-session plan completed eight GETs in 15.23 seconds,
+charging 1,207,831 bytes and 5,112 requested rows, with no retry or edge request.
+All 2,502 daily labels per asset are present; the 100 hourly check candles support
+same-label relative aggregation but leave absolute anchoring and trade times
+unknown. Focused actual-client and arithmetic tests passed; all contributors,
+12,807 comparisons, annual statistics and 735 gap candidates reconciled locally.
+The task return preserves initial fixture failures, original response evidence,
+accounting and independent review. No retained dataset, HDS gap/conflict, live
+timestamp, API/UI or product pointer changed. Rights remain unresolved; indexer
+PARKED, main unmerged, and no follow-on source selection is authorized.

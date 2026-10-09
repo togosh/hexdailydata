@@ -60,3 +60,21 @@ rotation, later-feed preservation and desktop/mobile views passed. Account
 seams are synthetic; SQL, unattended operation and physical power loss are not
 qualified. All failed fixtures remain in the task evidence. Main is unmerged,
 accepted roots untouched, owned processes closed and indexer PARKED.
+
+## Independent BTC/ETH candle reference, 9 October 2026
+
+A separate local Bitstamp reference candidate covers all 2,502 daily labels per
+asset from 2019-12-03 through 2026-10-08. Eight GETs closed without retries;
+5,004 daily and 100 hourly unique candles retain exact tokens and contributors.
+Jan 15, 2020 daily OHLC and volume exactly aggregate from the same-label hourly
+group for both assets. Absolute hourly anchoring and exact trade times remain
+unproved; this does not turn HDS observations into closes or midnight quotes.
+
+The three predeclared comparisons retain all 2,097 BTC and 2,172 ETH overlaps.
+Same-label opening references cover all 735 candidate null cells, including the
+five held conflicts and two additional Oct 8 endpoints, without publishing any.
+The task recommends one consistent source-labeled opening series in a later
+qualified selection task rather than mixing definitions on individual gaps.
+Commercial rights and intended time semantics remain gates. Accepted HDS values,
+gaps, current readings, product pointers and freshness are unchanged. This is
+candidate-only analysis; no new API, selector, import, UI or scheduler was added.
