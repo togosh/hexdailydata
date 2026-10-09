@@ -556,7 +556,7 @@ export class ProductDailyStore {
       BTC: freshness(null, 300, 'USD benchmark not qualified.'),
       ETH: freshness(null, 300, 'USD benchmark not qualified.'),
       PLS: freshness(null, 300, 'USD quote not qualified.'),
-      gas: freshness(null, 60, 'Gas feed not qualified.'),
+      gas: freshness(null, 300, 'Gas feed not qualified.'),
       liquidity: freshness(null, 300, 'Pool valuation not qualified.'),
     };
     let pool: { chainId: 369; address: string; dex: string; version: string } | null = null;
@@ -590,8 +590,8 @@ export class ProductDailyStore {
         values.priorityFeeWei = r.priorityFeeWei;
         groups.gas = freshness(
           r.observedAtUtc,
-          60,
-          'wei per gas, not transaction gas used or total fee.',
+          300,
+          'Primary node gas-price suggestion; optional mined contextual base fee and suggested tip are not an atomic sum. Legacy *Wei keys mean PulseChain smallest units per gas, not ETH. Earliest included observation time; not a fee or inclusion guarantee.',
         );
       } else if (r.kind === 'tracked-liquidity') {
         values.trackedLiquidityUsd = r.value;

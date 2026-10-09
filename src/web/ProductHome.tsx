@@ -47,13 +47,41 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
         <Reading label="Bitcoin price" value={data.btcPriceUsd} unit="USD / BTC" />
         <Reading label="Ethereum price" value={data.ethPriceUsd} unit="USD / ETH" />
         <Reading label="PulseChain price" value={data.plsPriceUsd} unit="USD / PLS" />
-        <Reading label="Suggested gas price" value={data.gasPriceWei} unit="wei / gas" />
+        <Reading
+          label="PulseChain suggested gas price"
+          value={data.gasPriceWei}
+          unit="raw smallest units / gas"
+        />
         <Reading
           label="Tracked HEX liquidity"
           value={data.trackedLiquidityUsd}
           unit="USD estimate"
         />
       </div>
+      <p className="meta" data-testid="gas-availability">
+        Gas: {data.freshness.gas?.status ?? 'unavailable'} · observed{' '}
+        {data.freshness.gas?.observedAtUtc ?? 'unavailable'}.{' '}
+        <a href="/daily?metric=gasPriceWei">Measured daily gas</a>
+      </p>
+      <details>
+        <summary>Gas units and components</summary>
+        <p>
+          Suggested gas price is a node estimate, not a guaranteed fee or inclusion price. Raw
+          values use PulseChain smallest units per gas; the API/CSV *Wei names are EVM aliases, not
+          ETH amounts. The contextual mined base fee and optional suggested tip were measured
+          separately and need not sum to the suggestion.
+        </p>
+        <dl>
+          <dt>Mined contextual base fee</dt>
+          <dd>{data.baseFeeWei ?? 'Unavailable'} raw units / gas</dd>
+          <dt>Suggested priority fee</dt>
+          <dd>{data.priorityFeeWei ?? 'Unavailable'} raw units / gas</dd>
+        </dl>
+        <p>
+          Daily gas keeps the last measured whole sample on its UTC date, not an average or verified
+          daily close. Missing dates remain gaps.
+        </p>
+      </details>
       {data.trackedSet && (
         <p>
           {data.trackedSet.poolCount} identified HEX pools · bounded tracked set, not all HEX

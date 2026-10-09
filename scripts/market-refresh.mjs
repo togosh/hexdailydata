@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { hash } from '../dist/history-bootstrap/normalize.js';
 import { ProductDailyStore } from '../dist/services/product-daily/store.js';
-import { readProductProfile } from '../dist/services/product-daily/open.js';
+import { readProductProfile, ProductProfileSchema } from '../dist/services/product-daily/open.js';
 import {
   publishStoredMarket,
   checkMarketCapacity,
@@ -126,6 +126,10 @@ export async function runRefresh(
   { onPublished = async () => null, onBegin = async () => {}, testLaunchCollector } = {},
 ) {
   const { mode, profilePath, output, preflightPath } = config;
+  const gas = config.feed === 'gas';
+  if (config.feed && !['gas', 'market'].includes(config.feed)) throw Error('FEED_KIND');
+  const selectedRuntime = gas ? join(repository, 'scripts/gas-feed') : runtime;
+  const publish = gas ? (await import('./gas-publication.mjs')).publishGas : publishCycle;
   if (!['once', 'trial'].includes(mode)) throw Error('EXPLICIT_MODE_REQUIRED');
   const preBytes = await readFile(preflightPath),
     pre = JSON.parse(preBytes),
@@ -134,6 +138,7 @@ export async function runRefresh(
     throw Error('SYNTHETIC_BINDING_REQUIRES_INJECTED_OFFLINE_COLLECTOR');
   if (
     pre.verdict !== 'PASS' ||
+    (gas ? pre.feed !== 'gas' : pre.feed && pre.feed !== 'market') ||
     hash(profileBytes) !== pre.profileSha256 ||
     resolve(output) !== pre.trialRoot ||
     resolve(profilePath) !== pre.profilePath
@@ -149,7 +154,10 @@ export async function runRefresh(
     })
   )
     throw Error('EXISTING_OR_UNCERTAIN_TRIAL');
-  const profile = await readProductProfile(profilePath);
+  if (profileBytes.length > 16384) throw Error('PROFILE_BOUND');
+  const profile = gas
+    ? ProductProfileSchema.pick({ productRoot: true, pair: true }).parse(JSON.parse(profileBytes))
+    : await readProductProfile(profilePath);
   if (
     profile.productRoot !== pre.productRoot ||
     resolve(profile.productRoot) === resolve(pre.acceptedProductRoot)
@@ -192,7 +200,14 @@ export async function runRefresh(
     env.PYTHONIOENCODING = 'utf-8';
     child = (testLaunchCollector ?? spawn)(
       'python',
-      ['-I', '-S', join(runtime, 'collector.py'), mode, resolve(output), resolve(preflightPath)],
+      [
+        '-I',
+        '-S',
+        join(selectedRuntime, 'collector.py'),
+        mode,
+        resolve(output),
+        resolve(preflightPath),
+      ],
       { cwd: repository, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true },
     );
     completion = new Promise((resolve) => {
@@ -210,20 +225,23 @@ export async function runRefresh(
     });
     // Independent parent bound. This task is Windows-only; target only our own
     // child PID and its descendants. Normal physical requests reap well before it.
-    watchdog = setTimeout(() => {
-      if (collectorClosed) return;
-      error ??= Error('WHOLE_TRIAL_PARENT_CUTOFF');
-      child.stdin.end();
-      emergencyClosure = new Promise((resolve) => {
-        const killer = spawn(
-          join(process.env.SystemRoot ?? process.env.SYSTEMROOT, 'System32', 'taskkill.exe'),
-          ['/PID', String(child.pid), '/T', '/F'],
-          { windowsHide: true, stdio: 'ignore', timeout: 1500 },
-        );
-        killer.once('error', (e) => resolve({ error: String(e) }));
-        killer.once('close', (code, signal) => resolve({ code, signal }));
-      });
-    }, 2696000);
+    watchdog = setTimeout(
+      () => {
+        if (collectorClosed) return;
+        error ??= Error('WHOLE_TRIAL_PARENT_CUTOFF');
+        child.stdin.end();
+        emergencyClosure = new Promise((resolve) => {
+          const killer = spawn(
+            join(process.env.SystemRoot ?? process.env.SYSTEMROOT, 'System32', 'taskkill.exe'),
+            ['/PID', String(child.pid), '/T', '/F'],
+            { windowsHide: true, stdio: 'ignore', timeout: 1500 },
+          );
+          killer.once('error', (e) => resolve({ error: String(e) }));
+          killer.once('close', (code, signal) => resolve({ code, signal }));
+        });
+      },
+      gas ? 1196000 : 2696000,
+    );
     let stderr = '';
     child.stderr.on('data', (b) => {
       stderr += b.toString();
@@ -252,7 +270,7 @@ export async function runRefresh(
             accounting.pending !== null
           )
             throw Error('PUBLIC_ACCOUNTING_NOT_SETTLED');
-          const receipt = await publishCycle(
+          const receipt = await publish(
             store,
             writer,
             output,

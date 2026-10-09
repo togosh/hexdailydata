@@ -46,9 +46,9 @@ export const productMetrics = {
   ethPriceUsd: ['Ethereum price', 'USD/ETH', 'market'],
   plsPriceUsd: ['PulseChain price', 'USD/PLS', 'market'],
   trackedLiquidityUsd: ['Tracked HEX liquidity (USD estimate)', 'USD', 'liquidity'],
-  gasPriceWei: ['Suggested gas price', 'wei/gas', 'gas'],
-  baseFeeWei: ['Base fee', 'wei/gas', 'gas'],
-  priorityFeeWei: ['Priority fee', 'wei/gas', 'gas'],
+  gasPriceWei: ['Suggested gas price', 'PulseChain smallest units/gas', 'gas'],
+  baseFeeWei: ['Mined contextual base fee', 'PulseChain smallest units/gas', 'gas'],
+  priorityFeeWei: ['Suggested priority fee', 'PulseChain smallest units/gas', 'gas'],
 } as const;
 export type ProductMetric = keyof typeof productMetrics;
 export const metricKeys = Object.keys(productMetrics) as ProductMetric[];

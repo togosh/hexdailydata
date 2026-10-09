@@ -211,3 +211,18 @@ Actual captures use390x844 and1440x1000 CSS viewports, dark theme, device scale1
 Compact native metrics, navy panels and magenta accents retain the supplied hierarchy.
 Unsupported observed APY, address history, sixth downloads and asset/gas panels are omitted.
 Owner aesthetic acceptance remains pending independently of implementation review.
+
+## Saved gas observations in the unified product (2026-10-09)
+
+The feature candidate now serves qualified PulseChain node gas suggestions through
+the ordinary Daily/Live/Home/CSV model. The primary node's suggestion is an unpinned
+estimate, not a guaranteed fee, PLS price or an average of providers. Contextual
+mined base fee and optional suggested priority fee have separate measurement times
+and need not sum to the suggestion. API/CSV `*Wei` names retain exact raw PulseChain
+smallest-unit strings; Home and metric labels state those units explicitly.
+
+The earliest included real observation time governs the gas group's 300-second
+freshness. Daily gas keeps the last measured whole sample on its UTC date, with
+nulls for missing components and no fabricated earlier dates. The finite gas trial
+does not renew saved HEX/liquidity/holder/stake times or start an automatic service.
+BTC/ETH/current protocol refresh and wider historical coverage remain unqualified.

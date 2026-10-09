@@ -45,13 +45,18 @@ def main():
     capacity=response_capacity(q)
     host=url.split('/')[2]
     if url not in SCOPE['graphEndpoints']+SCOPE['rpcEndpoints']+[]:raise ValueError('Unapproved endpoint')
+    return perform(method,url,body,body_path,meta_path,capacity)
+
+def perform(method,url,body,body_path,meta_path,capacity,timeout=18,user_agent='HDD-Market-Refresh/1.0'):
+    """One framed physical request, shared only after each feed's own admission gate."""
+    host=url.split('/')[2]
     record={'status':None,'complete':False,'transportError':None,'failureKind':None,'connectionClosed':False}
     save(meta_path,record)
-    conn=http.client.HTTPSConnection(host,port=443,timeout=18)
+    conn=http.client.HTTPSConnection(host,port=443,timeout=timeout)
     try:
         conn.request(method,url[len('https://'+host):],body=body if method=='POST' else None,headers={
             'Accept':'application/json','Accept-Encoding':'identity','Content-Type':'application/json',
-            'User-Agent':'HDD-Market-Refresh/1.0'})
+            'User-Agent':user_agent})
         response=conn.getresponse()
         headers=response.getheaders()
         if sum(len(k)+len(v) for k,v in headers)>32768:raise ValueError('Header byte bound')

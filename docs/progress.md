@@ -803,3 +803,21 @@ The earlier finite public trial remains closed; this milestone makes zero provid
 requests. Native filesystem failure evidence remains retained. Permanent scheduling,
 physical power-loss qualification and a later live soak remain NOT_RUN. Main stays
 unmerged, accepted data stays unchanged, and indexer remains PARKED.
+
+### 2026-10-09 — Bounded PulseChain gas feed
+
+Added the official node's measured gas suggestion to the same Daily/Live/Home/CSV
+model through the existing validated storage/publication path. One independently
+reviewed session completed three cycles: 38 RPC POSTs (19 per node), no retries,
+113,579 charged wire-body bytes, 456 objects and 139.422 seconds including closure.
+The same running API adopted all three generations at 54.887, 44.595 and 45.083
+seconds of observation age. Optional priority suggestions, paired 16-block recent
+fee history and one paired mined transaction/receipt were available; predicted
+next base fee is kept separate from mined data. UI uses raw PulseChain units.
+All 2,502 original rows and 90 liquidity buckets remain exact; one observed gas
+date was added. Focused client/access, real backup/isolated restore and four-view
+preview evidence is in pulsechain-gas-feed-r1. Preflight optional-missingness and
+injected-settlement evidence findings were corrected and independently rechecked.
+Gas becomes stale after 300 seconds; no scheduler is installed. BTC/ETH feeds,
+broader gas/history coverage and holder/stake/protocol refresh remain pending.
+Main remains unmerged, prior roots unchanged and indexer PARKED.

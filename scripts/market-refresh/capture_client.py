@@ -14,8 +14,8 @@ class LimitReached(Stop):pass
 
 class WorkerTransport:
     """One child, finite request INCLUDING kill/reap, inherited secrets excluded."""
-    def __init__(self,nonce,clock=time.monotonic,popen=subprocess.Popen):
-        self.nonce=nonce;self.clock=clock;self.popen=popen;self.child=None
+    def __init__(self,nonce,clock=time.monotonic,popen=subprocess.Popen,worker_path=None):
+        self.nonce=nonce;self.clock=clock;self.popen=popen;self.child=None;self.worker_path=worker_path or ROOT/'http_worker.py'
     def __call__(self,request,deadline,storage):
         request=Path(request);body=request.parent/'response.body';meta=request.parent/'transport.json'
         env={k:os.environ[k] for k in ('SystemRoot','WINDIR','COMSPEC') if k in os.environ}
@@ -24,7 +24,7 @@ class WorkerTransport:
         started=False;closed=False;cancel=None
         try:
             if self.clock()>=deadline-2:raise Stop('No attempt time before dispatch')
-            self.child=self.popen([sys.executable,'-I','-S',str(ROOT/'http_worker.py'),str(request),str(body),str(meta),self.nonce],
+            self.child=self.popen([sys.executable,'-I','-S',str(self.worker_path),str(request),str(body),str(meta),self.nonce],
                 cwd=ROOT,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             started=True
             self.child.wait(timeout=max(.001,deadline-2-self.clock()))
@@ -58,6 +58,17 @@ class WorkerTransport:
 
 class Session:
     """One admitted session. Controls reserve their own response classes, not data caps."""
+    job_validator=staticmethod(validate_job)
+    capacity=staticmethod(response_capacity)
+    rpc_validator=staticmethod(validate_rpc)
+    object_counter=staticmethod(entity_rows)
+    request_seconds=30
+    native_reserve=5
+    segment_label='MARKET_REFRESH'
+    def reserve_extra(self,q,is_retry):pass
+    def dispatch_cutoff(self):return min(self.cycle_started-self.started+(1140 if self.closing else 600),2640)
+    def retry_allowed(self,q,cap,special,veto):
+        return bool(q['kind'] not in ('rpc','docs') and not cap['usable'] and not veto and cap['closureKnown'] and (special or cap.get('failureKind') in ('network','transport_timeout') or cap.get('complete') and cap.get('status') in (502,503,504)))
     def __init__(self,root,transport,clock=time.monotonic,sleep=time.sleep,synthetic=False):
         self.root=Path(root);self.root.mkdir(exist_ok=True)
         self.transport=transport;self.clock=clock;self.sleep=sleep;self.started=clock();self.deadline=self.started+2700
@@ -134,15 +145,16 @@ class Session:
             raise
     def optional_failure(self,cap):return False # No optional work or hidden cycle retry.
     def attempt(self,q,tail=(),cutoff=None,is_retry=False,original=None,prior=None,retry_index=0):
-        cutoff=min(self.cycle_started-self.started+(1140 if self.closing else 600),2640)
-        method,url,body=validate_job(q)
-        rpc=q['kind']=='rpc';docs=q['kind']=='docs';protocol='rpc' if rpc else 'docs' if docs else 'graph';capacity=response_capacity(q)
+        cutoff=self.dispatch_cutoff()
+        method,url,body=self.job_validator(q)
+        rpc=q['kind']=='rpc';docs=q['kind']=='docs';protocol='rpc' if rpc else 'docs' if docs else 'graph';capacity=self.capacity(q)
         if self.last_closed is not None:self.sleep(max(0,1-(self.clock()-self.last_closed)))
         if is_retry and self.state['extraAttempts']>=24:raise Stop('Shared extra retry ceiling')
         self.budget(q,tail,cutoff,is_retry)
         s=self.state;s['attempts']+=1;s['extraAttempts']+=bool(is_retry)
         s[protocol+'Attempts']+=1
         if rpc:s['rpcEndpointAttempts'][q['endpoint']]+=1
+        self.reserve_extra(q,is_retry)
         if protocol=='graph':s['graphEndpointAttempts'][q['endpoint']]+=1
         if q['kind']=='schema':s['schemaAttempts'][q['endpoint']]+=1
         number=s['attempts'];directory=self.root/'captures'/f'{number:05d}';directory.mkdir(parents=True)
@@ -155,9 +167,9 @@ class Session:
         self.storage.put(directory/'request.body',body)
         disk_reservation=capacity+131072;self.storage.reserve(disk_reservation)
         self.persist()
-        start=self.clock();deadline=min(start+30,self.started+cutoff,self.deadline-5)
+        start=self.clock();deadline=min(start+self.request_seconds,self.started+cutoff,self.deadline-self.native_reserve)
         reserved_state=json.loads(json.dumps(s))
-        cap={'segment':'MARKET_REFRESH', 'cycle':self.cycle_ordinal,'protocol':protocol,'attempt':number,'capture':f'captures/{number:05d}/capture.json','job':q,'requestSha256':digest(body),
+        cap={'segment':self.segment_label, 'cycle':self.cycle_ordinal,'protocol':protocol,'attempt':number,'capture':f'captures/{number:05d}/capture.json','job':q,'requestSha256':digest(body),
              'mode':s['mode'],'startedAt':utc(),'startOffsetSeconds':start-self.started,'retry':is_retry,'usable':False,'retryable':False,
              'originalAttempt':original or number,'retryOf':prior,'retryIndex':retry_index}
         try:
@@ -200,7 +212,7 @@ class Session:
                 try:
                     parsed=strict_json(raw)
                     if not isinstance(parsed,dict):raise ValueError('Response object required')
-                    count=entity_rows(parsed)
+                    count=self.object_counter(parsed)
                     if not rpc:cap['graphqlErrors']=parsed.get('errors')
                 except (ValueError,UnicodeError,RecursionError) as exc:
                     parsed=None;count=None;cap['parseError']=str(exc)
@@ -213,7 +225,7 @@ class Session:
                 except ValueError as exc:cap['validationError']=str(exc)
             if status==200 and cap.get('complete') and not cap.get('parseError') and not cap.get('graphqlErrors') and not cap.get('validationError'):
                 try:
-                    if rpc:cap['selectedHeaderResult']=validate_rpc(q,parsed)
+                    if rpc:cap['selectedHeaderResult']=self.rpc_validator(q,parsed)
                     elif docs:pass
                     else:
                         if set(parsed)-{'data','extensions'}:raise ValueError('Unexpected GraphQL envelope')
@@ -232,7 +244,7 @@ class Session:
             cap['classification']=None if rpc or docs else classify_error_only(parsed,cap,policy_version='HOLDER_R3')
             special=cap['classification'] in CLASSIFICATIONS
             veto=access or (cap.get('graphqlErrors') and not special) or cap.get('validationError') or cap.get('parseError') or failure in ('body_cap','owner_cancellation','local_or_protocol','transport_terminal','unknown_closure','attempt_deadline')
-            cap['retryable']=bool(not rpc and not docs and not cap['usable'] and not veto and closed and (special or failure in ('network','transport_timeout') or cap.get('complete') and status in (502,503,504)))
+            cap['retryable']=self.retry_allowed(q,cap,special,veto)
             cap['identityValidated']=bool(cap['usable'] and q['kind']!='schema')
             if q['kind']=='schema':cap['schemaValidated']=bool(cap['usable'])
             cap['stopReason']=None if cap['usable'] else 'Unusable response: '+str(failure or cap.get('validationError') or cap.get('parseError') or ('GraphQL errors' if cap.get('graphqlErrors') else status))
