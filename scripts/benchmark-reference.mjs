@@ -8,11 +8,48 @@ import {
   mergeCandles,
   edgeRequest,
   analyze,
+  selectSavedCloses,
+  closeBodies,
 } from '../dist/history-bootstrap/benchmark-reference.js';
-import { hash } from '../dist/history-bootstrap/normalize.js';
+import { hash, stable } from '../dist/history-bootstrap/normalize.js';
 const W = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const read = async (p) => JSON.parse(await readFile(p, 'utf8'));
 const put = (p, v) => writeFile(p, JSON.stringify(v, null, 2) + '\n', { flag: 'wx' });
+export async function selectCloses(root) {
+  const normalized = await readFile(join(root, 'inputs/reference/candidate/DAILY_CANDLES.json'));
+  const bodies = await Promise.all(
+    closeBodies.map((b) =>
+      readFile(
+        join(root, 'inputs/reference/session', String(b.attempt).padStart(2, '0'), 'response.body'),
+      ),
+    ),
+  );
+  const result = selectSavedCloses(normalized, bodies);
+  await mkdir(join(root, 'data'), { recursive: true });
+  for (const [name, value] of Object.entries({
+    BENCHMARK_HISTORY: result.history,
+    HISTORY_UPDATE: result.update,
+    CLOSE_BUCKETS: result.history.buckets,
+  }))
+    await writeFile(join(root, 'data', name + '.json'), stable(value), { flag: 'wx' });
+  await writeFile(
+    join(root, 'evidence/CLOSE_RECONCILIATION.ndjson'),
+    result.reconciliation.map(stable).join(''),
+    { flag: 'wx' },
+  );
+  await put(join(root, 'evidence/CLOSE_SELECTION.json'), {
+    status: 'PASS',
+    externalRequests: 0,
+    method: result.history.methodRevision,
+    buckets: result.history.buckets.length,
+    selectionSha256: result.history.selectionSha256,
+    sourceBodies: closeBodies,
+    normalizedSha256: hash(normalized),
+    quoteTimes: null,
+    hdsConflictsResolved: false,
+  });
+  return { status: 'PASS', buckets: result.history.buckets.length };
+}
 export async function validate(root, attemptFolder) {
   const q = await read(join(attemptFolder, 'request.json')),
     state = await read(join(root, 'session/ACCOUNTING.json'));
@@ -99,7 +136,8 @@ export async function analyzeSaved(root) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [command, folder, attempt] = process.argv.slice(2),
     root = folder ? resolve(folder) : null;
-  if (command === 'validate' && root && attempt)
+  if (command === 'select-closes' && root) console.log(JSON.stringify(await selectCloses(root)));
+  else if (command === 'validate' && root && attempt)
     console.log(JSON.stringify(await validate(root, resolve(attempt))));
   else if (command === 'analyze' && root) console.log(JSON.stringify(await analyzeSaved(root)));
   else if (command === 'run' && root) {

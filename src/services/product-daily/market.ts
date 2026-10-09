@@ -20,6 +20,10 @@ import {
   type ProductReading,
   marketMethodRevision,
   BenchmarkHistorySchema,
+  benchmarkHistoryMethod,
+  benchmarkCloseMethod,
+  benchmarkCloseBinding,
+  benchmarkCloseDisclosure,
   type BenchmarkHistory,
 } from '../../contracts/product-daily.ts';
 import { readingKey, validateReadings } from './project.ts';
@@ -40,6 +44,38 @@ const same = (a: unknown, b: unknown) => stable(a) === stable(b);
 const benchmarkFields = { BTC: 'btcPriceUsd', ETH: 'ethPriceUsd' } as const;
 const benchmarkCredit =
   ' Historical BTC/ETH references: HEXDailyStats (togosh), CoinGecko USD method; exact sample times unavailable.';
+const closeCredit =
+  ' Historical BTC/ETH USD daily candle closes: Bitstamp; unchanged source UTC labels, exact trade times unknown. Local technical candidate; commercial rights unresolved.';
+function closeTransitionMetadata(a: ProductMetadata, b: BenchmarkHistory | undefined) {
+  return (
+    a.benchmarkHistory?.methodRevision === benchmarkHistoryMethod &&
+    hash(stable(a.benchmarkHistory)) === benchmarkCloseBinding.predecessorHistory &&
+    b?.methodRevision === benchmarkCloseMethod
+  );
+}
+function closeTransition(
+  a: { metadata: ProductMetadata; version?: string; manifestSha256?: string },
+  b: BenchmarkHistory | undefined,
+) {
+  return (
+    a.version === benchmarkCloseBinding.predecessorVersion &&
+    a.manifestSha256 === benchmarkCloseBinding.predecessorManifest &&
+    closeTransitionMetadata(a.metadata, b)
+  );
+}
+function historyLabels(a: ProductMetadata, b: BenchmarkHistory) {
+  if (b.methodRevision !== benchmarkCloseMethod)
+    return { methods: [...a.methods, benchmarkDisclosure], credits: a.credits + benchmarkCredit };
+  if (
+    a.methods.filter((m) => m === benchmarkDisclosure).length !== 1 ||
+    !a.credits.endsWith(benchmarkCredit)
+  )
+    throw Error('BENCHMARK_PREDECESSOR_LABELS');
+  return {
+    methods: a.methods.map((m) => (m === benchmarkDisclosure ? benchmarkCloseDisclosure : m)),
+    credits: a.credits.slice(0, -benchmarkCredit.length) + closeCredit,
+  };
+}
 function validateBenchmarkHistory(history: BenchmarkHistory) {
   BenchmarkHistorySchema.parse(history);
   if (hash(stable(history.buckets)) !== history.selectionSha256)
@@ -72,6 +108,16 @@ function marketGaps(rows: readonly ProductRow[]) {
 /** One certified history fill has no new observation clock; all quiet metadata stays exact. */
 export function benchmarkHistoryOnlyAdvance(a: ProductMetadata, b: ProductMetadata) {
   if (!b.marketStorage) return false;
+  if (
+    !b.benchmarkHistory ||
+    !(
+      closeTransitionMetadata(a, b.benchmarkHistory) ||
+      (!a.benchmarkHistory && b.benchmarkHistory.methodRevision === benchmarkHistoryMethod)
+    )
+  )
+    return false;
+  validateBenchmarkHistory(b.benchmarkHistory);
+  const labels = historyLabels(a, b.benchmarkHistory);
   // A newly created bounded store still serves its unmodified legacy seed until
   // the first certified journal entry. Compare its deterministic migration too.
   const before = a.marketStorage ? a : migrateMarketMetadata(a, b.marketStorage.seedVersion);
@@ -89,15 +135,13 @@ export function benchmarkHistoryOnlyAdvance(a: ProductMetadata, b: ProductMetada
     };
   };
   return (
-    !a.benchmarkHistory &&
-    !!b.benchmarkHistory &&
     !!before.marketStorage &&
     !!b.marketStorage &&
     b.marketStorage.sequence === before.marketStorage.sequence + 1 &&
     b.marketStorage.head !== before.marketStorage.head &&
     same(quiet(before), quiet(b)) &&
-    same(b.methods, [...a.methods, benchmarkDisclosure]) &&
-    b.credits === a.credits + benchmarkCredit &&
+    same(b.methods, labels.methods) &&
+    b.credits === labels.credits &&
     b.inputHashes['benchmark-history'] === hash(stable(b.benchmarkHistory))
   );
 }
@@ -336,6 +380,13 @@ function replay(
   }
   for (const r of observations) {
     const row = byDate.get(dateOf(r.observedAtUtc));
+    if (
+      history?.methodRevision === benchmarkCloseMethod &&
+      r.kind === 'reference' &&
+      dateOf(r.observedAtUtc) >= '2019-12-03' &&
+      dateOf(r.observedAtUtc) <= '2026-10-08'
+    )
+      throw Error('BENCHMARK_TIMED_OVERLAP');
     if (!row) throw Error('MARKET_OBSERVATION_OUTSIDE_DOMAIN');
     apply(row, r);
   }
@@ -362,6 +413,8 @@ export function validateMarketHistory(rows: readonly ProductRow[], metadata: Pro
 /** Offline bounded extension of an admitted generation; no provider access or pointer writes. */
 export function applyMarketUpdate(
   base: {
+    version?: string;
+    manifestSha256?: string;
     rows: readonly ProductRow[];
     metadata: ProductMetadata;
     exceptions: Record<string, unknown>[];
@@ -381,11 +434,18 @@ export function applyMarketUpdate(
       throw Error('BENCHMARK_HISTORY_ONLY_UPDATE');
     const history = update.benchmarkHistory;
     validateBenchmarkHistory(history);
+    if (
+      history.methodRevision === benchmarkCloseMethod &&
+      update.receiptSha256 !== hash(stable(history))
+    )
+      throw Error('BENCHMARK_RECEIPT_IDENTITY');
+    const replacement = closeTransition(base, history);
     if (base.metadata.benchmarkHistory) {
-      if (!same(base.metadata.benchmarkHistory, history))
-        throw Error('BENCHMARK_REPLACEMENT_REFUSED');
-      return base;
+      if (same(base.metadata.benchmarkHistory, history)) return base;
+      if (!replacement) throw Error('BENCHMARK_REPLACEMENT_REFUSED');
     }
+    if (history.methodRevision === benchmarkCloseMethod && !replacement)
+      throw Error('BENCHMARK_PREDECESSOR_REQUIRED');
     const rows = base.rows.map((r) => ({ ...r })),
       dates = new Map(rows.map((r) => [r.dateUtc, r]));
     for (const b of history.buckets) {
@@ -393,7 +453,7 @@ export function applyMarketUpdate(
         field = benchmarkFields[b.asset];
       if (
         !row ||
-        row[field] !== null ||
+        (!replacement && row[field] !== null) ||
         row[b.asset === 'BTC' ? 'btcRecordedAtUtc' : 'ethRecordedAtUtc'] !== null
       )
         throw Error('BENCHMARK_NON_NULL_OVERLAP_OR_DOMAIN');
@@ -414,8 +474,7 @@ export function applyMarketUpdate(
         'benchmark-history': hash(stable(history)),
       },
       coverage: { ...base.metadata.coverage, gaps: marketGaps(rows) },
-      methods: [...base.metadata.methods, benchmarkDisclosure],
-      credits: base.metadata.credits + benchmarkCredit,
+      ...historyLabels(base.metadata, history),
     });
     if (!benchmarkHistoryOnlyAdvance(base.metadata, metadata))
       throw Error('BENCHMARK_QUIET_METADATA_CHANGED');
@@ -676,15 +735,22 @@ export function applyMarketUpdate(
 
 /** Selection may extend market observations, but cannot rewrite accepted other fields. */
 export function preserveMarketHistory(
-  previous: { rows: readonly ProductRow[]; metadata: ProductMetadata },
+  previous: {
+    rows: readonly ProductRow[];
+    metadata: ProductMetadata;
+    version?: string;
+    manifestSha256?: string;
+  },
   next: { rows: readonly ProductRow[]; metadata: ProductMetadata },
 ) {
+  const replacement = closeTransition(previous, next.metadata.benchmarkHistory);
   if (
     previous.metadata.benchmarkHistory &&
-    !same(previous.metadata.benchmarkHistory, next.metadata.benchmarkHistory)
+    !same(previous.metadata.benchmarkHistory, next.metadata.benchmarkHistory) &&
+    !replacement
   )
     throw Error('BENCHMARK_HISTORY_CHANGED');
-  if (!previous.metadata.benchmarkHistory && next.metadata.benchmarkHistory) {
+  if ((!previous.metadata.benchmarkHistory || replacement) && next.metadata.benchmarkHistory) {
     if (!benchmarkHistoryOnlyAdvance(previous.metadata, next.metadata))
       throw Error('BENCHMARK_UNCERTIFIED_QUIET_CHANGE');
     const admitted = new Map(
@@ -700,7 +766,7 @@ export function preserveMarketHistory(
         if (old[key] === fresh[key]) continue;
         if (
           !['btcPriceUsd', 'ethPriceUsd'].includes(key) ||
-          old[key] !== null ||
+          (!replacement && old[key] !== null) ||
           admitted.get(old.dateUtc + ':' + key) !== fresh[key]
         )
           throw Error('BENCHMARK_QUIET_CELL_CHANGED');

@@ -2,6 +2,128 @@
 import { parse, isLosslessNumber } from 'lossless-json';
 import { compare, add, exact, hash } from './normalize.ts';
 import { decimal } from '../worker/history/input.ts';
+import {
+  CloseBenchmarkHistorySchema,
+  benchmarkCloseBinding,
+  benchmarkCloseMethod,
+} from '../contracts/product-daily.ts';
+import { stable } from './normalize.ts';
+
+// Fixed saved evidence only. No collector invocation or provider fallback.
+export const closeBodies = [
+  {
+    attempt: 1,
+    asset: 'BTC',
+    page: 1,
+    bytes: 135206,
+    sha256: '4e6bab95b900f42dadcce309a1574755d1a15ed938c27be93ba0bd36fb7299c4',
+  },
+  {
+    attempt: 2,
+    asset: 'BTC',
+    page: 2,
+    bytes: 136004,
+    sha256: '310176d72fb3233ad29fc4500000171b94c8dedab991900d7818e2a612fb492b',
+  },
+  {
+    attempt: 3,
+    asset: 'BTC',
+    page: 3,
+    bytes: 69413,
+    sha256: '5e3961a079841480166912f07312058ecadb2921cb295ab716dfa0d8486be664',
+  },
+  {
+    attempt: 5,
+    asset: 'ETH',
+    page: 1,
+    bytes: 131290,
+    sha256: 'f9ff858a476f8e5847cd3d35e62691b7527cb033764f342ddf13f3cca0929a2a',
+  },
+  {
+    attempt: 6,
+    asset: 'ETH',
+    page: 2,
+    bytes: 132230,
+    sha256: '13588019524df52dc0ddfa3a27287fb462ca80f4563f34d7d28cae20b67107f0',
+  },
+  {
+    attempt: 7,
+    asset: 'ETH',
+    page: 3,
+    bytes: 66388,
+    sha256: '8c9da47ad5e32af5eb6bd7c9c1a82006ff69ffe8c1d8b81c164945c7e6c11950',
+  },
+] as const;
+export function selectSavedCloses(normalized: Buffer, bodies: readonly Buffer[]) {
+  if (
+    normalized.length !== 3698181 ||
+    hash(normalized) !== benchmarkCloseBinding.candlesSha256 ||
+    bodies.length !== closeBodies.length
+  )
+    throw Error('CLOSE_INPUT_IDENTITY');
+  const rows = closeBodies.flatMap((binding, i) => {
+    const raw = bodies[i]!;
+    if (raw.length !== binding.bytes || hash(raw) !== binding.sha256)
+      throw Error('CLOSE_BODY_IDENTITY');
+    const query = {
+      step: 86400,
+      limit: binding.page === 3 ? 506 : 1000,
+      start: [1575331200, 1661558400, 1747785600][binding.page - 1]!,
+    };
+    const market = binding.asset.toLowerCase() + 'usd';
+    const request: Request = {
+      id: binding.asset.toLowerCase() + '-daily-' + binding.page,
+      asset: binding.asset,
+      expectedMarket: binding.asset + '/USD',
+      query,
+      url: `https://www.bitstamp.net/api/v2/ohlc/${market}/?step=86400&limit=${query.limit}&start=${query.start}&exclude_current_candle=true`,
+    };
+    return validatePage(raw, request, binding.attempt).candles;
+  });
+  const candles = mergeCandles(rows);
+  if (stable(candles) !== stable(JSON.parse(normalized.toString('utf8'))))
+    throw Error('CLOSE_NORMALIZATION_MISMATCH');
+  const buckets = candles
+    .map((c) => ({ dateUtc: c.labelUtc.slice(0, 10), asset: c.asset, value: c.close }))
+    .sort((a, b) => lexical(a.dateUtc, b.dateUtc) || lexical(a.asset, b.asset));
+  if (
+    Buffer.byteLength(stable(buckets)) !== 287321 ||
+    hash(stable(buckets)) !== benchmarkCloseBinding.selectionSha256
+  )
+    throw Error('CLOSE_BUCKET_IDENTITY');
+  const history = CloseBenchmarkHistorySchema.parse({
+    methodRevision: benchmarkCloseMethod,
+    sourceField: 'close',
+    dateMapping: 'unchanged-source-labelled-UTC-date',
+    candlesSha256: benchmarkCloseBinding.candlesSha256,
+    predecessorHistorySha256: benchmarkCloseBinding.predecessorHistory,
+    selectionSha256: benchmarkCloseBinding.selectionSha256,
+    buckets,
+  });
+  return {
+    history,
+    update: {
+      readings: [],
+      liquidityHistory: [],
+      receiptSha256: hash(stable(history)),
+      benchmarkHistory: history,
+    },
+    reconciliation: candles.map((c) => ({
+      dateUtc: c.labelUtc.slice(0, 10),
+      asset: c.asset,
+      sourceField: 'close',
+      value: c.close,
+      quoteTimeUtc: null,
+      contributors: c.contributors.map((s) => ({
+        attempt: s.attempt,
+        row: s.row,
+        bodySha256: s.bodySha256,
+        timestamp: s.values.timestamp,
+        close: s.values.close,
+      })),
+    })),
+  };
+}
 
 export type Asset = 'BTC' | 'ETH';
 export type Request = {

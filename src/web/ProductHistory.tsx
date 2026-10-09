@@ -4,6 +4,7 @@ import {
   ProductHomeResponseSchema,
   ProductMetricSchema,
   productMetrics,
+  benchmarkCloseDisclosure,
   type ProductMetric,
   type ProductRow,
 } from '../contracts/product-daily.ts';
@@ -64,13 +65,21 @@ export function productPoints(rows: readonly ProductRow[], metric: ProductMetric
     status: row[metric] === null ? 'unavailable' : 'recorded',
   }));
 }
-export function productObservation(row: ProductRow, metric: ProductMetric) {
+export function productObservation(
+  row: ProductRow,
+  metric: ProductMetric,
+  methods: readonly string[] = [],
+) {
   if (
     (metric === 'btcPriceUsd' || metric === 'ethPriceUsd') &&
     row[metric] !== null &&
     row[metric === 'btcPriceUsd' ? 'btcRecordedAtUtc' : 'ethRecordedAtUtc'] === null
   )
-    return 'Recorded-date USD reference; exact sample time unavailable, not a daily close';
+    return methods.includes(benchmarkCloseDisclosure) &&
+      row.dateUtc >= '2019-12-03' &&
+      row.dateUtc <= '2026-10-08'
+      ? 'Source-labelled daily candle close; exact trade time unknown'
+      : 'Recorded-date USD reference; exact sample time unavailable, not a daily close';
   if (
     metric === 'trackedLiquidityUsd' &&
     row.trackedLiquidityUsd !== null &&
@@ -253,9 +262,12 @@ export default function History() {
                 ? 'Ledger totals use their contract day; the payout denominator is separate from snapshot T-shares.'
                 : actualMetric === 'trackedLiquidityUsd'
                   ? 'Fixed contemporary HEX-pool cohort. Source daily reserve buckets are not verified closes; missing constituent pools produce gaps.'
-                  : productMetrics[actualMetric][2] === 'reference-price'
-                    ? 'Historical reference quotes are not live spot prices or verified daily closes.'
-                    : 'Snapshot time is the original recorded observation time, not a verified UTC daily close.'}
+                  : ['btcPriceUsd', 'ethPriceUsd'].includes(actualMetric) &&
+                      data.metadata?.methods.includes(benchmarkCloseDisclosure)
+                    ? benchmarkCloseDisclosure
+                    : productMetrics[actualMetric][2] === 'reference-price'
+                      ? 'Historical reference quotes are not live spot prices or verified daily closes.'
+                      : 'Snapshot time is the original recorded observation time, not a verified UTC daily close.'}
             </p>
           </section>
           <section className="panel">
@@ -282,7 +294,7 @@ export default function History() {
                       >
                         {r[actualMetric] === null ? 'Unavailable' : numberText(r[actualMetric], 8)}
                       </td>
-                      <td>{productObservation(r, actualMetric)}</td>
+                      <td>{productObservation(r, actualMetric, data.metadata?.methods)}</td>
                     </tr>
                   ))}
                 </tbody>

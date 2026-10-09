@@ -885,3 +885,16 @@ The task return preserves initial fixture failures, original response evidence,
 accounting and independent review. No retained dataset, HDS gap/conflict, live
 timestamp, API/UI or product pointer changed. Rights remain unresolved; indexer
 PARKED, main unmerged, and no follow-on source selection is authorized.
+
+### 2026-10-09 - Owner-selected BTC/ETH historical daily closes
+
+Implemented the narrow fixed HDS-to-Bitstamp close-method transition through the
+existing paired publisher and certified journal. Saved bodies reproduce the exact
+5,004-bucket digest. The local candidate replaces 4,269 strings, fills 735 nulls,
+and preserves 112,637 other cells, current oracle readings and participant pairing.
+The former HDS product remains exact rollback; source conflicts remain evidence.
+Focused reducer/replay, owned failure recovery, real API/CSV, compact restore and
+two final normal Charts previews passed after ordinary local fixture/UI corrections.
+Existing storage bounds, historical unknown trade times, stale latest references
+and access guards remain intact. No provider calls, main changes or public release;
+commercial rights unresolved, indexer and paid reconstruction PARKED.

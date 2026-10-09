@@ -78,3 +78,27 @@ qualified selection task rather than mixing definitions on individual gaps.
 Commercial rights and intended time semantics remain gates. Accepted HDS values,
 gaps, current readings, product pointers and freshness are unchanged. This is
 candidate-only analysis; no new API, selector, import, UI or scheduler was added.
+
+## Owner-selected historical daily closes, 9 October 2026
+
+The new local candidate uses uniform Bitstamp `close` strings on unchanged UTC
+source labels, 2019-12-03 through 2026-10-08: 2,502 dates per asset. This explicit
+choice supersedes the earlier comparison-only recommendation. A certified exact
+predecessor/history/bucket transition replaces 4,269 HDS strings and fills 735
+nulls; all other 112,637 cells remain exact. Original HDS conflicts are preserved,
+not adjudicated. The accepted HDS product is the new candidate's rollback.
+
+Normal Daily, Charts and protected CSV share these 5,004 values. Historical quote
+times remain null; a candle label does not identify a trade time or a globally
+verified daily close. October 9 oracle values/timestamps and 300-second freshness
+remain unchanged and stale. Participant coverage, ledger, liquidity and other
+feeds are unchanged. Exact repeats are no-ops; arbitrary replacements and timed
+historical overlaps remain rejected. Existing journal/intent bounds were retained.
+
+Focused real publication/recovery, same-server adoption, every API/CSV cell,
+held HDS export, compact rollback backup/restore, later synthetic updates and two
+corrected desktop/mobile previews passed. Initial fixture, typecheck and preview
+failures remain recorded. No external calls or original-root writes occurred.
+Commercial/public display and redistribution rights remain unresolved; this is
+a local technical candidate, not release authority. Main remains unmerged;
+indexer and paid reconstruction remain PARKED.

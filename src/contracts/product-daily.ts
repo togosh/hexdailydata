@@ -174,7 +174,7 @@ export const LiquidityBucketSchema = z.strictObject({
 // Internal recorded-date inputs. Exact provider quote times are unavailable;
 // these buckets must never become live ReadingSchema observations.
 export const benchmarkHistoryMethod = 'legacy-recorded-date-usd-1' as const;
-export const BenchmarkHistorySchema = z.strictObject({
+export const LegacyBenchmarkHistorySchema = z.strictObject({
   methodRevision: z.literal(benchmarkHistoryMethod),
   sourceBodySha256: digest,
   diagnosticBodySha256: digest,
@@ -192,6 +192,39 @@ export const BenchmarkHistorySchema = z.strictObject({
     .min(1)
     .max(6000),
 });
+// One owner-selected, fixed-domain transition. These are evidence identities,
+// never a general permission to replace a history or renew an observation time.
+export const benchmarkCloseMethod = 'bitstamp-labelled-daily-close-usd-1' as const;
+export const benchmarkCloseDisclosure =
+  'Bitstamp daily candle closes on unchanged source-labelled UTC dates, 2019-12-03 through 2026-10-08. Exact trade times are unknown; not live prices or timestamp-aligned returns. Original HDS conflicts remain unresolved evidence.';
+export const benchmarkCloseBinding = {
+  predecessorVersion: '4c1451dcb3015f24429c6327fb891b5a6d1c544b36e7c035d2644e1c8bee40ef',
+  predecessorManifest: '0827a2a97ab528b1d26e41405b2d662212e99952078d6ca3b66a4b5c8ae57ec1',
+  predecessorHistory: 'afb03a77b304c18bed7dca8a42aa22cf97d691fbb4e998298c3131f939c4bd96',
+  selectionSha256: '41fb052f00fa61689a56c861a4895eff49c3ba583c9e015e4ccc464951b48d1f',
+  candlesSha256: '76e3f745689077a39f772ea7add032e8a4fce3f1bccde53c68d586c59722e14f',
+} as const;
+export const CloseBenchmarkHistorySchema = z.strictObject({
+  methodRevision: z.literal(benchmarkCloseMethod),
+  sourceField: z.literal('close'),
+  dateMapping: z.literal('unchanged-source-labelled-UTC-date'),
+  candlesSha256: z.literal(benchmarkCloseBinding.candlesSha256),
+  predecessorHistorySha256: z.literal(benchmarkCloseBinding.predecessorHistory),
+  selectionSha256: z.literal(benchmarkCloseBinding.selectionSha256),
+  buckets: z
+    .array(
+      z.strictObject({
+        dateUtc: z.iso.date().refine((s) => s >= '2019-12-03' && s <= '2026-10-08'),
+        asset: z.enum(['BTC', 'ETH']),
+        value: precise,
+      }),
+    )
+    .length(5004),
+});
+export const BenchmarkHistorySchema = z.discriminatedUnion('methodRevision', [
+  LegacyBenchmarkHistorySchema,
+  CloseBenchmarkHistorySchema,
+]);
 export type BenchmarkHistory = z.infer<typeof BenchmarkHistorySchema>;
 export const ReadingSchema = z.discriminatedUnion('kind', [
   ProtocolReadingSchema,
