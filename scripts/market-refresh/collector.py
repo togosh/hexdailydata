@@ -36,7 +36,7 @@ def run_cycles(s,maximum,exchange,previous):
         c=sealed['current']
         if c['hexPriceUsd'] is None or c['trackedLiquidityUsd'] is None:raise Stop('Economic qualification refused; trial terminal')
         s.persist()
-        checkpoint={'accounting':dict(s.state),'networkSessionCount':1,'rounds':ordinal,'integrityClosed':True}
+        checkpoint={'accounting':dict(s.state),'networkSessionCount':0 if s.state.get('combinedJob') else 1,'rounds':ordinal,'integrityClosed':True}
         s.storage.json(s.root/'CHECKPOINT.json',checkpoint,replace=(s.root/'CHECKPOINT.json').exists())
         proof,updates=audit(s.root,synthetic=s.state['mode']=='SYNTHETIC_OFFLINE_TEST',active=True)
         recorded(s,f'ROUND_{ordinal}_AUDIT.json',proof)

@@ -50,7 +50,14 @@ export function qualifyCompletion(message, exit, final, accounting, published, m
         : null,
   };
 }
-export async function publishCycle(store, writer, output, message, active = () => true) {
+export async function publishCycle(
+  store,
+  writer,
+  output,
+  message,
+  active = () => true,
+  publish = publishStoredMarket,
+) {
   const remaining = message.expiresAtUnixSeconds * 1000 - Date.now();
   // Python has sub-millisecond UTC precision; Node Date.now rounds to milliseconds.
   // Clamp the local envelope to 30s rather than reject that harmless rounding edge.
@@ -86,7 +93,7 @@ export async function publishCycle(store, writer, output, message, active = () =
   )
     throw Error('CURRENT_ONLY_PAIRED_UPDATE');
   const base = store.capture();
-  const result = await publishStoredMarket(store, writer, update, assertCurrent, undefined, {
+  const result = await publish(store, writer, update, assertCurrent, undefined, {
     output: resolve(output),
     update: message.update,
     updateSha256: hash(bytes),

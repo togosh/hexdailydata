@@ -9,6 +9,18 @@ CAPS = {'eth_chainId': 4096, 'eth_getBlockByNumber': 1048576, 'eth_getCode': 262
 CODE_SHA = '331e6384b4acbab47e393ee5f85290cbdd8783be817b52643441c02bc0164511'
 BASE_TAIL = ['39843667585415780402054842749992773873163573541193571208195', '39843667585415780402007518833040386995262157612152416642428']
 
+def initial_ledger(value=None):
+    if value is None:
+        return {'number': 27720851, 'end': 2498, 'tail': BASE_TAIL[:]}
+    if (not isinstance(value, dict) or set(value) != {'number', 'end', 'tail'}
+        or type(value['number']) is not int or value['number'] < 27720851
+        or type(value['end']) is not int or not 2498 <= value['end'] <= 65535
+        or not isinstance(value['tail'], list) or len(value['tail']) != 2
+        or any(not isinstance(w, str) or not re.fullmatch('0|[1-9][0-9]{0,77}', w)
+               or int(w) >= 2**256 for w in value['tail'])):
+        raise ValueError('Admitted protocol ledger seed')
+    return value
+
 def quantity(v):
     if not isinstance(v, str) or not re.fullmatch('0x(?:0|[1-9a-fA-F][0-9a-fA-F]{0,63})', v):
         raise ValueError('Canonical quantity')

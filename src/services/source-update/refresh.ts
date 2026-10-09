@@ -11,8 +11,12 @@ import {
 import { PairSchema, type ProductPair } from '../../contracts/product-daily.ts';
 import { SavedSourceGenerations, canonical, sha } from './generation.ts';
 import { ProductDailyStore, admitProduct, type AdmittedProduct } from '../product-daily/store.ts';
-import { publishStoredMarket, verifyMarketCertificate } from '../product-daily/storage.ts';
-import { preserveParticipantProduct } from '../product-daily/market.ts';
+import {
+  publishStoredMarket,
+  verifyMarketCertificate,
+  verifyStoredTransition,
+} from '../product-daily/storage.ts';
+import { preserveParticipantProduct, preserveMarketHistory } from '../product-daily/market.ts';
 
 const hash = z.string().regex(/^[0-9a-f]{64}$/);
 const pointer = z.strictObject({
@@ -232,13 +236,26 @@ export class ParticipantRegistry {
           return;
         const raw = await bytes(this.root, 'CURRENT.json'),
           p = pointer.parse(JSON.parse(raw.toString()));
-        if (same(p, this.current.pointer)) return;
+        if (same(p, this.current.pointer)) {
+          if (
+            !same(
+              JSON.parse((await bytes(this.productDaily.root, 'CURRENT.json')).toString()),
+              p.product,
+            )
+          )
+            throw Error('PARTICIPANT_PRODUCT_POINTER');
+          this.error = null;
+          return;
+        }
         candidate =
           this.prepared.get(p.generation) ??
           (await ParticipantRegistry.loadView(this.root, p, this.current.source));
         // Even a prepared view must remain bound to the exact durable descriptor and payloads.
-        const segment = await ParticipantRegistry.segment(this.root, p.generation);
-        if (segment.descriptorSha256 !== p.descriptorSha256 || candidate.selection !== p.generation)
+        const descriptor =
+          p.generation === this.current.pointer.generation
+            ? this.current.pointer.descriptorSha256
+            : (await ParticipantRegistry.segment(this.root, p.generation)).descriptorSha256;
+        if (descriptor !== p.descriptorSha256 || candidate.selection !== p.generation)
           throw Error('PARTICIPANT_PREPARED_IDENTITY');
         const product = await admitProduct(
           join(this.productDaily.root, p.product.version),
@@ -247,9 +264,10 @@ export class ParticipantRegistry {
         if (!same(product.metadata.pair, participantPair(candidate)))
           throw Error('PARTICIPANT_MIXED_SELECTION');
         await verifyMarketCertificate(this.productDaily.root, product, this.current.product);
-        preserveParticipantProduct(this.current.product, product);
+        preserveMarketHistory(this.current.product, product);
         if (!(await bytes(this.root, 'CURRENT.json')).equals(raw))
           throw Error('PARTICIPANT_POINTER_CHANGED');
+        await this.productDaily.adoptCoordinated(product, participantPair(candidate));
         const next = { pointer: p, product, source: candidate, held: 0 };
         this.retained.add(next);
         this.current = next;
@@ -259,7 +277,12 @@ export class ParticipantRegistry {
         await this.retire();
       } catch (e) {
         this.error = e instanceof Error ? e.message : String(e);
-        if (candidate && !this.prepared.has(candidate.selection)) await candidate.close();
+        if (
+          candidate &&
+          !this.prepared.has(candidate.selection) &&
+          ![...this.retained].some((s) => s.source === candidate)
+        )
+          await candidate.close();
       }
     })();
     try {
@@ -299,11 +322,15 @@ export class ParticipantRegistry {
       .then(async () => {
         const states = [...this.retained];
         const previous = states.filter((x) => x !== this.current).at(-1);
-        for (const s of states)
-          if (s !== this.current && s !== previous && !s.held && s.source !== this.base) {
-            await s.source.close();
-            this.retained.delete(s);
-          }
+        const removed = states.filter((s) => s !== this.current && s !== previous && !s.held);
+        for (const s of removed) this.retained.delete(s);
+        for (const source of new Set(removed.map((s) => s.source)))
+          if (
+            source !== this.base &&
+            ![...this.retained].some((s) => s.source === source) &&
+            ![...this.prepared.values()].includes(source)
+          )
+            await source.close();
       })
       .catch((e) => {
         this.error = e instanceof Error ? e.message : String(e);
@@ -341,6 +368,8 @@ export class ParticipantRegistry {
       captureReference?: unknown;
     } = {},
   ) {
+    await this.refresh(performance.now(), true);
+    if (this.error) throw Error(this.error);
     const before = this.current;
     if (before.held < 0 || this.closed) throw Error('PARTICIPANT_REGISTRY_CLOSED');
     const lock = await open(join(this.root, 'SELECTION.lock'), 'wx');
@@ -443,6 +472,71 @@ export class ParticipantRegistry {
       }
     }
   }
+  /** Product-only writes use the same lock order and coherent pointer as participant writes. */
+  async publishProduct(
+    update: unknown,
+    options: {
+      beforeCommit?: () => void;
+      fault?: (phase: string) => void | Promise<void>;
+      captureReference?: unknown;
+    } = {},
+  ) {
+    await this.refresh(performance.now(), true);
+    if (this.error || this.closed) throw Error(this.error ?? 'PARTICIPANT_REGISTRY_CLOSED');
+    if (!update || typeof update !== 'object' || 'participantPair' in update)
+      throw Error('PRODUCT_ONLY_UPDATE_REQUIRED');
+    const before = this.current,
+      owner = randomUUID();
+    const lock = await open(join(this.root, 'SELECTION.lock'), 'wx');
+    let writer: Awaited<ReturnType<ProductDailyStore['acquireWriter']>> | undefined;
+    let intent = false,
+      done = false;
+    try {
+      await lock.writeFile(canonical({ owner, pid: process.pid }));
+      await lock.sync();
+      if (!same(JSON.parse((await bytes(this.root, 'CURRENT.json')).toString()), before.pointer))
+        throw Error('PARTICIPANT_PREDECESSOR_POINTER');
+      writer = await this.productDaily.acquireWriter();
+      await put(this.root, 'INTENT.json', {
+        kind: 'product',
+        owner,
+        previous: before.pointer,
+        generation: before.pointer.generation,
+        descriptorSha256: before.pointer.descriptorSha256,
+        productUpdate: update,
+      });
+      intent = true;
+      await options.fault?.('before-product');
+      const publication = await publishStoredMarket(
+        this.productDaily,
+        writer,
+        update,
+        options.beforeCommit,
+        () => {},
+        options.captureReference ?? null,
+      );
+      await options.fault?.('after-product');
+      const selected: Pointer = { ...before.pointer, product: publication.selected };
+      await put(this.root, 'CURRENT.json', selected, true, options.beforeCommit, () =>
+        options.fault?.('participant-stage'),
+      );
+      await options.fault?.('after-pointer');
+      await unlink(join(this.root, 'INTENT.json'));
+      intent = false;
+      done = true;
+      await options.fault?.('acknowledgement');
+      return publication;
+    } finally {
+      try {
+        if (writer)
+          await this.productDaily.releaseWriter(writer, this.productDaily.writerUncertain(writer));
+      } finally {
+        await lock.close();
+        if (done || !intent) await unlink(join(this.root, 'SELECTION.lock'));
+        else this.failedOwner = owner;
+      }
+    }
+  }
   /** Only this instance's known closed writer may settle its exact saved intent. */
   async recoverOwnedFailure() {
     if (!this.failedOwner) throw Error('UNKNOWN_PARTICIPANT_WRITER_OWNERSHIP');
@@ -478,9 +572,19 @@ export class ParticipantRegistry {
         productPointer.manifestSha256,
       );
       await verifyMarketCertificate(this.productDaily.root, product, this.current.product);
-      preserveParticipantProduct(this.current.product, product);
-      if (!same(product.metadata.pair, intent.productUpdate.participantPair.next))
-        throw Error('RECOVERY_PRODUCT_PAIR');
+      await verifyStoredTransition(
+        this.productDaily.root,
+        product,
+        this.current.product,
+        intent.productUpdate,
+      );
+      if (intent.kind === 'product') preserveMarketHistory(this.current.product, product);
+      else preserveParticipantProduct(this.current.product, product);
+      const expectedPair =
+        intent.kind === 'product'
+          ? this.current.product.metadata.pair
+          : intent.productUpdate.participantPair.next;
+      if (!same(product.metadata.pair, expectedPair)) throw Error('RECOVERY_PRODUCT_PAIR');
       selected = {
         generation: intent.generation,
         descriptorSha256: intent.descriptorSha256,
@@ -488,7 +592,7 @@ export class ParticipantRegistry {
       };
       const view = await ParticipantRegistry.loadView(this.root, selected, this.current.source);
       if (!same(product.metadata.pair, participantPair(view))) {
-        await view.close();
+        if (view !== this.current.source) await view.close();
         throw Error('RECOVERY_VIEW_PAIR');
       }
       this.prepared.set(view.selection, view);

@@ -16,7 +16,7 @@ def common_pin(s,schemas,ordinal,previous=None):
     heads=[ask(s,rpc_job(ep,'eth_blockNumber',[])) for ep in (0,1)]
     gh=[ask(s,graph_job('meta',ep,pin=None,deployment=sc['deployment']))['_meta']['block']['number'] for ep,sc in schemas.items()]
     number=min(heads+gh)-12
-    if previous and number<=previous['number']:return None
+    if previous and previous.get('number') is not None and number<=previous['number']:return None
     p=s.root/'TARGET_NUMBERS.json';numbers=strict_json(p.read_bytes()) if p.exists() else []
     if number<=0 or len(numbers)>=3 or number in numbers:raise IntegrityError('Observation target scope')
     s.storage.json(p,numbers+[number],replace=p.exists())

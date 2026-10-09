@@ -5,7 +5,14 @@ import { hash } from '../dist/history-bootstrap/normalize.js';
 import { publishStoredMarket } from '../dist/services/product-daily/storage.js';
 import { durableJson } from './market-refresh.mjs';
 
-export async function publishGas(store, writer, output, message, active = () => true) {
+export async function publishGas(
+  store,
+  writer,
+  output,
+  message,
+  active = () => true,
+  publish = publishStoredMarket,
+) {
   const remaining = message.expiresAtUnixSeconds * 1000 - Date.now();
   if (!Number.isFinite(remaining) || remaining <= 0 || remaining > 31000)
     throw Error('GAS_PUBLICATION_DEADLINE');
@@ -59,7 +66,7 @@ export async function publishGas(store, writer, output, message, active = () => 
   )
     throw Error('GAS_METHOD_BINDING');
   const before = store.capture();
-  const result = await publishStoredMarket(store, writer, update, assertCurrent, undefined, {
+  const result = await publish(store, writer, update, assertCurrent, undefined, {
     output: resolve(output),
     update: message.update,
     updateSha256: hash(bytes),

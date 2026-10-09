@@ -7,6 +7,9 @@ from protocol import validate_job, validate_rpc, capacity, objects, compare_head
 
 def audit_captures(root, state):
     root = Path(root)
+    if state.get('combinedJob'):
+        from combined import audit_reservations
+        audit_reservations(root, state, capacity)
     ledger = [strict_json(x) for x in (root / 'LEDGER.jsonl').read_bytes().splitlines()]
     if len(ledger) != state['attempts'] or state['pending'] is not None:
         raise ValueError('Unsettled capture ledger')
@@ -192,13 +195,16 @@ def audit_round(root, sample, state):
     c = sample['cycle']
     if type(c) is not int or not 1 <= c <= 3:
         raise ValueError('Finite cycle ordinal')
-    prior_number = 27720851
+    initial = strict_json((Path(root) / 'ADMISSION.json').read_bytes())['initial']['gas'] if state.get('combinedJob') else None
+    prior_number = initial['number'] if initial else 27720851
     prior_start = None
     for ordinal in range(1, c + 1):
         first = [cap for cap, v in captures.values() if cap['job']['cycle'] == ordinal and cap['job']['phase'] == 'head' and cap['retryIndex'] == 0]
         opening = [v for cap, v in captures.values() if cap['job']['cycle'] == ordinal and cap['job']['phase'] == 'open' and cap['usable']]
-        if len(first) != 2 or len(opening) != 2 or opening[0]['number'] <= prior_number:
+        if len(first) != 2 or len(opening) != 2 or prior_number is not None and opening[0]['number'] <= prior_number:
             raise ValueError('Cycle continuity/strict context advance')
+        if initial and opening[0]['timestamp'] <= instant(initial['observedAtUtc']).timestamp():
+            raise ValueError('Admitted gas observation time regression')
         binding = strict_json((Path(root) / f'CYCLE_{ordinal}_BINDING.json').read_bytes())
         start = binding['cycleStartOffsetSeconds']
         if binding['number'] != opening[0]['number'] or start < 0 or start > min(cap['startOffsetSeconds'] for cap in first):
@@ -212,13 +218,13 @@ def audit_round(root, sample, state):
         unsupported = any((cap['job']['method'] == 'eth_maxPriorityFeePerGas' and cap['job']['endpoint'] == ep and (cap['job']['cycle'] < c) and isinstance(v, dict) and (v.get('capability') == 'unsupported') for cap, v in captures.values()))
         if not unsupported:
             expected.add('tip' + str(ep))
-    if c == 1:
+    if c == 1 and (initial is None or initial['firstRound']):
         expected.update(('history0', 'history1'))
     for ordinal in range(1, c + 1):
         opening = [v for cap, v in captures.values() if cap['usable'] and cap['job']['cycle'] == ordinal and (cap['job']['phase'] == 'open')]
         if len(opening) == 2 and any((h['transactions'] for h in opening)):
             shared = set(opening[0]['transactions']) & set(opening[1]['transactions'])
-            if ordinal == c and shared:
+            if ordinal == c and shared and (initial is None or initial['firstRound']):
                 expected.update((k + str(ep) for k in ('transaction', 'receipt') for ep in (0, 1)))
             break
     if set(sample['calls']) != expected:

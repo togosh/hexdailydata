@@ -14,13 +14,15 @@ from audit import audit_round
 def recorded(s, name, value):
     s.storage.json(s.root / name, value)
 
-def run_cycles(s, maximum, exchange):
+def run_cycles(s, maximum, exchange, initial=None):
     for ep in (0, 1):
         s.request(job(ep, 'eth_chainId', []))
     last_start = None
-    previous = 27720851
-    end = 2498
-    tail = BASE_TAIL[:]
+    from protocol import initial_ledger
+    initial = initial_ledger(initial)
+    previous = initial['number']
+    end = initial['end']
+    tail = initial['tail'][:]
     accepted = []
     for cycle in range(1, maximum + 1):
         if last_start is not None:
@@ -106,7 +108,7 @@ def run_cycles(s, maximum, exchange):
         tail = (tail + update['ledgerAppend']['words'])[-2:]
         end = d
         previous = number
-    return {'status': 'COMPLETE_FINITE_TRIAL', 'rounds': len(accepted), 'integrityClosed': True, 'ledgerEnd': end, 'appendedDays': end - 2498}
+    return {'status': 'COMPLETE_FINITE_TRIAL', 'rounds': len(accepted), 'integrityClosed': True, 'ledgerEnd': end, 'appendedDays': end - initial['end']}
 
 def execute(mode, output, binding_path, test_transport=None, test_clock=None, test_sleep=None, test_exchange=None):
     root = Path(output).resolve()

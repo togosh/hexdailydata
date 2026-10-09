@@ -50,7 +50,12 @@ def run_window(s, index, base, exchange, seen):
         opening_base = rpc('base-open', plan['base']['number'])
         agree(opening_base, plan['base'])
     opening = rpc('target-open', w['targetNumber'])
-    target = agree(opening, plan['finalTarget'] if index == len(plan['windows']) else None)
+    target = agree(opening, plan['finalTarget'] if index == len(plan['windows']) and plan['finalTarget'].get('hash') is not None else None)
+    if plan.get('combinedJob'):
+        if len(plan['windows']) != 1 or target['number'] != 27754425:
+            raise Stop('Combined exact participant target')
+        plan['finalTarget'] = target
+        s.storage.json(s.root / 'RESOLVED_PLAN.json', plan)
     reference = getattr(s, 'reference', None) if index == 1 else None
     if reference is not None and target != reference['target']:
         raise Stop('R1 first-target header drift')
@@ -140,7 +145,7 @@ def run_window(s, index, base, exchange, seen):
             affected[sid] = owner
             children.append((link, child))
     seen['parents'].update(affected)
-    if len(seen['parents']) > 50000:
+    if len(seen['parents']) > (10000 if plan.get('combinedJob') else 50000):
         raise Stop('Session affected-parent ceiling')
     parents = {}
     parent_prov = {}

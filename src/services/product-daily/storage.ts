@@ -14,6 +14,7 @@ import {
 import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { isDeepStrictEqual } from 'node:util';
 import { digest, type ProductMetadata } from '../../contracts/product-daily.ts';
 import { hash, stable } from '../../history-bootstrap/normalize.ts';
 import { applyMarketUpdate, marketJournalEntry, migrateMarketMetadata } from './market.ts';
@@ -543,6 +544,24 @@ export async function verifyMarketCertificate(
     previous.version !== state.seed.version
   )
     throw Error('MARKET_READER_SEED');
+}
+
+/** Known-owner recovery must match the exact saved intent, not any later certified product. */
+export async function verifyStoredTransition(
+  root: string,
+  next: AdmittedProduct,
+  previous: AdmittedProduct,
+  update: unknown,
+) {
+  await verifyMarketCertificate(root, next, previous);
+  const sequence = next.metadata.marketStorage?.sequence;
+  if (!sequence) throw Error('RECOVERY_TRANSITION_SEQUENCE');
+  const record = await journalRecord(root, sequence);
+  if (
+    !isDeepStrictEqual(record.previousGeneration, ptr(previous)) ||
+    !isDeepStrictEqual(record.update, update)
+  )
+    throw Error('RECOVERY_TRANSITION_INTENT');
 }
 
 /** Invoked only after existing frozen source checks. Transaction failure never clears ownership. */

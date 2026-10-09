@@ -7,6 +7,9 @@ from protocol import validate_job, validate_rpc, capacity, objects, compare_head
 
 def audit_captures(root, state):
     root = Path(root)
+    if state.get('combinedJob'):
+        from combined import audit_reservations
+        audit_reservations(root, state, capacity)
     ledger = [strict_json(x) for x in (root / 'LEDGER.jsonl').read_bytes().splitlines()]
     if len(ledger) != state['attempts'] or state['pending'] is not None:
         raise ValueError('Unsettled capture ledger')
@@ -178,9 +181,11 @@ def audit_round(root, sample, state):
         raise ValueError('Both chains required exactly once')
     if [cap['job']['endpoint'] for cap, v in entries] != [0, 1]:
         raise ValueError('Entry identity order')
-    end = 2498
-    tail = BASE_TAIL[:]
-    previous = 27720851
+    from protocol import initial_ledger
+    initial = initial_ledger(strict_json((root / 'ADMISSION.json').read_bytes())['initial']['protocol'] if state.get('combinedJob') else None)
+    end = initial['end']
+    tail = initial['tail'][:]
+    previous = initial['number']
     last_start = None
     previous_close = max((cap['attempt'] for cap, v in entries))
     c = sample['cycle']

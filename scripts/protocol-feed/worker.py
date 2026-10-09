@@ -27,6 +27,11 @@ def main():
     if q['phase'] not in ('entry', 'head'):
         suffix = 'RANGE' if q['phase'] in ('range', 'first', 'last', 'close-global') else 'PIN' if q['method'] == 'eth_call' else 'BINDING'
         cycle = strict_json((root / f"CYCLE_{q['cycle']}_{suffix}.json").read_bytes())
+        if admission.get('combinedJob'):
+            from protocol import initial_ledger
+            seed = initial_ledger(admission['initial']['protocol'])
+            if q['cycle'] != 1 or cycle['end'] != seed['end'] or cycle['number'] <= seed['number']:
+                raise ValueError('Admitted protocol predecessor changed')
         if q['method'] == 'eth_getBlockByNumber' and int(q['params'][0], 16) != cycle['number']:
             raise ValueError('Unselected number')
         if q['method'] == 'eth_getCode' and int(q['params'][1], 16) != cycle['number']:

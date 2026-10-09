@@ -16,10 +16,13 @@ def audit(root,synthetic=False,active=False):
     from collector import source_binding
     root=Path(root);read=lambda n:strict_json((root/n).read_bytes())
     result=read('CHECKPOINT.json' if active else 'RESULT.json');state=read('ACCOUNTING.json');admission=read('ADMISSION.json')
+    if state.get('combinedJob'):
+        from combined import audit_reservations
+        audit_reservations(root,state,response_capacity)
     if admission['sourceFiles']!=source_binding():raise ValueError('Admission/source binding changed')
     if not synthetic:
         if state['mode']!='OWNER_AUTHORIZED_PUBLIC':raise ValueError('Synthetic data cannot publish')
-    if result['accounting']!=state or result['networkSessionCount']!=1:raise ValueError('Result/accounting mismatch')
+    if result['accounting']!=state or result['networkSessionCount']!=(0 if state.get('combinedJob') else 1):raise ValueError('Result/accounting mismatch')
     caps=[strict_json(x) for x in (root/'LEDGER.jsonl').read_bytes().splitlines()];by={};gaps=[]
     sums=dict(attempts=len(caps),chargedBytes=0,observedBytes=0,chargedEntities=0,extraAttempts=0,returnedEntities=0,unknownEntityReservations=0)
     for i,c in enumerate(caps,1):

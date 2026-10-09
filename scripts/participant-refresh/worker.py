@@ -22,6 +22,11 @@ def gate(request, nonce):
     if digest(plan_raw) != admission['planSha256']:
         raise ValueError('Frozen plan changed')
     plan = strict_json(plan_raw)
+    if plan.get('combinedJob') and (root / 'RESOLVED_PLAN.json').exists():
+        resolved = strict_json((root / 'RESOLVED_PLAN.json').read_bytes())
+        if {**resolved, 'finalTarget': plan['finalTarget']} != plan or resolved['finalTarget']['number'] != plan['finalTarget']['number']:
+            raise ValueError('Resolved target altered frozen plan')
+        plan = resolved
     plan_valid(plan)
     q = strict_json(request.read_bytes())['job']
     method, url, body = validate_job(q, plan)

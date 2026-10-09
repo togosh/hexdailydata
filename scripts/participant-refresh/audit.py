@@ -10,10 +10,14 @@ from retry_schedule import enabled, VERSION, WAITS, COUNTERS, ControlReplay, slo
 def audit_captures(root, plan, state, window=None, terminal=False):
     root = Path(root)
     r2 = enabled(plan)
+    combined = bool(plan.get('combinedJob'))
+    if combined:
+        from combined import audit_reservations
+        audit_reservations(root, state, capacity)
     if r2 and (state.get('retryScheduleVersion') != VERSION or state.get('retrySchedule') != plan['retry']):
         raise ValueError('Schedule identity')
     control_replay = ControlReplay()
-    reference = strict_json((root / 'R1_COMPARISON.json').read_bytes()) if r2 and state['mode'] == 'OWNER_AUTHORIZED_PUBLIC' else None
+    reference = strict_json((root / 'R1_COMPARISON.json').read_bytes()) if r2 and not combined and state['mode'] == 'OWNER_AUTHORIZED_PUBLIC' else None
     if reference is not None:
         binding = strict_json((root.parent / 'PREFLIGHT.json').read_bytes())
         if digest((root / 'R1_COMPARISON.json').read_bytes()) != binding['inputFiles'].get('R1_COMPARISON.json'):
@@ -28,7 +32,7 @@ def audit_captures(root, plan, state, window=None, terminal=False):
     for number, line in enumerate(lines, 1):
         cap = strict_json(line)
         q = cap['job']
-        if r2:
+        if r2 and not combined:
             controls = control_replay.before(q, cap['retry'])
             reservation = strict_json((root / 'reservations' / f'{number:05d}.json').read_bytes())
             counters = {k: (list(endpoints) if k == 'rpcEndpointAttempts' else totals[k]) for k in COUNTERS}

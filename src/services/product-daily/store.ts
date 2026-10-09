@@ -207,6 +207,20 @@ export class ProductDailyStore {
     if (!this.current) throw Error('PRODUCT_NOT_INITIALIZED');
     return this.current;
   }
+  /** Registry validation precedes this final disk/pair check; held snapshots stay immutable. */
+  async adoptCoordinated(next: AdmittedProduct, pair: ProductPair) {
+    if (this.selecting || this.writer) throw Error('PRODUCT_SELECTION_BUSY');
+    if (!same(next.metadata.pair, pair)) throw Error('PRODUCT_MIXED_PAIR');
+    const disk = pointerSchema.parse(
+      JSON.parse((await bounded(join(this.root, 'CURRENT.json'), 4096)).toString()),
+    );
+    if (!same(disk, { version: next.version, manifestSha256: next.manifestSha256 }))
+      throw Error('PARTICIPANT_PRODUCT_POINTER');
+    await verifyMarketCertificate(this.root, next, this.current);
+    if (this.current) preserveMarketHistory(this.current, next);
+    this.current = next;
+    this.pair = pair;
+  }
   assertWriter(lease: ProductWriter) {
     if (this.writer?.lease !== lease) throw Error('PRODUCT_WRITER_OWNERSHIP');
   }

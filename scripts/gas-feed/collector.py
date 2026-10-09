@@ -14,13 +14,13 @@ from audit import audit_round
 def recorded(s, name, value):
     s.storage.json(s.root / name, value)
 
-def run_cycles(s, maximum, exchange):
+def run_cycles(s, maximum, exchange, initial=None):
     for ep in (0, 1):
         s.request(job(ep, 'eth_chainId', []))
     last_start = None
-    previous = 27720851
+    previous = initial['number'] if initial else 27720851
     skip_tips = set()
-    witness_done = False
+    witness_done = bool(initial and not initial['firstRound'])
     accepted = []
     recorded(s, 'DENOMINATION_REFERENCE.json', denomination_witness())
     for cycle in range(1, maximum + 1):
@@ -40,12 +40,14 @@ def run_cycles(s, maximum, exchange):
             return value
         heads = [ask('head' + str(ep), ep, 'eth_getBlockByNumber', ['latest', False], 'head') for ep in (0, 1)]
         number = min((h['number'] for h in heads)) - 2
-        if number <= previous:
+        if previous is not None and number <= previous:
             raise Stop('Context did not advance; no alternative block/head hunt')
         recorded(s, f'CYCLE_{cycle}_BINDING.json', {'number': number, 'latest': [h['number'] for h in heads], 'cycleStartOffsetSeconds': s.cycle_started - s.started})
         s.controls = [job(ep, 'eth_getBlockByNumber', [hex(number), False], cycle, 'close') for ep in (0, 1)]
         opening = [ask('open' + str(ep), ep, 'eth_getBlockByNumber', [hex(number), False], 'open') for ep in (0, 1)]
         compare_headers(*opening)
+        if initial and opening[0]['timestamp'] <= __import__('datetime').datetime.fromisoformat(initial['observedAtUtc'].replace('Z','+00:00')).timestamp():
+            raise Stop('Context did not advance past admitted gas observation')
         age = time.time() - opening[0]['timestamp']
         if not 0 <= age <= 300:
             raise Stop('Context not plausible/nonfuture within 300 seconds')
@@ -57,7 +59,7 @@ def run_cycles(s, maximum, exchange):
             tip = ask('tip' + str(ep), ep, 'eth_maxPriorityFeePerGas', [], 'sample')
             if isinstance(tip, dict) and tip.get('capability') == 'unsupported':
                 skip_tips.add(ep)
-        if cycle == 1:
+        if cycle == 1 and (initial is None or initial['firstRound']):
             for ep in (0, 1):
                 ask('history' + str(ep), ep, 'eth_feeHistory', ['0x10', hex(number), [10, 50, 90]], 'history')
         if not witness_done and any((h['transactions'] for h in opening)):
