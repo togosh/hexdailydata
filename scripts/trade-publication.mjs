@@ -170,6 +170,7 @@ export async function publishTrade(store, output, message, active, publish, reta
       qualified: false,
       cycle: c,
       reason: 'Empty or stale valid pair; last-good retained',
+      ...(profile.cycles === 16 ? { sourceResult: !btc.selected || !eth.selected ? 'EMPTY' : 'STALE' } : {}),
       previous: before.version,
     };
   const auditRaw = await readFile(join(output, auditName));

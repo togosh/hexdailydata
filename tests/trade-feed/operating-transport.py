@@ -53,9 +53,11 @@ def setup(replies,new=True):
             def getresponse(self):
                 r=self.response_class(Socket(item));r.begin();return r
             def close(self):pass
-        perform_request(q,a,Path(args[-1]).parent,worker.perform,clock.wall,Connection)
+        exit_code=0
+        try:perform_request(q,a,Path(args[-1]).parent,worker.perform,clock.wall,Connection)
+        except ValueError:exit_code=1  # Injected native child returned a known exception/reap.
         clock.t+=.1
-        return {'reaped':True,'timeout':False,'interrupted':None,'exit':0,'seconds':.1,'stdout':'','stderr':''}
+        return {'reaped':True,'timeout':False,'interrupted':None,'exit':exit_code,'seconds':.1,'stdout':'','stderr':''}
     s=Session(root,a,runner,clock.mono,clock.wall,clock.sleep)
     return s,calls
 def run(name,fn):
@@ -209,11 +211,44 @@ def limits():
     finish(s,c)
     a={'authorityTaskId':COOKIE_AUTHORITY,'responseCookiePolicyId':COOKIE_POLICY,'tradeProfileId':OPERATING_PROFILE_ID,'job':'trade-operating-16-slots','startedAtUnixSeconds':100000}
     q={'url':URLS[1],'label':'BTC_1','retryOrdinal':0,'tradeProfileId':OPERATING_PROFILE_ID,'dispatchByUnixSeconds':101135,'slotDispatchByUnixSeconds':100005}
-    reached=[]
-    refused(lambda:perform_request(q,a,T/'fixtures',lambda *args:reached.append(True),lambda:100006))
+    reached=[];q.update(nonce='synthetic',attempt=1)
+    folder=Path(tempfile.mkdtemp(prefix='deadline-',dir=T/'fixtures'));save(folder/'request.json',q)
+    refused(lambda:perform_request(q,a,folder,lambda *args:reached.append(True),lambda:100006))
     assert not reached
     for patch in [{'authorityTaskId':ISOLATION_AUTHORITY},{'tradeProfileId':'other'},{'job':'trade-three-slots'}]:refused(lambda:trade_profile({**a,**patch}))
     assert trade_profile({})['attempts']==14
 run('66 physical attempts/33 extras, late profile boundary, no-refund local skip and cross-authority refusal',limits)
+def worker_skip_composed():
+    global perform_request
+    original=perform_request
+    s,c=setup([response(body=b'[]')]*33)
+    def delayed(q,*args,**kwargs):
+        if q['label']=='BTC_2':s.sleep(6)
+        return original(q,*args,**kwargs)
+    perform_request=delayed
+    try:
+        outcomes=collect(s,lambda kind,cycle,**extra:{'outcome':'QUALIFIED'},s.mono,s.sleep)
+    finally:perform_request=original
+    assert len(outcomes)==16 and outcomes[1]['status']=='SKIPPED' and outcomes[2]['status']=='QUALIFIED'
+    assert s.state['attempts']==32 and s.state['extras']==0 and s.state['chargedBytes']==32*RESERVATION
+    row=s.state['requests'][3]
+    assert row['localSlotMissed'] and row['closed'] and row['chargedObjects']==20000 and not row['networkConnectionBegan']
+    assert not row['integrityFailure'] and row['failureKind']=='local-slot-missed'
+    assert len(c)==31 and s.state['pending'] is None
+    finish(s,c)
+    # A forged/inconsistent skip does not erase a response or become a scheduler no-op.
+    for kind in ['response','nonce','unknown']:
+        s,c=setup([response(body=b'[]')]);runner=s.runner
+        def inconsistent(args,env,*rest):
+            life=runner(args,env,*rest);p=Path(args[-1]);q=strict_json(p.read_bytes())
+            save(p.parent/'LOCAL_SLOT_SKIP.json',{'requestSha256':digest(p.read_bytes()),'nonce':'wrong' if kind=='nonce' else q['nonce'],
+                'attempt':q['attempt'],'beforeNetworkDispatch':True,'reason':'Slot deadline expired before native network dispatch'})
+            if kind=='unknown':life['reaped']=False
+            return life
+        s.runner=inconsistent
+        refused(lambda:s.get(URLS[1],'BTC_1',slot_deadline=5));assert s.state['extras']==0
+        assert not s.state['requests'][0].get('localSlotMissed')
+        finish(s,c)
+run('composed worker preparation miss -> charged closed Session -> collector later slot; inconsistent certificate refusal',worker_skip_composed)
 save(T/'evidence/OPERATING_TRANSPORT.json',{'status':'PASS','synthetic':True,'publicRequests':0,'baseAdmissions':0,'apiListeners':0,'hardNetworkDenied':True,'cases':cases,'fixtures':results})
 print(json.dumps({'status':'PASS','groups':len(cases),'fixtureCount':len(results),'externalRequests':0}))

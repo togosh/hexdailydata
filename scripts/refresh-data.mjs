@@ -582,7 +582,7 @@ export async function runJob({
             if (!publication.qualified) {
               outcomes.push({ cycle: m.cycle, status: 'UNQUALIFIED', publication });
               await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
-              await observeSlot(m.cycle, 'UNQUALIFIED', 'retained', check);
+              await observeSlot(m.cycle, publication.sourceResult ?? 'UNQUALIFIED', 'retained', check);
               check();
               child.stdin.write(JSON.stringify({ ...answer, outcome: 'UNQUALIFIED' }) + '\n');
               return;

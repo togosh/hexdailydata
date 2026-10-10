@@ -23,6 +23,7 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
     if a.get('tradeProfileId') and q.get('tradeProfileId') != a['tradeProfileId']:
         raise ValueError('Worker operating profile binding')
     slot_deadline=q.get('slotDispatchByUnixSeconds')
+    network_dispatched=False
     if slot_deadline is not None:
         from authority import OPERATING_AUTHORITY
         if a.get('authorityTaskId')!=OPERATING_AUTHORITY or q['retryOrdinal']!=0 or not q['label'].startswith('BTC_') or slot_deadline>deadline:
@@ -32,6 +33,11 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
         if clock() >= deadline:
             raise ValueError('Dispatch deadline')
         if slot_deadline is not None and clock()>slot_deadline:
+            if not network_dispatched:
+                from durable import save, digest
+                save(folder/'LOCAL_SLOT_SKIP.json',{'requestSha256':digest((folder/'request.json').read_bytes()),
+                     'nonce':q['nonce'],'attempt':q['attempt'],'beforeNetworkDispatch':True,
+                     'reason':'Slot deadline expired before native network dispatch'})
             raise ValueError('Slot dispatch deadline')
 
     def phase(name):
@@ -47,9 +53,11 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
             phase('connection_object_ready')
 
         def connect(self):
+            nonlocal network_dispatched
             gate()
             phase('dns_tcp_tls_connection_begin')
             gate()  # Durable diagnostics may stall; do not dispatch after them unchecked.
+            network_dispatched=True
             super().connect()
             phase('dns_tcp_tls_connection_complete')
 

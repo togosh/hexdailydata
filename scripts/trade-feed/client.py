@@ -108,11 +108,23 @@ class Session:
             phases=[]
             integrity=None;complete=False;count=20000
             transport_complete=False;ignored_cookies=0;auth_challenges=0
+            local_skip=False
             try:
                 if len(phase_raw)>8192 or diagnostics>16384:raise ValueError('Diagnostic bound')
                 phases=[strict_json(line) for line in phase_raw.splitlines()]
                 if meta.get('synthetic') is True:raise ValueError('Synthetic capture refused')
                 if len(headers)>HEADER or len(raw)+(len(framing) if framing else 0)>CAP:raise ValueError('Capture size')
+                skip_path=folder/'LOCAL_SLOT_SKIP.json'
+                if skip_path.exists():
+                    proof=strict_json(skip_path.read_bytes())
+                    expected={'requestSha256':digest(request.read_bytes()),'nonce':q['nonce'],'attempt':q['attempt'],
+                              'beforeNetworkDispatch':True,'reason':'Slot deadline expired before native network dispatch'}
+                    if (proof!=expected or not closed or ordinal!=0 or slot_deadline is None or not self.cookie_policy
+                            or raw or framing or headers or meta.get('status') is not None or meta.get('complete')
+                            or life['timeout'] or meta.get('failureKind') not in (None,'terminal')
+                            or (meta.get('error') and meta['error']!='ValueError: Slot dispatch deadline')):
+                        raise ValueError('Inconsistent local slot-skip certificate')
+                    local_skip=True
                 if meta.get('complete'):
                     verify_framing(meta,raw,CAP,framing)
                     if meta.get('headerBytes')!=len(headers):raise ValueError('Header receipt')
@@ -134,7 +146,7 @@ class Session:
                         if meta.get('status')==200:raise
                         count=20000
             except BaseException as e:integrity=str(e)
-            if meta.get('failureKind')=='terminal':integrity=meta.get('error','Terminal transport')
+            if meta.get('failureKind')=='terminal' and not local_skip:integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
             isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, OPERATING_AUTHORITY)
@@ -143,6 +155,8 @@ class Session:
             if self.cookie_policy:
                 row.update(responseCookiePolicyId=self.cookie_policy,ignoredResponseCookieCount=ignored_cookies,
                            authenticationChallengeCount=auth_challenges,transportComplete=transport_complete)
+            if local_skip:
+                row.update(localSlotMissed=True,localSlotSkipSha256=digest(skip_path.read_bytes()),failureKind='local-slot-missed')
             save(folder/'AUDIT.json',row)
             s['diagnosticBytes']+=diagnostics
             s['requests'].append(row);s['chargedObjects']+=count;s['observedBodyBytes']+=len(raw);s['observedWireBytes']+=row['wireBytes'];s['observedHeaderBytes']+=len(headers)
@@ -152,6 +166,7 @@ class Session:
             if not closed:raise ValueError('Native closure unknown')
             if life['seconds']>30:raise ValueError('Request lifecycle deadline')
             if integrity:raise ValueError('Integrity: '+integrity)
+            if local_skip:raise SlotMissed('Worker preparation exceeded slot before network dispatch')
             if complete and meta.get('status')==200 and life['exit']==0 and not life['timeout']:
                 return {'attempt':s['attempts'],'bodySha256':row['bodySha256'],'bodyBytes':len(raw),'objects':count}
             if ordinal==0 and retryable(row, require_network_begin=isolated_grant):continue
