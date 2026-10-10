@@ -11,8 +11,11 @@ import https from 'node:https';
 import { syncBuiltinESMExports } from 'node:module';
 import { closeOwned, digest } from './control.mjs';
 const R = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2`;
-const T = join(R, 'operating-refresh-r1'),
-  C = join(T, 'offline-recovery-r1');
+const completing = ['settle-completed-reviewed', 'finalize-completed-reviewed'].includes(
+  process.argv[2],
+);
+const T = join(R, completing ? 'operating-refresh-r2' : 'operating-refresh-r1'),
+  C = join(T, completing ? 'offline-closure-recovery-r1' : 'offline-recovery-r1');
 const read = async (p) => JSON.parse(await fs.readFile(p));
 const put = (p, v) => fs.writeFile(p, JSON.stringify(v, null, 2) + '\n');
 const save = (n, v) => put(join(C, 'evidence', n + '.json'), v);
@@ -99,9 +102,9 @@ async function run() {
   };
   syncBuiltinESMExports();
   await fs.mkdir(join(C, 'temp'), { recursive: true });
-  const { abortClosedTradePublication } =
+  const { abortClosedTradePublication, settleClosedOperatingCompletion } =
     await import('../../scripts/trade-publication-recovery.mjs');
-  if (process.argv[2] === 'recover-reviewed') {
+  if (['recover-reviewed', 'settle-completed-reviewed'].includes(process.argv[2])) {
     const f = await fs.open(join(C, 'RECOVERY_ADMISSION.json'), 'wx');
     try {
       await f.writeFile(
@@ -117,12 +120,19 @@ async function run() {
     } finally {
       await f.close();
     }
-    const receipt = await abortClosedTradePublication(plan);
+    const receipt = await (
+      completing ? settleClosedOperatingCompletion : abortClosedTradePublication
+    )(plan);
     await save('RECOVERY_RESULT', receipt);
-    console.log('OFFLINE_RECOVERY_ABORT_SETTLED');
+    console.log(
+      completing ? 'OFFLINE_COMPLETED_SESSION_SETTLED' : 'OFFLINE_RECOVERY_ABORT_SETTLED',
+    );
   } else {
     const receipt = await read(join(C, 'evidence/RECOVERY_RESULT.json'));
-    assert.equal(receipt.outcome, 'ABORTED_BEFORE_PRODUCT');
+    assert.equal(
+      receipt.outcome,
+      completing ? 'COMPLETED_SESSION_LOCK_RETIRED' : 'ABORTED_BEFORE_PRODUCT',
+    );
     assert.deepEqual(receipt.selected, plan.selected);
   }
   // Reuse exact external bases once for the application and final restore.
@@ -137,19 +147,20 @@ async function run() {
   const profile = await read(join(C, 'reference/SELECTED_PROFILE.json'));
   const path = join(C, 'evidence/BASE_ADMISSIONS.json');
   const ledger = await read(path).catch((e) => {
-    if (e.code === 'ENOENT') return { prior: 9, maximum: 14, additional: [] };
+    if (e.code === 'ENOENT') return { prior: completing ? 11 : 9, maximum: 14, additional: [] };
     throw e;
   });
   assert(ledger.additional.every((a) => a.status === 'CLOSED'));
-  assert(ledger.additional.length < 5);
-  const ordinal = 10 + ledger.additional.length,
+  assert.equal(ledger.prior, completing ? 11 : 9);
+  assert(ledger.additional.length < (completing ? 3 : 5));
+  const ordinal = ledger.prior + 1 + ledger.additional.length,
     entry = { ordinal, status: 'OPENING', pid: process.pid, atUtc: new Date().toISOString() };
   ledger.additional.push(entry);
   await put(path, ledger);
   const budget = createBudget(join(C, 'evidence'), {
-    attempts: 378,
-    bytes: 533331968,
-    apiSeconds: 2095.2533651,
+    attempts: completing ? 367 : 378,
+    bytes: completing ? 526843904 : 533331968,
+    apiSeconds: completing ? 1491.9044962 : 2095.2533651,
   });
   let base, registry, f, held, heldExport, final, failure;
   try {
@@ -165,7 +176,7 @@ async function run() {
     registry = await ParticipantRegistry.open(profile.participantRoot, profile.productRoot, base);
     const seed = registry.productDaily.capture();
     assert.equal(seed.version, plan.selected.version);
-    assert.equal(seed.metadata.marketStorage.sequence, 28);
+    assert.equal(seed.metadata.marketStorage.sequence, completing ? 44 : 28);
     held = registry.capture();
     heldExport = registry.productDaily.openExport(
       held.product,
@@ -218,7 +229,7 @@ async function run() {
       version: seed.version,
       manifestSha256: seed.manifestSha256,
       csvSha256: sha(seed.csv),
-      sequence: 28,
+      sequence: completing ? 44 : 28,
       pricesUnchanged: true,
     });
   } catch (e) {
@@ -275,7 +286,15 @@ async function run() {
   console.log('OFFLINE_FINAL_PROOF_PASS');
 }
 if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
-  if (['recover-reviewed', 'finalize-reviewed'].includes(process.argv[2])) await run();
+  if (
+    [
+      'recover-reviewed',
+      'finalize-reviewed',
+      'settle-completed-reviewed',
+      'finalize-completed-reviewed',
+    ].includes(process.argv[2])
+  )
+    await run();
   else
     console.log(
       'Offline default. Explicit reviewed owner entry only; no providers, bases or mutation.',

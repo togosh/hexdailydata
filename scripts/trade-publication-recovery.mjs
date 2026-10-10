@@ -320,3 +320,345 @@ export async function abortClosedTradePublication(unknownPlan, { phase = async (
     }
   }
 }
+
+// Separate owner-authorized settlement of a fully committed Operating R2 trial.
+// The old abort contract above remains unchanged. This never replays a price.
+const completionKeys = [
+  'participantCurrent',
+  'marketLock',
+  'productCurrent',
+  'storage',
+  'certificate',
+  'ownerClosure',
+];
+const completionSessionNames = [
+  'ADMISSION.json',
+  'ACCOUNTING.json',
+  'RESULT.json',
+  'TRIAL_FINAL.json',
+  ...Array.from({ length: 16 }, (_, i) => i + 1).flatMap((i) => [
+    `WINDOW_${i}_UPDATE.json`,
+    `WINDOW_${i}_AUDIT.json`,
+    `PUBLICATION_${i}.json`,
+    `SERVICE_${i}.json`,
+  ]),
+];
+const completionSchema = z.strictObject({
+  format: z.literal('closed-operating-completion-1'),
+  root: z.string(),
+  productRoot: z.string(),
+  sessionRoot: z.string(),
+  ownerClosurePath: z.string(),
+  recoveryId: z.uuid(),
+  pid: z.number().int().positive(),
+  sequence: z.literal(44),
+  initialSequence: z.literal(28),
+  selected: z.strictObject({ version: digest, manifestSha256: digest }),
+  initial: z.strictObject({ version: digest, manifestSha256: digest }),
+  pair: PairSchema,
+  hashes: z.strictObject(Object.fromEntries(completionKeys.map((k) => [k, digest]))),
+  sessionHashes: z.strictObject(Object.fromEntries(completionSessionNames.map((k) => [k, digest]))),
+});
+function completionPaths(p) {
+  return {
+    participantCurrent: join(p.root, 'CURRENT.json'),
+    marketLock: join(p.productRoot, 'MARKET_REFRESH.lock'),
+    productCurrent: join(p.productRoot, 'CURRENT.json'),
+    storage: join(p.productRoot, 'STORAGE.json'),
+    certificate: join(p.productRoot, `verified-${p.selected.version}.json`),
+    ownerClosure: p.ownerClosurePath,
+  };
+}
+async function verifyCompletion(p, owned = false) {
+  for (const root of [p.root, p.productRoot, p.sessionRoot])
+    if (
+      resolve(root) !== root ||
+      (await realpath(root)) !== root ||
+      (await lstat(root)).isSymbolicLink()
+    )
+      throw Error('COMPLETION_ROOT_ALIAS');
+  dead(p.pid);
+  const found = {},
+    session = {};
+  for (const [k, path] of Object.entries(completionPaths(p))) {
+    const b = await raw(path);
+    if (sha(b) !== p.hashes[k]) throw Error('COMPLETION_BINDING:' + k);
+    found[k] = JSON.parse(b);
+  }
+  for (const n of completionSessionNames) {
+    const b = await raw(join(p.sessionRoot, n), 524288);
+    if (sha(b) !== p.sessionHashes[n]) throw Error('COMPLETION_SESSION_BINDING:' + n);
+    session[n] = JSON.parse(b);
+  }
+  const { participantCurrent, productCurrent, marketLock, storage, ownerClosure } = found;
+  if (
+    marketLock.pid !== p.pid ||
+    marketLock.output !== p.sessionRoot ||
+    marketLock.taskId !== 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2' ||
+    !same(productCurrent, p.selected) ||
+    !same(participantCurrent.product, p.selected) ||
+    participantCurrent.generation !== p.pair.generation ||
+    !same(storage.current, p.selected) ||
+    !same(storage.journalSelected, p.selected) ||
+    storage.sequence !== p.sequence
+  )
+    throw Error('COMPLETION_OWNER_OR_POINTER');
+  for (const n of ['INTENT.json', ...(owned ? [] : ['RECOVERY.lock', 'SELECTION.lock'])])
+    if (await exists(join(p.root, n))) throw Error('COMPLETION_PARTICIPANT_PENDING');
+  for (const n of [
+    'PENDING.json',
+    'COMMITTED.json',
+    'RETENTION_PENDING.json',
+    'WRITER.lock',
+    'MAINTENANCE.lock',
+    ...(owned ? [] : ['SELECTION.lock']),
+  ])
+    if (await exists(join(p.productRoot, n))) throw Error('COMPLETION_PRODUCT_PENDING');
+  for (const root of [p.root, p.productRoot])
+    for (const n of await readdir(root))
+      if (n.startsWith('pending-')) throw Error('COMPLETION_STAGED_WRITE');
+  const a = session['ACCOUNTING.json'],
+    result = session['RESULT.json'],
+    trial = session['TRIAL_FINAL.json'],
+    admission = session['ADMISSION.json'];
+  if (
+    admission.authorityTaskId !== 'HDD-BTC-ETH-OPERATING-REFRESH-R2' ||
+    admission.jobRoot !== p.sessionRoot ||
+    admission.tradeProfileId !== 'operating-16-slots-v1' ||
+    !same(a, result.accounting) ||
+    a.status !== 'CLOSED' ||
+    a.pending !== null ||
+    a.closureKnown !== true ||
+    a.attempts !== 33 ||
+    a.logicalRequests !== 33 ||
+    a.extras !== 0 ||
+    a.chargedBytes !== 33 * 2162688 ||
+    a.requests.length !== 33 ||
+    result.status !== 'COMPLETE_FRESH_CYCLES' ||
+    result.cycles.length !== 16 ||
+    !result.cycles.every((c, i) => c.cycle === i + 1 && c.status === 'QUALIFIED') ||
+    trial.status !== 'PARTIAL' ||
+    trial.networkClosureKnown !== false ||
+    trial.networkSessionCount !== 1 ||
+    trial.failure !== 'Error: NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' ||
+    JSON.stringify({ type: 'closed', result }).length <= 32768 ||
+    ownerClosure.pid !== p.pid ||
+    !ownerClosure.known ||
+    !ownerClosure.base?.known ||
+    ownerClosure.errors.length ||
+    ownerClosure.base.errors.length ||
+    ownerClosure.failure?.error !== 'Error: UNKNOWN_CLOSURE_OR_PUBLICATION'
+  )
+    throw Error('COMPLETION_CLOSURE_EVIDENCE');
+  for (let i = 0; i < a.requests.length; i++) {
+    const q = a.requests[i],
+      asset = i % 2 ? 'BTC' : 'ETH',
+      cycle = Math.ceil(i / 2);
+    const url =
+      i === 0
+        ? 'https://www.bitstamp.net/api/v2/markets/'
+        : `https://www.bitstamp.net/api/v2/transactions/${asset.toLowerCase()}usd/?time=minute`;
+    if (
+      q.attempt !== i + 1 ||
+      q.method !== 'GET' ||
+      q.url !== url ||
+      q.label !== (i === 0 ? 'markets' : `${asset}_${cycle}`) ||
+      q.retryOrdinal !== 0 ||
+      !q.closed ||
+      !q.complete ||
+      q.status !== 200 ||
+      q.integrityFailure ||
+      !q.native?.reaped ||
+      q.native.timeout ||
+      q.native.interrupted ||
+      q.native.exit !== 0
+    )
+      throw Error('COMPLETION_REQUEST_CLOSURE');
+    const body = await raw(
+      join(p.sessionRoot, String(i + 1).padStart(2, '0'), 'response.body'),
+      2097152,
+    );
+    if (body.length !== q.bodyBytes || sha(body) !== q.bodySha256)
+      throw Error('COMPLETION_BODY_IDENTITY');
+  }
+  const product = await admitProduct(
+    join(p.productRoot, p.selected.version),
+    p.selected.manifestSha256,
+  );
+  if (
+    !same(product.metadata.pair, p.pair) ||
+    product.metadata.marketStorage?.sequence !== p.sequence
+  )
+    throw Error('COMPLETION_SELECTED_PRODUCT');
+  await verifyMarketCertificate(p.productRoot, product);
+  const journal = await auditJournal(p.productRoot),
+    records = [];
+  if (journal.sequence !== p.sequence) throw Error('COMPLETION_JOURNAL_SEQUENCE');
+  for (const n of (await readdir(join(p.productRoot, 'journal'))).sort())
+    for (const line of (await raw(join(p.productRoot, 'journal', n), 32 * 1024 ** 2))
+      .toString()
+      .trimEnd()
+      .split('\n'))
+      records.push(JSON.parse(line));
+  let previous = p.initial,
+    firstTime,
+    lastTime;
+  for (let i = 1; i <= 16; i++) {
+    const update = session[`WINDOW_${i}_UPDATE.json`],
+      audit = session[`WINDOW_${i}_AUDIT.json`],
+      pub = session[`PUBLICATION_${i}.json`],
+      service = session[`SERVICE_${i}.json`],
+      record = records.find((r) => r.sequence === p.initialSequence + i),
+      view = service.service;
+    if (
+      !record ||
+      !same(record.previousGeneration, previous) ||
+      !same(record.update, update) ||
+      !same(record.selected, pub.selected) ||
+      !same(record.captureReference, {
+        output: p.sessionRoot,
+        update: `WINDOW_${i}_UPDATE.json`,
+        updateSha256: p.sessionHashes[`WINDOW_${i}_UPDATE.json`],
+        audit: `WINDOW_${i}_AUDIT.json`,
+        auditSha256: p.sessionHashes[`WINDOW_${i}_AUDIT.json`],
+      }) ||
+      audit.status !== 'QUALIFIED' ||
+      audit.cycle !== i ||
+      audit.sessionAdmissionSha256 !== p.sessionHashes['ADMISSION.json'] ||
+      update.receiptSha256 !== p.sessionHashes[`WINDOW_${i}_AUDIT.json`] ||
+      !same(update.readings, audit.effectiveReadings) ||
+      update.liquidityHistory.length ||
+      update.readings.length !== 2 ||
+      pub.cycle !== i ||
+      !pub.qualified ||
+      !pub.changed ||
+      pub.previous !== previous.version ||
+      pub.updateSha256 !== p.sessionHashes[`WINDOW_${i}_UPDATE.json`] ||
+      !same(pub.values, update.readings) ||
+      service.cycle !== i ||
+      service.sourceResult !== 'QUALIFIED' ||
+      service.publicationResult !== 'changed' ||
+      service.selectedVersion !== pub.selected.version ||
+      view.status !== 'FRESH' ||
+      view.httpStatus !== 200 ||
+      view.pid !== p.pid ||
+      view.origin !== session['SERVICE_1.json'].service.origin ||
+      view.datasetVersion !== pub.selected.version ||
+      view.readerStatus.productVersion !== pub.selected.version
+    )
+      throw Error('COMPLETION_WINDOW_CHAIN');
+    for (const [ordinal, asset] of ['BTC', 'ETH'].entries()) {
+      const r = update.readings[ordinal],
+        captured = audit.captured[asset],
+        q = a.requests[2 * i - 1 + ordinal];
+      if (
+        r.asset !== asset ||
+        r.kind !== 'trade' ||
+        r.method !== 'bitstamp-recent-trade-usd-1' ||
+        !same(audit.assets[asset].selected, r) ||
+        captured.attempt !== q.attempt ||
+        captured.bodySha256 !== q.bodySha256 ||
+        view[asset].observedAtUtc !== r.observedAtUtc ||
+        view[asset.toLowerCase() + 'PriceUsd'] !== r.value ||
+        view[asset].status !== 'fresh' ||
+        !(view[asset].ageSeconds >= 0 && view[asset].ageSeconds <= 300)
+      )
+        throw Error('COMPLETION_SOURCE_AND_SERVICE');
+    }
+    const time = Date.parse(pub.publishedAt);
+    if (!Number.isFinite(time) || (lastTime !== undefined && time < lastTime))
+      throw Error('COMPLETION_PUBLICATION_TIME');
+    firstTime ??= time;
+    lastTime = time;
+    previous = pub.selected;
+  }
+  if (!same(previous, p.selected) || lastTime - firstTime < 300000)
+    throw Error('COMPLETION_FINAL_CHAIN');
+  return { journal, frontier: await frontierFiles(p.productRoot) };
+}
+export async function settleClosedOperatingCompletion(
+  unknownPlan,
+  { phase = async () => {} } = {},
+) {
+  const p = completionSchema.parse(unknownPlan),
+    bound = completionPaths(p);
+  const original = await verifyCompletion(p);
+  const target = join(p.root, `CLOSED_MARKET_REFRESH-${p.recoveryId}.json`),
+    intent = join(p.root, `RECOVERY_INTENT-${p.recoveryId}.json`),
+    receiptPath = join(p.root, `RECOVERY-${p.recoveryId}.json`);
+  const destinations = [target, intent, receiptPath];
+  for (const f of destinations) if (await exists(f)) throw Error('COMPLETION_DESTINATION_EXISTS');
+  const own =
+    canonical({ format: p.format, pid: process.pid, planSha256: sha(canonical(p)) }) + '\n';
+  const acquired = [];
+  let mutating = false,
+    complete = false;
+  try {
+    for (const path of [
+      join(p.root, 'RECOVERY.lock'),
+      join(p.root, 'SELECTION.lock'),
+      join(p.productRoot, 'SELECTION.lock'),
+    ]) {
+      const handle = await open(path, 'wx');
+      acquired.push([handle, path]);
+      await handle.writeFile(own);
+      await handle.sync();
+    }
+    const checked = await verifyCompletion(p, true);
+    if (!same(original, checked)) throw Error('COMPLETION_FRONTIER_DRIFT');
+    await phase('verified');
+    const late = await verifyCompletion(p, true);
+    if (!same(original, late)) throw Error('COMPLETION_LATE_DRIFT');
+    for (const f of destinations) if (await exists(f)) throw Error('COMPLETION_DESTINATION_EXISTS');
+    mutating = true;
+    await exclusive(intent, { format: p.format, plan: p, verified: late, providerRequests: 0 });
+    await phase('intent');
+    const originalLock = await raw(bound.marketLock);
+    if (sha(originalLock) !== p.hashes.marketLock) throw Error('COMPLETION_LOCK_DRIFT');
+    // Exclusive durable preservation avoids rename-overwrite races at the target.
+    const preserved = await open(target, 'wx');
+    try {
+      await preserved.writeFile(originalLock);
+      await preserved.sync();
+    } finally {
+      await preserved.close();
+    }
+    await phase('preserved');
+    if (
+      sha(await raw(target)) !== p.hashes.marketLock ||
+      sha(await raw(bound.marketLock)) !== p.hashes.marketLock
+    )
+      throw Error('COMPLETION_PRESERVATION_DRIFT');
+    await unlink(bound.marketLock);
+    await phase('retired');
+    for (const k of ['productCurrent', 'participantCurrent', 'storage', 'certificate'])
+      if (sha(await raw(bound[k])) !== p.hashes[k]) throw Error('COMPLETION_POST_POINTER_DRIFT');
+    if (!same(original.frontier, await frontierFiles(p.productRoot)))
+      throw Error('COMPLETION_POST_FRONTIER_DRIFT');
+    const receipt = {
+      format: p.format,
+      outcome: 'COMPLETED_SESSION_LOCK_RETIRED',
+      planSha256: sha(canonical(p)),
+      selected: p.selected,
+      sequence: p.sequence,
+      originalPid: p.pid,
+      originalHashes: p.hashes,
+      retiredFile: target,
+      selectedDataAndPointersUnchanged: true,
+      originalPartialUnchanged: true,
+      providerRequests: 0,
+      completedAtUtc: new Date().toISOString(),
+    };
+    await exclusive(receiptPath, receipt);
+    await phase('receipt');
+    complete = true;
+    return receipt;
+  } finally {
+    for (const [h] of acquired.reverse()) await h.close();
+    if (!mutating || complete)
+      for (const [, path] of acquired) {
+        if ((await raw(path)).toString() !== own) throw Error('COMPLETION_EXCLUSION_CHANGED');
+        await unlink(path);
+      }
+  }
+}
