@@ -116,9 +116,10 @@ async function main() {
     if(mode==='service-error')assert.equal(result.serviceChecks[1].service.status,'ERROR');
     cases.push({mode,hookCount,result});
   }
-  const {runOperatingTrades,runCookieTrades}=await import('../../scripts/trade-refresh.mjs');
+  const {runOperatingTrades,runOperatingR2Trades,runCookieTrades}=await import('../../scripts/trade-refresh.mjs');
   await assert.rejects(runCookieTrades({}),/EXISTING_OR_UNCERTAIN_TRADE_SESSION/);
-  await assert.rejects(runOperatingTrades({}),/ENOENT/);
+  if(isR2) { await assert.rejects(runOperatingTrades({}),/EXISTING_OR_UNCERTAIN/); await assert.rejects(runOperatingR2Trades({}),/ENOENT/); }
+  else await assert.rejects(runOperatingTrades({}),/ENOENT/);
   await put(join(T,'evidence/OPERATING_POLICY.json'),{status:'PASS',synthetic:true,publicRequests:0,baseAdmissions:0,apiListeners:0,hardNetworkDenied:true,
     limitation:'Tiny synthetic selection facade; actual coordinator, captured parser, publication and Live formatter used. Not the real paired readiness gate.',cases});
   console.log('OPERATING_POLICY_PASS');
