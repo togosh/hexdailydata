@@ -589,3 +589,24 @@ product/MARKET_REFRESH.lock; all owning processes have exited. Do not force
 unlock or activate a copied generation. A separately scoped conservative
 recovery must reconcile the intent and both pointers before further operation.
 The return's quarantined selected files are evidence, not a qualified backup.
+
+The later authorized offline recovery is now complete. The exact closed intent
+was aborted before product commit, with original bytes retained in participant
+root CLOSED_INTENT/CLOSED_LOCK/CLOSED_MARKET_REFRESH records and durable recovery
+receipts. No active recovery/writer lock remains. Both CURRENT pointers, selected
+five-file product and certificate stayed byte-identical; backup accounting alone
+advanced the storage operation counter. The strict ordinary writer guard remains.
+
+`scripts/trade-publication-recovery.mjs` exports the narrow hash-bound offline
+settlement; it is not a generic unlock or provider entry. Default invocation of
+`tests/trade-feed/recovery-owner.mjs` is offline. Its exact `recover-reviewed`
+entry is consumed and must not be repeated. An interrupted recovery retains its
+new exclusion lock and durable intent; neither PID age nor elapsed time permits
+deletion. Active/unknown owners, changed pointers, pending work, journal drift,
+hardlinks and destination collisions refuse settlement.
+
+The offline-recovery-r1 return contains a genuine compact paired backup, verified
+restore and exact read-only external-base references. Restore needs those bases
+and a new destination; it does not create fresh observations or grant acquisition.
+The saved sequence-28 quotes are stale. No scheduler or additional public run
+was installed or started, and the original operating trial remains partial.

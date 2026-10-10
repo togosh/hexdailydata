@@ -76,3 +76,13 @@ correction passed actual isolated storage tests; legacy ROUND_1..3 stays exact.
 All quiet-feed values/times, participant generation and fixed closes passed
 read-only preservation. The retained paired intent prevents final genuine
 restore/access/preview qualification. No scheduler or public rerun was started.
+
+The later scoped offline recovery removed that specific final-proof blocker by
+proving ABORTED_BEFORE_PRODUCT and preserving the original failed intent/locks.
+It did not complete slot 6, alter prices, change either pointer or run a provider.
+Normal paired routes, protected CSV/HEAD/304, genuine compact backup/restore and
+desktop/mobile views then passed. One admitted immutable-base handle set served
+both the application and isolated restore; original writable roots were denied
+during restore. Full five-file selected identity and all historical values remain
+exact. This is recovery qualification, not a regrade of the consumed public trial
+or a continuous-freshness guarantee. All owned resources closed.

@@ -966,3 +966,16 @@ storage/journal/certificate/reader tests at slots 4/6/16 pass. This correction
 was tested after closure and was not rerun publicly. The genuine participant
 intent and safety locks remain untouched; final backup/restore/access/previews
 are blocked. Read-only selected-file preservation passed. Main is unchanged.
+
+The subsequently owner-authorized Operating Refresh offline recovery settled
+that exact interrupted writer as ABORTED_BEFORE_PRODUCT. It verified the closed
+owner, both unchanged pointers, journal/certificate and original sealed hashes,
+then preserved the original intent/lock bytes under closed-evidence filenames.
+No quote was republished and product sequence 28 is unchanged. Nineteen focused
+recovery cases and six owner cleanup/restore cases passed before genuine use;
+the same independent reviewer checked the correction and runtime bindings.
+The actual paired API, protected CSV/HEAD/304, compact backup/restore and two
+final local views passed with one additional immutable-base admission. Saved
+BTC/ETH values and source times remain exact and are correctly served as stale.
+All owned resources closed; zero new public requests. The original 16-slot
+trial remains PARTIAL, with its consumed session and evidence unchanged.
