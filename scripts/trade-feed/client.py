@@ -121,7 +121,8 @@ class Session:
                               'beforeNetworkDispatch':True,'reason':'Slot deadline expired before native network dispatch'}
                     if (proof!=expected or not closed or ordinal!=0 or slot_deadline is None or not self.cookie_policy
                             or raw or framing or headers or meta.get('status') is not None or meta.get('complete')
-                            or life['timeout'] or meta.get('failureKind') not in (None,'terminal')
+                            or life['timeout'] or life.get('interrupted') or life.get('exit') not in (0,1)
+                            or meta.get('failureKind') not in (None,'terminal')
                             or (meta.get('error') and meta['error']!='ValueError: Slot dispatch deadline')):
                         raise ValueError('Inconsistent local slot-skip certificate')
                     local_skip=True

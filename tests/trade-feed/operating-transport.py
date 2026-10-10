@@ -236,6 +236,23 @@ def worker_skip_composed():
     assert not row['integrityFailure'] and row['failureKind']=='local-slot-missed'
     assert len(c)==31 and s.state['pending'] is None
     finish(s,c)
+    for patch in [{'interrupted':'KeyboardInterrupt: synthetic owner cancellation'},{'exit':2},{'exit':-9}]:
+        s,c=setup([response(body=b'[]')]);runner=s.runner
+        def delayed_cancelled(args,env,*rest):
+            def lag(q,*a,**kw):
+                s.sleep(6);return original(q,*a,**kw)
+            global perform_request
+            perform_request=lag
+            try:life=runner(args,env,*rest)
+            finally:perform_request=original
+            return {**life,**patch}
+        s.runner=delayed_cancelled
+        try:s.get(URLS[1],'BTC_1',slot_deadline=5)
+        except ValueError as e:assert not isinstance(e,SlotMissed)
+        else:raise AssertionError('Cancelled skip must stop')
+        assert s.state['extras']==0 and not s.state['requests'][0].get('localSlotMissed')
+        assert s.state['chargedBytes']==RESERVATION
+        finish(s,c)
     # A forged/inconsistent skip does not erase a response or become a scheduler no-op.
     for kind in ['response','nonce','unknown']:
         s,c=setup([response(body=b'[]')]);runner=s.runner
