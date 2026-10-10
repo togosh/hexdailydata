@@ -10,6 +10,7 @@ import http from 'node:http';
 import https from 'node:https';
 import { syncBuiltinESMExports } from 'node:module';
 import { EventEmitter } from 'node:events';
+import { execFileSync } from 'node:child_process';
 import { PassThrough, Writable } from 'node:stream';
 const deny = () => { throw Error('OFFLINE_NETWORK_DENIED'); };
 net.connect = net.createConnection = net.Socket.prototype.connect = net.Server.prototype.listen = deny;
@@ -101,7 +102,8 @@ async function main() {
         const accounting={status:'CLOSED',pending:null,attempts:count,synthetic:true};
         const result={status:failure?'PARTIAL':'COMPLETE_FRESH_CYCLES',cycles,accounting,failure};
         await put(join(root,'ACCOUNTING.json'),accounting);await put(join(root,'RESULT.json'),result);
-        child.stdout.write(JSON.stringify({type:'closed',result})+'\n');child.exitCode=failure?2:0;
+        const raw=await fs.readFile(join(root,'RESULT.json'));
+        child.stdout.write(JSON.stringify(isR2?{type:'closed',resultBytes:raw.length,resultSha256:sha(raw)}:{type:'closed',result})+'\n');child.exitCode=failure?2:0;
         child.emit('exit',child.exitCode,null);child.stdout.end();child.stderr.end();child.emit('close',child.exitCode,null);
       });return child;
     }
@@ -190,5 +192,55 @@ async function storageContract() {
     heldViewUnchanged:true,limitation:'Actual product storage/journal/certificate/ordinary reader; no genuine paired recovery or public rerun.'});
   console.log('POST_SESSION_STORAGE_CONTRACT_PASS');
 }
+async function closureContract() {
+  assert(isR2);
+  const {runJob}=await import('../../scripts/refresh-data.mjs');
+  const original=await fs.readFile(join(T,'session/RESULT.json'));
+  const saved=JSON.parse(original);
+  assert(original.length>32768);
+  const cases=[];
+  for(const mode of ['legacy-oversize','valid','hash','size','bound','extra','accounting','pending','native-exit','duplicate','missing']) {
+    const root=await fixtureRoot('closed-ipc-'+mode+'-');
+    await fs.writeFile(join(root,'RESULT.json'),original);
+    const accounting=structuredClone(saved.accounting);
+    if(mode==='accounting')accounting.attempts++;
+    if(mode==='pending')accounting.pending={synthetic:true};
+    await put(join(root,'ACCOUNTING.json'),accounting);
+    const script=`import sys\nsys.dont_write_bytecode=True\ndef deny(event,args):\n if event.startswith('socket.'):raise PermissionError('OFFLINE_NETWORK_DENIED')\nsys.addaudithook(deny)\nfrom pathlib import Path\nimport json\nsys.path.insert(0,str(Path.cwd()/'scripts/trade-feed'))\nfrom collector import closure_frame\np=Path(sys.argv[1])\nr=json.loads((p/'RESULT.json').read_bytes())\nprint(json.dumps(closure_frame(p,r,sys.argv[2])))\n`;
+    let frame=JSON.parse(execFileSync('python',['-I','-S','-c',script,root,operatingR2TaskId],{cwd:resolve('.'),windowsHide:true}).toString());
+    assert.equal(frame.resultBytes,original.length);
+    assert.equal(frame.resultSha256,sha(original));
+    assert(JSON.stringify(frame).length<256);
+    if(mode==='legacy-oversize')frame={type:'closed',result:saved};
+    if(mode==='hash')frame.resultSha256='0'.repeat(64);
+    if(mode==='size')frame.resultBytes--;
+    if(mode==='bound')frame.resultBytes=524289;
+    if(mode==='extra')frame.result=saved;
+    function spawnChild() {
+      const child=new EventEmitter();child.stdout=new PassThrough();child.stderr=new PassThrough();child.exitCode=null;child.signalCode=null;
+      child.stdin=new Writable({write(b,_,done){done();}});
+      setImmediate(()=>{
+        if(mode!=='missing')child.stdout.write(JSON.stringify(frame)+'\n');
+        if(mode==='duplicate')child.stdout.write(JSON.stringify(frame)+'\n');
+        child.exitCode=mode==='native-exit'?1:0;
+        child.emit('exit',child.exitCode,null);child.stdout.end();child.stderr.end();child.emit('close',child.exitCode,null);
+      });return child;
+    }
+    const options={jobRoot:root,admission,registry:{status:()=>({productVersion:'synthetic-unmodified'})},spawnChild,
+      deadline:performance.now()+10000,onSlot:async()=>{throw Error('NO_SOURCE_OR_PUBLICATION_IN_CLOSURE_FIXTURE');}};
+    if(mode==='valid') {
+      const result=await runJob(options);assert.deepEqual(result.source,saved);
+      assert.equal(result.publications.length,0);assert.equal(result.status,'PARTIAL');
+    } else await assert.rejects(runJob(options),/NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN/);
+    const receipt=JSON.parse(await fs.readFile(join(root,'NATIVE_CLOSURE.json')));
+    if(mode==='legacy-oversize')assert.equal(receipt.ipcError,'Error: IPC_BOUND');
+    cases.push({mode,accepted:mode==='valid',receipt,fixture:root});
+  }
+  await put(join(T,'evidence/POST_SESSION_CLOSURE_TEST.json'),{status:'PASS',synthetic:true,hardNetworkDenied:true,
+    publicRequests:0,baseAdmissions:0,apiListeners:0,originalResultBytes:original.length,
+    originalResultSha256:sha(original),originalSessionUnchanged:true,actualCollectorClosureFunction:true,
+    actualCoordinatorClosureValidation:true,publicationNotReplayed:true,cases});
+  console.log('POST_SESSION_COMPACT_CLOSURE_PASS');
+}
 if(resolve(process.argv[1]??'')===fileURLToPath(import.meta.url))
-  await (process.argv[2]==='storage-contract'?storageContract():main());
+  await (process.argv[3]==='closure'?closureContract():process.argv[2]==='storage-contract'?storageContract():main());

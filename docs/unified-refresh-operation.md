@@ -86,3 +86,18 @@ both the application and isolated restore; original writable roots were denied
 during restore. Full five-file selected identity and all historical values remain
 exact. This is recovery qualification, not a regrade of the consumed public trial
 or a continuous-freshness guarantee. All owned resources closed.
+
+The separate BTC/ETH Operating Refresh R2 trial acquired 33 responses and
+published 16 genuine pairs from sequence 28 through 44. Every scheduled ordinary
+Live check was fresh on one API, with 899.499 seconds between first and last
+changed publications. Other-feed values and times were not renewed. The finite
+milestone remains PARTIAL because the final collector report exceeded its IPC
+frame bound; source success and measured serving do not waive closure safety.
+
+An offline R2-only compact saved-result identity fixes that reporting defect and
+passes composed acceptance/refusal tests. It has not been used for another public
+run. The original report/charges stay unchanged. The retained MARKET_REFRESH.lock
+protects completed state; the existing pre-product abort grant does not authorize
+its retirement. Read-only preservation passes, while final backup/restore and
+access/preview qualification remain blocked. No second trial, other-feed call,
+new seed, scheduler, indexer or paid-reconstruction work followed.

@@ -1,4 +1,4 @@
-import { publishTrade, admitTradeMarkets, tradeProfile, isOperatingAuthority } from './trade-publication.mjs';
+import { publishTrade, admitTradeMarkets, tradeProfile, isOperatingAuthority, operatingR2TaskId } from './trade-publication.mjs';
 // One explicit finite operation. Status/default makes no provider requests.
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
@@ -400,6 +400,7 @@ export async function runJob({
   let exited = false,
     exitObserved = false,
     closedMessage,
+    closureProtocolError = false,
     error = null,
     stderr = '',
     handler = Promise.resolve(),
@@ -502,8 +503,26 @@ export async function runJob({
         if (line.length > 32768) throw Error('IPC_BOUND');
         const m = JSON.parse(line);
         if (m.type === 'closed') {
-          if (closedMessage) throw Error('DUPLICATE_CLOSURE');
-          closedMessage = m.result;
+          if (closedMessage) {
+            closureProtocolError = trade && admission.authorityTaskId === operatingR2TaskId;
+            throw Error('DUPLICATE_CLOSURE');
+          }
+          if (trade && admission.authorityTaskId === operatingR2TaskId) {
+            if (Object.keys(m).sort().join(',') !== 'resultBytes,resultSha256,type' ||
+                !Number.isSafeInteger(m.resultBytes) || m.resultBytes < 1 || m.resultBytes > 524288 ||
+                typeof m.resultSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(m.resultSha256))
+              throw Error('CLOSED_RESULT_IDENTITY');
+            const report = await open(join(jobRoot, 'RESULT.json'), 'r');
+            try {
+              const info = await report.stat();
+              if (!info.isFile() || info.size !== m.resultBytes) throw Error('CLOSED_RESULT_SIZE');
+              const raw = Buffer.alloc(m.resultBytes + 1);
+              const { bytesRead } = await report.read(raw, 0, raw.length, 0);
+              if (bytesRead !== m.resultBytes || sha(raw.subarray(0, bytesRead)) !== m.resultSha256)
+                throw Error('CLOSED_RESULT_HASH');
+              closedMessage = JSON.parse(raw.subarray(0, bytesRead));
+            } finally { await report.close(); }
+          } else closedMessage = m.result;
           return;
         }
         if (!active()) throw Error('EXPIRED_JOB');
@@ -686,8 +705,16 @@ export async function runJob({
     lines.close();
     const source = await read(join(jobRoot, 'RESULT.json')),
       accounting = await read(join(jobRoot, 'ACCOUNTING.json'));
+    if (trade && admission.authorityTaskId === operatingR2TaskId)
+      await durableJson(join(jobRoot, 'NATIVE_CLOSURE.json'), {
+        exit, killed, closureProtocolError, ipcError: error, closedMessageReceived: Boolean(closedMessage),
+        resultMatchesClosedMessage: same(source, closedMessage),
+        accountingMatchesResult: same(source.accounting, accounting),
+        accountingClosed: accounting.status === 'CLOSED', pending: accounting.pending,
+      });
     if (
       killed ||
+      closureProtocolError ||
       exit.signal ||
       ![0, 2].includes(exit.code) ||
       !same(source, closedMessage) ||
@@ -695,7 +722,7 @@ export async function runJob({
       accounting.status !== 'CLOSED' ||
       accounting.pending !== null
     )
-      throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + stderr);
+      throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + (error ?? stderr));
     if (error && !trade) throw Error(error);
     const qualified =
       !error &&

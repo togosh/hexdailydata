@@ -5,7 +5,17 @@ from pathlib import Path
 import time,queue,threading
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from client import Session,TASK,URLS,W,strict_json,digest,save,SlotMissed
-from authority import validate_authority, trade_profile, OPERATING_AUTHORITIES
+from authority import validate_authority, trade_profile, OPERATING_AUTHORITIES, OPERATING_R2_AUTHORITY
+
+def closure_frame(root, result, authority):
+    # R2's 66-attempt accounting can exceed the unchanged 32 KiB IPC frame cap.
+    # Bind the already durable local report, rather than send its full ledger twice.
+    if authority == OPERATING_R2_AUTHORITY:
+        raw = (root/'RESULT.json').read_bytes()
+        if not 0 < len(raw) <= 524288: raise ValueError('Closed result bound')
+        if strict_json(raw) != result: raise ValueError('Closed result mismatch')
+        return {'type':'closed','resultBytes':len(raw),'resultSha256':digest(raw)}
+    return {'type':'closed','result':result}
 
 def start_reader(incoming, stream=None):
     """Keep the owner command pipe in the collector, including its waiting read."""
@@ -77,6 +87,6 @@ def main():
     finally:session.close(reason)
     result={'status':status,'accounting':session.state,'cycles':outcomes,'networkSessionCount':1,'noAutomaticRestart':True}
     save(root/'RESULT.json',result)
-    print(__import__('json').dumps({'type':'closed','result':result}),flush=True)
+    print(__import__('json').dumps(closure_frame(root,result,a.get('authorityTaskId'))),flush=True)
     return 0 if status.startswith('COMPLETE_') else 2
 if __name__=='__main__':sys.exit(main())

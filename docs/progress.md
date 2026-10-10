@@ -979,3 +979,24 @@ final local views passed with one additional immutable-base admission. Saved
 BTC/ETH values and source times remain exact and are correctly served as stale.
 All owned resources closed; zero new public requests. The original 16-slot
 trial remains PARTIAL, with its consumed session and evidence unchanged.
+
+BTC/ETH Operating Refresh R2 (2026-10-10) completed all 16 source pairs and
+16 fresh ordinary reads on the same API. Thirty-three HTTP 200 responses used
+no retries and 71,368,704 conservatively charged bytes. Sixteen publications
+advanced sequence 28 to 44; measured BTC ages were 5–26 seconds and ETH 4–22.
+The original overall result is nevertheless PARTIAL: the 43,488-character
+closing report exceeded the coordinator's unchanged 32,768-character IPC bound.
+Collector accounting is CLOSED with no pending request, but the owner correctly
+retained MARKET_REFRESH.lock when its own closure handshake could not qualify.
+
+The scoped offline correction gives only the exact R2 authority a compact
+byte-length/SHA256 identity for its durable result, with a 512 KiB saved-report
+bound. Native exit, accounting equality and all original closure checks remain;
+eleven focused composed cases reproduce the old refusal and test the correction.
+This code was not publicly rerun and does not rewrite the original PARTIAL.
+Read-only selected-file checks preserve all 117,641 earlier cells, 5,004 fixed
+closes, ledger, liquidity and participant state. Only four permitted October 10
+price/time cells changed. Final access/held-export/preview and qualified compact
+backup/restore remain uncompleted. The committed state is outside the authorized
+abort-before-product recovery; no lock was retired. All owner/app/base resources
+closed after one new base admission (11 cumulative). Main remains unchanged.

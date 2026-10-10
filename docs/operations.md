@@ -610,3 +610,20 @@ restore and exact read-only external-base references. Restore needs those bases
 and a new destination; it does not create fresh observations or grant acquisition.
 The saved sequence-28 quotes are stale. No scheduler or additional public run
 was installed or started, and the original operating trial remains partial.
+
+Operating Refresh R2's `node tests/trade-feed/operating-completion-owner.mjs
+run-reviewed` entry is also consumed. Do not rerun it. Its session recorded all
+16 fresh served pairs, then failed the oversized final IPC report check. Product
+sequence 44 is selected coherently by both CURRENT files. The retained product
+MARKET_REFRESH.lock must remain: this is committed work, not the narrowly
+authorized abort-before-product case. No PID-age deletion, manual selection,
+old recovery plan or copied backup may bypass it.
+
+The R2-only compact-closure correction binds exact saved RESULT bytes and SHA256
+without increasing the 32 KiB message bound. It passed focused offline tests;
+the original run remains PARTIAL and its frozen evidence is unchanged. The R2
+return's selected-files folder is quarantined inspection evidence, not a backup.
+Normal backupStorage requires a quiescent root, so new backup/restore and final
+application proof require an applicable separately reviewed committed-state
+settlement authority. That future local recovery need not reacquire prices or
+restart the consumed provider session. No continuous service is installed.
