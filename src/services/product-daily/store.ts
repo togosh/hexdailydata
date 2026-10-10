@@ -27,7 +27,7 @@ import {
   referenceOnlyAdvance,
   benchmarkHistoryOnlyAdvance,
 } from './market.ts';
-import { verifyMarketCertificate } from './storage.ts';
+import { verifyMarketCertificate, verifyMarketReaderAdvance } from './storage.ts';
 
 const names = ['daily.ndjson', 'daily.csv', 'metadata.json', 'exceptions.ndjson'];
 const manifestSchema = z.strictObject({
@@ -56,6 +56,19 @@ export type AdmittedProduct = {
   csv: Buffer;
   bundleId: string;
 };
+// Retain only already-hashed exception bytes with the admitted snapshot. A lagging
+// reader's generation directory need not survive retention. Not a public payload.
+const admittedExceptions = new WeakMap<AdmittedProduct, Buffer>();
+export function cachedProductExceptions(product: AdmittedProduct): Record<string, unknown>[] {
+  const bytes = admittedExceptions.get(product);
+  if (!bytes) throw Error('PRODUCT_READER_NOT_ADMITTED');
+  return bytes
+    .toString()
+    .trimEnd()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
+}
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 function freeze<T>(v: T): T {
   if (v && typeof v === 'object') {
@@ -135,7 +148,7 @@ export async function admitProduct(
   const v = manifest.version,
     bundleId = `${v.slice(0, 8)}-${v.slice(8, 12)}-4${v.slice(13, 16)}-8${v.slice(17, 20)}-${v.slice(20, 32)}`;
   const csvBytes = files['daily.csv']!;
-  return Object.freeze({
+  const admitted = Object.freeze({
     version: v,
     manifestSha256: expectedManifestSha256,
     rows: freeze(rows),
@@ -145,6 +158,8 @@ export async function admitProduct(
     },
     bundleId,
   });
+  admittedExceptions.set(admitted, files['exceptions.ndjson']!);
+  return admitted;
 }
 async function ownedRoot(root: string) {
   await mkdir(root, { recursive: true });
@@ -218,8 +233,8 @@ export class ProductDailyStore {
     );
     if (!same(disk, { version: next.version, manifestSha256: next.manifestSha256 }))
       throw Error('PARTICIPANT_PRODUCT_POINTER');
-    await verifyMarketCertificate(this.root, next, this.current);
-    if (this.current) preserveMarketHistory(this.current, next);
+    if (this.current) await verifyMarketReaderAdvance(this.root, next, this.current);
+    else await verifyMarketCertificate(this.root, next);
     this.current = next;
     this.pair = pair;
   }
@@ -291,7 +306,6 @@ export class ProductDailyStore {
         const next = await admitProduct(join(this.root, p.version), p.manifestSha256);
         this.checkPair(next);
         if (!this.current) throw Error('PRODUCT_NOT_INITIALIZED');
-        await verifyMarketCertificate(this.root, next, this.current);
         let authorizedRollback = false;
         const recovery = await bounded(join(this.root, 'RECOVERY.json'), 4096).catch(
           (e: NodeJS.ErrnoException) => {
@@ -310,15 +324,18 @@ export class ProductDailyStore {
             r.from?.manifestSha256 === this.current.manifestSha256 &&
             same(r.selected, p);
         }
+        const comparison = authorizedRollback
+          ? this.current
+          : await verifyMarketReaderAdvance(this.root, next, this.current);
+        if (authorizedRollback) await verifyMarketCertificate(this.root, next, this.current);
         if (
           !authorizedRollback &&
           Date.parse(next.metadata.effectiveAtUtc) <=
-            Date.parse(this.current.metadata.effectiveAtUtc) &&
-          !referenceOnlyAdvance(this.current.metadata, next.metadata) &&
-          !benchmarkHistoryOnlyAdvance(this.current.metadata, next.metadata)
+            Date.parse(comparison.metadata.effectiveAtUtc) &&
+          !referenceOnlyAdvance(comparison.metadata, next.metadata) &&
+          !benchmarkHistoryOnlyAdvance(comparison.metadata, next.metadata)
         )
           throw Error('PRODUCT_NOT_NEWER');
-        if (!authorizedRollback) preserveMarketHistory(this.current, next);
         if (!(await bounded(join(this.root, 'CURRENT.json'), 4096)).equals(raw))
           throw Error('PRODUCT_POINTER_CHANGED');
         if (

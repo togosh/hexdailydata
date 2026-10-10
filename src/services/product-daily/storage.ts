@@ -15,9 +15,19 @@ import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { isDeepStrictEqual } from 'node:util';
-import { digest, type ProductMetadata } from '../../contracts/product-daily.ts';
+import {
+  digest,
+  benchmarkCloseBinding,
+  benchmarkCloseMethod,
+  type ProductMetadata,
+} from '../../contracts/product-daily.ts';
 import { hash, stable } from '../../history-bootstrap/normalize.ts';
-import { applyMarketUpdate, marketJournalEntry, migrateMarketMetadata } from './market.ts';
+import {
+  applyMarketUpdate,
+  marketJournalEntry,
+  migrateMarketMetadata,
+  preserveMarketHistory,
+} from './market.ts';
 import { productFiles } from './project.ts';
 import {
   verifyOperationFrontier,
@@ -30,6 +40,7 @@ import {
 import {
   ProductDailyStore,
   admitProduct,
+  cachedProductExceptions,
   writeProductGeneration,
   type ProductWriter,
   type AdmittedProduct,
@@ -551,6 +562,62 @@ export async function verifyMarketCertificate(
     previous.version !== state.seed.version
   )
     throw Error('MARKET_READER_SEED');
+}
+
+/** Reader-only bridge for the one fixed, certified HDS -> candle-close transition.
+ * The intermediate directory may have been pruned. Rebuild its exact identity from
+ * the cached admitted predecessor and one retained journal update, never publish it.
+ * Endpoint certificates plus ordinary preservation still govern the newest product.
+ * This reads two additional bounded records, not the intervening lifetime journal.
+ */
+export async function verifyMarketReaderAdvance(
+  root: string,
+  next: AdmittedProduct,
+  previous: AdmittedProduct,
+) {
+  await verifyMarketCertificate(root, next, previous);
+  let comparison: Pick<AdmittedProduct, 'version' | 'manifestSha256' | 'rows' | 'metadata'> =
+    previous;
+  const a = previous.metadata.marketStorage,
+    b = next.metadata.marketStorage;
+  if (
+    previous.version === benchmarkCloseBinding.predecessorVersion &&
+    previous.manifestSha256 === benchmarkCloseBinding.predecessorManifest &&
+    next.metadata.benchmarkHistory?.methodRevision === benchmarkCloseMethod &&
+    a &&
+    b &&
+    b.sequence > a.sequence + 1
+  ) {
+    const old = await journalRecord(root, a.sequence);
+    const transition = await journalRecord(root, a.sequence + 1);
+    if (
+      !same(transition.previousGeneration, ptr(previous)) ||
+      transition.previous !== a.head ||
+      transition.archivePrevious !== old.archiveHash ||
+      !transition.update?.benchmarkHistory
+    )
+      throw Error('BENCHMARK_READER_TRANSITION');
+    const reconstructed = applyMarketUpdate(
+      { ...previous, exceptions: cachedProductExceptions(previous) },
+      transition.update,
+    );
+    // The ordinary reducer retains all exact predecessor, receipt, +1 and quiet guards.
+    preserveMarketHistory(previous, reconstructed);
+    const identity = productFiles(reconstructed);
+    if (
+      !same(transition.selected, ptr(identity)) ||
+      reconstructed.metadata.marketStorage?.head !== transition.head ||
+      reconstructed.metadata.marketStorage?.sequence !== transition.sequence
+    )
+      throw Error('BENCHMARK_READER_IDENTITY');
+    comparison = {
+      ...reconstructed,
+      version: identity.version,
+      manifestSha256: identity.manifestSha256,
+    };
+  }
+  preserveMarketHistory(comparison, next);
+  return comparison;
 }
 
 /** Known-owner recovery must match the exact saved intent, not any later certified product. */

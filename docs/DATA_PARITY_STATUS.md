@@ -102,3 +102,24 @@ failures remain recorded. No external calls or original-root writes occurred.
 Commercial/public display and redistribution rights remain unresolved; this is
 a local technical candidate, not release authority. Main remains unmerged;
 indexer and paid reconstruction remain PARKED.
+
+
+### 2026-10-10 - Missed daily-close generation reader correction
+
+Planner finding R1-READER-01 was reproduced against the actual prior functions:
+a cached exact HDS sequence 22 rejected valid sequence 24 after missing close 23.
+Reader-only validation now rebuilds the exact fixed transition from the cached
+admitted HDS product and bounded retained journal evidence, verifies its product
+identity, then applies ordinary preservation to the newest certified descendant.
+Strict one-step writer authorization and both timed BTC/ETH overlap guards remain.
+
+Focused paired/standalone tests passed, including unchanged-time reference rounds,
+22-to-25 adoption after normal pruning, malformed/missing proof refusal, held HDS
+CSV coherence and all 2,503 Daily rows/protected CSV cells. The isolated bridge read
+four bounded records (2,362,673 total proof bytes); unchanged-pointer requests read
+zero journal records. One base admission/compact synthetic fixture initialization;
+no provider requests, genuine selection changes, new genuine restore or screenshots.
+The exact close/HDS rollback identities and prior restore/visual evidence remain.
+Independent review and final commit identity are recorded in the correction return.
+Current BTC/ETH freshness and commercial-use permission remain separate; main,
+indexer and paid reconstruction are unchanged/PARKED.

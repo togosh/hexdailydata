@@ -14,6 +14,7 @@ import { ProductDailyStore, admitProduct, type AdmittedProduct } from '../produc
 import {
   publishStoredMarket,
   verifyMarketCertificate,
+  verifyMarketReaderAdvance,
   verifyStoredTransition,
 } from '../product-daily/storage.ts';
 import { preserveParticipantProduct, preserveMarketHistory } from '../product-daily/market.ts';
@@ -263,8 +264,7 @@ export class ParticipantRegistry {
         );
         if (!same(product.metadata.pair, participantPair(candidate)))
           throw Error('PARTICIPANT_MIXED_SELECTION');
-        await verifyMarketCertificate(this.productDaily.root, product, this.current.product);
-        preserveMarketHistory(this.current.product, product);
+        await verifyMarketReaderAdvance(this.productDaily.root, product, this.current.product);
         if (!(await bytes(this.root, 'CURRENT.json')).equals(raw))
           throw Error('PARTICIPANT_POINTER_CHANGED');
         await this.productDaily.adoptCoordinated(product, participantPair(candidate));
