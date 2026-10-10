@@ -382,7 +382,8 @@ function replay(
     const row = byDate.get(dateOf(r.observedAtUtc));
     if (
       history?.methodRevision === benchmarkCloseMethod &&
-      r.kind === 'reference' &&
+      (r.kind === 'reference' || r.kind === 'market') &&
+      (r.asset === 'BTC' || r.asset === 'ETH') &&
       dateOf(r.observedAtUtc) >= '2019-12-03' &&
       dateOf(r.observedAtUtc) <= '2026-10-08'
     )
