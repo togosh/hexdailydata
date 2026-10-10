@@ -18,8 +18,8 @@ export const keys = Object.fromEntries(
   ].map(([k, v]) => [k, 'lab_' + v.repeat(43)]),
 );
 export const auth = (key = keys.good) => ({ authorization: 'Bearer ' + key });
-export function charge() {
-  const path = join(root, 'evidence/LOCAL_REQUEST_BUDGET.json'),
+export function charge(evidenceRoot = join(root, 'evidence')) {
+  const path = join(evidenceRoot, 'LOCAL_REQUEST_BUDGET.json'),
     b = existsSync(path)
       ? JSON.parse(readFileSync(path))
       : { attempts: 0, maximum: 1000, externalRequests: 0 };
@@ -27,8 +27,8 @@ export function charge() {
   b.attempts++;
   writeFileSync(path, JSON.stringify(b) + '\n');
 }
-export function trace(value) {
-  appendFileSync(join(root, 'evidence/ACCESS_TRACES.ndjson'), JSON.stringify(value) + '\n');
+export function trace(value, evidenceRoot = join(root, 'evidence')) {
+  appendFileSync(join(evidenceRoot, 'ACCESS_TRACES.ndjson'), JSON.stringify(value) + '\n');
 }
 export async function until(fn) {
   const due = Date.now() + 5000;
@@ -37,8 +37,14 @@ export async function until(fn) {
     await delay(5);
   }
 }
-export async function wire(app, url, fields = [], method = 'GET') {
-  charge();
+export async function wire(
+  app,
+  url,
+  fields = [],
+  method = 'GET',
+  evidenceRoot = join(root, 'evidence'),
+) {
+  charge(evidenceRoot);
   if (!app.server.listening) await app.listen({ host: '127.0.0.1', port: 0 });
   return new Promise((done, reject) => {
     const socket = net.createConnection({ host: '127.0.0.1', port: app.server.address().port });
@@ -72,9 +78,18 @@ export async function wire(app, url, fields = [], method = 'GET') {
         ),
         body: text.slice(i + 4),
       };
-      trace({
-        wire: { url, method, status: result.statusCode, headers: result.headers, bytes: b.length },
-      });
+      trace(
+        {
+          wire: {
+            url,
+            method,
+            status: result.statusCode,
+            headers: result.headers,
+            bytes: b.length,
+          },
+        },
+        evidenceRoot,
+      );
       done(result);
     });
   });
@@ -85,6 +100,7 @@ export const cookie = {
   origin: 'http://127.0.0.1:43211',
 };
 export async function fixture(deps, options = {}) {
+  const { evidenceRoot = join(root, 'evidence'), ...appOptions } = options;
   const events = [],
     log = (stage, v = {}) => events.push({ stage, ...v });
   let ordinal = 0;
@@ -149,7 +165,7 @@ export async function fixture(deps, options = {}) {
     paidReads: lifecycle,
     downloadAuthorizer: authorize,
     now: () => controls.now,
-    ...options,
+    ...appOptions,
   });
   await app.ready();
   return {
@@ -158,15 +174,18 @@ export async function fixture(deps, options = {}) {
     controls,
     lifecycle,
     async inject(options) {
-      charge();
+      charge(evidenceRoot);
       const r = await app.inject(options);
-      trace({ inject: options, status: r.statusCode, headers: r.headers, bytes: r.body.length });
+      trace(
+        { inject: options, status: r.statusCode, headers: r.headers, bytes: r.body.length },
+        evidenceRoot,
+      );
       return r;
     },
     async close() {
       await app.close();
       assert.equal(lifecycle.stats().pending, 0);
-      trace({ fixtureClosed: true, events });
+      trace({ fixtureClosed: true, events }, evidenceRoot);
     },
   };
 }

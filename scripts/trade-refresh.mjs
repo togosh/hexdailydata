@@ -31,6 +31,7 @@ export async function runTrades({
   registry,
   onAdoption,
   spawnChild = spawn,
+  loadedRuntimeFiles,
 }) {
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
@@ -44,9 +45,25 @@ export async function runTrades({
     !pre.independentReviewSha256
   )
     throw Error('EXACT_UNUSED_PREFLIGHT');
+  const continuation = preflightPath === join(taskRoot, 'continuation-r1/PREFLIGHT.json');
   if (
-    sha(await readFile(join(taskRoot, 'evidence/PREFLIGHT_REVIEW.json'))) !==
-    pre.independentReviewSha256
+    continuation &&
+    (!loadedRuntimeFiles || JSON.stringify(loadedRuntimeFiles) !== JSON.stringify(pre.runtimeFiles))
+  )
+    throw Error('LOADED_RUNTIME_BINDING');
+  if (!continuation && preflightPath !== join(taskRoot, 'PREFLIGHT.json'))
+    throw Error('EXACT_PREFLIGHT_PATH');
+  if (
+    sha(
+      await readFile(
+        join(
+          taskRoot,
+          continuation
+            ? 'continuation-r1/evidence/PREFLIGHT_REVIEW.json'
+            : 'evidence/PREFLIGHT_REVIEW.json',
+        ),
+      ),
+    ) !== pre.independentReviewSha256
   )
     throw Error('PREFLIGHT_REVIEW_BINDING');
   for (const [p, h] of Object.entries(pre.runtimeFiles))

@@ -13,9 +13,18 @@ import {
   restoreParticipants,
 } from '../../scripts/participant-refresh-backup.mjs';
 import { fixture, auth } from '../market-feed/access-fixture.mjs';
-import { guard, reserve, complete } from './budget.mjs';
+import * as defaultBudget from './budget.mjs';
 
-export async function finalEvidence({ R, real, seed, f, origin, heldExport, save }) {
+export async function finalEvidence({
+  R,
+  real,
+  seed,
+  f,
+  origin,
+  heldExport,
+  save,
+  budget = defaultBudget,
+}) {
   const p = real.productDaily.capture();
   preserveMarketHistory(seed, p);
   assert.deepEqual(p.rows.slice(0, seed.rows.length), seed.rows);
@@ -102,7 +111,7 @@ export async function finalEvidence({ R, real, seed, f, origin, heldExport, save
     backup = await backupParticipants(real, join(R, 'real-backup'));
     await save('GENUINE_BACKUP', backup);
   }
-  await previews({ R, origin, save, f });
+  if (p.version !== seed.version) await previews({ R, origin, save, f, budget });
   return {
     backup,
     expected: {
@@ -118,7 +127,7 @@ export async function finalEvidence({ R, real, seed, f, origin, heldExport, save
     now: f.controls.now,
   };
 }
-export async function previews({ R, origin, save, f }) {
+export async function previews({ R, origin, save, f, budget = defaultBudget }) {
   const dir = join(R, 'evidence/preview');
   await mkdir(dir, { recursive: true });
   const result = { screenshots: [], blocked: [], errors: [] };
@@ -158,7 +167,10 @@ export async function previews({ R, origin, save, f }) {
         return route.abort();
       }
       f.controls.now = Date.now();
-      reservations.set(route.request(), reserve(u.pathname + u.search, 2 * 1024 ** 2 + 65536));
+      reservations.set(
+        route.request(),
+        budget.reserve(u.pathname + u.search, 2 * 1024 ** 2 + 65536),
+      );
       await route.continue();
     });
     await context.routeWebSocket('**/*', (ws) => {
@@ -171,7 +183,9 @@ export async function previews({ R, origin, save, f }) {
       pending.push(
         r
           .body()
-          .then((body) => complete(reservations.get(r.request()), body.length + 65536, r.status())),
+          .then((body) =>
+            budget.complete(reservations.get(r.request()), body.length + 65536, r.status()),
+          ),
       ),
     );
     for (const [name, path, width] of [
@@ -201,7 +215,15 @@ export async function previews({ R, origin, save, f }) {
   }
 }
 
-export async function restoreProof({ R, profile, final, save, admittedBase }) {
+export async function restoreProof({
+  R,
+  profile,
+  final,
+  save,
+  admittedBase,
+  budget = defaultBudget,
+  baseAdmissionCount,
+}) {
   if (!final.backup)
     return save('GENUINE_RESTORE', {
       status: 'UNCHANGED_SEED_REFERENCED',
@@ -273,12 +295,15 @@ export async function restoreProof({ R, profile, final, save, admittedBase }) {
     assert.equal(sha(p.csv), final.expected.csvSha256);
     assert.deepEqual(p.rows, final.expected.rows);
     assert.deepEqual(p.metadata.readings, final.expected.readings);
-    f = guard(
-      await fixture({
-        participants: restored.registry,
-        productDaily: restored.registry.productDaily,
-        sourceGenerations: base,
-      }),
+    f = budget.guard(
+      await fixture(
+        {
+          participants: restored.registry,
+          productDaily: restored.registry.productDaily,
+          sourceGenerations: base,
+        },
+        { evidenceRoot: join(R, 'evidence') },
+      ),
     );
     f.controls.now = final.now;
     const comparable = (v) =>
@@ -298,7 +323,7 @@ export async function restoreProof({ R, profile, final, save, admittedBase }) {
       status: 'PASS',
       receipt: restored.receipt,
       deniedPriorRoots: denied,
-      exactBaseAdmissions: 2,
+      exactBaseAdmissions: baseAdmissionCount ?? (admittedBase ? null : 1),
       admittedImmutableBaseHandlesReused: Boolean(admittedBase),
       selected: restored.registry.status(),
       csvSha256: sha(p.csv),
