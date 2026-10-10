@@ -627,3 +627,21 @@ Normal backupStorage requires a quiescent root, so new backup/restore and final
 application proof require an applicable separately reviewed committed-state
 settlement authority. That future local recovery need not reacquire prices or
 restart the consumed provider session. No continuous service is installed.
+
+The later owner-authorized offline closure recovery has now settled that exact
+sequence-44 completed state. `settleClosedOperatingCompletion` is separate from
+the pre-product abort path: it requires the bound closed owner/session, all 16
+committed publication records, exact journal/certificate and unchanged paired
+pointers, with no pending work. The original market lock is preserved in a
+collision-safe CLOSED_MARKET_REFRESH record with a durable recovery intent and
+receipt. An interrupted settlement retains its own exclusion locks.
+
+The exact `settle-completed-reviewed` entry is consumed; do not repeat it or
+reuse its plan. No active recovery/writer lock remains. The selected five-file
+product, certificate and both pointers stayed byte-identical. One ordinary
+backup advanced only storage operation accounting. The new compact backup and
+restore proof live under operating-refresh-r2/offline-closure-recovery-r1;
+external bases remain read-only references. Its immediate rollback is sequence
+43, not the separate original HDS rollback. Current saved quotes are stale.
+The original public trial and partial archive are unchanged; no new acquisition
+or permanent service was started.

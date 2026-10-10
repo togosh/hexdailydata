@@ -1000,3 +1000,19 @@ price/time cells changed. Final access/held-export/preview and qualified compact
 backup/restore remain uncompleted. The committed state is outside the authorized
 abort-before-product recovery; no lock was retired. All owner/app/base resources
 closed after one new base admission (11 cumulative). Main remains unchanged.
+
+The owner's subsequent offline continuation has settled that exact completed
+R2 state. Separate review bound all 33 closed requests, 16 committed windows,
+the sequence-44 journal/certificate and both pointers. Twenty actual-storage
+synthetic recovery cases passed. The original MARKET_REFRESH.lock bytes were
+durably preserved before retiring only its active name; no price or pointer
+changed. The original public PARTIAL_CLOSURE_BLOCKED return remains immutable.
+
+The remaining ordinary paired API, protected CSV/HEAD/304, saved-stale behavior,
+two local views and one genuine compact backup/restore passed. Restore reused
+the same admitted immutable bases while access to old writable roots was denied.
+This continuation used zero public requests and one admission (12 cumulative),
+36 local requests and 60,555,264 charged local bytes. Its held CSV proof begins
+at sequence 44; it cannot recreate the original discarded sequence-28 export.
+All owned processes closed. This is an offline recovery/final-proof PASS, not a
+rewrite of the original coordinator outcome or indefinite service approval.

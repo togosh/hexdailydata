@@ -101,3 +101,13 @@ protects completed state; the existing pre-product abort grant does not authoriz
 its retirement. Read-only preservation passes, while final backup/restore and
 access/preview qualification remain blocked. No second trial, other-feed call,
 new seed, scheduler, indexer or paid-reconstruction work followed.
+
+The subsequent explicit owner continuation completed a separately reviewed
+offline settlement of that exact committed state. Closed request, publication,
+paired-pointer and journal evidence agreed; only the exact active lock name was
+retired after preserving its bytes. Sequence 44 and all selected values/times
+are unchanged. The remaining paired API/access, compact backup/restore and two
+local previews passed with one shared base admission and zero provider calls.
+The new held-export proof covers sequence 44, not the original discarded held
+sequence 28. Saved prices now correctly read stale. The earlier public trial
+keeps its original partial result; no continuous-operation claim follows.
