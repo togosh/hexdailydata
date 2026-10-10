@@ -65,3 +65,14 @@ seed needs its first product publication before a participant-only transition;
 that publication initializes the fresh root's market-storage metadata. The
 failed participant-first fixture is retained, and the corrected synthetic
 product/participant/product sequence passed without changing production guards.
+
+The separate Operating Refresh R1 BTC/ETH-only trial did not rerun these feeds.
+Its 16 scheduled slots used one paired API and unchanged 300-second ages. Five
+fresh served measurements and three selections were observed before a local
+capture-reference refusal at slot 6. Source sampling and served freshness remain
+separate results; an empty ETH sample preserved the last-good pair. The finite
+trial is PARTIAL and permanently closed. The operating-only WINDOW_n adapter
+correction passed actual isolated storage tests; legacy ROUND_1..3 stays exact.
+All quiet-feed values/times, participant generation and fixed closes passed
+read-only preservation. The retained paired intent prevents final genuine
+restore/access/preview qualification. No scheduler or public rerun was started.

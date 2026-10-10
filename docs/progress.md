@@ -953,3 +953,16 @@ No additional screenshot, genuine backup/restore or provider retry was warranted
 The continuation return records the independent review and exact final identity;
 finite public freshness is unqualified, with main unchanged and indexer/paid
 reconstruction PARKED.
+
+BTC/ETH Operating Refresh R1 (2026-10-10) is CLOSED/PARTIAL. Thirteen GETs
+completed with HTTP 200, no retries and 28,114,944 reserved bytes. Source pairs
+qualified at slots 1, 2, 3 and 6; three publications advanced product sequence
+25 to 28 and five ordinary same-server Live checks were fresh. Slots 4 and 5
+had empty ETH samples and retained the pair without refreshing its timestamps.
+Slot 6 publication failed locally because the adapter emitted ROUND_6 filenames
+outside the storage contract. Slots 7–16 were not queried. No serving PASS.
+The operating adapter now uses supported WINDOW_n references; actual synthetic
+storage/journal/certificate/reader tests at slots 4/6/16 pass. This correction
+was tested after closure and was not rerun publicly. The genuine participant
+intent and safety locks remain untouched; final backup/restore/access/previews
+are blocked. Read-only selected-file preservation passed. Main is unchanged.

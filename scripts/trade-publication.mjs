@@ -163,7 +163,10 @@ export async function publishTrade(store, output, message, active, publish, reta
     ),
     effectiveReadings: readings,
   };
-  const auditName = `ROUND_${c}_AUDIT.json`;
+  // Storage accepts legacy ROUND_1..3 or bounded WINDOW_n references.
+  // The operating profile must use the latter even before its fourth slot.
+  const capturePrefix = profile.cycles === 16 ? 'WINDOW' : 'ROUND';
+  const auditName = `${capturePrefix}_${c}_AUDIT.json`;
   await durableJson(join(output, auditName), audit);
   if (audit.status !== 'QUALIFIED')
     return {
@@ -175,7 +178,7 @@ export async function publishTrade(store, output, message, active, publish, reta
     };
   const auditRaw = await readFile(join(output, auditName));
   const update = { readings, liquidityHistory: [], receiptSha256: sha(auditRaw) },
-    updateName = `ROUND_${c}_UPDATE.json`;
+    updateName = `${capturePrefix}_${c}_UPDATE.json`;
   await durableJson(join(output, updateName), update);
   const updateRaw = await readFile(join(output, updateName));
   const beforeCommit = () => {

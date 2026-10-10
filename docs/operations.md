@@ -578,3 +578,14 @@ indefinite unattended operation are unqualified. A native Windows rename refusal
 was preserved as a stopped synthetic run with uncertainty retained. No retry or
 force-unlock workaround is approved. Any future public trial needs a new build,
 preflight and explicit finite authority; no old command or allowance is revived.
+
+The BTC/ETH Operating Refresh R1 command is consumed:
+`node tests/trade-feed/operating-owner.mjs run-reviewed` with HDD_TASK_ROOT set
+to the original BTC/ETH R2 task root. Default invocation is offline. Do not rerun
+it or remove session markers. It was a finite 16-slot trial, not a service.
+Sequence 28 is the last successfully selected product. The failed sixth
+publication retained participants/INTENT.json, participants/SELECTION.lock and
+product/MARKET_REFRESH.lock; all owning processes have exited. Do not force
+unlock or activate a copied generation. A separately scoped conservative
+recovery must reconcile the intent and both pointers before further operation.
+The return's quarantined selected files are evidence, not a qualified backup.

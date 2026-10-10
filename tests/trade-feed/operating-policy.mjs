@@ -122,4 +122,71 @@ async function main() {
     limitation:'Tiny synthetic selection facade; actual coordinator, captured parser, publication and Live formatter used. Not the real paired readiness gate.',cases});
   console.log('OPERATING_POLICY_PASS');
 }
-if(resolve(process.argv[1]??'')===fileURLToPath(import.meta.url))await main();
+async function storageContract() {
+  const { productFiles, columns } = await import('../../dist/services/product-daily/project.js');
+  const { contractDayAt } = await import('../../dist/domain/day.js');
+  const { createMarketStorage, publishStoredMarket, auditJournal } = await import('../../dist/services/product-daily/storage.js');
+  const root=await fixtureRoot('actual-storage-contract-');
+  const date='2026-10-10', time=date+'T00:00:00Z', h=sha('synthetic-only');
+  const row=Object.fromEntries(columns.map(k=>[k,null]));
+  Object.assign(row,{dateUtc:date,contractDay:contractDayAt(BigInt(Date.parse(date)/1000))});
+  const pair={generation:h,holderDatasetVersion:h,stakeDatasetVersion:h,baseObservedAtUtc:time,
+    observedAtUtc:time,coverage:'accepted_base_plus_observed_updates',holderRecordCount:0,stakeStartRecordCount:0};
+  const initial=['BTC','ETH'].map(asset=>sampleTrades(JSON.stringify([{date:String(Date.parse(time)/1000),
+    tid:'1',price:asset==='BTC'?'80000':'2500'}]),asset,[]).selected);
+  Object.assign(row,{btcPriceUsd:'80000',ethPriceUsd:'2500',btcRecordedAtUtc:initial[0].observedAtUtc,ethRecordedAtUtc:initial[1].observedAtUtc});
+  const metadata={schemaVersion:'daily-product-1',methodRevision:'utc-recorded-snapshot-primary-price-1',
+    inputHashes:{synthetic:h},pair,ledgerObservedAtUtc:time,from:date,through:date,rows:1,effectiveAtUtc:time,
+    readings:initial,observations:initial,liquidityHistory:[],coverage:{snapshotDates:0,ledgerDates:0,priceDates:0,structuralDates:1,gaps:[]},
+    priceSegments:[],methods:[],credits:'Synthetic isolated storage contract fixture'};
+  const store=await createMarketStorage(join(root,'storage'),productFiles({rows:[row],metadata,exceptions:[]}));
+  const reader=new ProductDailyStore(store.root,pair);await reader.load();
+  const held=reader.capture(),results=[];let attempt=0;
+  for(const cycle of [4,6,16]) {
+    const sample=asset=>[{date:String(Math.floor(Date.now()/1000)-1),tid:String(1000+cycle),price:asset==='BTC'?String(80000+cycle):String(2500+cycle)}];
+    const btc=await capture(root,++attempt,`BTC_${cycle}`,sample('BTC'));
+    const eth=await capture(root,++attempt,`ETH_${cycle}`,sample('ETH'));
+    let oldNameRejected=false;
+    const result=await publishTrade(store,root,{cycle,btc,eth,expiresAtUnixSeconds:Date.now()/1000+30},()=>true,
+      async(update,beforeCommit,reference)=>{
+        assert.equal(reference.audit,`WINDOW_${cycle}_AUDIT.json`);
+        assert.equal(reference.update,`WINDOW_${cycle}_UPDATE.json`);
+        const writer=await store.acquireWriter();
+        try {
+          const previous=await fs.readFile(join(store.root,'CURRENT.json'));
+          await assert.rejects(publishStoredMarket(store,writer,update,beforeCommit,()=>{},{...reference,
+            audit:`ROUND_${cycle}_AUDIT.json`,update:`ROUND_${cycle}_UPDATE.json`}),
+            e=>e.name==='ZodError'&&e.issues.some(x=>x.path[0]==='update'));
+          oldNameRejected=true;
+          assert.deepEqual(await fs.readFile(join(store.root,'CURRENT.json')),previous);
+          await assert.rejects(fs.stat(join(store.root,'PENDING.json')),e=>e.code==='ENOENT');
+          return await publishStoredMarket(store,writer,update,beforeCommit,()=>{},reference);
+        } finally {await store.releaseWriter(writer);}
+      },[]);
+    assert(result.changed);
+    await reader.refresh(performance.now()+cycle*1000);
+    assert.equal(reader.capture().version,result.selected.version);
+    const journal=await auditJournal(store.root);
+    assert.equal(journal.sequence,results.length+1);
+    results.push({cycle,oldNameRejected,result,journal,ordinaryReaderSelected:reader.capture().version});
+  }
+  assert.deepEqual(held.metadata.readings,initial);
+  assert.notEqual(reader.capture().version,held.version);
+  // Exact legacy naming and the former three-slot limit remain unchanged.
+  const legacy=await fixtureRoot('legacy-capture-names-');
+  await put(join(legacy,'ADMISSION.json'),{task:admission.task,family:'trade',jobRoot:legacy,nonce:admission.nonce});
+  const b=await capture(legacy,1,'BTC_1',[{date:String(Math.floor(Date.now()/1000)-1),tid:'1',price:'80000'}]);
+  const e=await capture(legacy,2,'ETH_1',[{date:String(Math.floor(Date.now()/1000)-1),tid:'1',price:'2500'}]);
+  let legacyReference;
+  await publishTrade(tinyStore(),legacy,{cycle:1,btc:b,eth:e,expiresAtUnixSeconds:Date.now()/1000+30},()=>true,
+    async(u,check,ref)=>{check();legacyReference=ref;return {selected:{version:h},changed:true};},[]);
+  assert.equal(legacyReference.audit,'ROUND_1_AUDIT.json');
+  assert.equal(legacyReference.update,'ROUND_1_UPDATE.json');
+  await assert.rejects(publishTrade(tinyStore(),legacy,{cycle:4},()=>true,()=>{},[]),/TRADE_CYCLE/);
+  await put(join(T,'evidence/POST_SESSION_STORAGE_CONTRACT.json'),{status:'PASS',synthetic:true,
+    publicRequests:0,baseAdmissions:0,apiListeners:0,hardNetworkDenied:true,results,legacyReference,
+    heldViewUnchanged:true,limitation:'Actual product storage/journal/certificate/ordinary reader; no genuine paired recovery or public rerun.'});
+  console.log('POST_SESSION_STORAGE_CONTRACT_PASS');
+}
+if(resolve(process.argv[1]??'')===fileURLToPath(import.meta.url))
+  await (process.argv[2]==='storage-contract'?storageContract():main());
