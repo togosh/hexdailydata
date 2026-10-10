@@ -68,6 +68,8 @@ export async function finalEvidence({
     '/api/v2/stakes?limit=1',
   ];
   f.controls.now = Date.now();
+  // Preview requests advance controls.now; restore must use the API comparison clock.
+  const comparisonNow = f.controls.now;
   const responses = {};
   for (const url of routes) {
     const r = await f.inject(url);
@@ -124,7 +126,7 @@ export async function finalEvidence({
     },
     routes,
     responses,
-    now: f.controls.now,
+    now: comparisonNow,
   };
 }
 export async function previews({ R, origin, save, f, budget = defaultBudget }) {
@@ -305,20 +307,7 @@ export async function restoreProof({
         { evidenceRoot: join(R, 'evidence') },
       ),
     );
-    f.controls.now = final.now;
-    const comparable = (v) =>
-      JSON.parse(JSON.stringify(v, (k, v) => (k === 'nextCursor' && v !== null ? 'present' : v)));
-    for (const url of final.routes) {
-      const r = await f.inject(url);
-      assert.equal(r.statusCode, 200);
-      assert.deepEqual(comparable(r.json()), comparable(final.responses[url]));
-    }
-    const csv = await f.inject({
-      url: '/api/v2/downloads/' + p.bundleId + '/daily',
-      headers: auth(),
-    });
-    assert.equal(csv.statusCode, 200);
-    assert.equal(sha(csv.body), final.expected.csvSha256);
+    await verifyRestoredResponses({ f, final, product: p });
     await save('GENUINE_RESTORE', {
       status: 'PASS',
       receipt: restored.receipt,
@@ -336,4 +325,28 @@ export async function restoreProof({
     for (const [o, n, fn] of originals) o[n] = fn;
     syncBuiltinESMExports();
   }
+}
+
+// Reusable affected comparison, including a recheck of an already restored root.
+// This neither creates a restore nor relaxes values, freshness or access assertions.
+export async function verifyRestoredResponses({ f, final, product }) {
+  assert.equal(
+    new Date(Math.floor(final.now / 1000) * 1000).toISOString(),
+    final.responses['/api/v2/live'].servedAtUtc,
+    'RESTORE_COMPARISON_CLOCK_MISMATCH',
+  );
+  f.controls.now = final.now;
+  const comparable = (v) =>
+    JSON.parse(JSON.stringify(v, (k, v) => (k === 'nextCursor' && v !== null ? 'present' : v)));
+  for (const url of final.routes) {
+    const r = await f.inject(url);
+    assert.equal(r.statusCode, 200);
+    assert.deepEqual(comparable(r.json()), comparable(final.responses[url]));
+  }
+  const csv = await f.inject({
+    url: '/api/v2/downloads/' + product.bundleId + '/daily',
+    headers: auth(),
+  });
+  assert.equal(csv.statusCode, 200);
+  assert.equal(sha(csv.body), final.expected.csvSha256);
 }
