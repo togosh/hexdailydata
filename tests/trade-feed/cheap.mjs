@@ -39,6 +39,10 @@ try {
   assert.equal((await readCommand(commands, 1)).command, null);
   await atomicCommand(commands, { ordinal: 2, command: 'close' });
   assert.equal((await readCommand(commands, 1)).command.command, 'close');
+  const freshOwnerCommands = join(commands, 'fresh-owner');
+  assert.equal((await readCommand(freshOwnerCommands, 0)).command, null);
+  await atomicCommand(freshOwnerCommands, { ordinal: 1, command: 'offline' });
+  assert.equal((await readCommand(freshOwnerCommands, 0)).command.command, 'offline');
   checks.push('atomic complete replacement, refusal recovery and repeat no-op');
   const normal = await composed({ R: C, real: fake, base: null, save, budget, setupOnly: true });
   assert(normal.distinctReferences);

@@ -10,7 +10,18 @@ const C = join(R, 'continuation-r1'),
   repo = process.cwd();
 const read = async (p) => JSON.parse(await readFile(p));
 const put = (p, v) => writeFile(p, JSON.stringify(v, null, 2) + '\n');
-const save = (n, v) => put(join(C, 'evidence', n + '.json'), v);
+const save = async (n, v) => {
+  const path = join(C, 'evidence', n + '.json');
+  const old = await readFile(path).catch((e) => {
+    if (e.code === 'ENOENT') return null;
+    throw e;
+  });
+  if (old) {
+    await mkdir(join(C, 'evidence/history'), { recursive: true });
+    await writeFile(join(C, 'evidence/history', n + '-' + digest(old) + '.json'), old);
+  }
+  await put(path, v);
+};
 const present = async (p) =>
   !!(await lstat(p).catch((e) => {
     if (e.code === 'ENOENT') return null;
@@ -39,6 +50,8 @@ async function walk(dir) {
   }
 }
 await walk('dist');
+names.add('config/limits.json');
+await walk('account/dist/ui');
 const runtimeFiles = {};
 for (const p of [...names].sort()) runtimeFiles[p] = digest(await readFile(join(repo, p)));
 const runtimeHash = digest(JSON.stringify(runtimeFiles));
@@ -77,6 +90,8 @@ ledger.additional.push(entry);
 await put(ledgerPath, ledger);
 const ownerRoot = join(C, 'owners', String(ordinal));
 await mkdir(ownerRoot, { recursive: true });
+const commandRoot = join(ownerRoot, 'commands');
+await mkdir(commandRoot);
 const profile = await read(join(R, 'SELECTED_PROFILE.json'));
 const budget = createBudget(join(C, 'evidence'));
 let base, real, reader, f, held, heldExport, seed, origin, final, trial;
@@ -93,6 +108,7 @@ const loaded = {
   runtimeFiles,
   commit: execFileSync('git', ['rev-parse', 'HEAD']).toString().trim(),
   freshProcess: true,
+  commandRoot,
 };
 await put(join(ownerRoot, 'LOADED_RUNTIME.json'), loaded);
 await save('LOADED_RUNTIME', loaded);
@@ -177,7 +193,7 @@ try {
   }
   let last = 0;
   while (Date.now() - started < 3 * 3600000) {
-    const c = await readCommand(C, last);
+    const c = await readCommand(commandRoot, last);
     if (c.refusal && !refused.has(c.refusal.sha256)) {
       refused.add(c.refusal.sha256);
       await save('COMMAND_REFUSAL_' + c.refusal.sha256, c.refusal);
