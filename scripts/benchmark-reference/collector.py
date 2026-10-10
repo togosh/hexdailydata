@@ -11,9 +11,9 @@ CAP = 1048576
 HEADER = 65536
 RESERVATION = CAP + HEADER
 
-def native(args, env, wait=27, reap=2):
+def native(args, env, wait=27, reap=2, *, stdin=None):
     started = time.monotonic()
-    child = subprocess.Popen(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    child = subprocess.Popen(args, env=env, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     reaped = False
     interrupted = None
     timed = False

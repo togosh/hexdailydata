@@ -9,7 +9,7 @@ from client import Session,URLS,CAP,RESERVATION,exact_request,save,strict_json,p
 sys.path.insert(0,str(W/'scripts/trade-feed'))
 from collector import collect
 from worker import perform_request
-R=Path(os.environ['HDD_TASK_ROOT']);assert R.name in ('btc-eth-current-reference-freshness-r2','transport-recovery-r1')
+R=Path(os.environ['HDD_TASK_ROOT']);assert R.name in ('btc-eth-current-reference-freshness-r2','transport-recovery-r1','worker-stdin-isolation-r1')
 (R/'fixtures').mkdir(exist_ok=True)
 spec=importlib.util.spec_from_file_location('get_worker',W/'scripts/benchmark-reference/get_worker.py');worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker);worker.CAP=CAP
 cases=[]
@@ -60,6 +60,34 @@ def retry():
   s,c,calls=setup([first,response()]);s.get(URLS[0],'markets');s.close('done');assert s.state['attempts']==2 and s.state['extras']==1 and calls[1][1]-calls[0][1]>=2
   assert s.state['chargedBytes']==2*RESERVATION and calls[0][0]['url']==calls[1][0]['url']
 test('only single identical timeout/503 retry with retained charges',retry)
+def isolation_retry():
+ from authority import ISOLATION_AUTHORITY
+ for began,first in [(False,'timeout'),(True,'timeout'),(False,response(503,body=b'closed'))]:
+  s,c,calls=setup([first,response()]);s.a['authorityTaskId']=ISOLATION_AUTHORITY;runner=s.runner
+  def phased(args,env,*rest):
+   life=runner(args,env,*rest)
+   if began:
+    (Path(args[-1]).parent/'PHASES.ndjson').write_text(json.dumps({'event':'dns_tcp_tls_connection_begin','unixSeconds':c.wall()})+'\n')
+   return life
+  s.runner=phased
+  if not began and first=='timeout':refused(lambda:s.get(URLS[0],'markets'));assert len(calls)==1
+  else:s.get(URLS[0],'markets');assert len(calls)==2
+  s.close('isolated grant policy fixture');assert s.state['status']=='CLOSED' and s.state['chargedBytes']==len(calls)*RESERVATION
+test('new grant pre-network timeout terminal; begun-network timeout and complete503 keep single retry',isolation_retry)
+def native_policy():
+ import client,subprocess
+ calls=[];original=client.native_module.subprocess.Popen
+ class P:
+  returncode=0
+  def __init__(self,*a,**kw):calls.append(kw)
+  def communicate(self,timeout):return b'',b''
+ try:
+  client.native_module.subprocess.Popen=P
+  client.native([],{},1,1);client.worker_native([],{},1,1)
+ finally:client.native_module.subprocess.Popen=original
+ assert calls[0]['stdin'] is None and calls[1]['stdin']==subprocess.DEVNULL
+ assert calls[0]['stdout']==calls[1]['stdout']==subprocess.PIPE
+test('maintained native default unchanged; actual trade worker alone opts into DEVNULL',native_policy)
 def stops():
  for body in [response(301),response(429),response(401),response(503,extra=b'Content-Length: 0\r\n'),response(body=b'[{"a":1,"a":2}]'),response(body=b'{bad'),response(extra=b'Content-Encoding: gzip\r\n'),response(body=b'x'*(CAP+1)),response(extra=b'X: '+b'a'*65536+b'\r\n'),response(extra=b'Set-Cookie: private=value\r\n')]:
   s,c,calls=setup([body,response()]);refused(lambda:s.get(URLS[0],'markets'));assert len(calls)==1;s.close('expected terminal');assert s.state['status']=='CLOSED'

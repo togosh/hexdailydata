@@ -27,6 +27,14 @@ export async function tradeStorageGuard(root, reserve = 0, initial = false) {
 }
 export const recoveryTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-TRANSPORT-RECOVERY-R1';
 const recoveryRoot = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1`;
+export const isolationTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-WORKER-STDIN-ISOLATION-R1';
+const isolationRoot = join(dirname(recoveryRoot), 'worker-stdin-isolation-r1');
+export async function runIsolationTrades(options) {
+  return runFiniteTrades(
+    { ...options, taskRoot: isolationRoot, preflightPath: join(isolationRoot, 'PREFLIGHT.json') },
+    isolationTaskId,
+  );
+}
 export async function runTrades(options) {
   return runFiniteTrades(options, false);
 }
@@ -42,6 +50,9 @@ async function runFiniteTrades(
 ) {
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
+  const isolated = recovery === isolationTaskId,
+    authorityId = isolated ? isolationTaskId : recoveryTaskId,
+    authorityRoot = isolated ? isolationRoot : recoveryRoot;
   // Refuse spent/uncertain state before any interpretation of an old preflight.
   for (const name of ['session', 'PUBLIC_ADMISSION.json'])
     if (
@@ -67,10 +78,11 @@ async function runFiniteTrades(
     const ready = JSON.parse(await readFile(join(taskRoot, 'evidence/READY.json')));
     if (
       synthetic ||
-      pre.authorityTaskId !== recoveryTaskId ||
-      scope.taskId !== recoveryTaskId ||
-      resolve(scope.paths.newRoot) !== recoveryRoot ||
-      resolve(scope.network.sessionPath) !== join(recoveryRoot, 'session') ||
+      pre.authorityTaskId !== authorityId ||
+      scope.taskId !== authorityId ||
+      taskRoot !== authorityRoot ||
+      resolve(isolated ? scope.paths.taskRoot : scope.paths.newRoot) !== authorityRoot ||
+      resolve(scope.network.sessionPath) !== join(authorityRoot, 'session') ||
       pre.scopeSha256 !== sha(await readFile(join(taskRoot, 'packet/SCOPE.json'))) ||
       pre.readySha256 !== sha(await readFile(join(taskRoot, 'evidence/READY.json'))) ||
       ready.status !== 'PASS' ||
@@ -79,6 +91,11 @@ async function runFiniteTrades(
       sha(JSON.stringify(pre.runtimeFiles)) !== pre.runtimeHash
     )
       throw Error('EXACT_RECOVERY_READY_AUTHORITY');
+    if (isolated) {
+      const gate = await readFile(join(taskRoot, 'evidence/CAUSAL_GATE.json'));
+      if (pre.causalGateSha256 !== sha(gate) || JSON.parse(gate).status !== 'PASS')
+        throw Error('EXACT_CAUSAL_GATE_REQUIRED');
+    }
   } else if (pre.authorityTaskId) throw Error('RECOVERY_AUTHORITY_IN_OLD_ENTRY');
   if (
     (continuation || recovery) &&
@@ -139,7 +156,7 @@ async function runFiniteTrades(
     await mkdir(join(output, 'temp'));
     const nonce = randomBytes(32).toString('hex');
     const authority = recovery
-      ? { authorityTaskId: recoveryTaskId, scopeSha256: pre.scopeSha256, nonce }
+      ? { authorityTaskId: authorityId, scopeSha256: pre.scopeSha256, nonce }
       : {};
     await durableJson(marker, {
       taskId,

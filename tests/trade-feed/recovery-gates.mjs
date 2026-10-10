@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { runTrades, runRecoveryTrades } from '../../scripts/trade-refresh.mjs';
+import { runTrades, runRecoveryTrades, runIsolationTrades } from '../../scripts/trade-refresh.mjs';
 const R = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2`;
-const T = join(R, 'transport-recovery-r1');
+const T = join(R, 'worker-stdin-isolation-r1');
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 const original = await readFile(join(R, 'PUBLIC_ADMISSION.json'));
 await assert.rejects(
@@ -12,7 +12,13 @@ await assert.rejects(
   /EXISTING_OR_UNCERTAIN_TRADE_SESSION/,
 );
 assert.deepEqual(await readFile(join(R, 'PUBLIC_ADMISSION.json')), original);
-await assert.rejects(runRecoveryTrades({}), /ENOENT/); // No reviewed loaded-ready preflight yet.
+const priorRecovery = await readFile(join(R, 'transport-recovery-r1/PUBLIC_ADMISSION.json'));
+await assert.rejects(runRecoveryTrades({}), /EXISTING_OR_UNCERTAIN_TRADE_SESSION/);
+assert.deepEqual(
+  await readFile(join(R, 'transport-recovery-r1/PUBLIC_ADMISSION.json')),
+  priorRecovery,
+);
+await assert.rejects(runIsolationTrades({}), /ENOENT/); // No reviewed loaded-ready preflight yet.
 for (const name of ['session', 'PUBLIC_ADMISSION.json', 'evidence/BASE_ADMISSIONS.json'])
   assert.equal(
     await lstat(join(T, name)).catch((e) => {

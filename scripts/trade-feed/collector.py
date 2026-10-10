@@ -7,6 +7,20 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from client import Session,TASK,URLS,W,strict_json,digest,save
 from authority import validate_authority
 
+def start_reader(incoming, stream=None):
+    """Keep the owner command pipe in the collector, including its waiting read."""
+    stream = sys.stdin if stream is None else stream
+    def reader():
+        for line in stream:
+            try:
+                if len(line)>32768:raise ValueError('IPC bound')
+                incoming.put(strict_json(line))
+            except BaseException as e:incoming.put({'ok':False,'reason':str(e)})
+        incoming.put({'ok':False,'reason':'Owner input closed'})
+    thread = threading.Thread(target=reader,daemon=True)
+    thread.start()
+    return thread
+
 def collect(session,exchange,clock=time.monotonic,sleep=time.sleep):
     markets=session.get(URLS[0],'markets')
     exchange('markets',0,markets=markets)
@@ -31,14 +45,7 @@ def main():
     assert 0<=time.time()-a['startedAtUnixSeconds']<=30
     for p,h in a['runtimeFiles'].items():assert digest((W/p).read_bytes())==h,p
     session=Session(root,a);incoming=queue.Queue()
-    def reader():
-        for line in sys.stdin:
-            try:
-                if len(line)>32768:raise ValueError('IPC bound')
-                incoming.put(strict_json(line))
-            except BaseException as e:incoming.put({'ok':False,'reason':str(e)})
-        incoming.put({'ok':False,'reason':'Owner input closed'})
-    threading.Thread(target=reader,daemon=True).start()
+    start_reader(incoming)
     def exchange(kind,cycle,**extra):
         session.check(31)
         msg={'type':kind,'cycle':cycle,'expiresAtUnixSeconds':time.time()+30,**extra}

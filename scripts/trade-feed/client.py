@@ -2,14 +2,19 @@
 import sys
 sys.dont_write_bytecode = True
 from pathlib import Path
-import importlib.util, json, time, shutil, os
+import importlib.util, json, time, shutil, os, subprocess
 W = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(W/'scripts/market-refresh'))
 from durable import save, strict_json, digest, utc
 from http_framing import verify_framing
+sys.path.insert(0, str(W/'scripts/trade-feed'))
+from authority import ISOLATION_AUTHORITY
 spec=importlib.util.spec_from_file_location('historical_native',W/'scripts/benchmark-reference/collector.py')
 native_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(native_module)
 native=native_module.native
+def worker_native(args, env, wait=27, reap=2):
+    # This child reads files only. The collector must retain its own command pipe.
+    return native(args, env, wait, reap, stdin=subprocess.DEVNULL)
 TASK='HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2'
 URLS=('https://www.bitstamp.net/api/v2/markets/','https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute','https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute')
 CAP=2097152; HEADER=65536; RESERVATION=2162688
@@ -36,11 +41,12 @@ def parsed_objects(raw):
             queue.extend(v.values() if isinstance(v,dict) else v)
     return count
 
-def retryable(row):
-    return row['closed'] and not row.get('integrityFailure') and ((row['failureKind']=='timeout') or (row['complete'] and row['status'] in (502,503,504)))
+def retryable(row, require_network_begin=False):
+    timeout = row['failureKind']=='timeout' and (not require_network_begin or row.get('networkConnectionBegan') is True)
+    return row['closed'] and not row.get('integrityFailure') and (timeout or (row['complete'] and row['status'] in (502,503,504)))
 
 class Session:
-    def __init__(self,root,admission,runner=native,mono=time.monotonic,wall=time.time,sleep=time.sleep):
+    def __init__(self,root,admission,runner=worker_native,mono=time.monotonic,wall=time.time,sleep=time.sleep):
         self.root=Path(root);self.a=admission;self.runner=runner;self.mono=mono;self.wall=wall;self.sleep=sleep
         if (self.root/'ACCOUNTING.json').exists():raise ValueError('Consumed session')
         self.start=mono();self.remaining=600-(wall()-admission['startedAtUnixSeconds']);self.last=None
@@ -105,6 +111,9 @@ class Session:
             if meta.get('failureKind')=='terminal':integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
+            isolated_grant = self.a.get('authorityTaskId') == ISOLATION_AUTHORITY
+            if isolated_grant:
+                row['networkConnectionBegan'] = any(p.get('event')=='dns_tcp_tls_connection_begin' for p in phases)
             save(folder/'AUDIT.json',row)
             s['diagnosticBytes']+=diagnostics
             s['requests'].append(row);s['chargedObjects']+=count;s['observedBodyBytes']+=len(raw);s['observedWireBytes']+=row['wireBytes'];s['observedHeaderBytes']+=len(headers)
@@ -116,7 +125,7 @@ class Session:
             if integrity:raise ValueError('Integrity: '+integrity)
             if complete and meta.get('status')==200 and life['exit']==0 and not life['timeout']:
                 return {'attempt':s['attempts'],'bodySha256':row['bodySha256'],'bodyBytes':len(raw),'objects':count}
-            if ordinal==0 and retryable(row):continue
+            if ordinal==0 and retryable(row, require_network_begin=isolated_grant):continue
             raise ValueError('Terminal or exhausted request: '+str(meta.get('status')))
     def close(self,reason):
         self.state.update(status='CLOSED' if self.state['closureKnown'] and self.state['pending'] is None else 'UNKNOWN',closureReason=reason,closedAtUtc=utc(),elapsedSeconds=self.mono()-self.start)
