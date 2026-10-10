@@ -35,12 +35,14 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
         def connect(self):
             gate()
             phase('dns_tcp_tls_connection_begin')
+            gate()  # Durable diagnostics may stall; do not dispatch after them unchecked.
             super().connect()
             phase('dns_tcp_tls_connection_complete')
 
         def request(self, *args, **kwargs):
             gate()
             phase('request_begin')
+            gate()
             result = super().request(*args, **kwargs)
             phase('request_complete')
             return result

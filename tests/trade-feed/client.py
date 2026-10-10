@@ -90,6 +90,24 @@ def final_dispatch_gates():
  invoked=[]
  refused(lambda:perform_request(q,a,s.root,lambda *args:invoked.append(True),clock.wall,C));assert not invoked
 test('post-reservation and actual pre-HTTP deadline gates retain charge and prevent dispatch',final_dispatch_gates)
+def delayed_phase_gates():
+ for target in ['request_begin','dns_tcp_tls_connection_begin']:
+  clock=Clock();entered=[]
+  class C:
+   def request(self,*args,**kwargs):entered.append('request')
+   def connect(self):entered.append('connect')
+  class Phases:
+   def emit(self,event):
+    if event==target:clock.t=536
+  def perform(url,folder,connection):
+   conn=connection()
+   if target=='request_begin':conn.request('GET','/api/v2/markets/')
+   else:conn.connect()
+  a={'startedAtUnixSeconds':100000};q={'url':URLS[0],'dispatchByUnixSeconds':100535}
+  refused(lambda:perform_request(q,a,R/'fixtures',perform,clock.wall,C,Phases()))
+  assert clock.t==536 and not entered
+ testname='delayed durable begin-phase write refuses native request and combined DNS/TCP/TLS after deadline'
+test('delayed phase writes cannot bypass final native dispatch gates',delayed_phase_gates)
 def error_objects():
  s,c,calls=setup([response(503,body=b'[{"error":"temporary"}]'),response()]);s.get(URLS[0],'markets');s.close('done');assert s.state['chargedObjects']==3
  body=('['+','.join(['{}']*20000)+']').encode();s,c,calls=setup([response(503,body=body),response()]);refused(lambda:s.get(URLS[0],'markets'));assert len(calls)==1 and s.state['requests'][0]['integrityFailure']=='Object bound';s.close('object bound')
