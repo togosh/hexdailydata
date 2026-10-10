@@ -205,134 +205,205 @@ async function fresh() {
     },
   };
 }
-const cases = [];
-for (const mode of [
-  'success',
-  'active',
-  'unknown',
-  'foreign-owner',
-  'changed-pointer',
-  'frontier',
-  'journal',
-  'pending',
-  'retention',
-  'destination',
-  'concurrent',
-  'hardlink',
-  'late-pointer',
-  'late-journal',
-  'intent',
-  'renamed-intent',
-  'renamed-participantLock',
-  'renamed-marketLock',
-  'receipt',
-]) {
-  const f = await fresh(),
-    p = f.plan;
-  const before = await fs.readFile(join(p.productRoot, 'CURRENT.json'));
-  let phase = async () => {};
-  const mutate = async (key, fn, rehash = false) => {
-    const file = join(f.root, f.paths[key]);
-    const v = JSON.parse(await fs.readFile(file));
-    fn(v);
-    await put(file, v);
-    if (rehash) await f.refresh(key);
-  };
-  const originalKill = process.kill;
-  if (mode === 'active') process.kill = () => true;
-  if (mode === 'unknown')
-    process.kill = () => {
-      throw Object.assign(Error('unknown'), { code: 'EPERM' });
-    };
-  if (mode === 'foreign-owner')
-    await mutate('intent', (v) => (v.owner = '22222222-2222-4222-8222-222222222222'), true);
-  if (mode === 'changed-pointer')
-    await mutate('participantCurrent', (v) => (v.product.version = 'f'.repeat(64)));
-  if (mode === 'frontier') await mutate('storage', (v) => v.sequence++, true);
-  if (mode === 'journal')
-    await fs.appendFile(join(p.productRoot, 'journal/00000000.ndjson'), '{}\n');
-  if (mode === 'pending') await put(join(p.productRoot, 'PENDING.json'), {});
-  if (mode === 'retention') await put(join(p.productRoot, 'RETENTION_PENDING.json'), {});
-  if (mode === 'destination') await put(join(p.root, `CLOSED_INTENT-${p.owner}.json`), {});
-  if (mode === 'concurrent') await put(join(p.root, 'RECOVERY.lock'), {});
-  if (mode === 'hardlink')
-    await fs.link(join(p.root, 'INTENT.json'), join(f.root, 'hardlink.json'));
-  if (mode === 'late-pointer')
-    phase = async (name) => {
-      if (name === 'verified')
-        await mutate('participantCurrent', (v) => (v.product.version = 'e'.repeat(64)));
-    };
-  if (mode === 'late-journal')
-    phase = async (name) => {
-      if (name === 'verified')
-        await fs.appendFile(join(p.productRoot, 'journal/00000000.ndjson'), '{}\n');
-    };
-  if (
-    [
-      'intent',
-      'renamed-intent',
-      'renamed-participantLock',
-      'renamed-marketLock',
-      'receipt',
-    ].includes(mode)
-  )
-    phase = async (name) => {
-      if (name === mode) throw Error('INJECTED_INTERRUPTION:' + name);
-    };
-  let result, error;
-  try {
-    result = await abortClosedTradePublication(p, { phase });
-  } catch (e) {
-    error = String(e);
-  } finally {
-    process.kill = originalKill;
-  }
-  assert.deepEqual(await fs.readFile(join(p.productRoot, 'CURRENT.json')), before);
-  const afterIntent = [
+if (process.argv[2] !== 'owner-guards') {
+  const cases = [];
+  for (const mode of [
+    'success',
+    'active',
+    'unknown',
+    'foreign-owner',
+    'changed-pointer',
+    'frontier',
+    'journal',
+    'pending',
+    'retention',
+    'destination',
+    'concurrent',
+    'hardlink',
+    'late-pointer',
+    'late-journal',
     'intent',
     'renamed-intent',
     'renamed-participantLock',
     'renamed-marketLock',
     'receipt',
-  ].includes(mode);
-  if (mode === 'success') {
-    assert.equal(result.outcome, 'ABORTED_BEFORE_PRODUCT');
-    for (const n of ['INTENT.json', 'SELECTION.lock', 'RECOVERY.lock'])
-      assert(!(await exists(join(p.root, n))));
-    assert(!(await exists(join(p.productRoot, 'MARKET_REFRESH.lock'))));
-    assert(!(await exists(join(p.productRoot, 'SELECTION.lock'))));
-    assert.equal(
-      sha(await fs.readFile(join(p.root, `CLOSED_INTENT-${p.owner}.json`))),
-      p.hashes.intent,
-    );
-    assert.equal((await inspectStorage(p.productRoot)).status, 'READABLE');
-    await planRetention(p.productRoot);
-    await assert.rejects(abortClosedTradePublication(p));
-  } else {
-    assert(error, mode);
-    if (afterIntent) {
-      assert(await exists(join(p.root, 'RECOVERY.lock')));
-      assert(await exists(join(p.productRoot, 'SELECTION.lock')));
-    } else {
-      assert(await exists(join(p.root, 'INTENT.json')));
-      assert(await exists(join(p.root, 'SELECTION.lock')));
-      assert(await exists(join(p.productRoot, 'MARKET_REFRESH.lock')));
+  ]) {
+    const f = await fresh(),
+      p = f.plan;
+    const before = await fs.readFile(join(p.productRoot, 'CURRENT.json'));
+    let phase = async () => {};
+    const mutate = async (key, fn, rehash = false) => {
+      const file = join(f.root, f.paths[key]);
+      const v = JSON.parse(await fs.readFile(file));
+      fn(v);
+      await put(file, v);
+      if (rehash) await f.refresh(key);
+    };
+    const originalKill = process.kill;
+    if (mode === 'active') process.kill = () => true;
+    if (mode === 'unknown')
+      process.kill = () => {
+        throw Object.assign(Error('unknown'), { code: 'EPERM' });
+      };
+    if (mode === 'foreign-owner')
+      await mutate('intent', (v) => (v.owner = '22222222-2222-4222-8222-222222222222'), true);
+    if (mode === 'changed-pointer')
+      await mutate('participantCurrent', (v) => (v.product.version = 'f'.repeat(64)));
+    if (mode === 'frontier') await mutate('storage', (v) => v.sequence++, true);
+    if (mode === 'journal')
+      await fs.appendFile(join(p.productRoot, 'journal/00000000.ndjson'), '{}\n');
+    if (mode === 'pending') await put(join(p.productRoot, 'PENDING.json'), {});
+    if (mode === 'retention') await put(join(p.productRoot, 'RETENTION_PENDING.json'), {});
+    if (mode === 'destination') await put(join(p.root, `CLOSED_INTENT-${p.owner}.json`), {});
+    if (mode === 'concurrent') await put(join(p.root, 'RECOVERY.lock'), {});
+    if (mode === 'hardlink')
+      await fs.link(join(p.root, 'INTENT.json'), join(f.root, 'hardlink.json'));
+    if (mode === 'late-pointer')
+      phase = async (name) => {
+        if (name === 'verified')
+          await mutate('participantCurrent', (v) => (v.product.version = 'e'.repeat(64)));
+      };
+    if (mode === 'late-journal')
+      phase = async (name) => {
+        if (name === 'verified')
+          await fs.appendFile(join(p.productRoot, 'journal/00000000.ndjson'), '{}\n');
+      };
+    if (
+      [
+        'intent',
+        'renamed-intent',
+        'renamed-participantLock',
+        'renamed-marketLock',
+        'receipt',
+      ].includes(mode)
+    )
+      phase = async (name) => {
+        if (name === mode) throw Error('INJECTED_INTERRUPTION:' + name);
+      };
+    let result, error;
+    try {
+      result = await abortClosedTradePublication(p, { phase });
+    } catch (e) {
+      error = String(e);
+    } finally {
+      process.kill = originalKill;
     }
+    assert.deepEqual(await fs.readFile(join(p.productRoot, 'CURRENT.json')), before);
+    const afterIntent = [
+      'intent',
+      'renamed-intent',
+      'renamed-participantLock',
+      'renamed-marketLock',
+      'receipt',
+    ].includes(mode);
+    if (mode === 'success') {
+      assert.equal(result.outcome, 'ABORTED_BEFORE_PRODUCT');
+      for (const n of ['INTENT.json', 'SELECTION.lock', 'RECOVERY.lock'])
+        assert(!(await exists(join(p.root, n))));
+      assert(!(await exists(join(p.productRoot, 'MARKET_REFRESH.lock'))));
+      assert(!(await exists(join(p.productRoot, 'SELECTION.lock'))));
+      assert.equal(
+        sha(await fs.readFile(join(p.root, `CLOSED_INTENT-${p.owner}.json`))),
+        p.hashes.intent,
+      );
+      assert.equal((await inspectStorage(p.productRoot)).status, 'READABLE');
+      await planRetention(p.productRoot);
+      await assert.rejects(abortClosedTradePublication(p));
+    } else {
+      assert(error, mode);
+      if (afterIntent) {
+        assert(await exists(join(p.root, 'RECOVERY.lock')));
+        assert(await exists(join(p.productRoot, 'SELECTION.lock')));
+      } else {
+        assert(await exists(join(p.root, 'INTENT.json')));
+        assert(await exists(join(p.root, 'SELECTION.lock')));
+        assert(await exists(join(p.productRoot, 'MARKET_REFRESH.lock')));
+      }
+    }
+    cases.push({
+      mode,
+      root: f.root,
+      error: error ?? null,
+      result: result ?? null,
+      productPointerUnchanged: true,
+      interruptedExclusionRetained: afterIntent,
+    });
   }
-  cases.push({
-    mode,
-    root: f.root,
-    error: error ?? null,
-    result: result ?? null,
-    productPointerUnchanged: true,
-    interruptedExclusionRetained: afterIntent,
+  await put(join(C, 'evidence/RECOVERY_TESTS.json'), {
+    status: 'PASS',
+    publicRequests: 0,
+    baseAdmissions: 0,
+    networkHardDenied: true,
+    cases,
   });
+  console.log('OFFLINE_RECOVERY_PASS ' + cases.length);
+} else {
+  const { literalLookup, finishRecoveryProof } = await import('./recovery-owner.mjs');
+  const all = await new Promise((resolve) =>
+    literalLookup('127.0.0.1', { all: true }, (e, a) => {
+      assert.equal(e, null);
+      resolve(a);
+    }),
+  );
+  assert.deepEqual(all, [{ address: '127.0.0.1', family: 4 }]);
+  await new Promise((resolve) =>
+    literalLookup('127.0.0.1', (e, a, f) => {
+      assert.equal(e, null);
+      assert.equal(a, '127.0.0.1');
+      assert.equal(f, 4);
+      resolve();
+    }),
+  );
+  for (const h of ['localhost', '::1', 'www.bitstamp.net', '127.0.0.2'])
+    assert.throws(() => literalLookup(h, {}, () => {}), /OFFLINE_DNS_DENIED/);
+  const cases = [];
+  for (const mode of [
+    'pass',
+    'application-close-failure',
+    'base-close-failure',
+    'restore-failure',
+    'missing-restore',
+    'prior-failure',
+  ]) {
+    let restores = 0,
+      baseCloses = 0;
+    const r = await finishRecoveryProof(
+      [
+        [
+          'application',
+          async () => {
+            if (mode === 'application-close-failure') throw Error('INJECTED_APP_CLOSE');
+          },
+        ],
+      ],
+      async () => {
+        baseCloses++;
+        if (mode === 'base-close-failure') throw Error('INJECTED_BASE_CLOSE');
+      },
+      mode === 'missing-restore'
+        ? null
+        : async () => {
+            restores++;
+            if (mode === 'restore-failure') throw Error('INJECTED_RESTORE');
+          },
+      mode === 'prior-failure' ? { error: 'INJECTED_PRIOR' } : null,
+    );
+    assert.equal(baseCloses, 1);
+    if (mode === 'pass') {
+      assert.equal(r.failure, null);
+      assert(r.restoreCompleted);
+    } else assert(r.failure, mode);
+    if (['application-close-failure', 'prior-failure', 'missing-restore'].includes(mode))
+      assert.equal(restores, 0);
+    cases.push({ mode, restores, baseCloses, ...r });
+  }
+  await put(join(C, 'evidence/OWNER_GUARDS.json'), {
+    status: 'PASS',
+    publicRequests: 0,
+    baseAdmissions: 0,
+    listeners: 0,
+    literalLookup: 'deterministic no DNS',
+    cases,
+  });
+  console.log('OWNER_GUARDS_PASS');
 }
-await put(join(C, 'evidence/RECOVERY_TESTS.json'), {
-  status: 'PASS',
-  publicRequests: 0,
-  baseAdmissions: 0,
-  networkHardDenied: true,
-  cases,
-});
-console.log('OFFLINE_RECOVERY_PASS ' + cases.length);

@@ -15,6 +15,40 @@ const T = join(R, 'operating-refresh-r1'),
 const read = async (p) => JSON.parse(await fs.readFile(p));
 const put = (p, v) => fs.writeFile(p, JSON.stringify(v, null, 2) + '\n');
 const save = (n, v) => put(join(C, 'evidence', n + '.json'), v);
+export function literalLookup(host, options, callback) {
+  if (host !== '127.0.0.1') throw Error('OFFLINE_DNS_DENIED');
+  if (typeof options === 'function') {
+    callback = options;
+    options = {};
+  }
+  process.nextTick(() =>
+    options?.all
+      ? callback(null, [{ address: '127.0.0.1', family: 4 }])
+      : callback(null, '127.0.0.1', 4),
+  );
+}
+export async function finishRecoveryProof(resources, baseClose, restore, initialFailure) {
+  const closed = await closeOwned(resources);
+  let failure = initialFailure,
+    restoreCompleted = false,
+    baseClosed;
+  try {
+    if (!closed.known)
+      failure = { error: 'APPLICATION_CLOSURE_UNKNOWN', prior: failure, details: closed.errors };
+    if (!failure) {
+      if (!restore) throw Error('REQUIRED_RESTORE_UNAVAILABLE');
+      await restore();
+      restoreCompleted = true;
+    }
+  } catch (e) {
+    failure = { error: String(e), stack: e.stack };
+  } finally {
+    baseClosed = await closeOwned([['base', baseClose]]);
+    if (!baseClosed.known)
+      failure = { error: 'BASE_CLOSURE_UNKNOWN', prior: failure, details: baseClosed.errors };
+  }
+  return { closed, baseClosed, restoreCompleted, failure: failure ?? null };
+}
 async function run() {
   assert.equal(resolve(process.cwd()), String.raw`C:\Code\HEXDailyData-v2-Subgraph-History-R2`);
   const review = await read(join(C, 'PREFLIGHT_REVIEW.json')),
@@ -27,6 +61,8 @@ async function run() {
   assert.equal(review.planSha256, digest(await fs.readFile(join(C, 'RECOVERY_PLAN.json'))));
   for (const [p, h] of Object.entries(review.sourceBindings))
     assert.equal(digest(await fs.readFile(p)), h, 'SOURCE_CHANGED:' + p);
+  for (const [p, h] of Object.entries(review.inputBindings))
+    assert.equal(digest(await fs.readFile(join(C, p))), h, 'INPUT_CHANGED:' + p);
   for (const f of await read(join(C, 'evidence/ORIGINAL_FREEZE.json')))
     assert.equal(digest(await fs.readFile(f.path)), f.sha256);
   const deny = () => {
@@ -37,6 +73,17 @@ async function run() {
   for (const o of [dns, dns.promises])
     for (const k of Object.keys(o))
       if (k === 'lookup' || k.startsWith('resolve') || k === 'reverse') o[k] = deny;
+  dns.lookup = literalLookup;
+  dns.promises.lookup = (host, options) =>
+    new Promise((done, reject) => {
+      try {
+        literalLookup(host, options, (error, address, family) =>
+          error ? reject(error) : done(options?.all ? address : { address, family }),
+        );
+      } catch (error) {
+        reject(error);
+      }
+    });
   const connect = net.Socket.prototype.connect;
   net.Socket.prototype.connect = function (...args) {
     const first = Array.isArray(args[0]) ? args[0][0] : args[0];
@@ -177,37 +224,38 @@ async function run() {
     failure = { error: String(e), stack: e.stack };
     await save('FINAL_PROOF_FAILURE', failure);
   } finally {
-    const closed = await closeOwned([
+    const settled = await finishRecoveryProof(
       [
-        'held-export',
-        heldExport
-          ? async () => {
-              if (!heldExport.stream.destroyed) heldExport.stream.destroy();
-              await heldExport.released;
-            }
-          : null,
+        [
+          'held-export',
+          heldExport
+            ? async () => {
+                if (!heldExport.stream.destroyed) heldExport.stream.destroy();
+                await heldExport.released;
+              }
+            : null,
+        ],
+        ['held-view', held ? async () => held.release() : null],
+        ['api', f ? () => f.close() : null],
+        ['registry', registry ? () => registry.close() : null],
       ],
-      ['held-view', held ? async () => held.release() : null],
-      ['api', f ? () => f.close() : null],
-      ['registry', registry ? () => registry.close() : null],
-    ]);
-    if (final?.backup && closed.known && !failure) {
-      try {
-        await restoreProof({
-          R: C,
-          profile,
-          final,
-          save,
-          admittedBase: base,
-          budget,
-          baseAdmissionCount: ordinal,
-        });
-      } catch (e) {
-        failure = { error: String(e), stack: e.stack };
-        await save('RESTORE_FAILURE', failure);
-      }
-    }
-    const baseClosed = await closeOwned([['base', base ? () => base.close() : null]]);
+      base ? () => base.close() : null,
+      final?.backup
+        ? () =>
+            restoreProof({
+              R: C,
+              profile,
+              final,
+              save,
+              admittedBase: base,
+              budget,
+              baseAdmissionCount: ordinal,
+            })
+        : null,
+      failure,
+    );
+    const { closed, baseClosed } = settled;
+    failure = settled.failure;
     entry.status = closed.known && baseClosed.known ? 'CLOSED' : 'UNKNOWN';
     entry.closedAtUtc = new Date().toISOString();
     entry.failure = failure ?? null;
@@ -217,6 +265,7 @@ async function run() {
       baseClosed,
       ordinal,
       failure: failure ?? null,
+      restoreCompleted: settled.restoreCompleted,
       pid: process.pid,
       atUtc: entry.closedAtUtc,
     });
