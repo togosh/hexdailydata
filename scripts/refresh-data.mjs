@@ -1,4 +1,4 @@
-import { publishTrade, admitTradeMarkets } from './trade-publication.mjs';
+import { publishTrade, admitTradeMarkets, tradeProfile, operatingTaskId } from './trade-publication.mjs';
 // One explicit finite operation. Status/default makes no provider requests.
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
@@ -356,12 +356,16 @@ export async function runJob({
   admission,
   registry,
   onAdoption,
+  onSlot,
   spawnChild,
   deadline,
   storageGuard = async () => {},
 }) {
   const reference = admission.family === 'reference',
     trade = admission.family === 'trade';
+  const profile = trade ? tradeProfile(admission) : null;
+  const operating = trade && admission.authorityTaskId === operatingTaskId;
+  if (operating && typeof onSlot !== 'function') throw Error('OPERATING_SERVICE_HOOK_REQUIRED');
   if (trade && admission.task !== 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2')
     throw Error('EXACT_TRADE_TASK_REQUIRED');
   if (reference && admission.task !== 'HDD-BTC-ETH-REFERENCE-FEED-R1')
@@ -409,6 +413,28 @@ export async function runJob({
   let marketsAccepted = false,
     publicationUncertain = false;
   let begunCycle = 0;
+  const serviceChecks = [];
+  const observeSlot = async (cycle, sourceResult, publicationResult, check) => {
+    if (!operating) return null;
+    if (serviceChecks.some(s => s.cycle === cycle)) throw Error('DUPLICATE_SERVICE_SLOT');
+    check();
+    const selected = registry.productDaily.capture();
+    let service;
+    try {
+      service = await onSlot({ cycle, sourceResult, publicationResult, selected }, check);
+      check();
+    } catch (e) {
+      const failed = { cycle, sourceResult, publicationResult, selectedVersion: selected.version,
+        service: { status: 'ERROR', error: String(e) } };
+      await durableJson(join(jobRoot, `SERVICE_${cycle}.json`), failed);
+      serviceChecks.push(failed);
+      throw e;
+    }
+    const receipt = { cycle, sourceResult, publicationResult, selectedVersion: selected.version, service };
+    await durableJson(join(jobRoot, `SERVICE_${cycle}.json`), receipt);
+    serviceChecks.push(receipt);
+    return service;
+  };
   const completion = new Promise((done, reject) => {
     child.once('error', reject);
     child.once('close', (code, signal) => {
@@ -499,20 +525,21 @@ export async function runJob({
         } else if (m.type === 'skipped' && trade) {
           if (
             !marketsAccepted ||
-            m.cycle !== begunCycle + 1 ||
-            m.cycle > 3 ||
-            outcomes.length !== begunCycle
+            !(m.cycle === begunCycle + 1 || (operating && m.cycle === begunCycle && outcomes.length === begunCycle - 1)) ||
+            m.cycle > profile.cycles ||
+            !(outcomes.length === begunCycle || (operating && outcomes.length === begunCycle - 1 && m.cycle === begunCycle))
           )
             throw Error('TRADE_SKIP_ORDER');
           begunCycle = m.cycle;
           outcomes.push({ cycle: m.cycle, status: 'SKIPPED', reason: m.reason });
           await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+          await observeSlot(m.cycle, 'SKIPPED', 'retained', check);
         } else if (m.type === 'begin') {
           if (trade) {
             if (
               !marketsAccepted ||
               m.cycle !== begunCycle + 1 ||
-              m.cycle > 3 ||
+              m.cycle > profile.cycles ||
               outcomes.length !== begunCycle
             )
               throw Error('TRADE_CYCLE_ORDER');
@@ -555,6 +582,7 @@ export async function runJob({
             if (!publication.qualified) {
               outcomes.push({ cycle: m.cycle, status: 'UNQUALIFIED', publication });
               await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+              await observeSlot(m.cycle, 'UNQUALIFIED', 'retained', check);
               check();
               child.stdin.write(JSON.stringify({ ...answer, outcome: 'UNQUALIFIED' }) + '\n');
               return;
@@ -619,7 +647,9 @@ export async function runJob({
               throw Error('COORDINATED_PUBLICATION_UNKNOWN');
           }
           check();
-          const adoption = await onAdoption(selected, check, admission.job);
+          const adoption = operating
+            ? await observeSlot(m.cycle, 'QUALIFIED', publication.changed ? 'changed' : 'unchanged', check)
+            : await onAdoption(selected, check, admission.job);
           check();
           const receipt = { selected, publication, adoption, adoptedAt: new Date().toISOString() };
           await durableJson(
@@ -671,10 +701,35 @@ export async function runJob({
       !error &&
       exit.code === 0 &&
       source.status.startsWith('COMPLETE_') &&
-      publications.length === (trade ? 3 : reference ? 2 : 1);
+      publications.length === (trade ? profile.cycles : reference ? 2 : 1);
+    if (operating) {
+      // Terminal closure never restarts acquisition. The active failed slot may
+      // receive one safe local read; all later original slots remain explicit gaps.
+      for (let cycle = 1; cycle <= profile.cycles; cycle++) {
+        if (serviceChecks.some(s => s.cycle === cycle)) continue;
+        if (cycle === begunCycle && !publicationUncertain && performance.now() < deadline - 2000) {
+          try {
+            await observeSlot(cycle, 'TERMINAL_ERROR', 'retained_or_refused', () => {
+              if (performance.now() >= deadline - 2000) throw Error('SERVICE_CLOSURE_DEADLINE');
+            });
+            continue;
+          } catch (e) { error ??= String(e); if (serviceChecks.some(s => s.cycle === cycle)) continue; }
+        }
+        const missing = { cycle, sourceResult: 'UNRUN_TERMINAL', publicationResult: 'retained_or_unknown',
+          selectedVersion: registry.status().productVersion, service: { status: 'NOT_MEASURED' } };
+        await durableJson(join(jobRoot, `SERVICE_${cycle}.json`), missing);
+        serviceChecks.push(missing);
+      }
+    }
+    const changed = publications.filter(p => p.publication.changed);
+    const separated = changed.some(a => changed.some(b =>
+      Date.parse(b.publication.publishedAt) - Date.parse(a.publication.publishedAt) >= 300000));
+    const servingPass = operating && !error && !publicationUncertain && source.cycles.length === profile.cycles &&
+      serviceChecks.length === profile.cycles && serviceChecks.every(s => s.service.status === 'FRESH') && separated;
     return {
-      status: qualified ? 'QUALIFIED_ADOPTED' : 'PARTIAL',
+      status: operating ? (servingPass ? 'FINITE_SERVING_PASS' : 'PARTIAL') : qualified ? 'QUALIFIED_ADOPTED' : 'PARTIAL',
       source,
+      ...(operating ? { serviceChecks, servingPass, changedPublicationsSeparatedBy300Seconds: separated } : {}),
       ...(trade ? { outcomes, error, publicationUncertain } : {}),
       publications,
       exit,

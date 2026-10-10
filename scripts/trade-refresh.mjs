@@ -7,6 +7,8 @@ import { randomBytes } from 'node:crypto';
 import { sha } from '../dist/services/source-update/generation.js';
 import { durableJson } from './market-refresh.mjs';
 import { runJob } from './refresh-data.mjs';
+import { tradeProfile, operatingTaskId, operatingProfileId, validateOperatingScope } from './trade-publication.mjs';
+export { operatingTaskId, operatingProfileId } from './trade-publication.mjs';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const taskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2';
 export async function tradeStorageGuard(root, reserve = 0, initial = false) {
@@ -32,6 +34,13 @@ const isolationRoot = join(dirname(recoveryRoot), 'worker-stdin-isolation-r1');
 export const cookieTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-RESPONSE-COOKIE-HANDLING-R1';
 export const responseCookiePolicyId = 'ignore-response-cookies-no-replay-v1';
 const cookieRoot = join(dirname(recoveryRoot), 'response-cookie-handling-r1');
+const operatingRoot = join(dirname(recoveryRoot), 'operating-refresh-r1');
+export async function runOperatingTrades(options) {
+  return runFiniteTrades(
+    { ...options, taskRoot: operatingRoot, preflightPath: join(operatingRoot, 'PREFLIGHT.json') },
+    operatingTaskId,
+  );
+}
 export async function runCookieTrades(options) {
   return runFiniteTrades(
     { ...options, taskRoot: cookieRoot, preflightPath: join(cookieRoot, 'PREFLIGHT.json') },
@@ -54,15 +63,16 @@ export async function runRecoveryTrades(options) {
   );
 }
 async function runFiniteTrades(
-  { taskRoot, preflightPath, registry, onAdoption, spawnChild = spawn, loadedRuntimeFiles },
+  { taskRoot, preflightPath, registry, onAdoption, onSlot, spawnChild = spawn, loadedRuntimeFiles },
   recovery,
 ) {
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
   const isolated = recovery === isolationTaskId,
-    cookies = recovery === cookieTaskId,
-    authorityId = cookies ? cookieTaskId : isolated ? isolationTaskId : recoveryTaskId,
-    authorityRoot = cookies ? cookieRoot : isolated ? isolationRoot : recoveryRoot;
+    operating = recovery === operatingTaskId,
+    cookies = recovery === cookieTaskId || operating,
+    authorityId = operating ? operatingTaskId : cookies ? cookieTaskId : isolated ? isolationTaskId : recoveryTaskId,
+    authorityRoot = operating ? operatingRoot : cookies ? cookieRoot : isolated ? isolationRoot : recoveryRoot;
   // Refuse spent/uncertain state before any interpretation of an old preflight.
   for (const name of ['session', 'PUBLIC_ADMISSION.json'])
     if (
@@ -107,12 +117,17 @@ async function runFiniteTrades(
         throw Error('EXACT_CAUSAL_GATE_REQUIRED');
     }
     if (cookies) {
-      const gate = await readFile(join(taskRoot, 'evidence/POLICY_GATE.json'));
+      const gate = await readFile(join(taskRoot, operating ? 'evidence/OPERATING_GATE.json' : 'evidence/POLICY_GATE.json'));
       if (
-        pre.policyGateSha256 !== sha(gate) || JSON.parse(gate).status !== 'PASS' ||
+        (operating ? pre.operatingGateSha256 : pre.policyGateSha256) !== sha(gate) || JSON.parse(gate).status !== 'PASS' ||
         pre.responseCookiePolicyId !== responseCookiePolicyId ||
         scope.network.responseCookiePolicy.id !== responseCookiePolicyId
       ) throw Error('EXACT_RESPONSE_COOKIE_POLICY_REQUIRED');
+    }
+    if (operating) {
+      validateOperatingScope(scope);
+      if (pre.tradeProfileId !== operatingProfileId || typeof onSlot !== 'function')
+        throw Error('OPERATING_PROFILE_AND_SERVICE_HOOK_REQUIRED');
     }
   } else if (pre.authorityTaskId) throw Error('RECOVERY_AUTHORITY_IN_OLD_ENTRY');
   if (
@@ -175,7 +190,8 @@ async function runFiniteTrades(
     const nonce = randomBytes(32).toString('hex');
     const authority = recovery
       ? { authorityTaskId: authorityId, scopeSha256: pre.scopeSha256, nonce,
-          ...(cookies ? { responseCookiePolicyId } : {}) }
+          ...(cookies ? { responseCookiePolicyId } : {}),
+          ...(operating ? { tradeProfileId: operatingProfileId } : {}) }
       : {};
     await durableJson(marker, {
       taskId,
@@ -188,7 +204,7 @@ async function runFiniteTrades(
     const admission = {
       task: taskId,
       family: 'trade',
-      job: 'trade-three-slots',
+      job: operating ? 'trade-operating-16-slots' : 'trade-three-slots',
       jobRoot: output,
       nonce,
       ...authority,
@@ -198,18 +214,20 @@ async function runFiniteTrades(
       preflightSha256: sha(await readFile(preflightPath)),
     };
     await durableJson(join(output, 'ADMISSION.json'), admission);
+    const profile = tradeProfile(admission);
     result = await runJob({
       jobRoot: output,
       admission,
       registry,
       onAdoption,
+      onSlot,
       spawnChild,
-      deadline: began + 598000,
+      deadline: began + (profile.seconds - 2) * 1000,
       storageGuard: (bytes) => tradeStorageGuard(storageRoot, bytes ?? 0),
     });
     settled =
       result.source.accounting.status === 'CLOSED' && result.source.accounting.pending === null;
-    if (performance.now() >= began + 600000) throw Error('WHOLE_OPERATION_DEADLINE');
+    if (performance.now() >= began + profile.seconds * 1000) throw Error('WHOLE_OPERATION_DEADLINE');
   } catch (e) {
     result = { status: 'PARTIAL', failure: String(e), closureUncertain: !settled };
   } finally {

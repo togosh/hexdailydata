@@ -4,8 +4,8 @@ sys.dont_write_bytecode=True
 from pathlib import Path
 import time,queue,threading
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from client import Session,TASK,URLS,W,strict_json,digest,save
-from authority import validate_authority
+from client import Session,TASK,URLS,W,strict_json,digest,save,SlotMissed
+from authority import validate_authority, trade_profile, OPERATING_AUTHORITY
 
 def start_reader(incoming, stream=None):
     """Keep the owner command pipe in the collector, including its waiting read."""
@@ -21,24 +21,38 @@ def start_reader(incoming, stream=None):
     thread.start()
     return thread
 
-def collect(session,exchange,clock=time.monotonic,sleep=time.sleep):
+def collect(session,exchange,clock=time.monotonic,sleep=time.sleep,outcomes=None):
     markets=session.get(URLS[0],'markets')
     exchange('markets',0,markets=markets)
-    anchor=clock();previous_end=anchor;outcomes=[]
-    for cycle,offset in enumerate((0,60,120),1):
+    anchor=clock();previous_end=anchor;outcomes=[] if outcomes is None else outcomes
+    profile=getattr(session,'profile',trade_profile({}))
+    for cycle,offset in enumerate(range(0,profile['cycles']*60,60),1):
         slot=anchor+offset
-        if previous_end>slot:
-            answer=exchange('skipped',cycle,reason='Preceding cycle occupied scheduled slot',offsetSeconds=offset)
-            outcomes.append({'cycle':cycle,'status':'SKIPPED','offsetSeconds':offset});continue
+        if previous_end>slot or (profile['maximum_start_lag'] is not None and clock()>slot+profile['maximum_start_lag']):
+            reason='Preceding cycle occupied scheduled slot' if previous_end>slot else 'Scheduled dispatch more than five seconds late'
+            answer=exchange('skipped',cycle,reason=reason,offsetSeconds=offset)
+            outcomes.append({'cycle':cycle,'status':'SKIPPED','offsetSeconds':offset})
+            if profile['maximum_start_lag'] is not None:previous_end=clock()
+            continue
         sleep(max(0,slot-clock()));session.check(65)
+        if profile['maximum_start_lag'] is not None and clock()>slot+profile['maximum_start_lag']:
+            exchange('skipped',cycle,reason='Wake more than five seconds late',offsetSeconds=offset)
+            outcomes.append({'cycle':cycle,'status':'SKIPPED','offsetSeconds':offset});previous_end=clock();continue
         exchange('begin',cycle)
-        btc=session.get(URLS[1],f'BTC_{cycle}');eth=session.get(URLS[2],f'ETH_{cycle}')
+        try:
+            btc=session.get(URLS[1],f'BTC_{cycle}',slot_deadline=slot+5) if profile['maximum_start_lag'] is not None else session.get(URLS[1],f'BTC_{cycle}')
+        except SlotMissed as e:
+            exchange('skipped',cycle,reason=str(e),offsetSeconds=offset)
+            outcomes.append({'cycle':cycle,'status':'SKIPPED','offsetSeconds':offset});previous_end=clock();continue
+        eth=session.get(URLS[2],f'ETH_{cycle}')
         answer=exchange('qualified',cycle,btc=btc,eth=eth)
         outcomes.append({'cycle':cycle,'status':answer['outcome'],'offsetSeconds':offset})
         previous_end=clock()
     return outcomes
 
 def main():
+    if len(sys.argv)!=2:
+        print('No requests. Exact bound session required.');return 0
     root=Path(sys.argv[1]).resolve();a=strict_json((root/'ADMISSION.json').read_bytes())
     assert a['task']==TASK and a['family']=='trade' and a['jobRoot']==str(root) and a['synthetic'] is False
     validate_authority(a, root)
@@ -55,8 +69,9 @@ def main():
         return answer
     outcomes=[];status='PARTIAL';reason='Not completed'
     try:
-        outcomes=collect(session,exchange)
-        status='COMPLETE_FRESH_CYCLES' if all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
+        operating=a.get('authorityTaskId')==OPERATING_AUTHORITY
+        outcomes=collect(session,exchange,outcomes=outcomes if operating else None)
+        status='COMPLETE_FRESH_CYCLES' if len(outcomes)==session.profile['cycles'] and all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
         reason='All original slots accounted'
     except BaseException as e:reason=type(e).__name__+': '+str(e)
     finally:session.close(reason)

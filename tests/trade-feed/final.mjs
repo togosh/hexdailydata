@@ -24,10 +24,16 @@ export async function finalEvidence({
   heldExport,
   save,
   budget = defaultBudget,
+  operating = false,
 }) {
   const p = real.productDaily.capture();
   preserveMarketHistory(seed, p);
-  assert.deepEqual(p.rows.slice(0, seed.rows.length), seed.rows);
+  const mutable = new Set(['btcPriceUsd', 'ethPriceUsd', 'btcRecordedAtUtc', 'ethRecordedAtUtc']);
+  for (let i = 0; i < seed.rows.length; i++) {
+    const old = seed.rows[i], next = p.rows[i];
+    if (!operating || old.dateUtc <= '2026-10-09') assert.deepEqual(next, old);
+    else for (const key of Object.keys(old)) if (!mutable.has(key)) assert.deepEqual(next[key], old[key]);
+  }
   for (const k of [
     'pair',
     'ledgerSegments',
@@ -39,12 +45,21 @@ export async function finalEvidence({
     assert.deepEqual(p.metadata[k], seed.metadata[k]);
   assert.deepEqual(
     p.metadata.readings.filter((r) => r.kind !== 'trade' && r.kind !== 'reference'),
-    seed.metadata.readings.filter((r) => r.kind !== 'reference'),
+    seed.metadata.readings.filter((r) => r.kind !== 'reference' && (!operating || r.kind !== 'trade')),
   );
   for (const r of seed.metadata.readings.filter((r) => r.kind === 'reference'))
     assert(marketEvidence(p.metadata).some((n) => JSON.stringify(n) === JSON.stringify(r)));
   const trades = marketEvidence(p.metadata).filter((r) => r.kind === 'trade'),
     changed = [];
+  if (operating) for (const old of seed.rows.filter(r => r.dateUtc > '2026-10-09')) {
+    const row = p.rows.find(r => r.dateUtc === old.dateUtc);
+    const expected = { ...old };
+    for (const r of trades.filter(r => r.observedAtUtc.slice(0, 10) === row.dateUtc)) {
+      expected[r.asset === 'BTC' ? 'btcPriceUsd' : 'ethPriceUsd'] = r.value;
+      expected[r.asset === 'BTC' ? 'btcRecordedAtUtc' : 'ethRecordedAtUtc'] = r.observedAtUtc;
+    }
+    assert.deepEqual(row, expected);
+  }
   for (const row of p.rows.slice(seed.rows.length)) {
     const expected = Object.fromEntries(Object.keys(row).map((k) => [k, null]));
     expected.contractDay = row.contractDay;
@@ -93,7 +108,8 @@ export async function finalEvidence({
   await save('GENUINE_PRESERVATION', {
     status: 'PASS',
     existingRows: seed.rows.length,
-    exactExistingCells: seed.rows.reduce((n, r) => n + Object.keys(r).length, 0),
+    exactExistingCells: seed.rows.filter(r => !operating || r.dateUtc <= '2026-10-09').reduce((n, r) => n + Object.keys(r).length, 0),
+    ...(operating ? { protectedThrough: '2026-10-09', mutableLaterFields: [...mutable] } : {}),
     selectedRows: p.rows.length,
     newRows: changed,
     fixedCloseCells: p.metadata.benchmarkHistory.buckets.length,

@@ -9,7 +9,7 @@ from client import Session,URLS,CAP,RESERVATION,exact_request,save,strict_json,p
 sys.path.insert(0,str(W/'scripts/trade-feed'))
 from collector import collect
 from worker import perform_request
-R=Path(os.environ['HDD_TASK_ROOT']);assert R.name in ('btc-eth-current-reference-freshness-r2','transport-recovery-r1','worker-stdin-isolation-r1','response-cookie-handling-r1')
+R=Path(os.environ['HDD_TASK_ROOT']);assert R.name in ('btc-eth-current-reference-freshness-r2','transport-recovery-r1','worker-stdin-isolation-r1','response-cookie-handling-r1','operating-refresh-r1')
 (R/'fixtures').mkdir(exist_ok=True)
 spec=importlib.util.spec_from_file_location('get_worker',W/'scripts/benchmark-reference/get_worker.py');worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker);worker.CAP=CAP
 cases=[]

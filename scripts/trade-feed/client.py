@@ -8,7 +8,7 @@ sys.path.insert(0, str(W/'scripts/market-refresh'))
 from durable import save, strict_json, digest, utc
 from http_framing import verify_framing
 sys.path.insert(0, str(W/'scripts/trade-feed'))
-from authority import ISOLATION_AUTHORITY, COOKIE_AUTHORITY, cookie_policy, validate_authority
+from authority import ISOLATION_AUTHORITY, COOKIE_AUTHORITY, OPERATING_AUTHORITY, cookie_policy, validate_authority, trade_profile
 spec=importlib.util.spec_from_file_location('historical_native',W/'scripts/benchmark-reference/collector.py')
 native_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(native_module)
 native=native_module.native
@@ -19,6 +19,7 @@ TASK='HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2'
 URLS=('https://www.bitstamp.net/api/v2/markets/','https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute','https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute')
 CAP=2097152; HEADER=65536; RESERVATION=2162688
 class ObjectBoundError(ValueError):pass
+class SlotMissed(ValueError):pass
 
 def exact_request(method,url):
     if method!='GET' or url not in URLS: raise ValueError('Exact GET URL required')
@@ -49,29 +50,36 @@ class Session:
     def __init__(self,root,admission,runner=worker_native,mono=time.monotonic,wall=time.time,sleep=time.sleep):
         self.root=Path(root);self.a=admission;self.runner=runner;self.mono=mono;self.wall=wall;self.sleep=sleep
         self.cookie_policy = cookie_policy(admission)
+        self.profile = trade_profile(admission)
         if self.cookie_policy and runner is worker_native:
             validate_authority(admission, self.root)
         if (self.root/'ACCOUNTING.json').exists():raise ValueError('Consumed session')
-        self.start=mono();self.remaining=600-(wall()-admission['startedAtUnixSeconds']);self.last=None
-        if not 0<self.remaining<=600:raise ValueError('Admission time')
+        self.start=mono();self.remaining=self.profile['seconds']-(wall()-admission['startedAtUnixSeconds']);self.last=None
+        if not 0<self.remaining<=self.profile['seconds']:raise ValueError('Admission time')
         self.state={'status':'ADMITTED','startedAtUtc':utc(),'attempts':0,'logicalRequests':0,'extras':0,'chargedBytes':0,'observedWireBytes':0,'observedBodyBytes':0,'observedHeaderBytes':0,'diagnosticBytes':0,'chargedObjects':0,'pending':None,'closureKnown':True,'requests':[]}
         self.persist()
     def persist(self):save(self.root/'ACCOUNTING.json',self.state)
     def check(self,seconds=0):
         if self.mono()-self.start+seconds>=self.remaining:raise ValueError('Session deadline')
         if shutil.disk_usage(self.root).free<5*1024**3:raise ValueError('Free space floor')
-    def get(self,url,label):
+    def get(self,url,label,slot_deadline=None):
         exact_request('GET',url)
+        if slot_deadline is not None and (self.a.get('authorityTaskId')!=OPERATING_AUTHORITY or not label.startswith('BTC_')):raise ValueError('Slot gate authority')
         if self.state['status']!='ADMITTED' or self.state['pending'] is not None or not self.state['closureKnown']:raise ValueError('Consumed or uncertain session')
         s=self.state;s['logicalRequests']+=1
-        if s['logicalRequests']>7:raise ValueError('Logical bound')
+        if s['logicalRequests']>self.profile['logical']:raise ValueError('Logical bound')
         for ordinal in (0,1):
             if self.last is not None:self.sleep(max(0,self.last+(2 if ordinal else 1)-self.mono()))
+            if ordinal==0 and slot_deadline is not None and self.mono()>slot_deadline:raise SlotMissed('Slot start expired before reservation')
             self.check(65)
-            if s['attempts']>=14 or s['chargedBytes']+RESERVATION>32*1024**2 or s['chargedObjects']+20000>280000 or (ordinal and s['extras']>=7):raise ValueError('Attempt/reservation bound')
+            if s['attempts']>=self.profile['attempts'] or s['chargedBytes']+RESERVATION>self.profile['charged_bytes'] or s['chargedObjects']+20000>self.profile['objects'] or (ordinal and s['extras']>=self.profile['extras']):raise ValueError('Attempt/reservation bound')
             folder=self.root/f"{s['attempts']+1:02d}";folder.mkdir()
             request=folder/'request.json'
-            q={'method':'GET','url':url,'label':label,'attempt':s['attempts']+1,'retryOrdinal':ordinal,'nonce':self.a['nonce'],'dispatchByUnixSeconds':self.a['startedAtUnixSeconds']+535}
+            q={'method':'GET','url':url,'label':label,'attempt':s['attempts']+1,'retryOrdinal':ordinal,'nonce':self.a['nonce'],'dispatchByUnixSeconds':self.a['startedAtUnixSeconds']+self.profile['dispatch']}
+            if self.a.get('tradeProfileId'):
+                q['tradeProfileId']=self.a['tradeProfileId']
+            if ordinal==0 and slot_deadline is not None:
+                q['slotDispatchByUnixSeconds']=self.wall()+max(0,slot_deadline-self.mono())
             save(request,q)
             s['attempts']+=1;s['extras']+=ordinal;s['chargedBytes']+=RESERVATION
             s['pending']={'request':str(request),'reservedBytes':RESERVATION,'reservedObjects':20000,'startedAtUtc':utc()};self.persist()
@@ -80,6 +88,11 @@ class Session:
             # Durable writes and environment preparation may stall. A reservation
             # remains charged if this final pre-spawn gate refuses dispatch.
             self.check(65)
+            if ordinal==0 and slot_deadline is not None and self.mono()>slot_deadline:
+                # No worker exists. Retain the entire reservation and record known local closure.
+                s['chargedObjects']+=20000;s['pending']=None;self.persist()
+                save(folder/'LOCAL_SKIP.json',{'status':'SKIPPED','reason':'Durable preparation exceeded slot','networkRequests':0,'reservedBytes':RESERVATION,'reservedObjects':20000})
+                raise SlotMissed('Slot start expired after reservation')
             spawn_at=self.wall()
             life=self.runner([sys.executable,'-I','-S',str(W/'scripts/trade-feed/worker.py'),str(request)],env,27,2)
             for key,limit in [('stdout',2048),('stderr',2048),('interrupted',1024)]:
@@ -124,7 +137,7 @@ class Session:
             if meta.get('failureKind')=='terminal':integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
-            isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY)
+            isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, OPERATING_AUTHORITY)
             if isolated_grant:
                 row['networkConnectionBegan'] = any(p.get('event')=='dns_tcp_tls_connection_begin' for p in phases)
             if self.cookie_policy:

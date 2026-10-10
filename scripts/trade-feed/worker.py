@@ -9,18 +9,30 @@ from diagnostics import Phases
 RECOVERY = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1')
 ISOLATION = RECOVERY.parent/'worker-stdin-isolation-r1'
 COOKIES = RECOVERY.parent/'response-cookie-handling-r1'
+OPERATING = RECOVERY.parent/'operating-refresh-r1'
 
 
 def perform_request(q, a, folder, perform, clock=time.time, connection=None, phases=None):
     import http.client
     connection = connection or http.client.HTTPSConnection
-    deadline = a['startedAtUnixSeconds'] + 535
+    from authority import trade_profile
+    profile=trade_profile(a)
+    deadline = a['startedAtUnixSeconds'] + profile['dispatch']
     if q['dispatchByUnixSeconds'] != deadline:
         raise ValueError('Dispatch deadline binding')
+    if a.get('tradeProfileId') and q.get('tradeProfileId') != a['tradeProfileId']:
+        raise ValueError('Worker operating profile binding')
+    slot_deadline=q.get('slotDispatchByUnixSeconds')
+    if slot_deadline is not None:
+        from authority import OPERATING_AUTHORITY
+        if a.get('authorityTaskId')!=OPERATING_AUTHORITY or q['retryOrdinal']!=0 or not q['label'].startswith('BTC_') or slot_deadline>deadline:
+            raise ValueError('Worker slot deadline binding')
 
     def gate():
         if clock() >= deadline:
             raise ValueError('Dispatch deadline')
+        if slot_deadline is not None and clock()>slot_deadline:
+            raise ValueError('Slot dispatch deadline')
 
     def phase(name):
         if phases:
@@ -76,7 +88,7 @@ def main():
             if event.startswith('socket.'):
                 raise PermissionError('OFFLINE_NETWORK_DENIED')
         sys.addaudithook(deny)
-    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES)) else None
+    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING)) else None
     try:
         if phases:
             phases.emit('worker_entry', synthetic=offline)

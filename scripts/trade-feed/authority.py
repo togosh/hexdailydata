@@ -9,12 +9,32 @@ ISOLATION_ROOT = ROOT.parent/'worker-stdin-isolation-r1'
 COOKIE_AUTHORITY = 'HDD-BTC-ETH-CURRENT-REFERENCE-RESPONSE-COOKIE-HANDLING-R1'
 COOKIE_ROOT = ROOT.parent/'response-cookie-handling-r1'
 COOKIE_POLICY = 'ignore-response-cookies-no-replay-v1'
+OPERATING_AUTHORITY = 'HDD-BTC-ETH-OPERATING-REFRESH-R1'
+OPERATING_ROOT = ROOT.parent/'operating-refresh-r1'
+OPERATING_PROFILE_ID = 'operating-16-slots-v1'
+
+
+def trade_profile(admission):
+    """Exact versioned authority, never caller-supplied arbitrary allowances."""
+    if admission.get('authorityTaskId') == OPERATING_AUTHORITY:
+        if (admission.get('tradeProfileId') != OPERATING_PROFILE_ID
+                or admission.get('job') != 'trade-operating-16-slots'
+                or admission.get('responseCookiePolicyId') != COOKIE_POLICY):
+            raise ValueError('Exact operating profile required')
+        return dict(cycles=16, logical=33, attempts=66, extras=33, seconds=1200,
+                    dispatch=1135, charged_bytes=144*1024**2, objects=1320000,
+                    maximum_start_lag=5)
+    if admission.get('tradeProfileId') is not None:
+        raise ValueError('Operating profile outside exact authority')
+    return dict(cycles=3, logical=7, attempts=14, extras=7, seconds=600,
+                dispatch=535, charged_bytes=32*1024**2, objects=280000,
+                maximum_start_lag=None)
 
 
 def cookie_policy(admission):
     """Only the exact new authority can select the receiving-only amendment."""
     selected = admission.get('responseCookiePolicyId')
-    if admission.get('authorityTaskId') == COOKIE_AUTHORITY:
+    if admission.get('authorityTaskId') in (COOKIE_AUTHORITY, OPERATING_AUTHORITY):
         if selected != COOKIE_POLICY:
             raise ValueError('Exact response cookie policy required')
         return COOKIE_POLICY
@@ -25,10 +45,11 @@ def cookie_policy(admission):
 
 def validate_authority(admission, session):
     session = Path(session).resolve()
-    recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT, COOKIE_ROOT)) or 'authorityTaskId' in admission
+    recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT, COOKIE_ROOT, OPERATING_ROOT)) or 'authorityTaskId' in admission
     if not recovery:
         return  # Legacy mode retains its existing admission and spent-state gates.
-    root, authority = ((COOKIE_ROOT, COOKIE_AUTHORITY) if session == COOKIE_ROOT/'session' else
+    root, authority = ((OPERATING_ROOT, OPERATING_AUTHORITY) if session == OPERATING_ROOT/'session' else
+                       (COOKIE_ROOT, COOKIE_AUTHORITY) if session == COOKIE_ROOT/'session' else
                        (ISOLATION_ROOT, ISOLATION_AUTHORITY) if session == ISOLATION_ROOT/'session' else (ROOT, AUTHORITY))
     if session != root/'session' or admission.get('authorityTaskId') != authority:
         raise ValueError('Exact recovery authority/session required')
@@ -50,10 +71,14 @@ def validate_authority(admission, session):
         gate = (root/'evidence/POLICY_GATE.json').read_bytes()
         if digest(gate) != pre.get('policyGateSha256') or strict_json(gate).get('status') != 'PASS':
             raise ValueError('Response policy gate binding')
+    if authority == OPERATING_AUTHORITY:
+        gate = (root/'evidence/OPERATING_GATE.json').read_bytes()
+        if digest(gate) != pre.get('operatingGateSha256') or strict_json(gate).get('status') != 'PASS':
+            raise ValueError('Operating gate binding')
 
 
 def validate_recovery_documents(admission, session, scope_bytes, pre_bytes, marker, *, root=ROOT, authority=AUTHORITY):
-    if (root, authority) not in ((ROOT, AUTHORITY), (ISOLATION_ROOT, ISOLATION_AUTHORITY), (COOKIE_ROOT, COOKIE_AUTHORITY)):
+    if (root, authority) not in ((ROOT, AUTHORITY), (ISOLATION_ROOT, ISOLATION_AUTHORITY), (COOKIE_ROOT, COOKIE_AUTHORITY), (OPERATING_ROOT, OPERATING_AUTHORITY)):
         raise ValueError('Unknown public grant')
     if Path(session) != root/'session' or admission.get('authorityTaskId') != authority or admission.get('synthetic') is not False:
         raise ValueError('Exact recovery document identity')
@@ -76,9 +101,24 @@ def validate_recovery_documents(admission, session, scope_bytes, pre_bytes, mark
             or marker.get('output') != str(session) or marker.get('scopeSha256') != digest(scope_bytes)
             or marker.get('preflightSha256') != digest(pre_bytes)):
         raise ValueError('Recovery marker identity')
-    if authority == COOKIE_AUTHORITY:
+    if authority in (COOKIE_AUTHORITY, OPERATING_AUTHORITY):
         if (cookie_policy(admission) != COOKIE_POLICY
                 or pre.get('responseCookiePolicyId') != COOKIE_POLICY
                 or marker.get('responseCookiePolicyId') != COOKIE_POLICY
                 or scope['network']['responseCookiePolicy']['id'] != COOKIE_POLICY):
             raise ValueError('Response cookie policy document binding')
+    if authority == OPERATING_AUTHORITY:
+        profile = trade_profile(admission)
+        if pre.get('tradeProfileId') != OPERATING_PROFILE_ID or marker.get('tradeProfileId') != OPERATING_PROFILE_ID:
+            raise ValueError('Operating profile document binding')
+        n=scope['network']
+        expected={'maximumPhysicalAttempts':profile['attempts'],'maximumLogicalRequests':profile['logical'],
+                  'normalGetCount':profile['logical'],'maximumTotalRetries':profile['extras'],
+                  'maximumSessionSecondsIncludingClosure':profile['seconds'],
+                  'maximumNewDispatchOffsetSeconds':profile['dispatch'],
+                  'maximumChargedBytes':profile['charged_bytes'],
+                  'maximumParsedObjectsAcrossResponses':profile['objects'],
+                  'perAttemptDurableReservationBytes':2162688,
+                  'minimumCompleteAttemptAndClosureReserveSeconds':65}
+        if any(n.get(k)!=v for k,v in expected.items()) or n['plan']['cycles']!=16 or n['plan']['cycleOffsetsSeconds']!=list(range(0,901,60)) or n['plan']['maximumOrdinaryStartLagSeconds']!=5:
+            raise ValueError('Operating scope limits binding')
