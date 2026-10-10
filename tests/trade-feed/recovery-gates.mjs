@@ -2,9 +2,23 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { runTrades, runRecoveryTrades, runIsolationTrades } from '../../scripts/trade-refresh.mjs';
+import net from 'node:net';
+import tls from 'node:tls';
+import dns from 'node:dns';
+import http from 'node:http';
+import https from 'node:https';
+import { syncBuiltinESMExports } from 'node:module';
+const deny = () => { throw Error('OFFLINE_NETWORK_DENIED'); };
+net.connect = net.createConnection = net.Socket.prototype.connect = net.Server.prototype.listen = deny;
+tls.connect = http.request = http.get = https.request = https.get = deny;
+for (const o of [dns, dns.promises])
+  for (const k of Object.keys(o))
+    if (k === 'lookup' || k.startsWith('resolve') || k === 'reverse') o[k] = deny;
+globalThis.fetch = deny;
+syncBuiltinESMExports();
+const { runTrades, runRecoveryTrades, runIsolationTrades, runCookieTrades } = await import('../../scripts/trade-refresh.mjs');
 const R = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2`;
-const T = join(R, 'worker-stdin-isolation-r1');
+const T = join(R, 'response-cookie-handling-r1');
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 const original = await readFile(join(R, 'PUBLIC_ADMISSION.json'));
 await assert.rejects(
@@ -18,7 +32,10 @@ assert.deepEqual(
   await readFile(join(R, 'transport-recovery-r1/PUBLIC_ADMISSION.json')),
   priorRecovery,
 );
-await assert.rejects(runIsolationTrades({}), /ENOENT/); // No reviewed loaded-ready preflight yet.
+const priorIsolation = await readFile(join(R, 'worker-stdin-isolation-r1/PUBLIC_ADMISSION.json'));
+await assert.rejects(runIsolationTrades({}), /EXISTING_OR_UNCERTAIN_TRADE_SESSION/);
+assert.deepEqual(await readFile(join(R, 'worker-stdin-isolation-r1/PUBLIC_ADMISSION.json')), priorIsolation);
+await assert.rejects(runCookieTrades({}), /ENOENT/); // No reviewed loaded-ready preflight yet.
 for (const name of ['session', 'PUBLIC_ADMISSION.json', 'evidence/BASE_ADMISSIONS.json'])
   assert.equal(
     await lstat(join(T, name)).catch((e) => {

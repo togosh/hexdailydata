@@ -6,14 +6,30 @@ AUTHORITY = 'HDD-BTC-ETH-CURRENT-REFERENCE-TRANSPORT-RECOVERY-R1'
 ROOT = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1')
 ISOLATION_AUTHORITY = 'HDD-BTC-ETH-CURRENT-REFERENCE-WORKER-STDIN-ISOLATION-R1'
 ISOLATION_ROOT = ROOT.parent/'worker-stdin-isolation-r1'
+COOKIE_AUTHORITY = 'HDD-BTC-ETH-CURRENT-REFERENCE-RESPONSE-COOKIE-HANDLING-R1'
+COOKIE_ROOT = ROOT.parent/'response-cookie-handling-r1'
+COOKIE_POLICY = 'ignore-response-cookies-no-replay-v1'
+
+
+def cookie_policy(admission):
+    """Only the exact new authority can select the receiving-only amendment."""
+    selected = admission.get('responseCookiePolicyId')
+    if admission.get('authorityTaskId') == COOKIE_AUTHORITY:
+        if selected != COOKIE_POLICY:
+            raise ValueError('Exact response cookie policy required')
+        return COOKIE_POLICY
+    if selected is not None:
+        raise ValueError('Response cookie policy outside exact authority')
+    return None
 
 
 def validate_authority(admission, session):
     session = Path(session).resolve()
-    recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT)) or 'authorityTaskId' in admission
+    recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT, COOKIE_ROOT)) or 'authorityTaskId' in admission
     if not recovery:
         return  # Legacy mode retains its existing admission and spent-state gates.
-    root, authority = (ISOLATION_ROOT, ISOLATION_AUTHORITY) if session == ISOLATION_ROOT/'session' else (ROOT, AUTHORITY)
+    root, authority = ((COOKIE_ROOT, COOKIE_AUTHORITY) if session == COOKIE_ROOT/'session' else
+                       (ISOLATION_ROOT, ISOLATION_AUTHORITY) if session == ISOLATION_ROOT/'session' else (ROOT, AUTHORITY))
     if session != root/'session' or admission.get('authorityTaskId') != authority:
         raise ValueError('Exact recovery authority/session required')
     if admission.get('synthetic') is not False:
@@ -30,10 +46,14 @@ def validate_authority(admission, session):
         gate = (root/'evidence/CAUSAL_GATE.json').read_bytes()
         if digest(gate) != pre.get('causalGateSha256') or strict_json(gate).get('status') != 'PASS':
             raise ValueError('Causal gate binding')
+    if authority == COOKIE_AUTHORITY:
+        gate = (root/'evidence/POLICY_GATE.json').read_bytes()
+        if digest(gate) != pre.get('policyGateSha256') or strict_json(gate).get('status') != 'PASS':
+            raise ValueError('Response policy gate binding')
 
 
 def validate_recovery_documents(admission, session, scope_bytes, pre_bytes, marker, *, root=ROOT, authority=AUTHORITY):
-    if (root, authority) not in ((ROOT, AUTHORITY), (ISOLATION_ROOT, ISOLATION_AUTHORITY)):
+    if (root, authority) not in ((ROOT, AUTHORITY), (ISOLATION_ROOT, ISOLATION_AUTHORITY), (COOKIE_ROOT, COOKIE_AUTHORITY)):
         raise ValueError('Unknown public grant')
     if Path(session) != root/'session' or admission.get('authorityTaskId') != authority or admission.get('synthetic') is not False:
         raise ValueError('Exact recovery document identity')
@@ -56,3 +76,9 @@ def validate_recovery_documents(admission, session, scope_bytes, pre_bytes, mark
             or marker.get('output') != str(session) or marker.get('scopeSha256') != digest(scope_bytes)
             or marker.get('preflightSha256') != digest(pre_bytes)):
         raise ValueError('Recovery marker identity')
+    if authority == COOKIE_AUTHORITY:
+        if (cookie_policy(admission) != COOKIE_POLICY
+                or pre.get('responseCookiePolicyId') != COOKIE_POLICY
+                or marker.get('responseCookiePolicyId') != COOKIE_POLICY
+                or scope['network']['responseCookiePolicy']['id'] != COOKIE_POLICY):
+            raise ValueError('Response cookie policy document binding')

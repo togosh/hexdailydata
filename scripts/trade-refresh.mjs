@@ -29,6 +29,15 @@ export const recoveryTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-TRANSPORT-RECOVERY-
 const recoveryRoot = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1`;
 export const isolationTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-WORKER-STDIN-ISOLATION-R1';
 const isolationRoot = join(dirname(recoveryRoot), 'worker-stdin-isolation-r1');
+export const cookieTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-RESPONSE-COOKIE-HANDLING-R1';
+export const responseCookiePolicyId = 'ignore-response-cookies-no-replay-v1';
+const cookieRoot = join(dirname(recoveryRoot), 'response-cookie-handling-r1');
+export async function runCookieTrades(options) {
+  return runFiniteTrades(
+    { ...options, taskRoot: cookieRoot, preflightPath: join(cookieRoot, 'PREFLIGHT.json') },
+    cookieTaskId,
+  );
+}
 export async function runIsolationTrades(options) {
   return runFiniteTrades(
     { ...options, taskRoot: isolationRoot, preflightPath: join(isolationRoot, 'PREFLIGHT.json') },
@@ -51,8 +60,9 @@ async function runFiniteTrades(
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
   const isolated = recovery === isolationTaskId,
-    authorityId = isolated ? isolationTaskId : recoveryTaskId,
-    authorityRoot = isolated ? isolationRoot : recoveryRoot;
+    cookies = recovery === cookieTaskId,
+    authorityId = cookies ? cookieTaskId : isolated ? isolationTaskId : recoveryTaskId,
+    authorityRoot = cookies ? cookieRoot : isolated ? isolationRoot : recoveryRoot;
   // Refuse spent/uncertain state before any interpretation of an old preflight.
   for (const name of ['session', 'PUBLIC_ADMISSION.json'])
     if (
@@ -81,7 +91,7 @@ async function runFiniteTrades(
       pre.authorityTaskId !== authorityId ||
       scope.taskId !== authorityId ||
       taskRoot !== authorityRoot ||
-      resolve(isolated ? scope.paths.taskRoot : scope.paths.newRoot) !== authorityRoot ||
+      resolve(isolated || cookies ? scope.paths.taskRoot : scope.paths.newRoot) !== authorityRoot ||
       resolve(scope.network.sessionPath) !== join(authorityRoot, 'session') ||
       pre.scopeSha256 !== sha(await readFile(join(taskRoot, 'packet/SCOPE.json'))) ||
       pre.readySha256 !== sha(await readFile(join(taskRoot, 'evidence/READY.json'))) ||
@@ -95,6 +105,14 @@ async function runFiniteTrades(
       const gate = await readFile(join(taskRoot, 'evidence/CAUSAL_GATE.json'));
       if (pre.causalGateSha256 !== sha(gate) || JSON.parse(gate).status !== 'PASS')
         throw Error('EXACT_CAUSAL_GATE_REQUIRED');
+    }
+    if (cookies) {
+      const gate = await readFile(join(taskRoot, 'evidence/POLICY_GATE.json'));
+      if (
+        pre.policyGateSha256 !== sha(gate) || JSON.parse(gate).status !== 'PASS' ||
+        pre.responseCookiePolicyId !== responseCookiePolicyId ||
+        scope.network.responseCookiePolicy.id !== responseCookiePolicyId
+      ) throw Error('EXACT_RESPONSE_COOKIE_POLICY_REQUIRED');
     }
   } else if (pre.authorityTaskId) throw Error('RECOVERY_AUTHORITY_IN_OLD_ENTRY');
   if (
@@ -156,7 +174,8 @@ async function runFiniteTrades(
     await mkdir(join(output, 'temp'));
     const nonce = randomBytes(32).toString('hex');
     const authority = recovery
-      ? { authorityTaskId: authorityId, scopeSha256: pre.scopeSha256, nonce }
+      ? { authorityTaskId: authorityId, scopeSha256: pre.scopeSha256, nonce,
+          ...(cookies ? { responseCookiePolicyId } : {}) }
       : {};
     await durableJson(marker, {
       taskId,

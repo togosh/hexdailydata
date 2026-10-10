@@ -6,7 +6,7 @@ import json,copy,os
 W=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(W/'scripts/trade-feed'))
 from client import digest,save
-from authority import AUTHORITY,ROOT,ISOLATION_AUTHORITY,ISOLATION_ROOT,validate_authority,validate_recovery_documents
+from authority import AUTHORITY,ROOT,ISOLATION_AUTHORITY,ISOLATION_ROOT,COOKIE_ROOT,validate_authority,validate_recovery_documents
 scope=(ROOT/'packet/SCOPE.json').read_bytes()
 pre=json.dumps({'authorityTaskId':AUTHORITY,'taskRoot':str(ROOT),'synthetic':False,'verdict':'PASS','runtimeFiles':{'public-fixture':'synthetic'}}).encode()
 a={'authorityTaskId':AUTHORITY,'synthetic':False,'scopeSha256':digest(scope),'preflightSha256':digest(pre),'nonce':'0'*64,'runtimeFiles':{'public-fixture':'synthetic'}}
@@ -32,6 +32,6 @@ refused(lambda:validate_recovery_documents(newa,ROOT/'session',scope,pre,m))
 refused(lambda:validate_authority({'synthetic':False},ISOLATION_ROOT/'session'))
 cases.extend(['new isolated identity accepted in-memory only','both grants reject each other','new root rejects old/no authority'])
 output=Path(os.environ.get('HDD_TASK_ROOT',str(ROOT)))
-assert output in (ROOT,ISOLATION_ROOT)
+assert output in (ROOT,ISOLATION_ROOT,COOKIE_ROOT)
 save(output/'evidence/AUTHORITY_TESTS.json',{'status':'PASS','synthetic':True,'cases':cases,'publicAdmissions':0,'publicRequests':0,'baseAdmissions':0})
 print('EXACT_AUTHORITY_GATES_PASS')

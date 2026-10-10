@@ -8,7 +8,7 @@ sys.path.insert(0, str(W/'scripts/market-refresh'))
 from durable import save, strict_json, digest, utc
 from http_framing import verify_framing
 sys.path.insert(0, str(W/'scripts/trade-feed'))
-from authority import ISOLATION_AUTHORITY
+from authority import ISOLATION_AUTHORITY, COOKIE_AUTHORITY, cookie_policy, validate_authority
 spec=importlib.util.spec_from_file_location('historical_native',W/'scripts/benchmark-reference/collector.py')
 native_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(native_module)
 native=native_module.native
@@ -48,6 +48,9 @@ def retryable(row, require_network_begin=False):
 class Session:
     def __init__(self,root,admission,runner=worker_native,mono=time.monotonic,wall=time.time,sleep=time.sleep):
         self.root=Path(root);self.a=admission;self.runner=runner;self.mono=mono;self.wall=wall;self.sleep=sleep
+        self.cookie_policy = cookie_policy(admission)
+        if self.cookie_policy and runner is worker_native:
+            validate_authority(admission, self.root)
         if (self.root/'ACCOUNTING.json').exists():raise ValueError('Consumed session')
         self.start=mono();self.remaining=600-(wall()-admission['startedAtUnixSeconds']);self.last=None
         if not 0<self.remaining<=600:raise ValueError('Admission time')
@@ -91,6 +94,7 @@ class Session:
             diagnostics=len(phase_raw)+sum(len(str(life.get(k) or '').encode()) for k in ('stdout','stderr','interrupted'))+len(str(meta.get('error') or '').encode())
             phases=[]
             integrity=None;complete=False;count=20000
+            transport_complete=False;ignored_cookies=0;auth_challenges=0
             try:
                 if len(phase_raw)>8192 or diagnostics>16384:raise ValueError('Diagnostic bound')
                 phases=[strict_json(line) for line in phase_raw.splitlines()]
@@ -99,7 +103,16 @@ class Session:
                 if meta.get('complete'):
                     verify_framing(meta,raw,CAP,framing)
                     if meta.get('headerBytes')!=len(headers):raise ValueError('Header receipt')
-                    if any(k.lower() in ('set-cookie','www-authenticate','proxy-authenticate') for k,v in meta.get('headers',[])):raise ValueError('Cookie/authentication response')
+                    transport_complete=True
+                    cookie_count=sum(k.lower()=='set-cookie' for k,v in meta.get('headers',[]))
+                    auth_challenges=sum(k.lower() in ('www-authenticate','proxy-authenticate') for k,v in meta.get('headers',[]))
+                    if self.cookie_policy:
+                        # Count received fields only. No value is parsed, retained for reuse,
+                        # or forwarded to the maintained fixed outbound header list.
+                        ignored_cookies=cookie_count
+                        if auth_challenges:raise ValueError('Authentication challenge response')
+                    elif cookie_count or auth_challenges:
+                        raise ValueError('Cookie/authentication response')
                     complete=True
                     # Error bodies are not exempt from parsed-object limits.
                     # Non-JSON HTTP errors retain the full conservative reservation.
@@ -111,9 +124,12 @@ class Session:
             if meta.get('failureKind')=='terminal':integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
-            isolated_grant = self.a.get('authorityTaskId') == ISOLATION_AUTHORITY
+            isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY)
             if isolated_grant:
                 row['networkConnectionBegan'] = any(p.get('event')=='dns_tcp_tls_connection_begin' for p in phases)
+            if self.cookie_policy:
+                row.update(responseCookiePolicyId=self.cookie_policy,ignoredResponseCookieCount=ignored_cookies,
+                           authenticationChallengeCount=auth_challenges,transportComplete=transport_complete)
             save(folder/'AUDIT.json',row)
             s['diagnosticBytes']+=diagnostics
             s['requests'].append(row);s['chargedObjects']+=count;s['observedBodyBytes']+=len(raw);s['observedWireBytes']+=row['wireBytes'];s['observedHeaderBytes']+=len(headers)

@@ -8,6 +8,7 @@ from diagnostics import Phases
 
 RECOVERY = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1')
 ISOLATION = RECOVERY.parent/'worker-stdin-isolation-r1'
+COOKIES = RECOVERY.parent/'response-cookie-handling-r1'
 
 
 def perform_request(q, a, folder, perform, clock=time.time, connection=None, phases=None):
@@ -75,7 +76,7 @@ def main():
             if event.startswith('socket.'):
                 raise PermissionError('OFFLINE_NETWORK_DENIED')
         sys.addaudithook(deny)
-    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION)) else None
+    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES)) else None
     try:
         if phases:
             phases.emit('worker_entry', synthetic=offline)
