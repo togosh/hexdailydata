@@ -9,7 +9,7 @@ from client import Session,URLS,CAP,RESERVATION,exact_request,save,strict_json,p
 sys.path.insert(0,str(W/'scripts/trade-feed'))
 from collector import collect
 from worker import perform_request
-R=Path(os.environ['HDD_TASK_ROOT']);assert R.name=='btc-eth-current-reference-freshness-r2'
+R=Path(os.environ['HDD_TASK_ROOT']);assert R.name in ('btc-eth-current-reference-freshness-r2','transport-recovery-r1')
 (R/'fixtures').mkdir(exist_ok=True)
 spec=importlib.util.spec_from_file_location('get_worker',W/'scripts/benchmark-reference/get_worker.py');worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker);worker.CAP=CAP
 cases=[]
@@ -108,6 +108,22 @@ def schedule():
  assert [r['status'] for r in result]==['UNQUALIFIED','SKIPPED','QUALIFIED']
  assert [m for m in messages if m[:2]==('begin',3)][0][2]==121
 test('actual three-slot loop skips occupied slot, never catches up; unqualified may use later original slot',schedule)
+def diagnostics():
+ s,c,calls=setup([response()]);runner=s.runner
+ def wrapped(args,env,*rest):
+  life=runner(args,env,*rest);folder=Path(args[-1]).parent
+  (folder/'PHASES.ndjson').write_bytes(b'x'*8193)
+  return life
+ s.runner=wrapped;refused(lambda:s.get(URLS[0],'markets'));s.close('expected diagnostic refusal')
+ assert len(calls)==1 and s.state['status']=='CLOSED' and s.state['requests'][0]['integrityFailure']=='Diagnostic bound'
+ assert s.state['diagnosticBytes']==8193
+ s,c,calls=setup([response()]);runner=s.runner
+ def synthetic(args,env,*rest):
+  life=runner(args,env,*rest);p=Path(args[-1]).parent/'response.json';m=strict_json(p.read_bytes());m['synthetic']=True;save(p,m);return life
+ s.runner=synthetic;refused(lambda:s.get(URLS[0],'markets'));s.close('synthetic capture refused')
+ assert len(calls)==1 and s.state['requests'][0]['integrityFailure']=='Synthetic capture refused'
+ testrow=s.state['requests'][0];assert testrow['lastEstablishedPhase']=='worker_entry_not_established'
+test('bounded diagnostic accounting and synthetic capture refused by actual client',diagnostics)
 def child():
  result=native([sys.executable,'-I','-S','-c','print("injected child, no network")'],{},2,1)
  assert result['reaped'] and result['exit']==0

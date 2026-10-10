@@ -5,6 +5,7 @@ from pathlib import Path
 import time,queue,threading
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from client import Session,TASK,URLS,W,strict_json,digest,save
+from authority import validate_authority
 
 def collect(session,exchange,clock=time.monotonic,sleep=time.sleep):
     markets=session.get(URLS[0],'markets')
@@ -26,6 +27,7 @@ def collect(session,exchange,clock=time.monotonic,sleep=time.sleep):
 def main():
     root=Path(sys.argv[1]).resolve();a=strict_json((root/'ADMISSION.json').read_bytes())
     assert a['task']==TASK and a['family']=='trade' and a['jobRoot']==str(root) and a['synthetic'] is False
+    validate_authority(a, root)
     assert 0<=time.time()-a['startedAtUnixSeconds']<=30
     for p,h in a['runtimeFiles'].items():assert digest((W/p).read_bytes())==h,p
     session=Session(root,a);incoming=queue.Queue()

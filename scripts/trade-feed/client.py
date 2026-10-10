@@ -45,7 +45,7 @@ class Session:
         if (self.root/'ACCOUNTING.json').exists():raise ValueError('Consumed session')
         self.start=mono();self.remaining=600-(wall()-admission['startedAtUnixSeconds']);self.last=None
         if not 0<self.remaining<=600:raise ValueError('Admission time')
-        self.state={'status':'ADMITTED','startedAtUtc':utc(),'attempts':0,'logicalRequests':0,'extras':0,'chargedBytes':0,'observedWireBytes':0,'observedBodyBytes':0,'observedHeaderBytes':0,'chargedObjects':0,'pending':None,'closureKnown':True,'requests':[]}
+        self.state={'status':'ADMITTED','startedAtUtc':utc(),'attempts':0,'logicalRequests':0,'extras':0,'chargedBytes':0,'observedWireBytes':0,'observedBodyBytes':0,'observedHeaderBytes':0,'diagnosticBytes':0,'chargedObjects':0,'pending':None,'closureKnown':True,'requests':[]}
         self.persist()
     def persist(self):save(self.root/'ACCOUNTING.json',self.state)
     def check(self,seconds=0):
@@ -71,14 +71,24 @@ class Session:
             # Durable writes and environment preparation may stall. A reservation
             # remains charged if this final pre-spawn gate refuses dispatch.
             self.check(65)
+            spawn_at=self.wall()
             life=self.runner([sys.executable,'-I','-S',str(W/'scripts/trade-feed/worker.py'),str(request)],env,27,2)
+            for key,limit in [('stdout',2048),('stderr',2048),('interrupted',1024)]:
+                if life.get(key):life[key]=str(life[key]).encode()[:limit].decode(errors='ignore')
             closed=life['reaped'] is True
             meta=strict_json((folder/'response.json').read_bytes()) if (folder/'response.json').exists() else {}
             raw=(folder/'response.body').read_bytes() if (folder/'response.body').exists() else b''
             framing=(folder/'response.framing').read_bytes() if (folder/'response.framing').exists() else None
             headers=(folder/'response.headers').read_bytes() if (folder/'response.headers').exists() else b''
+            phase_path=folder/'PHASES.ndjson'
+            phase_raw=phase_path.read_bytes() if phase_path.exists() else b''
+            diagnostics=len(phase_raw)+sum(len(str(life.get(k) or '').encode()) for k in ('stdout','stderr','interrupted'))+len(str(meta.get('error') or '').encode())
+            phases=[]
             integrity=None;complete=False;count=20000
             try:
+                if len(phase_raw)>8192 or diagnostics>16384:raise ValueError('Diagnostic bound')
+                phases=[strict_json(line) for line in phase_raw.splitlines()]
+                if meta.get('synthetic') is True:raise ValueError('Synthetic capture refused')
                 if len(headers)>HEADER or len(raw)+(len(framing) if framing else 0)>CAP:raise ValueError('Capture size')
                 if meta.get('complete'):
                     verify_framing(meta,raw,CAP,framing)
@@ -94,7 +104,9 @@ class Session:
             except BaseException as e:integrity=str(e)
             if meta.get('failureKind')=='terminal':integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
+            row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
             save(folder/'AUDIT.json',row)
+            s['diagnosticBytes']+=diagnostics
             s['requests'].append(row);s['chargedObjects']+=count;s['observedBodyBytes']+=len(raw);s['observedWireBytes']+=row['wireBytes'];s['observedHeaderBytes']+=len(headers)
             if closed:s['pending']=None;self.last=self.mono()
             else:s['closureKnown']=False

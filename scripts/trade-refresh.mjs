@@ -25,16 +25,32 @@ export async function tradeStorageGuard(root, reserve = 0, initial = false) {
     throw Error('TASK_FREE_SPACE');
   return { bytes, freeBytes: disk.bavail * disk.bsize };
 }
-export async function runTrades({
-  taskRoot,
-  preflightPath,
-  registry,
-  onAdoption,
-  spawnChild = spawn,
-  loadedRuntimeFiles,
-}) {
+export const recoveryTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-TRANSPORT-RECOVERY-R1';
+const recoveryRoot = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1`;
+export async function runTrades(options) {
+  return runFiniteTrades(options, false);
+}
+export async function runRecoveryTrades(options) {
+  return runFiniteTrades(
+    { ...options, taskRoot: recoveryRoot, preflightPath: join(recoveryRoot, 'PREFLIGHT.json') },
+    true,
+  );
+}
+async function runFiniteTrades(
+  { taskRoot, preflightPath, registry, onAdoption, spawnChild = spawn, loadedRuntimeFiles },
+  recovery,
+) {
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
+  // Refuse spent/uncertain state before any interpretation of an old preflight.
+  for (const name of ['session', 'PUBLIC_ADMISSION.json'])
+    if (
+      await lstat(join(taskRoot, name)).catch((e) => {
+        if (e.code === 'ENOENT') return null;
+        throw e;
+      })
+    )
+      throw Error('EXISTING_OR_UNCERTAIN_TRADE_SESSION');
   const pre = JSON.parse(await readFile(preflightPath)),
     synthetic = spawnChild !== spawn;
   if (
@@ -46,8 +62,26 @@ export async function runTrades({
   )
     throw Error('EXACT_UNUSED_PREFLIGHT');
   const continuation = preflightPath === join(taskRoot, 'continuation-r1/PREFLIGHT.json');
+  if (recovery) {
+    const scope = JSON.parse(await readFile(join(taskRoot, 'packet/SCOPE.json')));
+    const ready = JSON.parse(await readFile(join(taskRoot, 'evidence/READY.json')));
+    if (
+      synthetic ||
+      pre.authorityTaskId !== recoveryTaskId ||
+      scope.taskId !== recoveryTaskId ||
+      resolve(scope.paths.newRoot) !== recoveryRoot ||
+      resolve(scope.network.sessionPath) !== join(recoveryRoot, 'session') ||
+      pre.scopeSha256 !== sha(await readFile(join(taskRoot, 'packet/SCOPE.json'))) ||
+      pre.readySha256 !== sha(await readFile(join(taskRoot, 'evidence/READY.json'))) ||
+      ready.status !== 'PASS' ||
+      ready.pid !== process.pid ||
+      ready.runtimeHash !== pre.runtimeHash ||
+      sha(JSON.stringify(pre.runtimeFiles)) !== pre.runtimeHash
+    )
+      throw Error('EXACT_RECOVERY_READY_AUTHORITY');
+  } else if (pre.authorityTaskId) throw Error('RECOVERY_AUTHORITY_IN_OLD_ENTRY');
   if (
-    continuation &&
+    (continuation || recovery) &&
     (!loadedRuntimeFiles || JSON.stringify(loadedRuntimeFiles) !== JSON.stringify(pre.runtimeFiles))
   )
     throw Error('LOADED_RUNTIME_BINDING');
@@ -73,8 +107,11 @@ export async function runTrades({
   if (
     registry.status().generation !== pre.initialGeneration ||
     registry.status().productVersion !== pre.initialProductVersion ||
-    !registry.root.startsWith(taskRoot + '\\') ||
-    !registry.productDaily.root.startsWith(taskRoot + '\\')
+    (recovery
+      ? registry.root !== join(dirname(taskRoot), 'runtime/participants') ||
+        registry.productDaily.root !== join(dirname(taskRoot), 'runtime/product')
+      : !registry.root.startsWith(taskRoot + '\\') ||
+        !registry.productDaily.root.startsWith(taskRoot + '\\'))
   )
     throw Error('GENUINE_OWNED_SELECTION_REQUIRED');
   const output = join(taskRoot, 'session'),
@@ -87,7 +124,8 @@ export async function runTrades({
       })
     )
       throw Error('EXISTING_OR_UNCERTAIN_TRADE_SESSION');
-  await tradeStorageGuard(taskRoot, 64 * 1024 ** 2, true);
+  const storageRoot = recovery ? dirname(taskRoot) : taskRoot;
+  await tradeStorageGuard(storageRoot, 64 * 1024 ** 2, true);
   const lockPath = join(registry.productDaily.root, 'MARKET_REFRESH.lock'),
     lock = await open(lockPath, 'wx');
   let settled = false,
@@ -99,8 +137,13 @@ export async function runTrades({
     await lock.sync();
     await mkdir(output);
     await mkdir(join(output, 'temp'));
+    const nonce = randomBytes(32).toString('hex');
+    const authority = recovery
+      ? { authorityTaskId: recoveryTaskId, scopeSha256: pre.scopeSha256, nonce }
+      : {};
     await durableJson(marker, {
       taskId,
+      ...authority,
       recordedAt: new Date().toISOString(),
       preflightSha256: sha(await readFile(preflightPath)),
       output,
@@ -111,7 +154,8 @@ export async function runTrades({
       family: 'trade',
       job: 'trade-three-slots',
       jobRoot: output,
-      nonce: randomBytes(32).toString('hex'),
+      nonce,
+      ...authority,
       synthetic,
       startedAtUnixSeconds: wall,
       runtimeFiles: pre.runtimeFiles,
@@ -125,7 +169,7 @@ export async function runTrades({
       onAdoption,
       spawnChild,
       deadline: began + 598000,
-      storageGuard: (bytes) => tradeStorageGuard(taskRoot, bytes ?? 0),
+      storageGuard: (bytes) => tradeStorageGuard(storageRoot, bytes ?? 0),
     });
     settled =
       result.source.accounting.status === 'CLOSED' && result.source.accounting.pending === null;
