@@ -934,3 +934,22 @@ no third admission, public call or genuine publication followed. Last-good close
 data, oracle times, original main and earlier evidence remain unchanged. Detailed
 failures, remaining qualification and review are in the task return. Indexer and
 paid reconstruction remain PARKED.
+
+HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2-CONTINUATION-R1 completed the
+corrected actual paired preflight on the existing immutable base handles. The
+continuation repairs clone ownership/references, command parsing and atomic
+delivery, exception-safe cleanup, explicit evidence destinations and loaded-code
+bindings. Synthetic three-slot tests cover publication/adoption, same-second
+advance, repeat no-op, held CSV and delayed history-reader adoption.
+
+The one original public session is now CLOSED/PARTIAL. The markets GET and its
+single allowed retry both timed out with known native closure: two attempts,
+4,325,376 conservatively charged bytes and zero observed response bytes. No trade
+cycle ran and no genuine selection changed. All 117,641 existing cells, 5,004
+fixed closes and original oracle timestamps remain exact. Genuine normal routes,
+protected CSV and HEAD/304 checks passed. Cumulative local use is four base
+admissions, one seed initialization, 64 requests and two original screenshots.
+No additional screenshot, genuine backup/restore or provider retry was warranted.
+The continuation return records the independent review and exact final identity;
+finite public freshness is unqualified, with main unchanged and indexer/paid
+reconstruction PARKED.

@@ -138,3 +138,14 @@ and no genuine quote was published. The selected close product and original orac
 times remain unchanged and stale. A third base admission requires expanded owner
 scope; the saved failures and unused public budget must not be reset. No sustained
 freshness, commercial redistribution, main integration or deployment is qualified.
+
+The R2 continuation subsequently passed the actual paired preflight, including
+normal application adoption of synthetic trade updates and the retained reader
+guards. Its one original authorized public session is now consumed and CLOSED:
+the markets GET and its sole allowed retry timed out before any response bytes
+were observed. No trade cycles, publications or genuine fresh-price adoption
+occurred. The same close product and stale oracle readings remain selected.
+Local implementation/preflight qualification therefore does not establish finite
+public freshness. The previous unused-session statement remains historical; it
+does not authorize a restart. Exact charges and separate continuation evidence
+are in the continuation return. Main and all original evidence remain unchanged.
