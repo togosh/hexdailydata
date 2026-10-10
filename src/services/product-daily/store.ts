@@ -225,7 +225,11 @@ export class ProductDailyStore {
     return this.current;
   }
   /** Registry validation precedes this final disk/pair check; held snapshots stay immutable. */
-  async adoptCoordinated(next: AdmittedProduct, pair: ProductPair) {
+  async adoptCoordinated(
+    next: AdmittedProduct,
+    pair: ProductPair,
+    assertPairedSelection?: () => Promise<void>,
+  ) {
     if (this.selecting || this.writer) throw Error('PRODUCT_SELECTION_BUSY');
     if (!same(next.metadata.pair, pair)) throw Error('PRODUCT_MIXED_PAIR');
     const disk = pointerSchema.parse(
@@ -235,6 +239,20 @@ export class ProductDailyStore {
       throw Error('PARTICIPANT_PRODUCT_POINTER');
     if (this.current) await verifyMarketReaderAdvance(this.root, next, this.current);
     else await verifyMarketCertificate(this.root, next);
+    // Proof work awaits bounded disk reads. Fence the still-current selection
+    // afterward, before changing either store/registry's in-memory snapshot.
+    const finalDisk = pointerSchema.parse(
+      JSON.parse((await bounded(join(this.root, 'CURRENT.json'), 4096)).toString()),
+    );
+    if (!same(finalDisk, disk)) throw Error('PRODUCT_POINTER_CHANGED');
+    if (
+      await lstat(join(this.root, 'SELECTION.lock')).catch((e: NodeJS.ErrnoException) => {
+        if (e.code === 'ENOENT') return null;
+        throw e;
+      })
+    )
+      throw Error('PRODUCT_SELECTION_BUSY');
+    if (assertPairedSelection) await assertPairedSelection();
     this.current = next;
     this.pair = pair;
   }

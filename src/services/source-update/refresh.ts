@@ -267,7 +267,17 @@ export class ParticipantRegistry {
         await verifyMarketReaderAdvance(this.productDaily.root, product, this.current.product);
         if (!(await bytes(this.root, 'CURRENT.json')).equals(raw))
           throw Error('PARTICIPANT_POINTER_CHANGED');
-        await this.productDaily.adoptCoordinated(product, participantPair(candidate));
+        await this.productDaily.adoptCoordinated(product, participantPair(candidate), async () => {
+          if (!(await bytes(this.root, 'CURRENT.json')).equals(raw))
+            throw Error('PARTICIPANT_POINTER_CHANGED');
+          if (
+            await lstat(join(this.root, 'SELECTION.lock')).catch((e) => {
+              if (e.code === 'ENOENT') return null;
+              throw e;
+            })
+          )
+            throw Error('PARTICIPANT_SELECTION_BUSY');
+        });
         const next = { pointer: p, product, source: candidate, held: 0 };
         this.retained.add(next);
         this.current = next;

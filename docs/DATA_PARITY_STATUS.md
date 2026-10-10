@@ -123,3 +123,8 @@ The exact close/HDS rollback identities and prior restore/visual evidence remain
 Independent review and final commit identity are recorded in the correction return.
 Current BTC/ETH freshness and commercial-use permission remain separate; main,
 indexer and paid reconstruction are unchanged/PARKED.
+
+Independent review found a remaining final-adoption ordering gap. Product and
+paired pointers/selection locks are now checked after all reader proof work and
+before either in-memory adoption. Focused late pointer/lock injection tests refuse
+all four cases and retain both snapshots; no new base admission or seed restore.
