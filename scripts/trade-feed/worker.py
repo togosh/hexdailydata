@@ -2,9 +2,21 @@
 import sys
 sys.dont_write_bytecode=True
 from pathlib import Path
-import importlib.util
+import importlib.util,time,http.client
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from client import W,TASK,exact_request,strict_json,digest,CAP
+
+def perform_request(q,a,folder,perform,clock=time.time,connection=http.client.HTTPSConnection):
+    deadline=a['startedAtUnixSeconds']+535
+    if q['dispatchByUnixSeconds']!=deadline:raise ValueError('Dispatch deadline binding')
+    def gate():
+        if clock()>=deadline:raise ValueError('Dispatch deadline')
+    gate()  # Includes all imports and frozen runtime hashing.
+    class DeadlineConnection(connection):
+        def request(self,*args,**kwargs):
+            gate()  # perform() writes metadata first; check again before DNS/HTTP.
+            return super().request(*args,**kwargs)
+    perform(q['url'],folder,DeadlineConnection)
 
 def main():
     request=Path(sys.argv[1]).resolve();session=request.parent.parent
@@ -15,6 +27,6 @@ def main():
     for p,h in a['runtimeFiles'].items():assert digest((W/p).read_bytes())==h,p
     spec=importlib.util.spec_from_file_location('bounded_get',W/'scripts/benchmark-reference/get_worker.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
     m.CAP=CAP
-    m.perform(q['url'],request.parent)
+    perform_request(q,a,request.parent,m.perform)
 if __name__=='__main__':main()
 

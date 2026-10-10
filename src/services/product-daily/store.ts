@@ -665,7 +665,7 @@ export class ProductDailyStore {
           r.observedAtUtc,
           300,
           r.kind === 'trade'
-            ? 'Bitstamp recent-trade USD reference; age uses this asset�s reported trade second. Numeric ID only breaks ties within that second; not an executable or global quote.'
+            ? "Bitstamp recent-trade USD reference; age uses this asset's reported trade second. Numeric ID only breaks ties within that second; not an executable or global quote."
             : r.kind === 'reference'
               ? 'Chainlink USD reference on Ethereum; age uses the oracle updatedAt. Not a streaming or guaranteed executable quote.'
               : 'Admitted spot observation; served time is not observation time.',

@@ -82,6 +82,16 @@ try {
       () => sampleTrades('[{"date":1,"date":2,"tid":1,"price":"1"}]', 'BTC', [], now),
       /DUPLICATE/,
     );
+    for (const body of [
+      '[{"date":1,"date":1,"tid":1,"price":"1"}]',
+      '[{"date":1,"d\\u0061te":1,"tid":1,"price":"1"}]',
+    ])
+      assert.throws(() => sampleTrades(body, 'BTC', [], now), /DUPLICATE/);
+    for (const key of ['__proto__', '__pro\\u0074o__'])
+      assert.throws(
+        () => sampleTrades('[{"' + key + '":{"date":1,"tid":1,"price":"1"}}]', 'BTC', [], now),
+        /UNEXPECTED_SOURCE_FIELD/,
+      );
   });
   await check(
     'lossless tuple, order-independent timestamp then numeric-ID tie and precision',

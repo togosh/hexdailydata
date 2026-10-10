@@ -8,6 +8,7 @@ sys.path.insert(0,str(W/'scripts/trade-feed'))
 from client import Session,URLS,CAP,RESERVATION,exact_request,save,strict_json,parsed_objects,native
 sys.path.insert(0,str(W/'scripts/trade-feed'))
 from collector import collect
+from worker import perform_request
 R=Path(os.environ['HDD_TASK_ROOT']);assert R.name=='btc-eth-current-reference-freshness-r2'
 (R/'fixtures').mkdir(exist_ok=True)
 spec=importlib.util.spec_from_file_location('get_worker',W/'scripts/benchmark-reference/get_worker.py');worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker);worker.CAP=CAP
@@ -72,6 +73,28 @@ def bounds():
  s,c,calls=setup([response()]);s.state['chargedObjects']=280000;refused(lambda:s.get(URLS[0],'markets'));assert not calls
  refused(lambda:parsed_objects(('['+','.join(['{}']*20000)+']').encode()))
 test('attempt/deadline/control reserve and nested object caps',bounds)
+def final_dispatch_gates():
+ s,c,calls=setup([response()]);persist=s.persist
+ def stalled_persist():
+  persist()
+  if s.state['pending']:c.t=536
+ s.persist=stalled_persist
+ refused(lambda:s.get(URLS[0],'markets'));assert not calls and s.state['chargedBytes']==RESERVATION and s.state['pending']
+ s.close('known local pre-dispatch reserve refusal; conservative pending charge retained')
+ a={'startedAtUnixSeconds':100000};q={'url':URLS[0],'dispatchByUnixSeconds':100535};clock=Clock();sent=[]
+ class C:
+  def request(self,*args,**kwargs):sent.append(True)
+ def delayed_perform(url,folder,connection):
+  clock.t=536;connection().request('GET','/api/v2/markets/')
+ refused(lambda:perform_request(q,a,s.root,delayed_perform,clock.wall,C));assert not sent
+ invoked=[]
+ refused(lambda:perform_request(q,a,s.root,lambda *args:invoked.append(True),clock.wall,C));assert not invoked
+test('post-reservation and actual pre-HTTP deadline gates retain charge and prevent dispatch',final_dispatch_gates)
+def error_objects():
+ s,c,calls=setup([response(503,body=b'[{"error":"temporary"}]'),response()]);s.get(URLS[0],'markets');s.close('done');assert s.state['chargedObjects']==3
+ body=('['+','.join(['{}']*20000)+']').encode();s,c,calls=setup([response(503,body=body),response()]);refused(lambda:s.get(URLS[0],'markets'));assert len(calls)==1 and s.state['requests'][0]['integrityFailure']=='Object bound';s.close('object bound')
+ s,c,calls=setup([response(503,body=b'upstream'),response()]);s.get(URLS[0],'markets');s.close('done');assert s.state['chargedObjects']==20001
+test('non-200 JSON counted, oversize error objects terminal, non-JSON error reserved conservatively',error_objects)
 def schedule():
  clock=Clock();messages=[]
  class S:

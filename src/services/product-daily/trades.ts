@@ -40,6 +40,38 @@ function integer(v: unknown, positive: boolean) {
   return n.toString();
 }
 export function parseTradeBody(body: string) {
+  // lossless-json accepts identical duplicate keys and assigns __proto__.
+  // Reject both before parsing, including escaped spellings of object keys.
+  if (Buffer.byteLength(body, 'utf8') > 2097152) throw Error('TRADE_BODY_BOUND');
+  const keys: (Set<string> | null)[] = [];
+  let quoted = false,
+    escaped = false,
+    start = 0;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') {
+        quoted = false;
+        let next = i + 1;
+        while (next < body.length && /\s/.test(body[next]!)) next++;
+        if (body[next] === ':') {
+          const key = JSON.parse(body.slice(start, i + 1)) as string;
+          const seen = keys.at(-1);
+          if (key === '__proto__') throw Error('UNEXPECTED_SOURCE_FIELD');
+          if (!seen || seen.has(key)) throw Error('DUPLICATE_JSON_KEY');
+          seen.add(key);
+        }
+      }
+    } else if (c === '"') {
+      quoted = true;
+      start = i;
+    } else if (c === '{' || c === '[') {
+      keys.push(c === '{' ? new Set() : null);
+      if (keys.length > 64) throw Error('TRADE_DEPTH_BOUND');
+    } else if (c === '}' || c === ']') keys.pop();
+  }
   const data = parse(body, undefined, {
     onDuplicateKey: () => {
       throw Error('DUPLICATE_JSON_KEY');

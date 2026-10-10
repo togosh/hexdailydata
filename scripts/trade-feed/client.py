@@ -13,6 +13,7 @@ native=native_module.native
 TASK='HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2'
 URLS=('https://www.bitstamp.net/api/v2/markets/','https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute','https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute')
 CAP=2097152; HEADER=65536; RESERVATION=2162688
+class ObjectBoundError(ValueError):pass
 
 def exact_request(method,url):
     if method!='GET' or url not in URLS: raise ValueError('Exact GET URL required')
@@ -31,7 +32,7 @@ def parsed_objects(raw):
         v=queue.pop()
         if isinstance(v,(dict,list)):
             count+=1
-            if count>20000:raise ValueError('Object bound')
+            if count>20000:raise ObjectBoundError('Object bound')
             queue.extend(v.values() if isinstance(v,dict) else v)
     return count
 
@@ -61,12 +62,15 @@ class Session:
             if s['attempts']>=14 or s['chargedBytes']+RESERVATION>32*1024**2 or s['chargedObjects']+20000>280000 or (ordinal and s['extras']>=7):raise ValueError('Attempt/reservation bound')
             folder=self.root/f"{s['attempts']+1:02d}";folder.mkdir()
             request=folder/'request.json'
-            q={'method':'GET','url':url,'label':label,'attempt':s['attempts']+1,'retryOrdinal':ordinal,'nonce':self.a['nonce']}
+            q={'method':'GET','url':url,'label':label,'attempt':s['attempts']+1,'retryOrdinal':ordinal,'nonce':self.a['nonce'],'dispatchByUnixSeconds':self.a['startedAtUnixSeconds']+535}
             save(request,q)
             s['attempts']+=1;s['extras']+=ordinal;s['chargedBytes']+=RESERVATION
             s['pending']={'request':str(request),'reservedBytes':RESERVATION,'reservedObjects':20000,'startedAtUtc':utc()};self.persist()
             env={k:v for k,v in os.environ.items() if k.upper() in ('SYSTEMROOT','WINDIR','COMSPEC')}
             env.update(TEMP=str(self.root/'temp'),TMP=str(self.root/'temp'),PYTHONIOENCODING='utf-8')
+            # Durable writes and environment preparation may stall. A reservation
+            # remains charged if this final pre-spawn gate refuses dispatch.
+            self.check(65)
             life=self.runner([sys.executable,'-I','-S',str(W/'scripts/trade-feed/worker.py'),str(request)],env,27,2)
             closed=life['reaped'] is True
             meta=strict_json((folder/'response.json').read_bytes()) if (folder/'response.json').exists() else {}
@@ -81,8 +85,12 @@ class Session:
                     if meta.get('headerBytes')!=len(headers):raise ValueError('Header receipt')
                     if any(k.lower() in ('set-cookie','www-authenticate','proxy-authenticate') for k,v in meta.get('headers',[])):raise ValueError('Cookie/authentication response')
                     complete=True
-                    # Success bodies must be lossless JSON; error status bodies remain evidence.
-                    count=parsed_objects(raw) if meta.get('status')==200 else 0
+                    # Error bodies are not exempt from parsed-object limits.
+                    # Non-JSON HTTP errors retain the full conservative reservation.
+                    try:count=parsed_objects(raw)
+                    except (UnicodeError,json.JSONDecodeError):
+                        if meta.get('status')==200:raise
+                        count=20000
             except BaseException as e:integrity=str(e)
             if meta.get('failureKind')=='terminal':integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
