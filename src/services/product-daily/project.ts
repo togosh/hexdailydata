@@ -122,7 +122,8 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
       if (
         value !== null &&
         (compare(value, '0') < 0 ||
-          ((r.kind === 'market' || r.kind === 'reference') && compare(value, '0') === 0) ||
+          ((r.kind === 'market' || r.kind === 'reference' || r.kind === 'trade') &&
+            compare(value, '0') === 0) ||
           (r.kind === 'gas' && !/^\d+$/.test(value)))
       )
         throw Error('READING_UNITS_OR_VALUE');
@@ -130,7 +131,7 @@ export function validateReadings(input: unknown[], now = Date.now()): ProductRea
   return readings;
 }
 export function readingKey(r: ProductReading) {
-  return r.kind === 'market' || r.kind === 'reference'
+  return r.kind === 'market' || r.kind === 'reference' || r.kind === 'trade'
     ? 'market:' + r.asset
     : r.kind === 'tracked-liquidity'
       ? 'liquidity'
@@ -265,7 +266,7 @@ export function projectDaily(input: {
         });
     }
     for (const reading of readings.filter((r) => dateOf(r.observedAtUtc) === dateUtc)) {
-      if (reading.kind === 'market' || reading.kind === 'reference') {
+      if (reading.kind === 'market' || reading.kind === 'reference' || reading.kind === 'trade') {
         // A live HEX spot quote is never a historical reference quote.
         if (reading.asset === 'HEX') continue;
         const field = (

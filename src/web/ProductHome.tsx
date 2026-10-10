@@ -61,8 +61,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
         />
       </div>
       <p className="meta">
-        BTC/ETH are oracle reference prices, not guaranteed executable quotes. Each retains its own
-        update time.
+        BTC/ETH references are not guaranteed executable quotes. Bitstamp readings sample a reported
+        trade. Each retains its own update time.
       </p>
       <section data-testid="protocol-availability">
         <h3>HEX protocol at its saved block</h3>

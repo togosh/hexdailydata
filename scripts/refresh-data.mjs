@@ -1,3 +1,4 @@
+import { publishTrade, admitTradeMarkets } from './trade-publication.mjs';
 // One explicit finite operation. Status/default makes no provider requests.
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
@@ -359,7 +360,10 @@ export async function runJob({
   deadline,
   storageGuard = async () => {},
 }) {
-  const reference = admission.family === 'reference';
+  const reference = admission.family === 'reference',
+    trade = admission.family === 'trade';
+  if (trade && admission.task !== 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2')
+    throw Error('EXACT_TRADE_TASK_REQUIRED');
   if (reference && admission.task !== 'HDD-BTC-ETH-REFERENCE-FEED-R1')
     throw Error('EXACT_REFERENCE_TASK_REQUIRED');
   const env = Object.fromEntries(
@@ -379,7 +383,11 @@ export async function runJob({
       '-S',
       join(
         repo,
-        reference ? 'scripts/reference-feed/collector.py' : 'scripts/unified-refresh/job.py',
+        trade
+          ? 'scripts/trade-feed/collector.py'
+          : reference
+            ? 'scripts/reference-feed/collector.py'
+            : 'scripts/unified-refresh/job.py',
       ),
       jobRoot,
     ],
@@ -395,7 +403,11 @@ export async function runJob({
   child.once('exit', () => {
     exitObserved = true;
   });
-  const publications = [];
+  const publications = [],
+    outcomes = [],
+    retainedTrades = [];
+  let marketsAccepted = false,
+    publicationUncertain = false;
   let begunCycle = 0;
   const completion = new Promise((done, reject) => {
     child.once('error', reject);
@@ -480,8 +492,32 @@ export async function runJob({
           ok: true,
           ...(admission.family === 'participants' ? { window: m.window } : { cycle: m.cycle }),
         };
-        if (m.type === 'begin') {
-          if (reference) {
+        if (m.type === 'markets' && trade) {
+          if (marketsAccepted || begunCycle || m.cycle !== 0) throw Error('TRADE_MARKETS_ORDER');
+          await admitTradeMarkets(jobRoot, m.markets);
+          marketsAccepted = true;
+        } else if (m.type === 'skipped' && trade) {
+          if (
+            !marketsAccepted ||
+            m.cycle !== begunCycle + 1 ||
+            m.cycle > 3 ||
+            outcomes.length !== begunCycle
+          )
+            throw Error('TRADE_SKIP_ORDER');
+          begunCycle = m.cycle;
+          outcomes.push({ cycle: m.cycle, status: 'SKIPPED', reason: m.reason });
+          await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+        } else if (m.type === 'begin') {
+          if (trade) {
+            if (
+              !marketsAccepted ||
+              m.cycle !== begunCycle + 1 ||
+              m.cycle > 3 ||
+              outcomes.length !== begunCycle
+            )
+              throw Error('TRADE_CYCLE_ORDER');
+            begunCycle = m.cycle;
+          } else if (reference) {
             if (m.cycle !== begunCycle + 1 || m.cycle > 2 || publications.length !== begunCycle)
               throw Error('REFERENCE_CYCLE_ORDER');
             begunCycle = m.cycle;
@@ -499,12 +535,35 @@ export async function runJob({
           check();
           await durableJson(join(jobRoot, 'WINDOW_1_DRAFT.json'), draft);
         } else if (m.type === 'qualified') {
+          if (trade && (m.cycle !== begunCycle || outcomes.length !== begunCycle - 1))
+            throw Error('TRADE_QUALIFICATION_ORDER');
           if (reference && (m.cycle !== begunCycle || publications.length !== begunCycle - 1))
             throw Error('REFERENCE_QUALIFICATION_ORDER');
           await storageGuard(512 * 1024 ** 2);
           check();
           let selected, publication;
-          if (admission.family === 'participants') {
+          if (trade) {
+            publication = await publishTrade(
+              registry.productDaily,
+              jobRoot,
+              m,
+              active,
+              (update, beforeCommit, captureReference) =>
+                registry.publishProduct(update, { beforeCommit, captureReference }),
+              retainedTrades,
+            );
+            if (!publication.qualified) {
+              outcomes.push({ cycle: m.cycle, status: 'UNQUALIFIED', publication });
+              await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+              check();
+              child.stdin.write(JSON.stringify({ ...answer, outcome: 'UNQUALIFIED' }) + '\n');
+              return;
+            }
+            await registry.refresh(undefined, true);
+            selected = await read(join(registry.root, 'CURRENT.json'));
+            if (selected.product.version !== publication.selected.version)
+              throw Error('COORDINATED_PUBLICATION_UNKNOWN');
+          } else if (admission.family === 'participants') {
             const raw = await readFile(join(jobRoot, 'WINDOW_1_AUDIT.json')),
               proof = JSON.parse(raw);
             if (
@@ -564,16 +623,23 @@ export async function runJob({
           check();
           const receipt = { selected, publication, adoption, adoptedAt: new Date().toISOString() };
           await durableJson(
-            join(jobRoot, reference ? `ADOPTION_${m.cycle}.json` : 'ADOPTION.json'),
+            join(jobRoot, reference || trade ? `ADOPTION_${m.cycle}.json` : 'ADOPTION.json'),
             receipt,
           );
           publications.push(receipt);
+          if (trade) {
+            outcomes.push({ cycle: m.cycle, status: 'QUALIFIED' });
+            answer.outcome = 'QUALIFIED';
+            await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+          }
         } else throw Error('UNEXPECTED_COLLECTOR_PHASE');
         check();
         child.stdin.write(JSON.stringify(answer) + '\n');
       })
       .catch((e) => {
         error ??= String(e);
+        publicationUncertain ||=
+          Boolean(e.publicationUncertain) || String(e).includes('PUBLICATION_UNKNOWN');
         if (child.stdin.writable)
           child.stdin.write(JSON.stringify({ ok: false, reason: error }) + '\n');
       });
@@ -600,14 +666,16 @@ export async function runJob({
       accounting.pending !== null
     )
       throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + stderr);
-    if (error) throw Error(error);
+    if (error && !trade) throw Error(error);
     const qualified =
+      !error &&
       exit.code === 0 &&
       source.status.startsWith('COMPLETE_') &&
-      publications.length === (reference ? 2 : 1);
+      publications.length === (trade ? 3 : reference ? 2 : 1);
     return {
       status: qualified ? 'QUALIFIED_ADOPTED' : 'PARTIAL',
       source,
+      ...(trade ? { outcomes, error, publicationUncertain } : {}),
       publications,
       exit,
       stderr,

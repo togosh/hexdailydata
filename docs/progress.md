@@ -924,3 +924,13 @@ Independent review found a remaining final-adoption ordering gap. Product and
 paired pointers/selection locks are now checked after all reader proof work and
 before either in-memory adoption. Focused late pointer/lock injection tests refuse
 all four cases and retain both snapshots; no new base admission or seed restore.
+
+HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2: partial local implementation, public
+session unstarted. Added exact reported-second/trade-ID selection, conflict/no-op
+rules, fixed-close protection and the bounded GET adapter on the maintained
+coordinator. Focused offline product/transport checks pass. The two-admission
+allowance was consumed by local harness failures before paired preflight completed;
+no third admission, public call or genuine publication followed. Last-good close
+data, oracle times, original main and earlier evidence remain unchanged. Detailed
+failures, remaining qualification and review are in the task return. Indexer and
+paid reconstruction remain PARKED.

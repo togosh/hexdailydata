@@ -128,3 +128,13 @@ Independent review found a remaining final-adoption ordering gap. Product and
 paired pointers/selection locks are now checked after all reader proof work and
 before either in-memory adoption. Focused late pointer/lock injection tests refuse
 all four cases and retain both snapshots; no new base admission or seed restore.
+
+Current-reference freshness R2 is a partial local candidate. A strict Bitstamp
+recent-trade adapter, paired-update reducer and finite native-coordinator extension
+are implemented. Focused product-only and injected transport checks pass; the full
+genuine paired preflight did not finish. Two local harness failures consumed both
+permitted immutable-base admissions. No public session was admitted or requested,
+and no genuine quote was published. The selected close product and original oracle
+times remain unchanged and stale. A third base admission requires expanded owner
+scope; the saved failures and unused public budget must not be reset. No sustained
+freshness, commercial redistribution, main integration or deployment is qualified.

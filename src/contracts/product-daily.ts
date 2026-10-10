@@ -228,6 +228,23 @@ export const BenchmarkHistorySchema = z.discriminatedUnion('methodRevision', [
 export type BenchmarkHistory = z.infer<typeof BenchmarkHistorySchema>;
 export const ReadingSchema = z.discriminatedUnion('kind', [
   ProtocolReadingSchema,
+  z
+    .strictObject({
+      kind: z.literal('trade'),
+      asset: z.enum(['BTC', 'ETH']),
+      quote: z.literal('USD'),
+      exchange: z.literal('Bitstamp'),
+      market: z.enum(['btcusd', 'ethusd']),
+      method: z.literal('bitstamp-recent-trade-usd-1'),
+      tradeId: z.string().regex(/^[1-9]\d{0,79}$/),
+      value: z
+        .string()
+        .max(160)
+        .regex(/^(?:0|[1-9]\d*)(?:\.\d*[1-9])?$/)
+        .refine((v) => /[1-9]/.test(v)),
+      observedAtUtc: utc.refine((v) => new Date(v).toISOString() === v && v.endsWith('.000Z')),
+    })
+    .refine((r) => r.market === r.asset.toLowerCase() + 'usd'),
   z.strictObject({
     kind: z.literal('reference'),
     asset: z.enum(['BTC', 'ETH']),

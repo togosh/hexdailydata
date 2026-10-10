@@ -1,3 +1,4 @@
+import { assertTradeIdentities, compareTrades, tradeDisclosure } from './trades.ts';
 import { z } from 'zod';
 import {
   LedgerAppendSchema,
@@ -147,18 +148,23 @@ export function benchmarkHistoryOnlyAdvance(a: ProductMetadata, b: ProductMetada
 }
 /** A later round may retain the exact same quote and timestamp; no value is invented. */
 const sameTimeReferenceAdvance = (a: ProductReading, b: ProductReading) =>
-  a.kind === 'reference' &&
-  b.kind === 'reference' &&
-  a.asset === b.asset &&
-  a.value === b.value &&
-  Date.parse(a.observedAtUtc) === Date.parse(b.observedAtUtc) &&
-  BigInt(b.roundId) > BigInt(a.roundId);
+  (a.kind === 'trade' &&
+    b.kind === 'trade' &&
+    a.asset === b.asset &&
+    a.observedAtUtc === b.observedAtUtc &&
+    compareTrades(b, a) > 0) ||
+  (a.kind === 'reference' &&
+    b.kind === 'reference' &&
+    a.asset === b.asset &&
+    a.value === b.value &&
+    Date.parse(a.observedAtUtc) === Date.parse(b.observedAtUtc) &&
+    BigInt(b.roundId) > BigInt(a.roundId));
 
 /** Certified independent observations need not exceed another feed's newest clock. */
 export function referenceOnlyAdvance(a: ProductMetadata, b: ProductMetadata) {
-  const before = a.readings.filter((r) => r.kind !== 'reference');
-  const after = b.readings.filter((r) => r.kind !== 'reference');
-  const refs = b.readings.filter((r) => r.kind === 'reference');
+  const before = a.readings.filter((r) => r.kind !== 'reference' && r.kind !== 'trade');
+  const after = b.readings.filter((r) => r.kind !== 'reference' && r.kind !== 'trade');
+  const refs = b.readings.filter((r) => r.kind === 'reference' || r.kind === 'trade');
   const storageAdvance =
     b.marketStorage &&
     (a.marketStorage
@@ -181,6 +187,7 @@ const order = (a: ProductReading, b: ProductReading) =>
 
 /** At most one exact last reading per independent key/date, never a fabricated close. */
 export function marketCheckpoints(readings: ProductReading[]) {
+  assertTradeIdentities(readings);
   const days = new Map<string, ProductReading>();
   for (const r of readings) {
     validateReadings([r]);
@@ -190,7 +197,8 @@ export function marketCheckpoints(readings: ProductReading[]) {
       old &&
       Date.parse(old.observedAtUtc) === Date.parse(r.observedAtUtc) &&
       !same(old, r) &&
-      !sameTimeReferenceAdvance(old, r)
+      !sameTimeReferenceAdvance(old, r) &&
+      !(old.kind === 'trade' && r.kind === 'trade' && compareTrades(r, old) < 0)
     )
       throw Error('SAME_TIME_MARKET_CONFLICT');
     if (
@@ -208,6 +216,7 @@ export function marketEvidence(metadata: ProductMetadata): ProductReading[] {
     return mergeObservations([], metadata.observations ?? metadata.readings);
   const cp = metadata.marketStorage.checkpoints,
     recent = metadata.observations ?? [];
+  assertTradeIdentities([...cp, ...recent]);
   if (
     recent.length > activeMarketBound ||
     !same(marketCheckpoints(cp), cp) ||
@@ -286,6 +295,7 @@ const marketFields = [
 ] as const;
 
 export function mergeObservations(previous: ProductReading[], additions: ProductReading[]) {
+  assertTradeIdentities([...previous, ...additions]);
   const found = new Map<string, ProductReading>();
   const liquidityIdentities = new Set<string>();
   for (const r of [...previous, ...additions]) {
@@ -296,6 +306,7 @@ export function mergeObservations(previous: ProductReading[], additions: Product
     if (liquidityIdentities.size > 1) throw Error('LIQUIDITY_COHORT_DRIFT');
     const key = readingKey(r) + ':' + new Date(r.observedAtUtc).toISOString();
     const old = found.get(key);
+    if (old?.kind === 'trade' && r.kind === 'trade' && compareTrades(r, old) < 0) continue;
     if (old && !same(old, r) && !sameTimeReferenceAdvance(old, r))
       throw Error('SAME_TIME_MARKET_CONFLICT');
     found.set(key, r);
@@ -327,14 +338,25 @@ function validateBuckets(
   }
 }
 export function latestReadings(observations: ProductReading[]) {
+  assertTradeIdentities(observations);
   const latest = new Map<string, ProductReading>();
-  for (const r of observations) latest.set(readingKey(r), r);
+  for (const r of observations) {
+    const old = latest.get(readingKey(r));
+    if (old?.kind === 'trade' && r.kind === 'trade') {
+      if (compareTrades(r, old) > 0) latest.set(readingKey(r), r);
+    } else if (
+      !old ||
+      Date.parse(r.observedAtUtc) > Date.parse(old.observedAtUtc) ||
+      sameTimeReferenceAdvance(old, r)
+    )
+      latest.set(readingKey(r), r);
+  }
   return validateReadings(
     [...latest.values()].sort((a, b) => readingKey(a).localeCompare(readingKey(b))),
   );
 }
 function apply(row: ProductRow, r: ProductReading) {
-  if (r.kind === 'market' || r.kind === 'reference') {
+  if (r.kind === 'market' || r.kind === 'reference' || r.kind === 'trade') {
     // Current marginal HEX spot is NEVER a historical HEX reference quote.
     if (r.asset === 'HEX') return;
     const fields = {
@@ -382,7 +404,7 @@ function replay(
     const row = byDate.get(dateOf(r.observedAtUtc));
     if (
       history?.methodRevision === benchmarkCloseMethod &&
-      (r.kind === 'reference' || r.kind === 'market') &&
+      (r.kind === 'reference' || r.kind === 'market' || r.kind === 'trade') &&
       (r.asset === 'BTC' || r.asset === 'ETH') &&
       dateOf(r.observedAtUtc) >= '2019-12-03' &&
       dateOf(r.observedAtUtc) <= '2026-10-08'
@@ -424,6 +446,43 @@ export function applyMarketUpdate(
 ) {
   const update = MarketUpdateSchema.parse(unknownUpdate);
   validateReadings(update.readings);
+  if (
+    base.metadata.benchmarkHistory?.methodRevision === benchmarkCloseMethod &&
+    update.readings.some(
+      (r) =>
+        (r.kind === 'reference' || r.kind === 'trade' || r.kind === 'market') &&
+        (r.asset === 'BTC' || r.asset === 'ETH') &&
+        dateOf(r.observedAtUtc) >= '2019-12-03' &&
+        dateOf(r.observedAtUtc) <= '2026-10-08',
+    )
+  )
+    throw Error('BENCHMARK_TIMED_OVERLAP');
+  const trades = update.readings.filter((r) => r.kind === 'trade');
+  if (trades.length) {
+    if (
+      trades.length !== 2 ||
+      update.readings.length !== 2 ||
+      new Set(trades.map((r) => r.asset)).size !== 2 ||
+      update.liquidityHistory.length ||
+      update.ledgerAppend ||
+      update.methodRevision ||
+      update.benchmarkHistory ||
+      update.participantPair
+    )
+      throw Error('PAIRED_TRADE_ONLY_UPDATE');
+    assertTradeIdentities([...marketEvidence(base.metadata), ...trades]);
+    update.readings = trades.map((r) => {
+      if (dateOf(r.observedAtUtc) <= '2026-10-09') throw Error('TRADE_EXISTING_DATE');
+      const old = base.metadata.readings.find((p) => readingKey(p) === readingKey(r));
+      if (!old || (old.kind !== 'reference' && old.kind !== 'trade'))
+        throw Error('TRADE_PREDECESSOR');
+      if (old.kind === 'reference') {
+        if (Date.parse(r.observedAtUtc) <= Date.parse(old.observedAtUtc))
+          throw Error('TRADE_TRANSITION_TIME');
+      } else if (compareTrades(r, old) <= 0) return old;
+      return r;
+    });
+  }
   if (update.benchmarkHistory) {
     if (
       update.readings.length ||
@@ -706,6 +765,7 @@ export function applyMarketUpdate(
     methods: [
       ...new Set([
         ...base.metadata.methods,
+        ...(trades.length ? [tradeDisclosure] : []),
         ...(references.length
           ? [
               'BTC/ETH USD references: standard Chainlink proxies on Ethereum mainnet; answer scaled by 8 decimals, each updatedAt is its observation time. Paired number-pinned RPC checks corroborate one oracle state, not independent market truth. Last actual observation per UTC date; no forward fill or daily-close claim.',
@@ -725,6 +785,9 @@ export function applyMarketUpdate(
         ? base.metadata.credits
         : base.metadata.credits +
           ' Market observations: PulseX subgraphs on PulseChain; paired public RPC pool checks. USD pricing shares source inputs.') +
+      (trades.length && !base.metadata.credits.includes('Bitstamp recent-trade')
+        ? ' Current BTC/ETH references: Bitstamp recent-trade spot USD samples.'
+        : '') +
       (references.length && !base.metadata.credits.includes('Chainlink')
         ? ' BTC/ETH reference observations: Chainlink standard USD feeds on Ethereum; PublicNode and BlockPI public RPC corroboration.'
         : ''),
@@ -745,6 +808,12 @@ export function preserveMarketHistory(
   next: { rows: readonly ProductRow[]; metadata: ProductMetadata },
 ) {
   const replacement = closeTransition(previous, next.metadata.benchmarkHistory);
+  if (next.metadata.readings.some((r) => r.kind === 'trade')) {
+    for (let i = 0; i < previous.rows.length; i++)
+      if (previous.rows[i]!.dateUtc <= '2026-10-09' && !same(previous.rows[i], next.rows[i]))
+        throw Error('TRADE_EXISTING_CELL_CHANGED');
+    assertTradeIdentities([...marketEvidence(previous.metadata), ...marketEvidence(next.metadata)]);
+  }
   if (
     previous.metadata.benchmarkHistory &&
     !same(previous.metadata.benchmarkHistory, next.metadata.benchmarkHistory) &&

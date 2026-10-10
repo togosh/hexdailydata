@@ -650,7 +650,7 @@ export class ProductDailyStore {
       coverage: 'bounded contemporary HEX-pool cohort';
     } | null = null;
     for (const r of m.readings) {
-      if (r.kind === 'market' || r.kind === 'reference') {
+      if (r.kind === 'market' || r.kind === 'reference' || r.kind === 'trade') {
         values[
           (
             {
@@ -664,9 +664,11 @@ export class ProductDailyStore {
         groups[r.asset] = freshness(
           r.observedAtUtc,
           300,
-          r.kind === 'reference'
-            ? 'Chainlink USD reference on Ethereum; age uses the oracle updatedAt. Not a streaming or guaranteed executable quote.'
-            : 'Admitted spot observation; served time is not observation time.',
+          r.kind === 'trade'
+            ? 'Bitstamp recent-trade USD reference; age uses this asset�s reported trade second. Numeric ID only breaks ties within that second; not an executable or global quote.'
+            : r.kind === 'reference'
+              ? 'Chainlink USD reference on Ethereum; age uses the oracle updatedAt. Not a streaming or guaranteed executable quote.'
+              : 'Admitted spot observation; served time is not observation time.',
         );
       } else if (r.kind === 'protocol') {
         Object.assign(values, protocolValues(r));
