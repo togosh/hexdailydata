@@ -12,13 +12,15 @@ import { marketEvidence } from '../dist/services/product-daily/market.js';
 import { durableJson } from './market-refresh.mjs';
 
 export const operatingTaskId = 'HDD-BTC-ETH-OPERATING-REFRESH-R1';
+export const operatingR2TaskId = 'HDD-BTC-ETH-OPERATING-REFRESH-R2';
+export const isOperatingAuthority = (id) => [operatingTaskId, operatingR2TaskId].includes(id);
 export const operatingProfileId = 'operating-16-slots-v1';
 const legacyProfile = Object.freeze({ cycles: 3, logical: 7, attempts: 14, extras: 7,
   seconds: 600, dispatch: 535, chargedBytes: 32 * 1024 ** 2, objects: 280000 });
 const operatingProfile = Object.freeze({ cycles: 16, logical: 33, attempts: 66, extras: 33,
   seconds: 1200, dispatch: 1135, chargedBytes: 144 * 1024 ** 2, objects: 1320000 });
 export function tradeProfile(admission) {
-  if (admission.authorityTaskId === operatingTaskId) {
+  if (isOperatingAuthority(admission.authorityTaskId)) {
     if (admission.tradeProfileId !== operatingProfileId ||
         admission.job !== 'trade-operating-16-slots' ||
         admission.responseCookiePolicyId !== 'ignore-response-cookies-no-replay-v1')
@@ -35,7 +37,7 @@ export function validateOperatingScope(scope) {
     maximumSessionSecondsIncludingClosure: p.seconds, maximumNewDispatchOffsetSeconds: p.dispatch,
     maximumChargedBytes: p.chargedBytes, maximumParsedObjectsAcrossResponses: p.objects,
     perAttemptDurableReservationBytes: 2162688, minimumCompleteAttemptAndClosureReserveSeconds: 65 };
-  if (scope.taskId !== operatingTaskId || Object.entries(expected).some(([k,v]) => n[k] !== v) ||
+  if (!isOperatingAuthority(scope.taskId) || Object.entries(expected).some(([k,v]) => n[k] !== v) ||
       n.plan.cycles !== 16 || n.plan.maximumOrdinaryStartLagSeconds !== 5 ||
       JSON.stringify(n.plan.cycleOffsetsSeconds) !== JSON.stringify(Array.from({length:16},(_,i)=>i*60)))
     throw Error('OPERATING_SCOPE_LIMITS');

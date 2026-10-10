@@ -17,16 +17,17 @@ tls.connect = http.request = http.get = https.request = https.get = deny;
 for (const o of [dns, dns.promises]) for (const k of Object.keys(o))
   if (k === 'lookup' || k.startsWith('resolve') || k === 'reverse') o[k] = deny;
 globalThis.fetch = deny; syncBuiltinESMExports();
-export const T = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\operating-refresh-r1`;
+const isR2 = process.argv[2] === 'r2';
+export const T = join(String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2`, isR2 ? 'operating-refresh-r2' : 'operating-refresh-r1');
 export const put = (p,v) => fs.writeFile(p,JSON.stringify(v,null,2)+'\n');
 const { sha } = await import('../../dist/services/source-update/generation.js');
 export const { sampleTrades, qualifyMarkets, freshTradePair } = await import('../../dist/services/product-daily/trades.js');
 const { ProductDailyStore } = await import('../../dist/services/product-daily/store.js');
 const { mergeObservations, latestReadings } = await import('../../dist/services/product-daily/market.js');
 export const { checkTradeService, tradeProfile, validateOperatingScope, capturedBody, publishTrade,
-  operatingTaskId, operatingProfileId } = await import('../../scripts/trade-publication.mjs');
+  operatingTaskId, operatingR2TaskId, operatingProfileId } = await import('../../scripts/trade-publication.mjs');
 export const admission = { task:'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2', family:'trade',
-  authorityTaskId:operatingTaskId, tradeProfileId:operatingProfileId, job:'trade-operating-16-slots',
+  authorityTaskId:isR2 ? operatingR2TaskId : operatingTaskId, tradeProfileId:operatingProfileId, job:'trade-operating-16-slots',
   responseCookiePolicyId:'ignore-response-cookies-no-replay-v1', nonce:'synthetic-fixture' };
 export function tinyStore(readings=[]) {
   let selected={version:sha(JSON.stringify(readings)), rows:[], metadata:{readings,observations:readings,

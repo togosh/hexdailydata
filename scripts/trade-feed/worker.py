@@ -10,6 +10,7 @@ RECOVERY = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-cu
 ISOLATION = RECOVERY.parent/'worker-stdin-isolation-r1'
 COOKIES = RECOVERY.parent/'response-cookie-handling-r1'
 OPERATING = RECOVERY.parent/'operating-refresh-r1'
+OPERATING_R2 = RECOVERY.parent/'operating-refresh-r2'
 
 
 def perform_request(q, a, folder, perform, clock=time.time, connection=None, phases=None):
@@ -25,8 +26,8 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
     slot_deadline=q.get('slotDispatchByUnixSeconds')
     network_dispatched=False
     if slot_deadline is not None:
-        from authority import OPERATING_AUTHORITY
-        if a.get('authorityTaskId')!=OPERATING_AUTHORITY or q['retryOrdinal']!=0 or not q['label'].startswith('BTC_') or slot_deadline>deadline:
+        from authority import OPERATING_AUTHORITIES
+        if a.get('authorityTaskId') not in OPERATING_AUTHORITIES or q['retryOrdinal']!=0 or not q['label'].startswith('BTC_') or slot_deadline>deadline:
             raise ValueError('Worker slot deadline binding')
 
     def gate():
@@ -96,7 +97,7 @@ def main():
             if event.startswith('socket.'):
                 raise PermissionError('OFFLINE_NETWORK_DENIED')
         sys.addaudithook(deny)
-    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING)) else None
+    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2)) else None
     try:
         if phases:
             phases.emit('worker_entry', synthetic=offline)

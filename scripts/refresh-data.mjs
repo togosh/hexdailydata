@@ -1,4 +1,4 @@
-import { publishTrade, admitTradeMarkets, tradeProfile, operatingTaskId } from './trade-publication.mjs';
+import { publishTrade, admitTradeMarkets, tradeProfile, isOperatingAuthority } from './trade-publication.mjs';
 // One explicit finite operation. Status/default makes no provider requests.
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
@@ -364,7 +364,7 @@ export async function runJob({
   const reference = admission.family === 'reference',
     trade = admission.family === 'trade';
   const profile = trade ? tradeProfile(admission) : null;
-  const operating = trade && admission.authorityTaskId === operatingTaskId;
+  const operating = trade && isOperatingAuthority(admission.authorityTaskId);
   if (operating && typeof onSlot !== 'function') throw Error('OPERATING_SERVICE_HOOK_REQUIRED');
   if (trade && admission.task !== 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2')
     throw Error('EXACT_TRADE_TASK_REQUIRED');

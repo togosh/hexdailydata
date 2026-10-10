@@ -1,6 +1,7 @@
 // Explicit offline recovery/final proof owner. No provider collector is imported.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import net from 'node:net';
@@ -273,8 +274,10 @@ async function run() {
   if (failure) throw Error(failure.error);
   console.log('OFFLINE_FINAL_PROOF_PASS');
 }
-if (['recover-reviewed', 'finalize-reviewed'].includes(process.argv[2])) await run();
-else
-  console.log(
-    'Offline default. Explicit reviewed owner entry only; no providers, bases or mutation.',
-  );
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  if (['recover-reviewed', 'finalize-reviewed'].includes(process.argv[2])) await run();
+  else
+    console.log(
+      'Offline default. Explicit reviewed owner entry only; no providers, bases or mutation.',
+    );
+}

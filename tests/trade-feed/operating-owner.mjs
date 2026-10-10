@@ -3,13 +3,18 @@ import assert from 'node:assert/strict';
 import { readFile, writeFile, mkdir, lstat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { finishRecoveryProof, literalLookup } from './recovery-owner.mjs';
+import net from 'node:net';
+import tls from 'node:tls';
+import dns from 'node:dns';
+import https from 'node:https';
+import { syncBuiltinESMExports } from 'node:module';
 import { digest, closeOwned } from './control.mjs';
 
 const R = String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2`;
-const T = join(R, 'operating-refresh-r1');
 const read = async (p) => JSON.parse(await readFile(p));
 const put = (p, v) => writeFile(p, JSON.stringify(v, null, 2) + '\n');
-const save = (n, v) => put(join(T, 'evidence', n + '.json'), v);
 const present = async (p) =>
   Boolean(
     await lstat(p).catch((e) => {
@@ -18,7 +23,29 @@ const present = async (p) =>
     }),
   );
 
-export async function runReviewedOperating() {
+export async function runReviewedOperating(version = 'r1') {
+  assert(['r1', 'r2'].includes(version));
+  const isR2 = version === 'r2';
+  const T = join(R, 'operating-refresh-' + version);
+  const save = (n, v) => put(join(T, 'evidence', n + '.json'), v);
+  if (isR2) {
+    const deny = () => {
+      throw Error('OWNER_EXTERNAL_NETWORK_DENIED');
+    };
+    tls.connect = https.get = https.request = globalThis.fetch = deny;
+    for (const o of [dns, dns.promises])
+      for (const k of Object.keys(o))
+        if (k === 'lookup' || k.startsWith('resolve') || k === 'reverse') o[k] = deny;
+    dns.lookup = literalLookup;
+    const connect = net.Socket.prototype.connect;
+    net.Socket.prototype.connect = function (...args) {
+      const o = Array.isArray(args[0]) ? args[0][0] : args[0];
+      if (!o || typeof o !== 'object' || o.host !== '127.0.0.1' || !Number.isInteger(o.port))
+        throw Error('LITERAL_LOOPBACK_ONLY');
+      return connect.apply(this, args);
+    };
+    syncBuiltinESMExports();
+  }
   assert.equal(resolve(process.cwd()), String.raw`C:\Code\HEXDailyData-v2-Subgraph-History-R2`);
   const unused = async () => {
     assert(!(await present(join(T, 'session'))), 'RECOVERY_SESSION_SPENT');
@@ -46,6 +73,10 @@ export async function runReviewedOperating() {
   const policy = await read(join(T, 'evidence/OPERATING_GATE.json'));
   assert.equal(policy.status, 'PASS');
   assert(policy.noReplayProved && policy.actualSchedulerAndServicePassed);
+  if (isR2) assert(policy.actualPairedStorageAll16Passed && policy.finalProofOrchestrationPassed);
+  if (isR2)
+    for (const x of await read(join(T, 'evidence/BEFORE_STATE.json')))
+      assert.equal(digest(await readFile(x.path)), x.sha256, 'RECOVERED_BEFORE_STATE_CHANGED');
   for (const [path, hash] of Object.entries(policy.sourceBindings))
     assert.equal(digest(await readFile(path)), hash);
   await mkdir(join(T, 'temp'), { recursive: true });
@@ -56,19 +87,30 @@ export async function runReviewedOperating() {
   const { fixture } = await import('../market-feed/access-fixture.mjs');
   const { createBudget } = await import('./budget.mjs');
   const { finalEvidence, restoreProof } = await import('./final.mjs');
-  const { runOperatingTrades, taskId, operatingTaskId, operatingProfileId, responseCookiePolicyId, tradeStorageGuard } =
-    await import('../../scripts/trade-refresh.mjs');
+  const {
+    runOperatingTrades,
+    runOperatingR2Trades,
+    taskId,
+    operatingTaskId,
+    operatingR2TaskId,
+    operatingProfileId,
+    responseCookiePolicyId,
+    tradeStorageGuard,
+  } = await import('../../scripts/trade-refresh.mjs');
   const { checkTradeService } = await import('../../scripts/trade-publication.mjs');
   await verify();
   const ledgerPath = join(T, 'evidence/BASE_ADMISSIONS.json');
   const ledger = (await present(ledgerPath))
     ? await read(ledgerPath)
-    : { prior: 8, maximum: 14, additional: [] };
+    : { prior: isR2 ? 10 : 8, maximum: 14, additional: [] };
   assert(
     ledger.additional.every((x) => x.status === 'CLOSED'),
     'PRIOR_OWNER_UNCERTAIN',
   );
-  assert(ledger.additional.length < 6, 'BASE_ADMISSION_BOUND');
+  assert(
+    ledger.prior === (isR2 ? 10 : 8) && ledger.additional.length < (isR2 ? 4 : 6),
+    'BASE_ADMISSION_BOUND',
+  );
   const ordinal = ledger.prior + ledger.additional.length + 1;
   await tradeStorageGuard(R, 64 * 1024 ** 2, true);
   const entry = {
@@ -92,7 +134,9 @@ export async function runReviewedOperating() {
   };
   await put(join(ownerRoot, 'LOADED_RUNTIME.json'), loaded);
   await save('LOADED_RUNTIME', loaded);
-  const profile = await read(join(T, 'reference/prior/SELECTED_PROFILE.json'));
+  const profile = await read(
+    join(T, isR2 ? 'SELECTED_PROFILE.json' : 'reference/prior/SELECTED_PROFILE.json'),
+  );
   const budget = createBudget(join(T, 'evidence'), {
     attempts: 384,
     bytes: 512 * 1024 ** 2,
@@ -121,7 +165,7 @@ export async function runReviewedOperating() {
     real = await ParticipantRegistry.open(profile.participantRoot, profile.productRoot, base);
     seed = real.productDaily.capture();
     assert.equal(seed.version, profile.selectedProduct.version);
-    assert.equal(seed.metadata.marketStorage.sequence, 25);
+    assert.equal(seed.metadata.marketStorage.sequence, isR2 ? 28 : 25);
     assert.deepEqual(seed.metadata.pair, profile.pair);
     reader = await ParticipantRegistry.open(real.root, real.productDaily.root, base);
     held = reader.capture();
@@ -165,7 +209,7 @@ export async function runReviewedOperating() {
     const pre = {
       verdict: 'PASS',
       taskId,
-      authorityTaskId: operatingTaskId,
+      authorityTaskId: isR2 ? operatingR2TaskId : operatingTaskId,
       tradeProfileId: operatingProfileId,
       taskRoot: T,
       synthetic: false,
@@ -184,7 +228,7 @@ export async function runReviewedOperating() {
     await verify();
     await unused();
     console.log('READY_SMOKE_PASS_STARTING_AUTHORIZED_OPERATING_SESSION');
-    const trial = await runOperatingTrades({
+    const trial = await (isR2 ? runOperatingR2Trades : runOperatingTrades)({
       registry: real,
       loadedRuntimeFiles: plan.runtimeFiles,
       onSlot: async ({ cycle, sourceResult, publicationResult, selected }, check) => {
@@ -198,7 +242,11 @@ export async function runReviewedOperating() {
         const measured = checkTradeService(body, selected, requestStartedAt, Date.now());
         check();
         return {
-          ...measured, cycle, sourceResult, publicationResult, httpStatus: r.statusCode,
+          ...measured,
+          cycle,
+          sourceResult,
+          publicationResult,
+          httpStatus: r.statusCode,
           origin,
           pid: process.pid,
           body,
@@ -215,49 +263,61 @@ export async function runReviewedOperating() {
       ...profile,
       selectedProduct: { version: p.version, manifestSha256: p.manifestSha256 },
     });
-    final = await finalEvidence({ R: T, real, seed, f, origin, heldExport, save, budget, operating: true });
+    final = await finalEvidence({
+      R: T,
+      real,
+      seed,
+      f,
+      origin,
+      heldExport,
+      save,
+      budget,
+      operating: true,
+    });
   } catch (e) {
     failure = { error: String(e), stack: e.stack };
     await save('OWNER_FAILURE', failure);
   } finally {
-    const closed = await closeOwned([
+    const settled = await finishRecoveryProof(
       [
-        'held-export',
-        heldExport
-          ? async () => {
-              if (!heldExport.stream.destroyed) heldExport.stream.destroy();
-              await heldExport.released;
-            }
-          : null,
+        [
+          'held-export',
+          heldExport
+            ? async () => {
+                if (!heldExport.stream.destroyed) heldExport.stream.destroy();
+                await heldExport.released;
+              }
+            : null,
+        ],
+        ['held-view', held ? async () => held.release() : null],
+        ['api', f ? () => f.close() : null],
+        ['reader', reader ? () => reader.close() : null],
+        ['writer', real ? () => real.close() : null],
       ],
-      ['held-view', held ? async () => held.release() : null],
-      ['api', f ? () => f.close() : null],
-      ['reader', reader ? () => reader.close() : null],
-      ['writer', real ? () => real.close() : null],
-    ]);
-    if (final && closed.known) {
-      try {
-        await restoreProof({
-          R: T,
-          profile,
-          final,
-          save,
-          admittedBase: base,
-          budget,
-          baseAdmissionCount: ordinal,
-        });
-      } catch (e) {
-        failure = { error: String(e), stack: e.stack };
-        await save('RESTORE_FAILURE', failure);
-      }
-    }
-    const baseClosed = await closeOwned([['immutable-base', base ? () => base.close() : null]]);
+      base ? () => base.close() : null,
+      final
+        ? () =>
+            restoreProof({
+              R: T,
+              profile,
+              final,
+              save,
+              admittedBase: base,
+              budget,
+              baseAdmissionCount: ordinal,
+            })
+        : null,
+      failure,
+    );
+    const { closed, baseClosed } = settled;
+    failure = settled.failure;
     entry.status = closed.known && baseClosed.known ? 'CLOSED' : 'UNKNOWN';
     entry.closedAtUtc = new Date().toISOString();
     entry.failure = failure;
     await put(ledgerPath, ledger);
     await save('OWNER_CLOSURE', {
       ...closed,
+      finalProofCompleted: settled.restoreCompleted,
       base: baseClosed,
       baseAdmissions: ordinal,
       newAdmissions: ledger.additional.length,
@@ -271,8 +331,10 @@ export async function runReviewedOperating() {
   if (failure) throw Error(failure.error);
 }
 
-if (process.argv[2] === 'run-reviewed') await runReviewedOperating();
-else
-  console.log(
-    'Offline default: no application, base admission or public request. Explicit run-reviewed requires frozen review and deterministic ready gates.',
-  );
+if (resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] === 'run-reviewed') await runReviewedOperating();
+  else
+    console.log(
+      'Offline default: no application, base admission or public request. Explicit run-reviewed requires frozen review and deterministic ready gates.',
+    );
+}

@@ -7,13 +7,16 @@ sys.addaudithook(deny)
 import os, json, io, tempfile, importlib.util, copy, subprocess
 from pathlib import Path
 W=Path(__file__).resolve().parents[2]
-T=Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\operating-refresh-r1')
+IS_R2 = len(sys.argv)>1 and sys.argv[1]=='r2'
+T=Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2')/('operating-refresh-r2' if IS_R2 else 'operating-refresh-r1')
 sys.path.insert(0,str(W/'scripts/trade-feed'))
 from client import Session, URLS, CAP, RESERVATION, save, strict_json, digest, worker_native, native_module
 from worker import perform_request
-from authority import OPERATING_AUTHORITY as COOKIE_AUTHORITY, OPERATING_ROOT as COOKIE_ROOT, OPERATING_PROFILE_ID, trade_profile, COOKIE_POLICY, cookie_policy, validate_authority, validate_recovery_documents, ISOLATION_AUTHORITY
+from authority import OPERATING_AUTHORITY, OPERATING_ROOT, OPERATING_R2_AUTHORITY, OPERATING_R2_ROOT, OPERATING_PROFILE_ID, trade_profile, COOKIE_POLICY, cookie_policy, validate_authority, validate_recovery_documents, ISOLATION_AUTHORITY
 spec=importlib.util.spec_from_file_location('maintained_get',W/'scripts/benchmark-reference/get_worker.py')
 worker=importlib.util.module_from_spec(spec);spec.loader.exec_module(worker);worker.CAP=CAP
+COOKIE_AUTHORITY = OPERATING_R2_AUTHORITY if IS_R2 else OPERATING_AUTHORITY
+COOKIE_ROOT = OPERATING_R2_ROOT if IS_R2 else OPERATING_ROOT
 BODY=(T/'reference/prior/public-session/01/response.body').read_bytes()
 assert len(BODY)==99217 and digest(BODY)=='9b2db367c10c0784a6fbc3e4a3deb90a4c73bda4e162d3cf1841007655cc445d'
 cases=[];results=[]

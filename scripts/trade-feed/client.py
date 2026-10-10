@@ -8,7 +8,7 @@ sys.path.insert(0, str(W/'scripts/market-refresh'))
 from durable import save, strict_json, digest, utc
 from http_framing import verify_framing
 sys.path.insert(0, str(W/'scripts/trade-feed'))
-from authority import ISOLATION_AUTHORITY, COOKIE_AUTHORITY, OPERATING_AUTHORITY, cookie_policy, validate_authority, trade_profile
+from authority import ISOLATION_AUTHORITY, COOKIE_AUTHORITY, OPERATING_AUTHORITIES, cookie_policy, validate_authority, trade_profile
 spec=importlib.util.spec_from_file_location('historical_native',W/'scripts/benchmark-reference/collector.py')
 native_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(native_module)
 native=native_module.native
@@ -64,7 +64,7 @@ class Session:
         if shutil.disk_usage(self.root).free<5*1024**3:raise ValueError('Free space floor')
     def get(self,url,label,slot_deadline=None):
         exact_request('GET',url)
-        if slot_deadline is not None and (self.a.get('authorityTaskId')!=OPERATING_AUTHORITY or not label.startswith('BTC_')):raise ValueError('Slot gate authority')
+        if slot_deadline is not None and (self.a.get('authorityTaskId') not in OPERATING_AUTHORITIES or not label.startswith('BTC_')):raise ValueError('Slot gate authority')
         if self.state['status']!='ADMITTED' or self.state['pending'] is not None or not self.state['closureKnown']:raise ValueError('Consumed or uncertain session')
         s=self.state;s['logicalRequests']+=1
         if s['logicalRequests']>self.profile['logical']:raise ValueError('Logical bound')
@@ -150,7 +150,7 @@ class Session:
             if meta.get('failureKind')=='terminal' and not local_skip:integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
-            isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, OPERATING_AUTHORITY)
+            isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, *OPERATING_AUTHORITIES)
             if isolated_grant:
                 row['networkConnectionBegan'] = any(p.get('event')=='dns_tcp_tls_connection_begin' for p in phases)
             if self.cookie_policy:

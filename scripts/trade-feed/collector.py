@@ -5,7 +5,7 @@ from pathlib import Path
 import time,queue,threading
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from client import Session,TASK,URLS,W,strict_json,digest,save,SlotMissed
-from authority import validate_authority, trade_profile, OPERATING_AUTHORITY
+from authority import validate_authority, trade_profile, OPERATING_AUTHORITIES
 
 def start_reader(incoming, stream=None):
     """Keep the owner command pipe in the collector, including its waiting read."""
@@ -69,7 +69,7 @@ def main():
         return answer
     outcomes=[];status='PARTIAL';reason='Not completed'
     try:
-        operating=a.get('authorityTaskId')==OPERATING_AUTHORITY
+        operating=a.get('authorityTaskId') in OPERATING_AUTHORITIES
         outcomes=collect(session,exchange,outcomes=outcomes if operating else None)
         status='COMPLETE_FRESH_CYCLES' if len(outcomes)==session.profile['cycles'] and all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
         reason='All original slots accounted'

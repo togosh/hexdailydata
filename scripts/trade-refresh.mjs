@@ -7,8 +7,8 @@ import { randomBytes } from 'node:crypto';
 import { sha } from '../dist/services/source-update/generation.js';
 import { durableJson } from './market-refresh.mjs';
 import { runJob } from './refresh-data.mjs';
-import { tradeProfile, operatingTaskId, operatingProfileId, validateOperatingScope } from './trade-publication.mjs';
-export { operatingTaskId, operatingProfileId } from './trade-publication.mjs';
+import { tradeProfile, operatingTaskId, operatingR2TaskId, isOperatingAuthority, operatingProfileId, validateOperatingScope } from './trade-publication.mjs';
+export { operatingTaskId, operatingR2TaskId, operatingProfileId } from './trade-publication.mjs';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const taskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2';
 export async function tradeStorageGuard(root, reserve = 0, initial = false) {
@@ -35,6 +35,10 @@ export const cookieTaskId = 'HDD-BTC-ETH-CURRENT-REFERENCE-RESPONSE-COOKIE-HANDL
 export const responseCookiePolicyId = 'ignore-response-cookies-no-replay-v1';
 const cookieRoot = join(dirname(recoveryRoot), 'response-cookie-handling-r1');
 const operatingRoot = join(dirname(recoveryRoot), 'operating-refresh-r1');
+const operatingR2Root = join(dirname(recoveryRoot), 'operating-refresh-r2');
+export async function runOperatingR2Trades(options) {
+  return runFiniteTrades({ ...options, taskRoot: operatingR2Root, preflightPath: join(operatingR2Root, 'PREFLIGHT.json') }, operatingR2TaskId);
+}
 export async function runOperatingTrades(options) {
   return runFiniteTrades(
     { ...options, taskRoot: operatingRoot, preflightPath: join(operatingRoot, 'PREFLIGHT.json') },
@@ -69,10 +73,10 @@ async function runFiniteTrades(
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
   const isolated = recovery === isolationTaskId,
-    operating = recovery === operatingTaskId,
+    operating = isOperatingAuthority(recovery),
     cookies = recovery === cookieTaskId || operating,
-    authorityId = operating ? operatingTaskId : cookies ? cookieTaskId : isolated ? isolationTaskId : recoveryTaskId,
-    authorityRoot = operating ? operatingRoot : cookies ? cookieRoot : isolated ? isolationRoot : recoveryRoot;
+    authorityId = operating ? recovery : cookies ? cookieTaskId : isolated ? isolationTaskId : recoveryTaskId,
+    authorityRoot = operating ? (recovery === operatingR2TaskId ? operatingR2Root : operatingRoot) : cookies ? cookieRoot : isolated ? isolationRoot : recoveryRoot;
   // Refuse spent/uncertain state before any interpretation of an old preflight.
   for (const name of ['session', 'PUBLIC_ADMISSION.json'])
     if (

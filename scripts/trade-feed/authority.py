@@ -11,12 +11,15 @@ COOKIE_ROOT = ROOT.parent/'response-cookie-handling-r1'
 COOKIE_POLICY = 'ignore-response-cookies-no-replay-v1'
 OPERATING_AUTHORITY = 'HDD-BTC-ETH-OPERATING-REFRESH-R1'
 OPERATING_ROOT = ROOT.parent/'operating-refresh-r1'
+OPERATING_R2_AUTHORITY = 'HDD-BTC-ETH-OPERATING-REFRESH-R2'
+OPERATING_R2_ROOT = ROOT.parent/'operating-refresh-r2'
+OPERATING_AUTHORITIES = (OPERATING_AUTHORITY, OPERATING_R2_AUTHORITY)
 OPERATING_PROFILE_ID = 'operating-16-slots-v1'
 
 
 def trade_profile(admission):
     """Exact versioned authority, never caller-supplied arbitrary allowances."""
-    if admission.get('authorityTaskId') == OPERATING_AUTHORITY:
+    if admission.get('authorityTaskId') in OPERATING_AUTHORITIES:
         if (admission.get('tradeProfileId') != OPERATING_PROFILE_ID
                 or admission.get('job') != 'trade-operating-16-slots'
                 or admission.get('responseCookiePolicyId') != COOKIE_POLICY):
@@ -34,7 +37,7 @@ def trade_profile(admission):
 def cookie_policy(admission):
     """Only the exact new authority can select the receiving-only amendment."""
     selected = admission.get('responseCookiePolicyId')
-    if admission.get('authorityTaskId') in (COOKIE_AUTHORITY, OPERATING_AUTHORITY):
+    if admission.get('authorityTaskId') in (COOKIE_AUTHORITY, *OPERATING_AUTHORITIES):
         if selected != COOKIE_POLICY:
             raise ValueError('Exact response cookie policy required')
         return COOKIE_POLICY
@@ -45,10 +48,11 @@ def cookie_policy(admission):
 
 def validate_authority(admission, session):
     session = Path(session).resolve()
-    recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT, COOKIE_ROOT, OPERATING_ROOT)) or 'authorityTaskId' in admission
+    recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT, COOKIE_ROOT, OPERATING_ROOT, OPERATING_R2_ROOT)) or 'authorityTaskId' in admission
     if not recovery:
         return  # Legacy mode retains its existing admission and spent-state gates.
-    root, authority = ((OPERATING_ROOT, OPERATING_AUTHORITY) if session == OPERATING_ROOT/'session' else
+    root, authority = ((OPERATING_R2_ROOT, OPERATING_R2_AUTHORITY) if session == OPERATING_R2_ROOT/'session' else
+                       (OPERATING_ROOT, OPERATING_AUTHORITY) if session == OPERATING_ROOT/'session' else
                        (COOKIE_ROOT, COOKIE_AUTHORITY) if session == COOKIE_ROOT/'session' else
                        (ISOLATION_ROOT, ISOLATION_AUTHORITY) if session == ISOLATION_ROOT/'session' else (ROOT, AUTHORITY))
     if session != root/'session' or admission.get('authorityTaskId') != authority:
@@ -71,14 +75,14 @@ def validate_authority(admission, session):
         gate = (root/'evidence/POLICY_GATE.json').read_bytes()
         if digest(gate) != pre.get('policyGateSha256') or strict_json(gate).get('status') != 'PASS':
             raise ValueError('Response policy gate binding')
-    if authority == OPERATING_AUTHORITY:
+    if authority in OPERATING_AUTHORITIES:
         gate = (root/'evidence/OPERATING_GATE.json').read_bytes()
         if digest(gate) != pre.get('operatingGateSha256') or strict_json(gate).get('status') != 'PASS':
             raise ValueError('Operating gate binding')
 
 
 def validate_recovery_documents(admission, session, scope_bytes, pre_bytes, marker, *, root=ROOT, authority=AUTHORITY):
-    if (root, authority) not in ((ROOT, AUTHORITY), (ISOLATION_ROOT, ISOLATION_AUTHORITY), (COOKIE_ROOT, COOKIE_AUTHORITY), (OPERATING_ROOT, OPERATING_AUTHORITY)):
+    if (root, authority) not in ((ROOT, AUTHORITY), (ISOLATION_ROOT, ISOLATION_AUTHORITY), (COOKIE_ROOT, COOKIE_AUTHORITY), (OPERATING_ROOT, OPERATING_AUTHORITY), (OPERATING_R2_ROOT, OPERATING_R2_AUTHORITY)):
         raise ValueError('Unknown public grant')
     if Path(session) != root/'session' or admission.get('authorityTaskId') != authority or admission.get('synthetic') is not False:
         raise ValueError('Exact recovery document identity')
@@ -101,13 +105,13 @@ def validate_recovery_documents(admission, session, scope_bytes, pre_bytes, mark
             or marker.get('output') != str(session) or marker.get('scopeSha256') != digest(scope_bytes)
             or marker.get('preflightSha256') != digest(pre_bytes)):
         raise ValueError('Recovery marker identity')
-    if authority in (COOKIE_AUTHORITY, OPERATING_AUTHORITY):
+    if authority in (COOKIE_AUTHORITY, *OPERATING_AUTHORITIES):
         if (cookie_policy(admission) != COOKIE_POLICY
                 or pre.get('responseCookiePolicyId') != COOKIE_POLICY
                 or marker.get('responseCookiePolicyId') != COOKIE_POLICY
                 or scope['network']['responseCookiePolicy']['id'] != COOKIE_POLICY):
             raise ValueError('Response cookie policy document binding')
-    if authority == OPERATING_AUTHORITY:
+    if authority in OPERATING_AUTHORITIES:
         profile = trade_profile(admission)
         if pre.get('tradeProfileId') != OPERATING_PROFILE_ID or marker.get('tradeProfileId') != OPERATING_PROFILE_ID:
             raise ValueError('Operating profile document binding')
