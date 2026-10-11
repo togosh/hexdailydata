@@ -702,3 +702,11 @@ loaded actual paired API. It cannot reuse R4 or any old grant. See
 reservations, closure and task-owned restore limits. Do not install this entry
 as a service or reuse it after terminal closure. Inspect the task return for
 actual served ages and any partial outcome before considering later operation.
+
+That qualification entry is now consumed. Its public result is PARTIAL after
+43 charged attempts and one selected trade pair (sequence 72). Do not execute
+it again. The retained UNKNOWN parent and pending charge are not a reusable
+session or permission to remove its lock. Saved-only finalization may inspect
+the exact committed selection under its separately reviewed task-local plan;
+it never settles or reopens the public coordinator. A longer operating cadence
+and reliable cross-family public progression remain unqualified.

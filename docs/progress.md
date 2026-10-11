@@ -1117,3 +1117,14 @@ other feeds progressed. Actual five-family worker-entry refusals and delayed
 request-timeout checks are separate from the reused forty-job offline campaign.
 Public and genuine-data results belong to that task's final reviewed report;
 the source implementation alone is not evidence that public execution passed.
+
+The operating qualification's one activation is now consumed with a public
+PARTIAL result. It charged 43 attempts before a gas timeout's fallback transport
+envelope conflicted with its enclosing worker-reap receipt. One genuine trade
+pair committed and was served at sequence 72; participant state did not advance.
+The parent UNKNOWN state, pending charge and lock remain original evidence.
+Saved-only correction accepts that exact incomplete timeout only with native
+enclosing proof and full charges. Cancellation now records actual native handle
+closure on its final path. Focused replay/refusal and real denied-network
+cancellation checks pass; no second public activation was made. Final preservation,
+backup and restore results are separate from public cadence qualification.

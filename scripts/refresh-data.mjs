@@ -916,7 +916,8 @@ export async function runJob({
     error = null,
     stderr = '',
     handler = Promise.resolve(),
-    killed = false;
+    killed = false,
+    cutoffStage = null;
   child.once('exit', () => {
     exitObserved = true;
   });
@@ -1295,11 +1296,14 @@ export async function runJob({
   try {
     const exit = await Promise.race([completion, cutoff]);
     if (exit === null) {
+      cutoffStage = 'native-cutoff';
       const closed = await terminate();
       throw Error(closed ? 'NATIVE_DEADLINE_CLOSED' : 'NATIVE_CLOSURE_UNKNOWN');
     }
-    if ((await Promise.race([handler.then(() => true), cutoff])) === null)
+    if ((await Promise.race([handler.then(() => true), cutoff])) === null) {
+      cutoffStage = 'handler-cutoff';
       throw Error('PUBLICATION_SETTLEMENT_UNKNOWN');
+    }
     clearTimeout(expired);
     lines.close();
     let source, accounting;
@@ -1433,6 +1437,22 @@ export async function runJob({
     clearTimeout(expired);
     lines.close();
     if (!exited) await terminate();
+    if (unified)
+      await durableJson(join(jobRoot, 'NATIVE_TERMINATION.json'), {
+        ownerPid: process.pid,
+        childPid: child.pid,
+        childCloseObserved: exited,
+        childExitObserved: exitObserved,
+        childExitCode: child.exitCode,
+        childSignalCode: child.signalCode,
+        terminationRequested: killed,
+        cutoffStage,
+        terminatorClosed: killed ? killClosed : null,
+        knownClosure: exited && (!killed || killClosed),
+        recordedAtUtc: new Date().toISOString(),
+        qualification:
+          'Enclosing collector handle only; physical/accounting/publication closure is separately required.',
+      });
     child.stdin.end();
   }
 }

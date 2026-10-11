@@ -564,8 +564,19 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
                 m.seconds >= 2) ||
               (mode === 'operating-cancel-completion' && m.type === 'closed') ||
               (mode === 'operating-parent-stop' && m.type === 'operating-permit')
-            )
+            ) {
+              writeFileSync(
+                join(jobRoot, 'CANCELLATION_TRIGGER.json'),
+                JSON.stringify({
+                  mode,
+                  childPid: child.pid,
+                  observedControl: m,
+                  triggered: true,
+                }) + '\n',
+                { flag: 'wx' },
+              );
               ac.abort();
+            }
           }
         });
         if (mode === 'operating-cancel-physical') {

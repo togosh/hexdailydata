@@ -422,3 +422,24 @@ An adoption check may report the reader's ordinary one-second check interval;
 it does not force refresh or renew an observation time. Freshness, source
 qualification, publication and finite operational closure are separate results.
 No permanent schedule, continuous-freshness SLA or commercial permission is added.
+
+### Recorded partial activation and saved-only correction
+
+The granted activation was consumed after 43 charged physical attempts. One
+trade pair reached the ordinary API at sequence 72. A gas request timed out
+with an empty body; its worker was actually reaped, but the fallback transport
+envelope still reported closure false. The parent retained UNKNOWN and the
+full pending reservation, then cancelled other collectors. All original
+receipts, conservative child reservations and the parent lock stay unchanged.
+
+For this explicit live mode and its denied-network boundary only, an incomplete
+empty timeout can now settle using its exact enclosing native proof, full
+charges and all existing identity checks. It contributes no accepted response
+data. Historical mode checks are unchanged. Collector cleanup now saves actual
+exit/close/termination observations separately from accounting qualification,
+including when cancellation occurs before ordinary completion parsing.
+
+These changes have focused saved-receipt/refusal and actual native cancellation
+evidence. They were not exercised in another public run. Saved-only API,
+preservation and compact restore work does not upgrade the original PARTIAL
+result or establish the unrun twenty-minute schedule.

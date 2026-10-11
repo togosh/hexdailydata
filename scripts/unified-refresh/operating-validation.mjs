@@ -201,15 +201,45 @@ export async function settlementEvidence(p, m, family) {
       'OPERATING_ABSENT_PHASE_VALUES',
     );
   }
+  // A timed-out worker can leave the default (not closed) transport envelope.
+  // Only the enclosing process's exact reaping proof can establish its closure.
+  const enclosingTimeout =
+    ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
+    family !== 'trade' &&
+    closed === true &&
+    !complete &&
+    r.failureKind === 'transport_timeout' &&
+    r.status === null &&
+    r.childStarted === true &&
+    r.childReaped === true &&
+    r.connectionClosed === true &&
+    r.responseBytes === 0 &&
+    body.length === 0 &&
+    transport?.status === null &&
+    transport?.complete === false &&
+    transport?.connectionClosed === false &&
+    m.bytes === p.bytes &&
+    m.objects === p.objects;
   if (closed && transport && family !== 'trade')
     assert(
       (p.closureMode === 'unified-operating-offline-1'
         ? transport.childReaped === true
-        : r.childReaped === true) && transport.connectionClosed === true,
+        : r.childReaped === true) &&
+        (transport.connectionClosed === true || enclosingTimeout),
       'OPERATING_NATIVE_CLOSURE_RECEIPT',
     );
   if (closed) {
     const physical = await read(join(folder, 'PHYSICAL_CLOSED.json'));
+    if (enclosingTimeout)
+      assert(
+        physical.syntheticResponse === false &&
+          physical.noChildStarted === false &&
+          physical.native?.childStarted === true &&
+          physical.native?.childReaped === true &&
+          Number.isInteger(physical.native?.exitCode) &&
+          physical.proofOwnerPid !== physical.workerPid,
+        'OPERATING_TIMEOUT_ENCLOSING_PROOF',
+      );
     if (p.closureMode === 'unified-operating-public-1')
       assert(
         physical.syntheticResponse === false && physical.deniedBoundaryTest === false,
