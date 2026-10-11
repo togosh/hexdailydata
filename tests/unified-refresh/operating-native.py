@@ -9,7 +9,7 @@ sys.dont_write_bytecode=True
 W=Path(__file__).resolve().parents[2];root=Path(sys.argv[1]).resolve()
 a=json.loads((root/'ADMISSION.json').read_bytes());f=json.loads((root/'FIXTURE.json').read_bytes())
 assert a['synthetic'] is True and a['authorityTaskId']=='HDD-UNIFIED-REFRESH-INTEGRATION-R2'
-assert any(x in root.parts for x in ('unified-refresh-integration-r2','unified-refresh-public-qualification-r2','unified-refresh-public-qualification-r3'))
+assert any(x in root.parts for x in ('unified-refresh-integration-r2','unified-refresh-public-qualification-r2','unified-refresh-public-qualification-r3','unified-refresh-public-qualification-r4'))
 def deny(*args,**kwargs):raise AssertionError('DENIED_EXTERNAL_DNS_SOCKET_OR_CHILD')
 socket.getaddrinfo=socket.create_connection=socket.socket.connect=socket.socket.connect_ex=deny
 subprocess.Popen=os.system=deny
@@ -63,6 +63,37 @@ if family=='trade':
         (p.parent/'response.headers').write_bytes(headers);meta['headerBytes']=len(headers)
         save(p.parent/'response.json',meta)
         return dict(reaped=True,timeout=False,exit=0,seconds=.01,stdout='',stderr='')
+    if f.get('actualMain'):
+        import collector,builtins
+        RealSession=Session
+        collector.Session=lambda r,admission:RealSession(r,admission,runner=transport,mono=c,wall=c,sleep=c.sleep,parent_accounting=TradeParent(r,admission,c,c.sleep))
+        original_save=collector.save
+        def save_report(path,value):
+            if Path(path).name=='RESULT.json' and f.get('largeResult'):
+                value['boundedSyntheticDiagnostic']='x'*40000
+            if Path(path).name=='RESULT.json' and f.get('exactResultBytes'):
+                value['boundedSyntheticDiagnostic']=''
+                value['boundedSyntheticDiagnostic']='x'*(f['exactResultBytes']-len(encode(value)))
+                assert len(encode(value))==f['exactResultBytes']
+            return original_save(path,value)
+        collector.save=save_report
+        # Only negative fixtures corrupt an already-produced real completion frame.
+        real_print=builtins.print
+        def observe_print(value,*args,**kwargs):
+            m=json.loads(value)
+            if m.get('type')=='closed':
+                save(root/'COMPLETION_EMITTER.json',dict(entrypoint='scripts/trade-feed/collector.py:main',formatter='scripts/unified-refresh/offline_profile.py:closed_frame',frame=m,frameBytes=len(value.encode()),synthetic=True))
+                if f.get('closure')=='legacy':value=json.dumps(dict(type='closed',result=strict_json((root/'RESULT.json').read_bytes())))
+                if f.get('closure')=='hash':m['resultSha256']='0'*64;value=json.dumps(m)
+                if f.get('closure')=='length':m['resultBytes']+=1;value=json.dumps(m)
+                if f.get('closure')=='malformed':value='{'
+                if f.get('closure')=='truncated':value=value[:20]
+                if f.get('closure')=='missing':return
+                if f.get('closure')=='duplicate':real_print(value,*args,**kwargs)
+            real_print(value,*args,**kwargs)
+        builtins.print=observe_print
+        code=collector.main(offline_fixture=True)
+        raise SystemExit(3 if f.get('closure')=='exit' else code)
     parent=TradeParent(root,a,c,c.sleep)
     s=Session(root,a,runner=transport,mono=c,wall=c,sleep=c.sleep,parent_accounting=parent)
     incoming=queue.Queue();start_reader(incoming)
@@ -80,7 +111,7 @@ if family=='trade':
     result.update(accounting=s.state,networkSessionCount=0,synthetic=True,noAutomaticRestart=True)
     if f.get('largeResult'):result['boundedSyntheticDiagnostic']='x'*40000
     save(root/'RESULT.json',result)
-    message=closure_frame(root,result,f['closureAuthority']) if f.get('closureAuthority') else closed_frame(root,result)
+    message=closure_frame(root,result,f['closureAuthority'],unified=True) if f.get('closureAuthority') else closed_frame(root,result)
     if f.get('closure')=='hash':message['resultSha256']='0'*64
     if f.get('closure')!='missing':print(json.dumps(message),flush=True)
     if f.get('closure')=='duplicate':print(json.dumps(message),flush=True)
@@ -143,4 +174,13 @@ class Injected:
         return result
 capture_client.WorkerTransport=Injected
 import job
+if f.get('actualMain'):
+    import builtins
+    real_print=builtins.print
+    def observe_print(value,*args,**kwargs):
+        m=json.loads(value)
+        if m.get('type')=='closed':
+            save(root/'COMPLETION_EMITTER.json',dict(entrypoint='scripts/unified-refresh/job.py:main',collector=folder+'/collector.py',formatter='scripts/unified-refresh/offline_profile.py:closed_frame',frame=m,frameBytes=len(value.encode()),synthetic=True))
+        real_print(value,*args,**kwargs)
+    builtins.print=observe_print
 raise SystemExit(job.main(offline_fixture=True))

@@ -12,15 +12,15 @@ from public_profile import TASK,R3_PROFILE,authority
 root=Path(tempfile.mkdtemp(prefix='closure-',dir=T/'fixtures'))
 result={'status':'SYNTHETIC','diagnostic':'x'*40000};raw=(json.dumps(result)+'\n').encode();(root/'RESULT.json').write_bytes(raw)
 for task in [TASK,authority(R3_PROFILE)['task'],'HDD-BTC-ETH-OPERATING-REFRESH-R2']:
- m=closure_frame(root,result,task)
+ m=closure_frame(root,result,task,unified=task!='HDD-BTC-ETH-OPERATING-REFRESH-R2')
  assert set(m)=={'type','resultBytes','resultSha256'} and len(json.dumps(m))<32768
  assert m['resultBytes']==len(raw) and m['resultSha256']==hashlib.sha256(raw).hexdigest()
 assert closure_frame(root,result,'HDD-BTC-ETH-OPERATING-REFRESH-R1')=={'type':'closed','result':result}
-try:closure_frame(root,{'different':True},authority(R3_PROFILE)['task'])
+try:closure_frame(root,{'different':True},authority(R3_PROFILE)['task'],unified=True)
 except ValueError:pass
 else:raise AssertionError('Mismatched durable report accepted')
 (root/'RESULT.json').write_bytes(b' '*524289)
-try:closure_frame(root,result,authority(R3_PROFILE)['task'])
+try:closure_frame(root,result,authority(R3_PROFILE)['task'],unified=True)
 except ValueError:pass
 else:raise AssertionError('Oversized durable report accepted')
 print(json.dumps({'status':'PASS','root':str(root),'cases':['R3 compact emitter','R2/operating R2 unchanged','older frame unchanged','durable mismatch refusal','size refusal'],'externalRequests':0,'baseAdmissions':0}))

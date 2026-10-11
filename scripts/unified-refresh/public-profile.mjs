@@ -25,6 +25,19 @@ export const publicR3 = Object.freeze({
   }),
   sequence: 50,
 });
+export const publicR4 = Object.freeze({
+  task: 'HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R4',
+  profile: 'unified-five-feed-public-qualification-4',
+  root: 'C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\unified-refresh-public-qualification-r4',
+  profileHash: 'd20057b7e7c149389b0c7caa48b3f035d4d971007e9c5bf27141e30c0a508078',
+  packetHashes: {
+    'packet/SCOPE.json': '31951ef2a30b8fc0fc9bd39f801ac7f2663e1d9c8505fc4c7f95b7338e164544',
+    'packet/INPUTS.json': 'cc5e7f710b11e0487810908211118fd8cd09aa6920b9ecd92260cbab74b89b5a',
+    'packet/PUBLIC_PROFILE.json':
+      '8c2ffc332d49bafae977a49198461ae91e00d0e10d52d6383503f8100c8ed194',
+  },
+  sequence: 51,
+});
 export function publicAuthority(profile) {
   if (profile === publicProfile)
     return {
@@ -35,7 +48,7 @@ export function publicAuthority(profile) {
       packetHashes,
       sequence: 44,
     };
-  return profile === publicR3.profile ? publicR3 : null;
+  return profile === publicR3.profile ? publicR3 : profile === publicR4.profile ? publicR4 : null;
 }
 
 export function exactPublicProfile(p) {
@@ -78,7 +91,10 @@ export async function validatePublicReady({
   loadedRuntimeFiles,
   repo,
 }) {
-  const authority = resolve(taskRoot) === publicR3.root ? publicR3 : publicAuthority(publicProfile);
+  const authority = [publicAuthority(publicProfile), publicR3, publicR4].find(
+    (a) => a.root === resolve(taskRoot),
+  );
+  if (!authority) throw Error('EXACT_PUBLIC_ROOT');
   const {
     task: publicTask,
     root: publicRoot,

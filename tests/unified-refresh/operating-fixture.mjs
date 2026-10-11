@@ -35,6 +35,10 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       priorTask,
       priorTask.replace(
         'unified-refresh-integration-r2',
+        'unified-refresh-public-qualification-r4',
+      ),
+      priorTask.replace(
+        'unified-refresh-integration-r2',
         'unified-refresh-public-qualification-r3',
       ),
       priorTask.replace(
@@ -45,6 +49,13 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   assert(
     [
+      'r4-all',
+      'result-limit',
+      'result-over',
+      'legacy',
+      'length',
+      'malformed',
+      'truncated',
       'r3-final',
       'mixed',
       'qualification',
@@ -153,7 +164,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     generation: ACCEPTED.generation,
     deployment: ACCEPTED.deployment,
     target: {
-      number: mode === 'r3-final' ? 27758521 : 27754425,
+      number: ['r3-final', 'r4-all'].includes(mode) ? 27758521 : 27754425,
       hash: '0x' + sha('synthetic base pin'),
       timestamp: 1791560565,
     },
@@ -236,7 +247,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         productDaily: reader.productDaily,
         sourceGenerations: base,
       },
-      ['qualification', 'r3-final'].includes(mode)
+      ['qualification', 'r3-final', 'r4-all'].includes(mode)
         ? {
             evidenceRoot: join(root, 'evidence'),
             webRoot: join(W, 'dist/web'),
@@ -302,20 +313,19 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       beforePublication = after;
       return live;
     };
-    const profile =
-      mode === 'r3-final'
-        ? {
-            ...(await read(join(T, 'packet/PUBLIC_PROFILE.json'))),
-            format: 'unified-five-feed-offline-1',
-            mode: 'OFFLINE_ONLY',
-          }
-        : await read(join(W, 'config/unified-refresh-offline.json'));
+    const profile = ['r3-final', 'r4-all'].includes(mode)
+      ? {
+          ...(await read(join(T, 'packet/PUBLIC_PROFILE.json'))),
+          format: 'unified-five-feed-offline-1',
+          mode: 'OFFLINE_ONLY',
+        }
+      : await read(join(W, 'config/unified-refresh-offline.json'));
     if (mode === 'r3-final')
       for (const j of profile.jobs)
         j.enabled = ['trade-15', 'trade-16', 'participants-1'].includes(j.id);
     if (mode === 'policy-clock') profile.jobs = profile.jobs.slice(0, 2);
     else if (mode === 'policy-payout') profile.jobs = profile.jobs.slice(0, 4);
-    else if (!['mixed', 'qualification', 'r3-final'].includes(mode))
+    else if (!['mixed', 'qualification', 'r3-final', 'r4-all'].includes(mode))
       profile.jobs = profile.jobs.slice(0, 1);
     if (mode === 'budget') {
       profile.jobs = [
@@ -383,6 +393,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       const selected = writer.productDaily.capture();
       const config = {
         codeBody: join(T, 'fixtures/protocol-code.json'),
+        actualMain: T.endsWith('unified-refresh-public-qualification-r4'),
         ...(mode === 'r3-final'
           ? { closureAuthority: 'HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3' }
           : {}),
@@ -399,8 +410,20 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         ...(a.tradeSlot === 6 ? { retry: true } : {}),
         ...(a.tradeSlot === 16 ? { largeResult: true } : {}),
         ...(a.family === 'participants' ? { delay: 400 } : {}),
-        ...(['hash', 'duplicate', 'exit', 'missing'].includes(mode)
-          ? { closure: mode, largeResult: true }
+        ...([
+          'hash',
+          'duplicate',
+          'exit',
+          'missing',
+          'legacy',
+          'length',
+          'malformed',
+          'truncated',
+        ].includes(mode)
+          ? { closure: mode, largeResult: mode !== 'legacy' }
+          : {}),
+        ...(['result-limit', 'result-over'].includes(mode)
+          ? { exactResultBytes: mode === 'result-limit' ? 524288 : 524289 }
           : {}),
         ...(mode === 'exhaust' ? { exhaust: true } : {}),
         ...(mode === 'no-body' ? { noBody: true } : {}),
@@ -434,8 +457,25 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     });
     receipt.result = result;
     receipt.starts = starts;
+    if (mode === 'r4-all') {
+      assert.equal(starts.length, 23);
+      receipt.completionMatrix = await Promise.all(
+        starts.map(async (s) => ({
+          job: s.job,
+          ...(await read(join(root, 'session', s.job, 'COMPLETION_EMITTER.json'))),
+          native: await read(join(root, 'session', s.job, 'NATIVE_CLOSURE.json')),
+        })),
+      );
+      assert(
+        receipt.completionMatrix.every(
+          (m) => m.formatter === 'scripts/unified-refresh/offline_profile.py:closed_frame',
+        ),
+      );
+      receipt.admissionSeam =
+        'Exact R4 jobs/timing/caps translated only to OFFLINE_ONLY/unified-five-feed-offline-1; exact public documents tested separately; real public paths reject injected transports/clocks.';
+    }
     receipt.facts = facts;
-    if (['mixed', 'qualification', 'r3-final'].includes(mode)) {
+    if (['mixed', 'qualification', 'r3-final', 'r4-all'].includes(mode)) {
       assert.equal(
         result.status,
         'OFFLINE_PROFILE_COMPLETE',
@@ -474,12 +514,16 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       assert.equal(head.statusCode, 200);
       assert.equal(head.body, '');
       assert(facts.some((f) => f.freshness.BTC.status === 'stale'));
-      assert.equal(facts.at(-1).freshness.BTC.status, mode === 'r3-final' ? 'stale' : 'fresh');
-      assert.equal(result.jobs.find((j) => j.job === 'trade-2').publication, 'retained');
+      assert.equal(
+        facts.at(-1).freshness.BTC.status,
+        ['r3-final', 'r4-all'].includes(mode) ? 'stale' : 'fresh',
+      );
+      if (mode !== 'r3-final')
+        assert.equal(result.jobs.find((j) => j.job === 'trade-2').publication, 'retained');
       if (mode !== 'r3-final')
         assert.equal(result.jobs.find((j) => j.job === 'trade-3').publication, 'no-op');
       assert.equal(result.jobs.find((j) => j.job === 'participants-1').publication, 'changed');
-      for (const n of mode === 'r3-final' ? [15, 16] : [4, 6, 16])
+      for (const n of mode === 'r3-final' ? [15, 16] : [1, 4, 6, 15, 16])
         assert(await fs.stat(join(root, `session/trade-${n}/WINDOW_${n}_UPDATE.json`)));
       assert((await fs.stat(join(root, 'session/trade-16/RESULT.json'))).size > 32768);
       receipt.journal = await auditJournal(store.root);
@@ -504,7 +548,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
               'Daily/protected CSV/HEAD',
               'large compact native closure',
             ];
-      if (mode === 'qualification' || mode === 'r3-final') {
+      if (['qualification', 'r3-final', 'r4-all'].includes(mode)) {
         const { finalProof } = await import('../../scripts/unified-refresh/final-proof.mjs');
         process.env.HDD_TASK_ROOT = T;
         const { createBudget } = await import('../trade-feed/budget.mjs');
@@ -547,15 +591,36 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         receipt.finalizationAccounting = budget.snapshot();
       }
     } else if (
-      ['hash', 'duplicate', 'exit', 'missing', 'unknown-product', 'cancel-active'].includes(mode)
+      [
+        'hash',
+        'duplicate',
+        'exit',
+        'missing',
+        'legacy',
+        'length',
+        'malformed',
+        'truncated',
+        'unknown-product',
+        'cancel-active',
+        'result-over',
+      ].includes(mode)
     ) {
       assert.equal(result.status, 'PARTIAL');
       assert.equal(result.networkClosureKnown, false);
       assert(await fs.stat(join(store.root, 'MARKET_REFRESH.lock')));
+      if (mode === 'legacy') {
+        const native = await read(join(root, 'session/trade-1/NATIVE_CLOSURE.json'));
+        assert.equal(native.ipcError, 'Error: CLOSED_RESULT_IDENTITY');
+        assert((await fs.stat(join(root, 'session/trade-1/RESULT.json'))).size < 32768);
+      }
       receipt.cases = ['unknown closure retained/refused'];
     } else {
       assert.equal(result.accounting.status, 'CLOSED');
       receipt.cases = [mode];
+      if (mode === 'result-limit') {
+        assert.equal(result.status, 'OFFLINE_PROFILE_COMPLETE');
+        assert.equal((await fs.stat(join(root, 'session/trade-1/RESULT.json'))).size, 524288);
+      }
       if (mode === 'no-body') {
         assert.equal(result.status, 'PARTIAL');
         assert.equal(result.accounting.attempts, 1);

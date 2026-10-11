@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import {
   publicAuthority,
   publicR3,
+  publicR4,
   validatePublicReady,
   publicAdmission,
 } from './unified-refresh/public-profile.mjs';
@@ -1375,12 +1376,18 @@ export async function runJob({
 export async function main(args = process.argv.slice(2)) {
   if (
     args.length === 1 &&
-    ['public-qualification-r2', 'public-qualification-r3'].includes(args[0])
+    ['public-qualification-r2', 'public-qualification-r3', 'public-qualification-r4'].includes(
+      args[0],
+    )
   ) {
     const { runReviewedPublic } = await import('./unified-refresh/owner.mjs');
     return runReviewedPublic(
       runUnified,
-      args[0] === 'public-qualification-r3' ? publicR3.profile : undefined,
+      args[0] === 'public-qualification-r4'
+        ? publicR4.profile
+        : args[0] === 'public-qualification-r3'
+          ? publicR3.profile
+          : undefined,
     );
   }
   if (args[0] === 'plan' && args.length === 2) {

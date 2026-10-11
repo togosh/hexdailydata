@@ -190,7 +190,7 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
     assert.equal(real.status().generation, expected.participantGeneration);
     assert.equal(seed.metadata.coverage.ledgerDates, expected.ledgerPeriods);
     assert.equal(seed.rows.length, expected.reportingRows);
-    if (expected.sequence === 50) {
+    if (expected.participantFrontier !== undefined) {
       const heldInitial = real.capture();
       try {
         const snapshot = heldInitial.sourceGenerations.identity.snapshot;
@@ -306,25 +306,26 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
     failure = { error: String(e), stack: e.stack };
     await save('OWNER_FAILURE', failure);
   } finally {
-    const closed = await closeOwned([
-      [
-        'held-export',
-        heldExport
-          ? async () => {
-              heldExport.stream.destroy();
-              await heldExport.released;
-            }
-          : null,
-      ],
-      ['held-view', held ? async () => held.release() : null],
-      ['api', f ? () => f.close() : null],
-      ['reader', reader ? () => reader.close() : null],
-      ['writer', real ? () => real.close() : null],
-    ]);
-    if (!closed.known) failure ??= { error: 'OWNED_APPLICATION_CLOSURE_UNKNOWN', details: closed };
-    if (final && !failure)
-      try {
-        await restoreProof({
+    const cleanup = await closePublicResources({
+      closeApplication: () =>
+        closeOwned([
+          [
+            'held-export',
+            heldExport
+              ? async () => {
+                  heldExport.stream.destroy();
+                  await heldExport.released;
+                }
+              : null,
+          ],
+          ['held-view', held ? async () => held.release() : null],
+          ['api', f ? () => f.close() : null],
+          ['reader', reader ? () => reader.close() : null],
+          ['writer', real ? () => real.close() : null],
+        ]),
+      shouldRestore: Boolean(final && !failure),
+      restore: () =>
+        restoreProof({
           R: T,
           profile,
           final,
@@ -332,12 +333,13 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
           admittedBase: base,
           budget,
           baseAdmissionCount: entry.ordinal,
-        });
-      } catch (e) {
-        failure = { error: String(e), stack: e.stack };
-        await save('RESTORE_FAILURE', failure);
-      }
-    const baseClosed = await closeOwned([['base', base ? () => base.close() : null]]);
+        }),
+      reportFailure: (e) => save('RESTORE_FAILURE', e),
+      closeBase: () => closeOwned([['base', base ? () => base.close() : null]]),
+    });
+    const { closed, baseClosed } = cleanup;
+    if (!cleanup.ok)
+      failure ??= { error: 'OWNED_FINALIZATION_OR_CLOSURE_FAILED', details: cleanup.errors };
     entry.status = closed.known && baseClosed.known ? 'CLOSED' : 'UNKNOWN';
     entry.closedAtUtc = new Date().toISOString();
     entry.failure = failure;
@@ -355,4 +357,54 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
     console.log('PUBLIC_OWNER_CLOSED ' + entry.status);
   }
   return !failure && result?.status === 'PUBLIC_PROFILE_COMPLETE' ? 0 : 2;
+}
+
+// Unconditional base closure also applies when a restore failure receipt cannot be written.
+export async function closePublicResources({
+  closeApplication,
+  shouldRestore,
+  restore,
+  reportFailure,
+  closeBase,
+}) {
+  let closed = { known: false },
+    baseClosed = { known: false },
+    restored = false;
+  const errors = [];
+  const record = (e) => errors.push({ error: String(e), stack: e?.stack });
+  try {
+    try {
+      closed = await closeApplication();
+      if (!closed.known) record(Error('APPLICATION_CLOSURE_UNKNOWN'));
+    } catch (e) {
+      record(e);
+    }
+    if (shouldRestore && closed.known) {
+      try {
+        await restore();
+        restored = true;
+      } catch (e) {
+        record(e);
+        try {
+          await reportFailure({ error: String(e), stack: e.stack });
+        } catch (report) {
+          record(report);
+        }
+      }
+    }
+  } finally {
+    try {
+      baseClosed = await closeBase();
+      if (!baseClosed.known) record(Error('BASE_CLOSURE_UNKNOWN'));
+    } catch (e) {
+      record(e);
+    }
+  }
+  return {
+    closed,
+    baseClosed,
+    restored,
+    errors,
+    ok: closed.known && baseClosed.known && (!shouldRestore || restored) && errors.length === 0,
+  };
 }

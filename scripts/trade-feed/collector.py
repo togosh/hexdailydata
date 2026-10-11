@@ -7,15 +7,12 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from client import Session,TASK,URLS,W,strict_json,digest,save,SlotMissed
 from authority import validate_authority, trade_profile, OPERATING_AUTHORITIES, OPERATING_R2_AUTHORITY
 
-def closure_frame(root, result, authority):
-    # R2's 66-attempt accounting can exceed the unchanged 32 KiB IPC frame cap.
-    # Bind the already durable local report, rather than send its full ledger twice.
-    from public_profile import TASK as PUBLIC_TASK, R3_PROFILE, authority as public_authority
-    if authority in (OPERATING_R2_AUTHORITY,PUBLIC_TASK,public_authority(R3_PROFILE)['task']):
-        raw = (root/'RESULT.json').read_bytes()
-        if not 0 < len(raw) <= 524288: raise ValueError('Closed result bound')
-        if strict_json(raw) != result: raise ValueError('Closed result mismatch')
-        return {'type':'closed','resultBytes':len(raw),'resultSha256':digest(raw)}
+def closure_frame(root, result, authority, *, unified=False):
+    # The caller establishes execution mode only after full admission validation.
+    # No per-edition list chooses the unified wire format.
+    if unified or authority == OPERATING_R2_AUTHORITY:
+        from offline_profile import closed_frame
+        return closed_frame(root, result)
     return {'type':'closed','result':result}
 
 def start_reader(incoming, stream=None):
@@ -61,12 +58,20 @@ def collect(session,exchange,clock=time.monotonic,sleep=time.sleep,outcomes=None
         previous_end=clock()
     return outcomes
 
-def main():
+def main(offline_fixture=False):
     if len(sys.argv)!=2:
         print('No requests. Exact bound session required.');return 0
     root=Path(sys.argv[1]).resolve();a=strict_json((root/'ADMISSION.json').read_bytes())
-    assert a['task']==TASK and a['family']=='trade' and a['jobRoot']==str(root) and a['synthetic'] is False
-    validate_authority(a, root)
+    assert a['task']==TASK and a['family']=='trade' and a['jobRoot']==str(root)
+    from offline_profile import admitted
+    from public_profile import is_public
+    if offline_fixture:
+        if is_public(a) or not admitted(a) or a.get('synthetic') is not True:
+            raise ValueError('Exact denied-network offline fixture admission')
+    else:
+        assert a['synthetic'] is False
+        validate_authority(a, root)
+    unified=admitted(a)
     assert 0<=time.time()-a['startedAtUnixSeconds']<=30
     for p,h in a['runtimeFiles'].items():assert digest((W/p).read_bytes())==h,p
     session=Session(root,a);incoming=queue.Queue()
@@ -74,14 +79,14 @@ def main():
     def exchange(kind,cycle,**extra):
         session.check(31)
         msg={'type':kind,'cycle':cycle,'expiresAtUnixSeconds':time.time()+30,**extra}
+        if offline_fixture:msg['syntheticClockUnixSeconds']=time.time()
         print(__import__('json').dumps(msg),flush=True)
         answer=incoming.get(timeout=30)
         if not answer.get('ok') or answer.get('cycle')!=cycle:raise ValueError('Owner refused: '+str(answer))
         return answer
     outcomes=[];status='PARTIAL';reason='Not completed'
     try:
-        from public_profile import is_public
-        unified=is_public(a);operating=a.get('authorityTaskId') in OPERATING_AUTHORITIES
+        operating=a.get('authorityTaskId') in OPERATING_AUTHORITIES
         outcomes=collect(session,exchange,outcomes=outcomes if operating or unified else None)
         status='COMPLETE_SAMPLED_JOB' if unified and len(outcomes)==1 else 'COMPLETE_FRESH_CYCLES' if len(outcomes)==session.profile['cycles'] and all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
         reason='All original slots accounted'
@@ -89,6 +94,6 @@ def main():
     finally:session.close(reason)
     result={'status':status,'accounting':session.state,'cycles':outcomes,'networkSessionCount':1,'noAutomaticRestart':True}
     save(root/'RESULT.json',result)
-    print(__import__('json').dumps(closure_frame(root,result,a.get('authorityTaskId'))),flush=True)
+    print(__import__('json').dumps(closure_frame(root,result,a.get('authorityTaskId'),unified=unified)),flush=True)
     return 0 if status.startswith('COMPLETE_') else 2
 if __name__=='__main__':sys.exit(main())

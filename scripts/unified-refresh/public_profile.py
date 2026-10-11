@@ -19,10 +19,16 @@ R3_ROOT=Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\unified-refre
 R3_PACKET={'packet/SCOPE.json':'92d27b17d571dbd674bd70c3b5d4d3990674c0eaab46a1003e933f7aeeeeac64',
            'packet/INPUTS.json':'ce345b5aea9e1a5ed03e13c4248fb6adab55802415dac148b16dfd4dd639f924',
            'packet/PUBLIC_PROFILE.json':'2bf3e9a23de15296b52fc493b47a02e0fdca10d4b0c26c21bebe6372aa4d41f6'}
+R4_PROFILE='unified-five-feed-public-qualification-4'
+R4_ROOT=Path('C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\unified-refresh-public-qualification-r4')
+R4_PACKET={'packet/SCOPE.json': '31951ef2a30b8fc0fc9bd39f801ac7f2663e1d9c8505fc4c7f95b7338e164544', 'packet/INPUTS.json': 'cc5e7f710b11e0487810908211118fd8cd09aa6920b9ecd92260cbab74b89b5a', 'packet/PUBLIC_PROFILE.json': '8c2ffc332d49bafae977a49198461ae91e00d0e10d52d6383503f8100c8ed194'}
 def authority(profile):
     if profile==PROFILE:return dict(task=TASK,profile=PROFILE,root=ROOT,profileHash=PROFILE_HASH,packet=PACKET,base=27754425,target=27758521)
     if profile==R3_PROFILE:return dict(task='HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3',profile=R3_PROFILE,root=R3_ROOT,
         profileHash='c438cd9b773a473d8a6fe77a285a21146ee7266ad0cc285f95835fd21b8862b4',packet=R3_PACKET,base=27758521,target=27762617,
+        basePin={'number':27758521,'hash':'0x4f4c970d7c5e3f2bfe00120934a3647913bdbf598ce1b8529e674ecf9b6176fa','timestamp':1791602675})
+    if profile==R4_PROFILE:return dict(task='HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R4',profile=R4_PROFILE,root=R4_ROOT,
+        profileHash='d20057b7e7c149389b0c7caa48b3f035d4d971007e9c5bf27141e30c0a508078',packet=R4_PACKET,base=27758521,target=27762617,
         basePin={'number':27758521,'hash':'0x4f4c970d7c5e3f2bfe00120934a3647913bdbf598ce1b8529e674ecf9b6176fa','timestamp':1791602675})
     return None
 

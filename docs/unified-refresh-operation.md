@@ -330,3 +330,31 @@ references. Two real admissions, one final backup and one restore completed;
 all owned processes/connections closed. This qualifies that saved result and
 offline correction, not the 22 unrun jobs, continuous freshness or production
 operation. The task's final report separates public and offline evidence.
+
+### R4 shared completion contract
+
+R4 has a distinct exact task/root/profile/scope/input binding and starts from
+the accepted sequence-51 compact backup. The maintained foreground entry is
+`node scripts/refresh-data.mjs public-qualification-r4`; it requires independent
+preflight PASS and starts one fresh paired API before exclusive public admission.
+It cannot reuse any earlier public or recovery marker. Default/plan/status stay
+offline. The fixed 23-job profile puts the still-unqueried participant window
+27,758,521 to 27,762,617 last. This is conditional finite authority, not a service.
+
+After full admission validation, both the real trade collector and the other
+unified job entrypoint use `offline_profile.closed_frame`: exactly type,
+resultBytes and resultSha256 for the durable RESULT.json. The wire format no
+longer has a second per-edition task allowlist. The parent retains its strict
+32-KiB frame/512-KiB durable-result, identity, native-exit and accounting guards.
+Legacy inline and standalone operating-R2 contracts remain explicit and intact.
+
+The R4 offline gate invokes the actual collector/job mains through native pipes
+for all 23 jobs and five families, actual parent decoding, paired publication,
+readers, journal, final proof and compact restore. Only responses, virtual clocks,
+empty immutable base handles and a labelled offline admission translation are
+injected; the public path rejects these injections. Separate pure tests validate
+exact R4 public documents and collector/auditor retry parity. Negative pipe tests
+corrupt already-emitted frames, including the original small inline mismatch.
+The exact 512-KiB result is accepted and an over-limit result is refused. An owner
+cleanup recheck also ensures base closure despite restore/reporting failures.
+Real source outcomes are reported separately after the single authorized run.

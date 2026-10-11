@@ -1068,3 +1068,10 @@ preservation/access, compact backup/restore and two stale-aware views passed.
 Only four October 11 benchmark value/time cells changed; participant frontier
 remains 27,758,521. Two genuine base admissions are closed; main/original data
 unchanged, indexer and paid reconstruction PARKED. No automatic follow-on.
+
+2026-10-11 — R4 completion-contract preparation: unified trade and non-trade
+children now use the same durable-result formatter after exact admission; no
+per-edition serializer list. Final denied-network 23-job native/paired-store
+gate and focused authority, retry/auditor, malformed closure and exact-size
+checks passed. The new R4 public grant remains conditional on separate review
+and a freshly loaded real paired API from the exact sequence-51 compact backup.
