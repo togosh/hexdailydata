@@ -9,6 +9,8 @@ from retry_schedule import enabled, VERSION, WAITS, COUNTERS, ControlReplay, slo
 
 def public_combined_schedule(root, plan):
     """Recognize only this admitted combined profile; historical policies stay fixed."""
+    if plan.get('unifiedProfileId') not in ('unified-five-feed-public-qualification-2','unified-five-feed-public-qualification-3'):
+        return False
     from public_profile import authority,is_public
     config=authority(plan.get('unifiedProfileId'))
     if config is None:return False

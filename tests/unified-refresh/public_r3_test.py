@@ -1,5 +1,5 @@
 """Exact live document refusal tests; no filesystem admission, bases, or networking."""
-import sys,socket,json,copy,unittest
+import sys,socket,json,copy,unittest,subprocess
 from pathlib import Path
 sys.dont_write_bytecode=True
 W=Path(__file__).resolve().parents[2]
@@ -11,6 +11,23 @@ config=authority(R3_PROFILE)
 ROOT=config['root'];PROFILE=config['profile'];TASK=config['task'];PROFILE_HASH=config['profileHash'];PACKET=config['packet']
 
 class Policy(unittest.TestCase):
+    def test_standalone_bootstrap_has_no_unified_dependency(self):
+        code="""import sys,socket
+from pathlib import Path
+def deny(*a,**k):raise AssertionError('NETWORK_DENIED')
+socket.getaddrinfo=socket.create_connection=socket.socket.connect=deny
+w=Path.cwd()
+sys.path[:0]=[str(w/'scripts/participant-refresh'),str(w/'scripts/market-refresh')]
+import audit
+assert 'public_profile' not in sys.modules
+for plan in ({},{'unifiedProfileId':'unified-five-feed-offline-1'},{'unifiedProfileId':'unknown'}):
+ assert audit.public_combined_schedule(Path('UNREAD_SYNTHETIC'),plan) is False
+assert 'public_profile' not in sys.modules
+print('STANDALONE_BOOTSTRAP_PASS')
+"""
+        p=subprocess.run([sys.executable,'-I','-S','-c',code],cwd=W,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=15)
+        self.assertEqual(p.returncode,0,p.stdout.decode())
+        self.assertIn(b'STANDALONE_BOOTSTRAP_PASS',p.stdout)
     def fixture(self):
         p=json.loads((ROOT/'packet/PUBLIC_PROFILE.json').read_bytes());j=p['jobs'][0];h='a'*64
         a=dict(unifiedProfileId=PROFILE,authorityTaskId=TASK,synthetic=False,parentMode='OWNER_AUTHORIZED_PUBLIC',parentProfileSha256=PROFILE_HASH,
