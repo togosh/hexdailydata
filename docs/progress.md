@@ -1165,3 +1165,13 @@ records remain preserved. Saved-only finalization passed: 117,735 CSV cells,
 only eight October 11 trade/gas value/time cells changed. Compact 80/79 backup,
 isolated restore, protected access and desktop/mobile previews passed. Both
 base admissions closed. This does not change the original public PARTIAL result.
+
+### Repeatable public qualification R3 — separate owner-authorized activation
+
+R3 begins from the reviewed clean sequence80/79 backup and corrected R2 source.
+The numerical public bounds, source methods, five-feed cadence and participant
+window are unchanged. Both R1 and R2 UNKNOWN parents remain immutable. The exact
+new authority checks their saved closures, current PID ownership and R2's sealed
+pre-worker refusal without inventing a receipt or settling its pending permit.
+Focused R3 entry/binding/refusal checks precede the same independent review and
+freshly loaded paired readiness; old operating commands remain refused.

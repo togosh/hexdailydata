@@ -1,6 +1,6 @@
 // One finite authority for the maintained cooperative owner. No default activation.
 import { readFileSync } from 'node:fs';
-import { readFile, lstat } from 'node:fs/promises';
+import { readFile, lstat, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { canonical, sha } from '../../dist/services/source-update/generation.js';
@@ -29,7 +29,7 @@ export function validatePriorProcessObservations(expectedPids, observed, lastClo
   check(remaining.size === 0, 'OPERATING_PRIOR_PROCESS_MISSING');
 }
 // New authority never settles an older UNKNOWN owner. Inspect its exact native
-// closure and current process identities before opening a genuine R2 runtime.
+// closure and current process identities before opening the new genuine runtime.
 export async function verifyPriorOperatingSafety() {
   const old = operatingPolicy.oldStateProtection;
   check(old && old.root !== operatingPolicy.root, 'OPERATING_PRIOR_OWNER_BOUNDARY');
@@ -86,6 +86,9 @@ export async function verifyPriorOperatingSafety() {
     }),
   );
   validatePriorProcessObservations([...pids], observed, lastClose);
+  const additional = operatingPolicy.additionalOldStateProtection
+    ? await verifyAdditionalPriorSafety()
+    : null;
   return {
     status: 'PASS',
     atUtc: new Date().toISOString(),
@@ -96,6 +99,139 @@ export async function verifyPriorOperatingSafety() {
     reusedPids: observed.filter((p) => p.status === 'PRESENT'),
     oldParent: 'UNKNOWN_UNCHANGED',
     pendingPermit: 43,
+    oldLockPreserved: true,
+    actions: 'READ_ONLY_NO_SETTLEMENT',
+    additional,
+  };
+}
+
+// R2's final permit has no worker receipt. Its sealed, reviewed pre-worker
+// refusal is checked as historical evidence, never converted into a settlement.
+export function validatePriorUnstartedPermit(state, result, names, expected) {
+  const pending = state.pending;
+  check(
+    state.status === 'UNKNOWN' &&
+      pending?.id === expected.pendingPermit &&
+      pending.bytes === expected.reservedBytes &&
+      pending.objects === expected.reservedObjects &&
+      result.failure === 'LimitReached: Combined mandatory controls/publication deadline reserve' &&
+      result.accounting.status === 'CLOSURE_OR_ACCOUNTING_UNKNOWN' &&
+      result.accounting.pending?.requestPath === pending.requestPath &&
+      result.accounting.pending.reservedBytes === pending.bytes &&
+      result.accounting.pending.reservedEntities === pending.objects &&
+      canonical([...names].sort()) === canonical(['request.body', 'request.json']),
+    'OPERATING_PRIOR_UNSTARTED_UNCERTAIN',
+  );
+}
+
+async function verifyAdditionalPriorSafety() {
+  const old = operatingPolicy.additionalOldStateProtection;
+  check(
+    old.root !== operatingPolicy.root && old.root !== operatingPolicy.oldStateProtection.root,
+    'OPERATING_PRIOR_ADDITIONAL_ROOT',
+  );
+  const read = async (p) => JSON.parse(await readFile(p));
+  const proof = await read(join(operatingPolicy.root, 'reference/PRIOR_R2_STATE_BINDINGS.json'));
+  check(
+    proof.root === old.root && proof.physical.length === old.physicalReaps,
+    'OPERATING_PRIOR_ADDITIONAL_PROOF',
+  );
+  for (const item of proof.files) {
+    const path = resolve(old.root, item.path);
+    check(path.startsWith(old.root + '\\'), 'OPERATING_PRIOR_PATH');
+    const raw = await readFile(path);
+    check(raw.length === item.bytes && sha(raw) === item.sha256, 'OPERATING_PRIOR_STATE_CHANGED');
+  }
+  const owner = await read(join(old.root, 'evidence/OWNER_CLOSURE.json'));
+  check(
+    owner.status === 'CLOSED' && owner.closed.known && owner.baseClosed.known,
+    'OPERATING_PRIOR_OWNER_CLOSURE',
+  );
+  const state = await read(join(old.root, 'session/OPERATING_STATE.json'));
+  const capture = resolve(state.pending.requestPath, '..');
+  check(
+    capture === proof.unsettled.capture && capture.startsWith(old.root + '\\session\\'),
+    'OPERATING_PRIOR_UNSTARTED_PATH',
+  );
+  const result = await read(join(old.root, 'session', state.pending.job, 'RESULT.json'));
+  validatePriorUnstartedPermit(state, result, await readdir(capture), old);
+  const review = await read(join(old.root, 'SEALED_ARCHIVE_REVIEW.json'));
+  check(
+    review.verdict === 'PASS' &&
+      review.qualifiedOutcome.unsettledPermit === old.pendingPermit &&
+      review.qualifiedOutcome.actualPhysicalStartsAndCloses === old.physicalReaps &&
+      sha(await readFile(join(old.root, 'SEALED_ARCHIVE_REVIEW.json'))) ===
+        proof.sealedReviewSha256,
+    'OPERATING_PRIOR_REVIEW_BINDING',
+  );
+  const pids = new Set([owner.pid, proof.oldOwner.pid]);
+  const permits = new Set();
+  let lastClose =
+    Date.parse(
+      owner.baseClosed.closedAtUtc ??
+        (await read(join(old.root, 'evidence/BASE_ADMISSIONS.json'))).entries[0].closedAtUtc,
+    ) / 1000;
+  check(Number.isFinite(lastClose), 'OPERATING_PRIOR_CLOSE_TIME');
+  for (const item of proof.physical) {
+    check(!permits.has(item.id) && item.id < old.pendingPermit, 'OPERATING_PRIOR_PERMIT_DUPLICATE');
+    permits.add(item.id);
+    const permit = await read(
+      join(old.root, 'session', `PERMIT_${String(item.id).padStart(8, '0')}.json`),
+    );
+    const folder = resolve(permit.requestPath, '..');
+    check(folder.startsWith(old.root + '\\session\\'), 'OPERATING_PRIOR_CAPTURE_PATH');
+    const close = await read(join(folder, 'PHYSICAL_CLOSED.json'));
+    check(
+      close.permit === permit.id &&
+        close.nonce === permit.nonce &&
+        close.childReaped === true &&
+        close.connectionClosed === true &&
+        close.native?.childReaped === true &&
+        Number.isInteger(close.native.exitCode) &&
+        close.workerPid !== close.proofOwnerPid,
+      'OPERATING_PRIOR_PHYSICAL_CLOSURE',
+    );
+    pids.add(close.workerPid);
+    pids.add(close.proofOwnerPid);
+    lastClose = Math.max(lastClose, close.closedAt);
+  }
+  check(permits.size === old.pendingPermit - 1, 'OPERATING_PRIOR_PERMIT_GAP');
+  for (const item of proof.native) {
+    const n = await read(join(old.root, item.path));
+    check(
+      n.knownClosure === true &&
+        n.childCloseObserved === true &&
+        n.childExitObserved === true &&
+        Number.isInteger(n.childExitCode),
+      'OPERATING_PRIOR_NATIVE_CLOSURE',
+    );
+    pids.add(n.ownerPid);
+    pids.add(n.childPid);
+    lastClose = Math.max(lastClose, Date.parse(n.recordedAtUtc) / 1000);
+  }
+  check(
+    [...pids].every((p) => Number.isInteger(p) && p > 0),
+    'OPERATING_PRIOR_PID',
+  );
+  const command = `$ErrorActionPreference='Stop'; $ids=@(${[...pids].join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$p.StartTime.ToUniversalTime().ToString('o')}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+  const observed = JSON.parse(
+    execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 10000,
+      windowsHide: true,
+    }),
+  );
+  validatePriorProcessObservations([...pids], observed, lastClose);
+  return {
+    status: 'PASS',
+    root: old.root,
+    checkedFiles: proof.files.length,
+    physicalReaps: permits.size,
+    observations: observed,
+    oldParent: 'UNKNOWN_UNCHANGED',
+    pendingPermit: old.pendingPermit,
+    pendingChargeBytes: old.reservedBytes,
+    pendingObjects: old.reservedObjects,
     oldLockPreserved: true,
     actions: 'READ_ONLY_NO_SETTLEMENT',
   };
