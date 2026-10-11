@@ -1038,3 +1038,15 @@ unpublished and the original PARTIAL stays immutable. Sixteen jobs never ran.
 Final access/preservation/backup/restore and stale-aware previews passed. Main
 and original roots are unchanged; all owned resources closed. No automatic
 follow-on, scheduler or indexer/reconstruction work.
+
+2026-10-11 — Owner-authorized offline participant completion: applied the saved
+27,754,425–27,758,521 window through the maintained paired publisher, advancing
+only this task's candidate from sequence 49 to 50. All 1,427 selected before/after
+records matched, ordinary same-API adoption and held views passed, and an exact
+repeat was a no-op. The represented view now has 664,651 holder rows and 954,949
+stake starts; it remains accepted base plus observed updates, not a new census.
+All Daily cells, prices/times and CSV bytes stayed exact. One additional compact
+backup/restore passed using the same base handles; zero public requests, one new
+base admission (three cumulative). Original closed PARTIAL and sealed return
+remain unchanged. Separate continuation evidence records the result; no public
+retry, scheduler or automatic follow-on is authorized.

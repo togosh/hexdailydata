@@ -229,3 +229,38 @@ source includes the narrow saved-audit correction; the live run used commit
 `c0ccf2e1f315c088d90a84f98fd2b451ceb27809`. A future application of the captured
 unpublished participant window requires its own scoped offline integration;
 another public qualification requires fresh authority.
+
+### Authorized offline completion of the saved participant window
+
+The owner subsequently authorized applying that saved window and one additional
+compact backup/restore. The task-local continuation replayed the actual saved
+auditor, bound the source/profile/proof, and independently reviewed the offline
+harness before opening the immutable bases. Every selected before-value matched
+the original draft. The maintained publisher committed one paired update and the
+already-running API adopted it on an ordinary request; held records and the old
+CSV stayed coherent. Reapplying the identical descriptor made no new commit.
+
+The candidate is now sequence 50, product
+`48a7a3c3c2f7ad9da2ab3c0e58f90ef4641584244d8904c3ddb125ae38b1153b`,
+participant generation
+`eec0148c07010189a290d39b151dc7c26df8e3b438fc141e722306819b32faf5`.
+The participant frontier is 27,758,521, observed 2026-10-10T03:24:35Z.
+The 1,329 holder changes comprise 35 new and 1,294 replaced rows; 98 stake
+changes comprise 28 new starts and 70 updated parent records. The resulting
+664,651 represented holder rows and 954,949 starts are not a current full census,
+positive-balance holder count or inferred active-staker population.
+
+All 117,735 Daily CSV cells and original quote times remain exact, including
+5,004 fixed closes, 2,504 payout periods and 90 liquidity dates. Participant
+publication does not renew other feed times. A new compact backup and isolated
+restore passed with the existing admitted handles and prior writable roots denied.
+The continuation used zero external requests, 20 local requests, 21,233,664
+charged local bytes and one new base admission (three cumulative); all owned
+resources closed. No recovery/unlock or new screenshot was needed.
+
+The continuation return under `offline-participant-continuation-r1` contains the
+reviewed task-owned one-use harness, exact saved update/proof, new backup and
+receipts. Its command is consumed and is not a scheduler or public retry command.
+The original public PARTIAL, unrun jobs, archives and charges remain unchanged.
+This offline completion does not qualify continuous feed freshness or authorize
+another public run. Main and all original data remain untouched.
