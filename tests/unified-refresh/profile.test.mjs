@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { runJob } from '../../scripts/refresh-data.mjs';
 import {
   validateProfile,
   unifiedAdmission,
@@ -69,4 +70,33 @@ test('remaining parent capacities and closure time reduce each next job', () => 
   assert.equal(clipJob(p, p.jobs[0], parent, p.jobs[0].deadline - 60), null);
   parent.httpAttempts = p.parent.httpAttempts;
   assert.equal(clipJob(p, p.jobs[0], parent, 0), null);
+});
+test('cancelled or expired offline child is refused before spawn', async () => {
+  const admission = {
+    unifiedProfileId: profileId,
+    authorityTaskId: profileTask,
+    synthetic: true,
+    parentMode: 'OFFLINE_ONLY',
+    parentProfileSha256: 'a'.repeat(64),
+    family: 'gas',
+  };
+  let spawned = 0;
+  for (const cancelled of [true, false]) {
+    const controller = new AbortController();
+    if (cancelled) controller.abort();
+    await assert.rejects(
+      runJob({
+        admission,
+        jobRoot: 'synthetic-unused',
+        deadline: performance.now() + (cancelled ? 600000 : -1),
+        signal: controller.signal,
+        spawnChild: () => {
+          spawned++;
+          throw Error('UNEXPECTED_SPAWN');
+        },
+      }),
+      /OFFLINE_CHILD_DISPATCH_REFUSED/,
+    );
+  }
+  assert.equal(spawned, 0);
 });

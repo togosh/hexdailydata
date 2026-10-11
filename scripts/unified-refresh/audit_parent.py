@@ -48,14 +48,31 @@ def audit(root):
 def audit_profile(root):
     """Reconcile every native subdivision in finite order, including GET liabilities."""
     root=Path(root);profile=read(root/'PROFILE.json');keys=KEYS+['httpAttempts','httpExtras','httpChargedBytes']
+    profile_hash=hashlib.sha256(json.dumps(profile,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
+    final=read(root/'PARENT_ACCOUNTING.json')
+    if final['profileSha256']!=profile_hash or final['limits']!=profile['parent']:
+        raise ValueError('Profile parent identity/limits')
     totals={k:0 for k in keys};eps=[0,0];last=None;jobs=[]
     for j in profile['jobs']:
         d=root/j['id']
         if not d.exists():continue
-        a=read(d/'ADMISSION.json');state=read(d/'ACCOUNTING.json');native=read(d/'NATIVE_CLOSURE.json')
+        a=read(d/'ADMISSION.json')
         ah=hashlib.sha256((d/'ADMISSION.json').read_bytes()).hexdigest()
-        if (a['job']!=j['id'] or not a['synthetic'] or a['parentMode']!='OFFLINE_ONLY'
-            or native['exit']['code'] not in (0,2) or native['exit']['signal'] or native['killed']
+        if (a['job']!=j['id'] or a['family']!=j['family'] or not a['synthetic'] or a['parentMode']!='OFFLINE_ONLY'
+            or a['parentProfileSha256']!=profile_hash or a['parentLimits']!=profile['parent']):
+            raise ValueError('Profile child identity/limits')
+        if (d/'DISPATCH_SKIPPED.json').exists():
+            skipped=read(d/'DISPATCH_SKIPPED.json');fact=read(root/(j['id']+'-SKIPPED.json'))
+            if (skipped['jobAdmissionSha256']!=ah or skipped['parentProfileSha256']!=profile_hash
+                or skipped['closure']!='NO_CHILD' or fact['closure']!='NO_CHILD' or fact['status']!='SKIPPED'
+                or fact['reason']!=skipped['reason'] or fact['job']!=j['id']
+                or skipped['reason'] not in ('CANCELLED_DURING_PREPARATION','MISSED_DUE_DURING_PREPARATION','PREPARATION_CONSUMED_RESERVE')
+                or any((d/name).exists() for name in ('ACCOUNTING.json','NATIVE_CLOSURE.json','LEDGER.jsonl','JOB_CLOCK.json','RESULT.json'))):
+                raise ValueError('Prepared no-child dispatch evidence')
+            jobs.append(dict(job=j['id'],attempts=0,closure='NO_CHILD'))
+            continue
+        state=read(d/'ACCOUNTING.json');native=read(d/'NATIVE_CLOSURE.json')
+        if (native['exit']['code'] not in (0,2) or native['exit']['signal'] or native['killed']
             or native['closureProtocolError'] or not native['resultMatchesClosedMessage'] or not native['accountingMatchesResult']):
             raise ValueError('Profile native identity/closure')
         trade=j['family']=='trade'
@@ -66,6 +83,7 @@ def audit_profile(root):
             if trade:
                 reservation=read(d/'parent-reservations'/f'{n:05d}.json')
                 if reservation['jobAdmissionSha256']!=ah:raise ValueError('GET exclusive child binding')
+                if reservation['rpcEndpointAttempts']!=eps:raise ValueError('GET endpoint counter lineage')
                 start=reservation['pending']['startedMonotonic']
                 charged=2162688;objects=c['chargedObjects'];observed=c['wireBytes']+c['headerBytes']
                 returned=objects if c['complete'] else 0;unknown=0 if c['complete'] else objects;extra=c['retryOrdinal']
@@ -77,7 +95,7 @@ def audit_profile(root):
                     if reservation[key]!=totals[key]+inc:raise ValueError('GET reservation lineage '+key)
             else:
                 before=read(d/'combined-reservations'/f'{n:05d}.json')['parentBefore']
-                if before['jobAdmissionSha256']!=ah or any(before[k]!=totals[k] for k in keys) or before['pending'] is not None:
+                if before['jobAdmissionSha256']!=ah or any(before[k]!=totals[k] for k in keys) or before['rpcEndpointAttempts']!=eps or before['pending'] is not None:
                     raise ValueError('POST preceding counter/admission lineage')
                 start=clock['startedMonotonic']+c['startOffsetSeconds'];charged=c['chargedBytes'];objects=c['chargedEntities']
                 observed=c['responseBytes'];returned=c['entityRows'] or 0;unknown=0 if c['entityRows'] is not None else c['job']['maxRows'];extra=int(c['retry'])
@@ -95,8 +113,7 @@ def audit_profile(root):
             last=settled['lastClosedMonotonic']
         if len(captures)!=state['attempts'] or state['status']!='CLOSED' or state['pending'] is not None:raise ValueError('Profile child closure')
         jobs.append(dict(job=j['id'],attempts=len(captures)))
-    final=read(root/'PARENT_ACCOUNTING.json')
-    if any(final[k]!=v for k,v in totals.items()) or final['status']!='CLOSED' or final['pending'] is not None or final['lastClosedMonotonic']!=last:
+    if any(final[k]!=v for k,v in totals.items()) or final['rpcEndpointAttempts']!=eps or final['status']!='CLOSED' or final['pending'] is not None or final['lastClosedMonotonic']!=last:
         raise ValueError('Profile final reconciliation')
     return dict(status='PASS',synthetic=True,savedOnly=True,totals=totals,jobs=jobs,externalRequests=0)
 if __name__=='__main__':

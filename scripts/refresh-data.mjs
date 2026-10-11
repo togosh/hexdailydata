@@ -427,6 +427,7 @@ async function runFiniteProfile({
     failure = null,
     cancelled = false;
   const began = clock.now(),
+    beganMonotonic = performance.now(),
     wall = Date.now() / 1000,
     contexts = {},
     disabled = new Set(),
@@ -508,6 +509,9 @@ async function runFiniteProfile({
         await skip('PARENT_OR_CLOSURE_RESERVE');
         continue;
       }
+      // Preparation consumes the same allowance; it cannot renew the job clock.
+      const finishOffset = elapsed + allowance.seconds,
+        childDeadline = beganMonotonic + finishOffset * 1000;
       await registry.refresh(undefined, true);
       if (registry.status().error) throw Error('SELECTOR_INTEGRITY');
       const held = registry.capture();
@@ -546,10 +550,9 @@ async function runFiniteProfile({
         runtimeFiles,
         sourceFiles,
         startedAtUnixSeconds: Date.now() / 1000,
-        deadlineUnixSeconds: Date.now() / 1000 + allowance.seconds,
-        networkClosesAtUnixSeconds:
-          Date.now() / 1000 + allowance.seconds - allowance.publication - 5,
-        networkSeconds: allowance.seconds - allowance.publication - 5,
+        deadlineUnixSeconds: wall + finishOffset,
+        networkClosesAtUnixSeconds: wall + finishOffset - allowance.publication - 5,
+        networkSeconds: wall + finishOffset - allowance.publication - 5 - Date.now() / 1000,
         ...(j.family === 'trade'
           ? {
               tradeSlot: j.tradeSlot,
@@ -590,6 +593,31 @@ async function runFiniteProfile({
       parent.job = j.id;
       parent.jobAdmissionSha256 = sha(await readFile(join(jobRoot, 'ADMISSION.json')));
       await replace(join(output, 'PARENT_ACCOUNTING.json'), parent);
+      const dispatchOffset = clock.now() - began;
+      const dispatchRefusal = signal?.aborted
+        ? 'CANCELLED_DURING_PREPARATION'
+        : dispatchOffset > j.due + j.maximumStartLag || dispatchOffset >= j.deadline
+          ? 'MISSED_DUE_DURING_PREPARATION'
+          : finishOffset - dispatchOffset <= allowance.publication + 65 ||
+              childDeadline - performance.now() <= (allowance.publication + 65) * 1000
+            ? 'PREPARATION_CONSUMED_RESERVE'
+            : null;
+      if (dispatchRefusal) {
+        await durableJson(join(jobRoot, 'DISPATCH_SKIPPED.json'), {
+          reason: dispatchRefusal,
+          jobAdmissionSha256: parent.jobAdmissionSha256,
+          parentProfileSha256: profileSha256,
+          dispatchOffset,
+          closure: 'NO_CHILD',
+        });
+        await skip(dispatchRefusal);
+        if (signal?.aborted) {
+          cancelled = true;
+          break;
+        }
+        continue;
+      }
+      // No await between the final fence and runJob's synchronous spawn guard.
       outstanding = true;
       const result = await runJob({
         jobRoot,
@@ -597,7 +625,7 @@ async function runFiniteProfile({
         registry,
         onAdoption,
         spawnChild,
-        deadline: performance.now() + allowance.seconds * 1000,
+        deadline: childDeadline,
         syncFixtureClock: (t) => clock.synchronize(t),
         signal,
         storageGuard: (n = 0) => guardStorage(taskRoot, 128 * 1024 ** 2 + n),
@@ -644,18 +672,22 @@ async function runFiniteProfile({
           throw Error('FAILED_JOB_SELECTION_CHANGED');
         disabled.add(j.family);
       }
+      const selected = await read(join(registry.root, 'CURRENT.json'));
+      const selectionChanged =
+        !same(selected.product, initial.product) ||
+        selected.generation !== initial.participant.generation;
       const fact = {
         job: j.id,
         family: j.family,
         due: j.due,
         nextDue,
         deadline: j.deadline,
-        startedOffset: elapsed,
+        startedOffset: dispatchOffset,
         completedOffset: clock.now() - began,
-        delayedSeconds: Math.max(0, elapsed - j.due),
+        delayedSeconds: Math.max(0, dispatchOffset - j.due),
         status: exhausted ? 'CLOSED_FEED_DISABLED' : sampled ? 'SAMPLED' : 'QUALIFIED',
         closure: 'KNOWN',
-        publication: result.publications.some((x) => x.publication.changed)
+        publication: selectionChanged
           ? 'changed'
           : result.publications.length
             ? 'no-op'
@@ -764,6 +796,8 @@ export async function runJob({
     TMP: join(jobRoot, 'temp'),
     PYTHONIOENCODING: 'utf-8',
   });
+  if (unified && (signal?.aborted || performance.now() >= deadline - 2000))
+    throw Error('OFFLINE_CHILD_DISPATCH_REFUSED');
   const child = spawnChild(
     'python',
     [

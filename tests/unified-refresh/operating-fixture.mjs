@@ -1,7 +1,7 @@
 // Real coordinator / native collectors / paired storage / API. No real bases or network.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -47,6 +47,11 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       'unknown-product',
       'policy-clock',
       'policy-payout',
+      'prepare-delay',
+      'admission-delay',
+      'cancel-prepared',
+      'prepare-within',
+      'prepare-reserve',
     ].includes(mode),
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
@@ -306,6 +311,29 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     }
     const ac = new AbortController();
     if (mode === 'cancel') ac.abort();
+    if (['prepare-delay', 'cancel-prepared', 'prepare-within', 'prepare-reserve'].includes(mode)) {
+      const refresh = writer.refresh.bind(writer);
+      let first = true;
+      writer.refresh = async (...args) => {
+        await refresh(...args);
+        if (!first) return;
+        first = false;
+        if (mode === 'cancel-prepared') ac.abort();
+        else
+          now += (mode === 'prepare-within' ? 30 : mode === 'prepare-reserve' ? 550 : 200) * 1000;
+      };
+    }
+    if (mode === 'prepare-reserve') profile.jobs[0].maximumStartLag = 590;
+    if (mode === 'admission-delay') {
+      let delayed = false;
+      clock.now = () => {
+        if (!delayed && existsSync(join(root, 'session/trade-1/ADMISSION.json'))) {
+          delayed = true;
+          now += 200000;
+        }
+        return now / 1000;
+      };
+    }
     const spawnFixture = (_exe, args, options) => {
       assert.equal(children.size, 0, 'ONE_NATIVE_CHILD');
       const jobRoot = args.at(-1),
@@ -402,6 +430,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       assert.equal(facts.at(-1).freshness.BTC.status, 'fresh');
       assert.equal(result.jobs.find((j) => j.job === 'trade-2').publication, 'retained');
       assert.equal(result.jobs.find((j) => j.job === 'trade-3').publication, 'no-op');
+      assert.equal(result.jobs.find((j) => j.job === 'participants-1').publication, 'changed');
       for (const n of [4, 6, 16])
         assert(await fs.stat(join(root, `session/trade-${n}/WINDOW_${n}_UPDATE.json`)));
       assert((await fs.stat(join(root, 'session/trade-16/RESULT.json'))).size > 32768);
@@ -442,6 +471,39 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         assert(result.jobs.some((j) => j.reason === 'PARENT_OR_CLOSURE_RESERVE'));
       }
       if (mode === 'cancel') assert.equal(starts.length, 0);
+      if (
+        ['prepare-delay', 'admission-delay', 'cancel-prepared', 'prepare-reserve'].includes(mode)
+      ) {
+        assert.equal(starts.length, 0);
+        assert.equal(result.accounting.attempts, 0);
+        assert.equal(result.accounting.pending, null);
+        const skipped = await read(join(root, 'session/trade-1/DISPATCH_SKIPPED.json'));
+        assert.equal(skipped.closure, 'NO_CHILD');
+        assert.equal(
+          skipped.reason,
+          mode === 'cancel-prepared'
+            ? 'CANCELLED_DURING_PREPARATION'
+            : mode === 'prepare-reserve'
+              ? 'PREPARATION_CONSUMED_RESERVE'
+              : 'MISSED_DUE_DURING_PREPARATION',
+        );
+        assert.equal(
+          result.status,
+          mode === 'cancel-prepared' ? 'CANCELLED' : 'OFFLINE_PROFILE_COMPLETE',
+        );
+        assert.equal(existsSync(join(root, 'session/trade-1/ACCOUNTING.json')), false);
+      }
+      if (mode === 'prepare-within') {
+        assert.equal(result.status, 'OFFLINE_PROFILE_COMPLETE');
+        assert.equal(starts.length, 1);
+        assert.equal(result.jobs[0].startedOffset, 30);
+        const admission = await read(join(root, 'session/trade-1/ADMISSION.json'));
+        assert.equal(
+          admission.deadlineUnixSeconds,
+          NativeDate.parse('2026-10-11T00:03:00Z') / 1000,
+        );
+        assert.equal(admission.deadlineUnixSeconds - starts[0].clock / 1000, 570);
+      }
       if (mode === 'exhaust') {
         assert.deepEqual(result.disabledFeeds, ['market']);
         assert.equal(starts.length, 2);
