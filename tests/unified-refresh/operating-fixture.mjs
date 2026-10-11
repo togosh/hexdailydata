@@ -66,6 +66,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       'repeatable',
       'native-boundary',
       'native-timeout',
+      'native-reserve',
       'operating-smoke',
       'operating-cancel-retry',
       'operating-cancel-physical',
@@ -111,7 +112,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
   const operatingSmall = mode.startsWith('operating-');
-  const boundary = ['native-boundary', 'native-timeout'].includes(mode);
+  const boundary = ['native-boundary', 'native-timeout', 'native-reserve'].includes(mode);
   await fs.mkdir(join(root, 'evidence'));
   process.env.HDD_TASK_ROOT = root;
   const NativeDate = Date,
@@ -477,6 +478,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
               realClockBoundary: true,
               tradeMode: mode === 'native-boundary' && tradeOrdinal === 1 ? 'empty' : 'fresh',
               timeoutTip: mode === 'native-timeout' && a.family === 'gas',
+              postGrantReserve: mode === 'native-reserve' && a.family === 'market',
               delay: mode === 'native-boundary' && a.family === 'participants' ? 121 : 0,
             }
           : {}),
@@ -640,7 +642,12 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         return f;
       },
       signal: ac.signal,
-      ...(boundary ? { mode: 'DENIED_NETWORK_TEST', until: configuration.startsAt + 62 } : {}),
+      ...(boundary
+        ? {
+            mode: 'DENIED_NETWORK_TEST',
+            until: configuration.startsAt + (mode === 'native-reserve' ? 2 : 62),
+          }
+        : {}),
     });
     receipt.result = result;
     receipt.starts = starts;
@@ -668,8 +675,9 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         const jr = join(root, 'operating', j.job),
           r = await read(join(jr, 'COORDINATOR_RESULT.json'));
         const native = await read(join(jr, 'NATIVE_CLOSURE.json'));
+        const reserveRefusal = mode === 'native-reserve' && j.family === 'market';
         assert(
-          native.exit.code === 0 &&
+          native.exit.code === (reserveRefusal ? 2 : 0) &&
             !native.killed &&
             !native.closureProtocolError &&
             !native.ipcError &&
@@ -681,7 +689,12 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
             !r.error,
           JSON.stringify({ native, error: r.error }),
         );
-        assert(r.source.status.startsWith('COMPLETE_'), JSON.stringify(r.source).slice(-3500));
+        assert(
+          reserveRefusal
+            ? r.source.feedLocalClosedReserveRefusal === true
+            : r.source.status.startsWith('COMPLETE_'),
+          JSON.stringify(r.source).slice(-3500),
+        );
         receipt.completionMatrix.push({
           job: j.job,
           family: j.family,
@@ -754,6 +767,56 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
           pendingCleared: true,
           networkingDenied: true,
         };
+      }
+      if (mode === 'native-reserve') {
+        const market = result.jobs.find((j) => j.family === 'market');
+        const dir = join(root, 'operating', market.job, 'captures/00001');
+        const c = await read(join(dir, 'capture.json')),
+          physical = await read(join(dir, 'PHYSICAL_CLOSED.json'));
+        const permit = await read(
+          join(root, 'operating', `PERMIT_${String(physical.permit).padStart(8, '0')}.json`),
+        );
+        const settlement = await read(
+          join(root, 'operating', `SETTLEMENT_${String(physical.permit).padStart(8, '0')}.json`),
+        );
+        assert.equal(c.failureKind, 'local_reserve_refusal');
+        assert.equal(c.usable, false);
+        assert.equal(c.retryable, false);
+        assert.equal(c.responseBytes, 0);
+        assert.equal(c.childStarted, false);
+        assert.equal(c.childReaped, false);
+        assert.equal(c.closureKnown, true);
+        assert.equal(physical.noChildStarted, true);
+        assert.equal(physical.workerPid, null);
+        assert.equal(settlement.bytes, permit.bytes);
+        assert.equal(settlement.objects, permit.objects);
+        assert.equal(settlement.complete, false);
+        assert(!existsSync(join(dir, 'PHYSICAL_STARTED.json')));
+        const next = await read(
+          join(root, 'operating', `PERMIT_${String(physical.permit + 1).padStart(8, '0')}.json`),
+        );
+        assert(next.at >= settlement.at + 1);
+        assert(!next.job.startsWith('market-'));
+        assert(result.jobs.some((j) => j.job === next.job && j.status === 'QUALIFIED_ADOPTED'));
+        assert.equal(result.accounting.pending, null);
+        assert(result.accounting.disabled.includes('market'));
+        receipt.reserveProgression = {
+          capture: c,
+          physical,
+          permit,
+          settlement,
+          next,
+          networkingDenied: true,
+          fullCharge: true,
+          noWorkerDispatched: true,
+        };
+        receipt.cases = [
+          'actual post-grant reserve refusal',
+          'enclosing no-worker proof without self-reap',
+          'full charge and durable settlement',
+          'another native family publishes and serves',
+          'terminal local feed disable without retry',
+        ];
       }
     } else if (mode === 'r4-all') {
       assert.equal(starts.length, 23);

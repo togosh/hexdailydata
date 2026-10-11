@@ -185,7 +185,10 @@ class Session:
             self.phase_check(q,tail)
             transport=self.transport(request,deadline,self.storage)
             cap.update(transport)
-            closed=cap.get('childReaped') is True and cap.get('connectionClosed') is True
+            no_dispatch=(cap.get('failureKind')=='local_reserve_refusal' and cap.get('noChildStarted') is True
+                and cap.get('childStarted') is False and cap.get('childReaped') is False and cap.get('status') is None
+                and cap.get('complete') is False)
+            closed=(cap.get('childReaped') is True or no_dispatch) and cap.get('connectionClosed') is True
             cap['closedWithinDeadline']=closed and self.clock()<=deadline
             if not closed:cap.update(complete=False,failureKind='unknown_closure')
             if self.clock()>deadline:cap.update(complete=False,failureKind='attempt_deadline')
@@ -249,7 +252,7 @@ class Session:
             cap['accessRestricted']=bool(access)
             cap['classification']=None if rpc or docs else classify_error_only(parsed,cap,policy_version='HOLDER_R3')
             special=cap['classification'] in CLASSIFICATIONS
-            veto=access or (cap.get('graphqlErrors') and not special) or cap.get('validationError') or cap.get('parseError') or failure in ('body_cap','owner_cancellation','local_or_protocol','transport_terminal','unknown_closure','attempt_deadline')
+            veto=access or (cap.get('graphqlErrors') and not special) or cap.get('validationError') or cap.get('parseError') or failure in ('body_cap','owner_cancellation','local_or_protocol','local_reserve_refusal','transport_terminal','unknown_closure','attempt_deadline')
             cap['retryable']=self.retry_allowed(q,cap,special,veto)
             cap['identityValidated']=bool(cap['usable'] and q['kind']!='schema')
             if q['kind']=='schema':cap['schemaValidated']=bool(cap['usable'])

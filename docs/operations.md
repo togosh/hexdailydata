@@ -724,3 +724,16 @@ checks R1's unchanged evidence and confirms each recorded old PID is absent or
 a demonstrably later process; lookup uncertainty stops admission. It never
 settles R1 or removes its lock. The existing numerical limits remain unchanged.
 Actual qualification belongs to the R2 result, not this command's availability.
+
+R2 is now consumed and must not be run again. Its public owner stopped with
+UNKNOWN accounting after 130 charged permits: 129 have physical closure and
+parent settlement receipts; permit 130 retains its full 4,096-byte/two-object
+charge. Seven paired publications completed through the running API. Market and
+participant acquisition did not qualify. The original failure, lock and counters
+remain unchanged. See the R2 return for any separately reviewed saved completion
+and finalization; neither renews this authority or qualifies the full cadence.
+
+The narrow corrected transport records a post-grant mandatory-reserve refusal
+before any worker is called. It requires exact enclosing no-dispatch proof, keeps
+the full charge, accepts no data, performs no retry and disables only that closed
+feed. Other integrity or uncertain-closure failures still stop all dispatch.

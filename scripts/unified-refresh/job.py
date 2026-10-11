@@ -100,7 +100,8 @@ def main(offline_fixture=False):
         else:result=collector.run_cycles(s,1,exchange,a['initial'][family])
     except BaseException as e:
         result=dict(status='PARTIAL',failure=type(e).__name__+': '+str(e),
-                    feedLocalClosedExhaustion=str(e)=='COMBINED_FEED_CLOSED_RETRY_EXHAUSTION')
+                    feedLocalClosedExhaustion=str(e)=='COMBINED_FEED_CLOSED_RETRY_EXHAUSTION',
+                    feedLocalClosedReserveRefusal=str(e)=='Unusable response: local_reserve_refusal' and s.state['pending'] is None)
     finally:
         s.close(result.get('failure','Combined job closed'))
         result.update(accounting=s.state,parentSubdivision=True,networkSessionCount=0,synthetic=bool(a.get('synthetic')),noAutomaticRestart=True,indexer='PARKED')

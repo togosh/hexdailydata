@@ -1816,7 +1816,8 @@ export async function runOperating({
           if (
             result.status === 'PARTIAL' &&
             !result.source.status.startsWith('COMPLETE_') &&
-            result.source.feedLocalClosedExhaustion !== true
+            result.source.feedLocalClosedExhaustion !== true &&
+            result.source.feedLocalClosedReserveRefusal !== true
           )
             throw Error(
               'OPERATING_TERMINAL_SOURCE:' +

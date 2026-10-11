@@ -463,3 +463,21 @@ refusal and cancellation evidence is reused where the executed code is unchanged
 The numerical limits and source methods above remain unchanged. A reviewed frozen
 plan and a newly loaded paired application are mandatory. This conditional grant
 does not qualify provider availability, continuous freshness or permanent service.
+
+### R2 measured outcome and saved-only correction
+
+The one activation is consumed: PARTIAL, seven completed paired publications,
+129 actual physical closure receipts and 130 charged permits. The final permit
+was granted before the market's mandatory-control reserve check refused local
+dispatch. Its original parent UNKNOWN status, pending 4,096-byte/two-object
+liability and owner lock remain unchanged. Collector termination and application
+closure are recorded separately; they do not retroactively settle that permit.
+
+The corrected path catches only the post-grant `LimitReached` reserve refusal
+before calling the worker. Exact request/nonce/permit, absent worker/start/active
+lock, durable no-dispatch and enclosing closure records are required. The normal
+capture/ledger and parent validator keep full charge and no accepted data or
+retry. A known closed local refusal disables that feed; arbitrary failures still
+stop the owner. The denied-network composed test proves another family proceeds
+to normal publication and serving, plus thirteen strict acceptance/refusal cases.
+These are offline correction results, not a second live qualification.

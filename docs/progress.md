@@ -1142,3 +1142,18 @@ native timeout/progression test and exact five-family entry checks precede any
 genuine admission. The new conditional authority retains every original numeric
 cap and source method. Final public results are recorded separately after the
 single activation; preparation alone does not qualify the operating cadence.
+
+R2's actual activation returned PARTIAL after 130 charged permits (33,577,533
+bytes and 4,226 objects). Four trade, two gas and one protocol publication reached
+the same running paired API. A fifth trade product committed while cancellation
+interrupted its paired pointer; it is separately subject to exact saved-data
+completion. Participants remained at block 27,762,617 and market/liquidity were
+retained. Twenty served probes honestly included stale intervals. This is not a
+twenty-minute or continuous-freshness qualification.
+
+Saved inspection located the stop after parent permit grant but before the
+worker call, when the market closing reserve no longer fitted. The original
+UNKNOWN parent/pending permit 130 remains protected. The future source path now
+emits bounded no-dispatch evidence and retains full charges. Its focused actual
+native/parent/storage/API fixture and malformed-evidence refusals passed with
+networking denied; the public activation was not repeated.

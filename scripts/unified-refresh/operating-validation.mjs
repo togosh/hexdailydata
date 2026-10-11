@@ -220,12 +220,39 @@ export async function settlementEvidence(p, m, family) {
     transport?.connectionClosed === false &&
     m.bytes === p.bytes &&
     m.objects === p.objects;
+  const noDispatch =
+    ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
+    family !== 'trade' &&
+    closed === true &&
+    !complete &&
+    r.failureKind === 'local_reserve_refusal' &&
+    r.complete === false &&
+    r.status === null &&
+    r.childStarted === false &&
+    r.childReaped === false &&
+    r.noChildStarted === true &&
+    r.connectionClosed === true &&
+    r.responseBytes === 0 &&
+    body.length === 0 &&
+    r.usable === false &&
+    r.retryable === false &&
+    r.entityRows === null &&
+    transport?.failureKind === 'local_reserve_refusal' &&
+    transport?.status === null &&
+    transport?.complete === false &&
+    transport?.childStarted === false &&
+    transport?.childReaped === false &&
+    transport?.noChildStarted === true &&
+    transport?.connectionClosed === true &&
+    m.bytes === p.bytes &&
+    m.objects === p.objects;
   if (closed && transport && family !== 'trade')
     assert(
-      (p.closureMode === 'unified-operating-offline-1'
-        ? transport.childReaped === true
-        : r.childReaped === true) &&
-        (transport.connectionClosed === true || enclosingTimeout),
+      noDispatch ||
+        ((p.closureMode === 'unified-operating-offline-1'
+          ? transport.childReaped === true
+          : r.childReaped === true) &&
+          (transport.connectionClosed === true || enclosingTimeout)),
       'OPERATING_NATIVE_CLOSURE_RECEIPT',
     );
   if (closed) {
@@ -272,7 +299,8 @@ export async function settlementEvidence(p, m, family) {
       if (noChild) {
         const proof = JSON.parse(await fs.readFile(join(folder, 'NATIVE_NO_DISPATCH.json')));
         assert(
-          !started &&
+          (family === 'trade' || noDispatch) &&
+            !started &&
             proof.ownerPid === n.ownerPid &&
             proof.permit === p.id &&
             proof.nonce === p.nonce &&
@@ -280,6 +308,11 @@ export async function settlementEvidence(p, m, family) {
             proof.requestSha256 === p.requestSha256,
           'OPERATING_NO_CHILD_PROOF',
         );
+        if (family !== 'trade')
+          assert(
+            proof.reason === 'COMBINED_POST_GRANT_RESERVE_REFUSAL',
+            'OPERATING_NO_DISPATCH_REASON',
+          );
       }
     }
   }

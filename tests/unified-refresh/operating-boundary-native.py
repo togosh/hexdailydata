@@ -38,6 +38,20 @@ else:
         def __init__(self,nonce,**kw):super().__init__(nonce,worker_path=Path(worker))
     capture_client.WorkerTransport=ResponseChildren
     import collector,job
+    if f.get('postGrantReserve'):
+        from combined import Combined
+        original_phase=Combined.phase_check
+        def exhausted_after_grant(self,*args,**kw):
+            from operating_bridge import current
+            if self.state['attempts']==1 and current().pending is not None:
+                # Denied fixture: consume the reserve only AFTER the real permit.
+                # Actual reserve(), collector ledger, no-dispatch emitter and parent
+                # settlement execute; no worker or successful receipt is substituted.
+                old_seconds=self.limits['seconds'];self.limits['seconds']=1
+                try:return original_phase(self,*args,**kw)
+                finally:self.limits['seconds']=old_seconds
+            return original_phase(self,*args,**kw)
+        Combined.phase_check=exhausted_after_grant
     if a['family']=='participants':
         old=collector.run_window
         def held(*args,**kw):

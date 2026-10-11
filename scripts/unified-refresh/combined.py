@@ -198,7 +198,32 @@ class ParentTransport:
             r['parentBefore']=answer['parentBefore']
             atomic(s.root/'combined-reservations'/f'{n:05d}.json',r)
             # Waiting consumed the original deadline; the exact query and controls are checked again.
-            s.phase_check(q,[])
+            try:
+                s.phase_check(q,[])
+            except LimitReached as exc:
+                # A queued permit can consume a mandatory-control reserve. No
+                # worker has been called here: record that exact fact, retain the
+                # full liability, and let the ordinary durable ledger settle it.
+                # Storage/integrity failures deliberately do not enter this path.
+                if not hasattr(bridge.clock,'epoch'):raise
+                import os
+                p=bridge.pending;folder=Path(request).parent
+                if (not p or p['requestPath']!=str(Path(request).resolve()) or
+                    p['requestSha256']!=digest(Path(request).read_bytes()) or
+                    getattr(self.physical,'child',None) is not None or
+                    any((folder/name).exists() for name in ('PHYSICAL_STARTED.json','PHYSICAL_CLOSED.json','NATIVE_NO_DISPATCH.json','transport.json','response.body')) or
+                    (s.root.parent/'PHYSICAL_ACTIVE.lock').exists()):
+                    raise Stop('Uncertain pre-dispatch ownership') from exc
+                proof=dict(ownerPid=os.getpid(),permit=p['id'],nonce=p['nonce'],requestSha256=p['requestSha256'],
+                    networkRequests=0,reason='COMBINED_POST_GRANT_RESERVE_REFUSAL',detail=str(exc))
+                storage.json(folder/'NATIVE_NO_DISPATCH.json',proof)
+                result=dict(status=None,complete=False,connectionClosed=True,childStarted=False,childReaped=False,
+                    noChildStarted=True,failureKind='local_reserve_refusal',transportError=str(exc))
+                storage.json(folder/'transport.json',result)
+                from operating_bridge import native_closure
+                native_closure(request,s.root,s.admission,dict(ownerPid=os.getpid(),workerPid=None,
+                    childStarted=False,childReaped=False,exitCode=None,connectionClosed=True),bridge.clock.epoch())
+                return result
             result=self.physical(request,min(deadline,s.admission['networkDeadline']),storage)
             if hasattr(bridge.clock,'epoch'):
                 from operating_bridge import native_closure
