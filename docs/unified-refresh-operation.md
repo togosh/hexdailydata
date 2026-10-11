@@ -251,7 +251,8 @@ changes comprise 28 new starts and 70 updated parent records. The resulting
 positive-balance holder count or inferred active-staker population.
 
 All 117,735 Daily CSV cells and original quote times remain exact, including
-5,004 fixed closes, 2,504 payout periods and 90 liquidity dates. Participant
+5,004 fixed closes, 2,504 payout periods and 90 stored historical liquidity
+buckets (93 populated trackedLiquidityUsd dates including three timed rows). Participant
 publication does not renew other feed times. A new compact backup and isolated
 restore passed with the existing admitted handles and prior writable roots denied.
 The continuation used zero external requests, 20 local requests, 21,233,664
