@@ -1192,3 +1192,13 @@ is recorded in new operations, then parent protection stops retries/dispatch.
 The actual network-denied native fixture and 19 refusal/reproduction checks pass.
 This offline correction does not change the original R3 accounting or grant a new
 public run. Saved-only preservation/access/compact restore is reported separately.
+
+## Repeatable operating R4 preparation
+
+Fresh owner authority binds one unchanged finite operating profile to the reviewed
+queued-deadline correction and clean sequence 85/84 backup. Original R1/R2/R3
+UNKNOWN parents and full pending charges remain immutable. Admission checks the
+third historical worker/collector closure separately; it does not settle old
+accounting. The current command is `node scripts/refresh-data.mjs
+operating-public-qualification-r4`; old operating commands remain refused.
+Public qualification and final results are recorded only after actual execution.

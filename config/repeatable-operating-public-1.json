@@ -1,13 +1,13 @@
 {
-  "task": "HDD-REPEATABLE-REFRESH-PUBLIC-QUALIFICATION-R3",
+  "task": "HDD-REPEATABLE-REFRESH-PUBLIC-QUALIFICATION-R4",
   "format": "unified-operating-public-1",
-  "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r3",
+  "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r4",
   "packetHashes": {
-    "packet/INPUTS.json": "b2b786158f794674172fe5d23201efa9c7859ba49976de28153669d981cec9a1",
-    "packet/MANIFEST.json": "ea6b6c19a72c8b630d1634574213b49a5878e6870313c7f0c87673e89834cd0e",
-    "packet/OWNER_AUTHORITY.md": "af6a576f17e7899d2b590eb12c045b1194432dfc8713a8d1cd9d023e9007a2a1",
-    "packet/SCOPE.json": "9df13584a0fe1d9538fafec67e656f985ba75efaa9a87e665b892468e9724f7d",
-    "packet/TASK.md": "a1323bef500961f8eca15d1847c628b11a0419396b04c3d8c2e1f40641af6326"
+    "packet/INPUTS.json": "cc463de834eeacd4aab3de462228e65bf36d956941a7404df53da80c875717bf",
+    "packet/MANIFEST.json": "ff59d0010c2e4830a7cb13f016d832c5345f08d8c0e0fbc723e0c09570cfdb0a",
+    "packet/OWNER_AUTHORITY.md": "bb26f772873a4fa2e7b8e9dabfb0058f79d0be4ff653694e6af560d5eaf3c906",
+    "packet/SCOPE.json": "af5911324dfff36127c6219dffe8e15310103a10c955a1bcd47f1303d87730a0",
+    "packet/TASK.md": "9dea915e809b1b4c3179457a3ecec80f084c448ffc97e615af1b1fcc53f0c8f1"
   },
   "public": {
     "sessions": 1,
@@ -223,17 +223,17 @@
     "cookies": "Ignore response Set-Cookie without storage/replay in requests; retain auth/challenge, redirect and TLS refusals. Sanitize distributable evidence only; preserve original response/source tokens locally."
   },
   "selection": {
-    "sequence": 80,
-    "productVersion": "46f943dd7c3eaf053b2f4f805b7d87003432f6801b8eee4cc41921c9e7db09d5",
+    "sequence": 85,
+    "productVersion": "f44121c636171e82ec9b885adba0c8833329b0f434666843fe617869abb22a22",
     "participantGeneration": "c182da939f433aa88973730281c0f1bb41c1f54ae8be1722ff06ce2d962d5b62",
     "participantFrontier": {
       "hash": "0x3e2e5bf8d66f6f048bd2678a054859d46bf7f2598675403fae5db62e61b3deb6",
       "number": 27762617,
       "timestamp": 1791644675
     },
-    "immediateRollbackSequence": 79,
-    "backupSha256": "a9c8bedee1f165d7224368c9bc063ba9fd5038c0212606b42bf45d3b08f25dc1",
-    "productManifestSha256": "f4f6ae90e55156f99973c8072c9bcd9e326449c3869029274c7fa8b8d3bce166"
+    "immediateRollbackSequence": 84,
+    "backupSha256": "0cb72a29d6f1cf9446eaf024a38653ce8bcd0e016a9a1db86a572164580f6f61",
+    "productManifestSha256": "6c352653e77453cf0701d49b62686900b4e7ada42d3c4d331eca0e03464f6802"
   },
   "oldStateProtection": {
     "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r1",
@@ -242,7 +242,7 @@
     "reservedBytes": 16384,
     "reservedObjects": 16,
     "ownerLock": "session/OPERATING_OWNER.lock",
-    "rule": "Never settle, delete, rename, recover, resume, repair or import this prior R1 owner/session state. Its43 charges and original failure remain immutable. Retrospective physical closure does not change original accounting. The new R3 seed is only the separately verified clean sequence80/79 product/participant backup from the accepted R2 return."
+    "rule": "R1 pending43/full charge/lock remain immutable; no old session state copied."
   },
   "additionalOldStateProtection": {
     "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r2",
@@ -253,5 +253,15 @@
     "physicalReaps": 129,
     "ownerLock": "session/OPERATING_OWNER.lock",
     "rule": "Read-only forever; no settlement, reset, repair, resume, refund or lock action. No old session or owner state is restored."
+  },
+  "thirdOldStateProtection": {
+    "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r3",
+    "parentStatus": "UNKNOWN",
+    "pendingPermit": 103,
+    "reservedBytes": 1048576,
+    "reservedObjects": 128,
+    "physicalReaps": 103,
+    "ownerLock": "session/OPERATING_OWNER.lock",
+    "rule": "Immutable original UNKNOWN, full charges and lock; all103 workers reaped, last physical entry absent. No settlement, refund or old-runtime mutation."
   }
 }

@@ -1975,7 +1975,7 @@ export async function runOperating({
 }
 
 export async function main(args = process.argv.slice(2)) {
-  if (args[0] === 'operating-public-qualification-r3' && args.length === 1) {
+  if (args[0] === 'operating-public-qualification-r4' && args.length === 1) {
     const { runReviewedPublic } = await import('./unified-refresh/owner.mjs');
     return runReviewedPublic(runOperating, liveOperatingFormat);
   }

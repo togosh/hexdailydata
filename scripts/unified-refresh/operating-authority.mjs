@@ -89,6 +89,7 @@ export async function verifyPriorOperatingSafety() {
   const additional = operatingPolicy.additionalOldStateProtection
     ? await verifyAdditionalPriorSafety()
     : null;
+  const third = operatingPolicy.thirdOldStateProtection ? await verifyReapedPriorSafety() : null;
   return {
     status: 'PASS',
     atUtc: new Date().toISOString(),
@@ -102,6 +103,183 @@ export async function verifyPriorOperatingSafety() {
     oldLockPreserved: true,
     actions: 'READ_ONLY_NO_SETTLEMENT',
     additional,
+    third,
+  };
+}
+
+// Historical R3 is not R2's never-started case. Its last worker started and
+// was reaped; the original parent nevertheless retains its unknown liability.
+export function validatePriorReapedPermit(state, capture, close, old) {
+  check(
+    state.status === 'UNKNOWN' &&
+      state.pending?.id === old.pendingPermit &&
+      state.pending.bytes === old.reservedBytes &&
+      state.pending.objects === old.reservedObjects &&
+      capture.failureKind === 'transport_timeout' &&
+      capture.status === null &&
+      capture.complete === false &&
+      capture.usable === false &&
+      capture.entityRows === null &&
+      capture.bodyDurable === true &&
+      capture.responseBytes === 0 &&
+      capture.chargedBytes === old.reservedBytes &&
+      capture.chargedEntities === old.reservedObjects &&
+      capture.childStarted === true &&
+      capture.childReaped === true &&
+      capture.connectionClosed === true &&
+      close.permit === state.pending.id &&
+      close.nonce === state.pending.nonce &&
+      close.physicalStarted === false &&
+      close.noChildStarted === false &&
+      close.childReaped === true &&
+      close.connectionClosed === true &&
+      close.native?.childStarted === true &&
+      close.native.childReaped === true &&
+      close.native.workerPid === close.workerPid &&
+      close.native.ownerPid === close.proofOwnerPid &&
+      close.workerPid !== close.proofOwnerPid &&
+      Number.isInteger(close.native.exitCode),
+    'OPERATING_PRIOR_REAPED_UNCERTAIN',
+  );
+}
+
+async function verifyReapedPriorSafety() {
+  const old = operatingPolicy.thirdOldStateProtection;
+  check(
+    old.root !== operatingPolicy.root &&
+      old.root !== operatingPolicy.oldStateProtection.root &&
+      old.root !== operatingPolicy.additionalOldStateProtection.root,
+    'OPERATING_PRIOR_THIRD_ROOT',
+  );
+  const read = async (p) => JSON.parse(await readFile(p));
+  const proof = await read(join(operatingPolicy.root, 'reference/PRIOR_R3_STATE_BINDINGS.json'));
+  check(
+    proof.root === old.root &&
+      proof.physical.length === old.physicalReaps &&
+      proof.native.length === 9,
+    'OPERATING_PRIOR_THIRD_PROOF',
+  );
+  for (const item of proof.files) {
+    const p = resolve(old.root, item.path);
+    check(p.startsWith(old.root + '\\'), 'OPERATING_PRIOR_PATH');
+    const raw = await readFile(p);
+    check(raw.length === item.bytes && sha(raw) === item.sha256, 'OPERATING_PRIOR_STATE_CHANGED');
+  }
+  const state = await read(join(old.root, 'session/OPERATING_STATE.json'));
+  const folder = resolve(state.pending.requestPath, '..');
+  check(folder.startsWith(old.root + '\\session\\'), 'OPERATING_PRIOR_CAPTURE_PATH');
+  validatePriorReapedPermit(
+    state,
+    await read(join(folder, 'capture.json')),
+    await read(join(folder, 'PHYSICAL_CLOSED.json')),
+    old,
+  );
+  check(
+    canonical((await readdir(folder)).sort()) ===
+      canonical(
+        [
+          'PHYSICAL_CLOSED.json',
+          'capture.json',
+          'request.body',
+          'request.json',
+          'response.body',
+        ].sort(),
+      ),
+    'OPERATING_PRIOR_THIRD_CAPTURE',
+  );
+  check(
+    (await readFile(join(folder, 'response.body'))).length === 0,
+    'OPERATING_PRIOR_THIRD_EMPTY',
+  );
+  const owner = await read(join(old.root, 'evidence/OWNER_CLOSURE.json'));
+  const final = await read(join(old.root, 'finalization-r1/evidence/RESULT.json'));
+  const base = await read(join(old.root, 'finalization-r1/evidence/BASE_ADMISSION.json'));
+  check(
+    owner.status === 'CLOSED' &&
+      owner.closed.known &&
+      owner.baseClosed.known &&
+      final.status === 'SAVED_ONLY_FINALIZATION_PASS' &&
+      final.cleanup.ok &&
+      base.status === 'CLOSED' &&
+      base.pid === final.pid,
+    'OPERATING_PRIOR_THIRD_OWNER_CLOSURE',
+  );
+  const reviewRaw = await readFile(join(old.root, 'SEALED_ARCHIVE_REVIEW.json'));
+  const review = JSON.parse(reviewRaw);
+  check(
+    sha(reviewRaw) === proof.sealedReviewSha256 &&
+      review.verdict === 'PASS' &&
+      review.sha256 === proof.archiveSha256,
+    'OPERATING_PRIOR_THIRD_REVIEW',
+  );
+  const pids = new Set([owner.pid, final.pid, proof.oldOwner.pid]);
+  const seen = new Set();
+  let lastClose = Date.parse(base.closedAtUtc) / 1000;
+  check(Number.isFinite(lastClose), 'OPERATING_PRIOR_CLOSE_TIME');
+  for (const item of proof.physical) {
+    check(
+      !seen.has(item.id) && item.id >= 1 && item.id <= old.pendingPermit,
+      'OPERATING_PRIOR_PERMIT_DUPLICATE',
+    );
+    seen.add(item.id);
+    const permit = await read(
+      join(old.root, 'session', `PERMIT_${String(item.id).padStart(8, '0')}.json`),
+    );
+    const captureRoot = resolve(permit.requestPath, '..');
+    check(captureRoot.startsWith(old.root + '\\session\\'), 'OPERATING_PRIOR_CAPTURE_PATH');
+    const c = await read(join(captureRoot, 'PHYSICAL_CLOSED.json'));
+    check(
+      c.permit === permit.id &&
+        c.nonce === permit.nonce &&
+        c.childReaped === true &&
+        c.connectionClosed === true &&
+        c.native?.childReaped === true &&
+        Number.isInteger(c.native.exitCode) &&
+        c.workerPid !== c.proofOwnerPid,
+      'OPERATING_PRIOR_PHYSICAL_CLOSURE',
+    );
+    pids.add(c.workerPid);
+    pids.add(c.proofOwnerPid);
+    lastClose = Math.max(lastClose, c.closedAt);
+  }
+  check(seen.size === old.pendingPermit, 'OPERATING_PRIOR_PERMIT_GAP');
+  for (const item of proof.native) {
+    const n = await read(join(old.root, item.path));
+    check(
+      n.knownClosure === true &&
+        n.childCloseObserved === true &&
+        n.childExitObserved === true &&
+        Number.isInteger(n.childExitCode),
+      'OPERATING_PRIOR_NATIVE_CLOSURE',
+    );
+    pids.add(n.ownerPid);
+    pids.add(n.childPid);
+    lastClose = Math.max(lastClose, Date.parse(n.recordedAtUtc) / 1000);
+  }
+  check(
+    [...pids].every((p) => Number.isInteger(p) && p > 0),
+    'OPERATING_PRIOR_PID',
+  );
+  const command = `$ErrorActionPreference='Stop'; $ids=@(${[...pids].join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$p.StartTime.ToUniversalTime().ToString('o')}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+  const observations = JSON.parse(
+    execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 10000,
+      windowsHide: true,
+    }),
+  );
+  validatePriorProcessObservations([...pids], observations, lastClose);
+  return {
+    status: 'PASS',
+    root: old.root,
+    physicalReaps: seen.size,
+    observations,
+    oldParent: 'UNKNOWN_UNCHANGED',
+    pendingPermit: old.pendingPermit,
+    oldLockPreserved: true,
+    pendingChargeBytes: old.reservedBytes,
+    pendingObjects: old.reservedObjects,
+    actions: 'READ_ONLY_NO_SETTLEMENT',
   };
 }
 
