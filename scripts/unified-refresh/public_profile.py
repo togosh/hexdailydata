@@ -2,7 +2,8 @@
 import json,re,time,datetime,math,sys
 from pathlib import Path
 sys.dont_write_bytecode=True
-sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'market-refresh'))
+dependency=str(Path(__file__).resolve().parent.parent/'market-refresh')
+if dependency not in sys.path:sys.path.append(dependency)
 from durable import strict_json,digest
 
 TASK='HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R2'

@@ -48,6 +48,9 @@ if family=='trade':
         label=q['label'];status=200
         if f.get('noBody'):
             return dict(reaped=True,timeout=False,exit=1,seconds=.01,stdout='',stderr='synthetic worker pre-response failure')
+        if f.get('noBodyRetry') and count==1:
+            (p.parent/'PHASES.ndjson').write_bytes(encode(dict(event='dns_tcp_tls_connection_begin',unixSeconds=c())))
+            return dict(reaped=True,timeout=True,exit=1,seconds=.01,stdout='',stderr='synthetic timeout before headers')
         if label=='markets':
             value=[dict(market_symbol=x.lower()+'usd',base_currency=x,counter_currency='USD',market_type='SPOT',trading='Enabled') for x in ('BTC','ETH')]
         elif f.get('retry') and count==2:status=503;value={'error':'synthetic unavailable'}

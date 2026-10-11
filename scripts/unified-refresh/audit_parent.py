@@ -111,11 +111,21 @@ def audit_profile(root):
                         or c['native']['reaped'] is not True or c['bodyBytes']!=0 or c['wireBytes']!=0
                         or c['bodySha256']!=hashlib.sha256(b'').hexdigest() or c['chargedObjects']!=20000
                         or c['status'] is not None or c.get('transportComplete') is not False
-                        or c!=read(folder/'AUDIT.json') or c!=captures[-1]
-                        or read(d/'RESULT.json')['status']!='PARTIAL'
+                        or c!=read(folder/'AUDIT.json')
                         or state['closureKnown'] is not True):raise ValueError('GET missing-body closure/uncertainty evidence')
                     meta=read(folder/'response.json') if (folder/'response.json').exists() else {}
                     if meta.get('complete') or meta.get('status') is not None:raise ValueError('GET missing accepted body')
+                    if c==captures[-1]:
+                        if read(d/'RESULT.json')['status']!='PARTIAL':raise ValueError('GET missing terminal body')
+                    else:
+                        phase=(folder/'PHASES.ndjson').read_bytes()
+                        nxt=captures[captures.index(c)+1]
+                        if (c['failureKind']!='timeout' or c['native']['timeout'] is not True or c['integrityFailure']
+                            or c['retryOrdinal']!=0 or nxt['retryOrdinal']!=1 or nxt['attempt']!=n+1
+                            or any(nxt[k]!=c[k] for k in ('method','url','label','nonce'))
+                            or len(phase)!=c['phaseBytes'] or hashlib.sha256(phase).hexdigest()!=c['phaseSha256']
+                            or not any(json.loads(line).get('event')=='dns_tcp_tls_connection_begin' for line in phase.splitlines())):
+                            raise ValueError('GET missing-body retry lineage')
                     raw=b''
                 if hashlib.sha256(raw).hexdigest()!=c['bodySha256'] or len(raw)!=c['bodyBytes'] or not c['closed']:
                     raise ValueError('GET saved body/closure')
