@@ -178,6 +178,34 @@ export function referenceOnlyAdvance(a: ProductMetadata, b: ProductMetadata) {
     refs.some((r) => !a.readings.some((old) => same(old, r)))
   );
 }
+/** Independent source clocks may advance below another feed's global maximum.
+ * Callers must still verify the stored certificate, exact writer step/reader
+ * ancestry, pair and complete history/quiet-field preservation.
+ */
+export function independentReadingAdvance(a: ProductMetadata, b: ProductMetadata) {
+  const advance =
+    b.marketStorage &&
+    (a.marketStorage
+      ? b.marketStorage.sequence > a.marketStorage.sequence
+      : b.marketStorage.sequence === 1 && b.marketStorage.seedMetadataSha256 === hash(stable(a)));
+  if (!advance || !same(a.pair, b.pair) || a.readings.length !== b.readings.length) return false;
+  let changed = false;
+  for (const old of a.readings) {
+    const next = b.readings.find((r) => readingKey(r) === readingKey(old));
+    if (!next) return false;
+    if (same(old, next)) continue;
+    const delta = Date.parse(next.observedAtUtc) - Date.parse(old.observedAtUtc);
+    if (
+      delta < 0 ||
+      (delta === 0 &&
+        !sameTimeReferenceAdvance(old, next) &&
+        !(old.kind === 'trade' && next.kind === 'trade' && compareTrades(next, old) > 0))
+    )
+      return false;
+    changed = true;
+  }
+  return changed;
+}
 const dateOf = (time: string) => new Date(time).toISOString().slice(0, 10);
 export const activeMarketBound = 512;
 const dayKey = (r: ProductReading) => dateOf(r.observedAtUtc) + ':' + readingKey(r);
@@ -809,9 +837,33 @@ export function preserveMarketHistory(
 ) {
   const replacement = closeTransition(previous, next.metadata.benchmarkHistory);
   if (next.metadata.readings.some((r) => r.kind === 'trade')) {
-    for (let i = 0; i < previous.rows.length; i++)
-      if (previous.rows[i]!.dateUtc <= '2026-10-09' && !same(previous.rows[i], next.rows[i]))
-        throw Error('TRADE_EXISTING_CELL_CHANGED');
+    // Trade history stays fixed. A separately qualified ledger append may fill
+    // only its previously null payout cells; all ledger checks below still apply.
+    const payout = new Set([
+      'payoutHearts',
+      'payoutStakeShares',
+      'dailyPayoutHEX',
+      'payoutPerTshareHEX',
+    ]);
+    const from =
+      2498 + (previous.metadata.ledgerSegments ?? []).reduce((n, s) => n + s.words.length, 0);
+    const through =
+      2498 + (next.metadata.ledgerSegments ?? []).reduce((n, s) => n + s.words.length, 0);
+    for (let i = 0; i < previous.rows.length; i++) {
+      const old = previous.rows[i]!;
+      if (old.dateUtc > '2026-10-09') continue;
+      for (const [key, value] of Object.entries(old))
+        if (
+          next.rows[i]?.[key as keyof ProductRow] !== value &&
+          !(
+            payout.has(key) &&
+            value === null &&
+            old.contractDay >= from &&
+            old.contractDay < through
+          )
+        )
+          throw Error('TRADE_EXISTING_CELL_CHANGED');
+    }
     assertTradeIdentities([...marketEvidence(previous.metadata), ...marketEvidence(next.metadata)]);
   }
   if (

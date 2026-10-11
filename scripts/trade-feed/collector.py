@@ -36,7 +36,7 @@ def collect(session,exchange,clock=time.monotonic,sleep=time.sleep,outcomes=None
     exchange('markets',0,markets=markets)
     anchor=clock();previous_end=anchor;outcomes=[] if outcomes is None else outcomes
     profile=getattr(session,'profile',trade_profile({}))
-    for cycle,offset in enumerate(range(0,profile['cycles']*60,60),1):
+    for cycle,offset in enumerate(range(0,profile['cycles']*60,60),profile.get('first_cycle',1)):
         slot=anchor+offset
         if previous_end>slot or (profile['maximum_start_lag'] is not None and clock()>slot+profile['maximum_start_lag']):
             reason='Preceding cycle occupied scheduled slot' if previous_end>slot else 'Scheduled dispatch more than five seconds late'

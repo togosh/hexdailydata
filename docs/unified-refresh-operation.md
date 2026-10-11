@@ -111,3 +111,62 @@ local previews passed with one shared base admission and zero provider calls.
 The new held-export proof covers sequence 44, not the original discarded held
 sequence 28. Saved prices now correctly read stale. The earlier public trial
 keeps its original partial result; no continuous-operation claim follows.
+
+## Finite five-feed offline profile (Integration R2)
+
+The existing `scripts/refresh-data.mjs` accepts the versioned
+`config/unified-refresh-offline.json` profile. This profile is OFFLINE ONLY;
+it cannot satisfy any legacy or new public admission. No-argument, plan and
+status commands make no requests or base admissions. No scheduler is installed.
+
+```powershell
+node scripts/refresh-data.mjs plan config/unified-refresh-offline.json
+node scripts/refresh-data.mjs run-fixture 'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\unified-refresh-integration-r2' mixed
+node scripts/refresh-data.mjs status '<the new fixture root printed by run-fixture>'
+```
+
+`run-fixture` requires the task's verified synthetic template and exact small
+saved contract-code fixture. It creates a new collision-free root for each
+invocation and refuses reuse. Those inputs are in the return's fixture catalog;
+neither genuine sequence 44 nor a production participant base is opened. The
+unchanged real adapters, journal, certificates, paired publication and API are
+used with small empty immutable bases and injected network-denied responses.
+Compatibility counts in the fake base descriptor are fixture metadata, not
+loaded records or population evidence.
+
+Jobs have finite due offsets, deadlines, permitted lateness and smaller-than-
+existing per-family ceilings. They derive each predecessor from the selected
+pair. Only one native child and one physical transport slot exist. GET, GraphQL
+and RPC liabilities reconcile separately into one parent. A missed job is
+recorded, never queued for catch-up. A known closed exhausted feed is disabled;
+unknown native/accounting/publication state stops the operation and retains its
+exclusion. Closing messages bind the bounded saved result; the 32 KiB IPC limit
+has not increased. Known-owner synthetic interruptions use only the existing
+recovery contract after native closure is established.
+
+Actual mixed testing exposed two pre-existing product-policy conflicts:
+
+- The trade preservation guard freezes all pre-October-10 cells, including null
+  payout cells that a separately qualified day-2502 ledger append needs to fill.
+- Product writer and standalone reader global-time guards reject a separately
+  advancing feed when another feed still has the newest observation timestamp.
+
+The owner explicitly extended scope for the narrow `market.ts` and `store.ts`
+correction, generated output and focused tests. Only previously null payout cells
+inside a validated contiguous ledger append may fill. A certified independently
+advancing feed may retain the global maximum observation time. Writer-step,
+reader-ancestry, pairing, quiet/history, decoding and source-time guards remain.
+`policy-payout` and `policy-clock` now exercise those real writer/reader paths and
+their negative cases; original failing receipts remain in the task return.
+
+The mixed fixture exercises 16 trade slots and all other families on one API,
+crosses midnight and 300-second aging, performs two payout appends, transitions
+the participant pair, skips a delayed job and rotates the actual journal. Held
+exports remain exact, lagging readers adopt coherently, and normal Daily and
+protected CSV agree. This is bounded synthetic qualification, not a provider
+cadence, scale or permanent-service claim.
+
+The `NEXT_PUBLIC_QUALIFICATION.md` in the return is a proposal only. A later
+public scope must bind current targets, runtime, per-feed budgets, source times
+and reviewed closure before execution. All old grants remain consumed. Saved
+sequence 44, the completed offline recovery, main and parked work are unchanged.

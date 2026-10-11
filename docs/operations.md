@@ -645,3 +645,12 @@ external bases remain read-only references. Its immediate rollback is sequence
 43, not the separate original HDS rollback. Current saved quotes are stale.
 The original public trial and partial archive are unchanged; no new acquisition
 or permanent service was started.
+
+Unified Refresh Integration R2 adds a finite **offline-only** five-feed profile
+to the existing coordinator; see `docs/unified-refresh-operation.md` for plan,
+fixture and saved-status commands. The two product-policy incompatibilities
+documented there received an explicit narrow owner scope extension and correction;
+the original failed fixtures are preserved. The real mixed synthetic schedule and
+focused accounting/native-closure/refusal checks qualify offline behavior. Genuine
+sequence 44 is read-only, no new bases or network are admitted, and this profile
+does not authorize a public run or operating service.

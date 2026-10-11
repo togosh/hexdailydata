@@ -47,9 +47,10 @@ def retryable(row, require_network_begin=False):
     return row['closed'] and not row.get('integrityFailure') and (timeout or (row['complete'] and row['status'] in (502,503,504)))
 
 class Session:
-    def __init__(self,root,admission,runner=worker_native,mono=time.monotonic,wall=time.time,sleep=time.sleep):
+    def __init__(self,root,admission,runner=worker_native,mono=time.monotonic,wall=time.time,sleep=time.sleep,parent_accounting=None):
         self.root=Path(root);self.a=admission;self.runner=runner;self.mono=mono;self.wall=wall;self.sleep=sleep
         self.cookie_policy = cookie_policy(admission)
+        self.parent_accounting=parent_accounting
         self.profile = trade_profile(admission)
         if self.cookie_policy and runner is worker_native:
             validate_authority(admission, self.root)
@@ -94,6 +95,7 @@ class Session:
                 save(folder/'LOCAL_SKIP.json',{'status':'SKIPPED','reason':'Durable preparation exceeded slot','networkRequests':0,'reservedBytes':RESERVATION,'reservedObjects':20000})
                 raise SlotMissed('Slot start expired after reservation')
             spawn_at=self.wall()
+            if self.parent_accounting:self.parent_accounting.before(q)
             life=self.runner([sys.executable,'-I','-S',str(W/'scripts/trade-feed/worker.py'),str(request)],env,27,2)
             for key,limit in [('stdout',2048),('stderr',2048),('interrupted',1024)]:
                 if life.get(key):life[key]=str(life[key]).encode()[:limit].decode(errors='ignore')
@@ -164,6 +166,7 @@ class Session:
             if closed:s['pending']=None;self.last=self.mono()
             else:s['closureKnown']=False
             self.persist()
+            if self.parent_accounting:self.parent_accounting.after(row)
             if not closed:raise ValueError('Native closure unknown')
             if life['seconds']>30:raise ValueError('Request lifecycle deadline')
             if integrity:raise ValueError('Integrity: '+integrity)

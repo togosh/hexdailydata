@@ -6,6 +6,7 @@ KEYS=['attempts','extraAttempts','graphAttempts','rpcAttempts','graphExtras','rp
 ORDER=['market-1','gas-1','protocol-1','participants-1','market-2','gas-2','protocol-2']
 def read(p):return json.loads(Path(p).read_bytes())
 def audit(root):
+    if (Path(root)/'PROFILE.json').exists():return audit_profile(root)
     root=Path(root);totals={k:0 for k in KEYS};eps=[0,0];last=None;jobs=[]
     for name in ORDER:
         d=root/name
@@ -43,6 +44,61 @@ def audit(root):
         raise ValueError('Final parent reconciliation')
     if final['lastClosedMonotonic']!=last:raise ValueError('Final closure lineage')
     return dict(status='PASS',savedOnly=True,jobs=jobs,totals=totals,rpcEndpointAttempts=eps)
+
+def audit_profile(root):
+    """Reconcile every native subdivision in finite order, including GET liabilities."""
+    root=Path(root);profile=read(root/'PROFILE.json');keys=KEYS+['httpAttempts','httpExtras','httpChargedBytes']
+    totals={k:0 for k in keys};eps=[0,0];last=None;jobs=[]
+    for j in profile['jobs']:
+        d=root/j['id']
+        if not d.exists():continue
+        a=read(d/'ADMISSION.json');state=read(d/'ACCOUNTING.json');native=read(d/'NATIVE_CLOSURE.json')
+        ah=hashlib.sha256((d/'ADMISSION.json').read_bytes()).hexdigest()
+        if (a['job']!=j['id'] or not a['synthetic'] or a['parentMode']!='OFFLINE_ONLY'
+            or native['exit']['code'] not in (0,2) or native['exit']['signal'] or native['killed']
+            or native['closureProtocolError'] or not native['resultMatchesClosedMessage'] or not native['accountingMatchesResult']):
+            raise ValueError('Profile native identity/closure')
+        trade=j['family']=='trade'
+        captures=state['requests'] if trade else [json.loads(x) for x in (d/'LEDGER.jsonl').read_bytes().splitlines()]
+        clock=None if trade else read(d/'JOB_CLOCK.json')
+        for c in captures:
+            n=c['attempt'];p='http' if trade else 'rpc' if c['job']['kind']=='rpc' else 'graph'
+            if trade:
+                reservation=read(d/'parent-reservations'/f'{n:05d}.json')
+                if reservation['jobAdmissionSha256']!=ah:raise ValueError('GET exclusive child binding')
+                start=reservation['pending']['startedMonotonic']
+                charged=2162688;objects=c['chargedObjects'];observed=c['wireBytes']+c['headerBytes']
+                returned=objects if c['complete'] else 0;unknown=0 if c['complete'] else objects;extra=c['retryOrdinal']
+                raw=(d/f'{n:02d}/response.body').read_bytes()
+                if hashlib.sha256(raw).hexdigest()!=c['bodySha256'] or len(raw)!=c['bodyBytes'] or not c['closed']:
+                    raise ValueError('GET saved body/closure')
+                for key in keys:
+                    inc={'attempts':1,'httpAttempts':1,'extraAttempts':extra,'httpExtras':extra,'httpChargedBytes':charged,'chargedEntities':20000}.get(key,0)
+                    if reservation[key]!=totals[key]+inc:raise ValueError('GET reservation lineage '+key)
+            else:
+                before=read(d/'combined-reservations'/f'{n:05d}.json')['parentBefore']
+                if before['jobAdmissionSha256']!=ah or any(before[k]!=totals[k] for k in keys) or before['pending'] is not None:
+                    raise ValueError('POST preceding counter/admission lineage')
+                start=clock['startedMonotonic']+c['startOffsetSeconds'];charged=c['chargedBytes'];objects=c['chargedEntities']
+                observed=c['responseBytes'];returned=c['entityRows'] or 0;unknown=0 if c['entityRows'] is not None else c['job']['maxRows'];extra=int(c['retry'])
+                if p=='rpc':eps[c['job']['endpoint']]+=1
+            if last is not None and start+.002<last+1:raise ValueError('Global post-closure pacing')
+            totals['attempts']+=1;totals[p+'Attempts']+=1;totals['extraAttempts']+=extra;totals[p+'Extras']+=extra
+            totals[p+'ChargedBytes']+=charged;totals['chargedEntities']+=objects;totals['observedBytes']+=observed
+            totals['returnedEntities']+=returned;totals['unknownEntityReservations']+=unknown
+            settled=read(d/'parent-settlements'/f'{n:05d}.json')
+            if any(settled[k]!=totals[k] for k in keys) or settled['rpcEndpointAttempts']!=eps or settled['pending'] is not None:
+                raise ValueError('Profile settlement lineage')
+            for k,v in profile['parent'].items():
+                if k in totals and totals[k]>v:raise ValueError('Parent ceiling '+k)
+            if sum(totals[k+'ChargedBytes'] for k in ('graph','rpc','http'))>profile['parent']['chargedBytes']:raise ValueError('Combined byte ceiling')
+            last=settled['lastClosedMonotonic']
+        if len(captures)!=state['attempts'] or state['status']!='CLOSED' or state['pending'] is not None:raise ValueError('Profile child closure')
+        jobs.append(dict(job=j['id'],attempts=len(captures)))
+    final=read(root/'PARENT_ACCOUNTING.json')
+    if any(final[k]!=v for k,v in totals.items()) or final['status']!='CLOSED' or final['pending'] is not None or final['lastClosedMonotonic']!=last:
+        raise ValueError('Profile final reconciliation')
+    return dict(status='PASS',synthetic=True,savedOnly=True,totals=totals,jobs=jobs,externalRequests=0)
 if __name__=='__main__':
     import sys
     print(json.dumps(audit(sys.argv[1]),indent=2))

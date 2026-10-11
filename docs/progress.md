@@ -1016,3 +1016,14 @@ This continuation used zero public requests and one admission (12 cumulative),
 at sequence 44; it cannot recreate the original discarded sequence-28 export.
 All owned processes closed. This is an offline recovery/final-proof PASS, not a
 rewrite of the original coordinator outcome or indefinite service approval.
+
+Unified Refresh Integration R2: implemented the finite offline five-feed profile
+at the existing coordinator boundary, including separate GET/GraphQL/RPC parent
+charging, native saved-result closure and actual paired-storage failure paths.
+Genuine sequence 44 and main remain unchanged; no public requests/base admissions.
+Actual mixed execution exposed two product-policy conflicts (late payout null
+fills and independently advancing feed clocks). The owner explicitly authorized
+the two narrow product-file corrections. Actual 16-slot mixed publication,
+payout append, participant pairing, retention, held/lagging readers and protected
+CSV passed offline; focused negative guards and original failures are retained.
+This grants no public run, genuine-data mutation or service installation.

@@ -1,6 +1,9 @@
 """The recovery has a separate exact grant; the old trade wire ID is unchanged."""
 from pathlib import Path
 from durable import strict_json, digest
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'unified-refresh'))
+from offline_profile import admitted as unified_admitted
 
 AUTHORITY = 'HDD-BTC-ETH-CURRENT-REFERENCE-TRANSPORT-RECOVERY-R1'
 ROOT = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1')
@@ -19,6 +22,15 @@ OPERATING_PROFILE_ID = 'operating-16-slots-v1'
 
 def trade_profile(admission):
     """Exact versioned authority, never caller-supplied arbitrary allowances."""
+    if unified_admitted(admission):
+        if (admission.get('family')!='trade' or admission.get('tradeProfileId')!='unified-single-pair-1'
+                or type(admission.get('tradeSlot')) is not int or not 1<=admission['tradeSlot']<=16
+                or admission.get('responseCookiePolicyId')!=COOKIE_POLICY):
+            raise ValueError('Exact offline single-pair profile')
+        b=admission['allowance'];seconds=min(600,b['seconds'])
+        return dict(cycles=1,logical=3,attempts=min(6,b['httpAttempts']),extras=min(3,b['httpExtras']),seconds=seconds,dispatch=min(535,seconds-65),
+                    charged_bytes=min(6*2162688,b['httpChargedBytes']),objects=min(120000,b['chargedEntities']),maximum_start_lag=None,
+                    first_cycle=admission['tradeSlot'])
     if admission.get('authorityTaskId') in OPERATING_AUTHORITIES:
         if (admission.get('tradeProfileId') != OPERATING_PROFILE_ID
                 or admission.get('job') != 'trade-operating-16-slots'
@@ -37,6 +49,9 @@ def trade_profile(admission):
 def cookie_policy(admission):
     """Only the exact new authority can select the receiving-only amendment."""
     selected = admission.get('responseCookiePolicyId')
+    if unified_admitted(admission):
+        trade_profile(admission)
+        return COOKIE_POLICY
     if admission.get('authorityTaskId') in (COOKIE_AUTHORITY, *OPERATING_AUTHORITIES):
         if selected != COOKIE_POLICY:
             raise ValueError('Exact response cookie policy required')

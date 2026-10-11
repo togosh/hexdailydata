@@ -1,4 +1,10 @@
-import { publishTrade, admitTradeMarkets, tradeProfile, isOperatingAuthority, operatingR2TaskId } from './trade-publication.mjs';
+import {
+  publishTrade,
+  admitTradeMarkets,
+  tradeProfile,
+  isOperatingAuthority,
+  operatingR2TaskId,
+} from './trade-publication.mjs';
 // One explicit finite operation. Status/default makes no provider requests.
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
@@ -14,6 +20,14 @@ import { publishGas } from './gas-publication.mjs';
 import { publishProtocol } from './protocol-publication.mjs';
 import { publishReference } from './reference-publication.mjs';
 import { prepareWindow } from './participant-refresh.mjs';
+import {
+  profileId,
+  profileTask,
+  validateProfile,
+  unifiedAdmission,
+  clipJob,
+  counterKeys,
+} from './unified-refresh/profile.mjs';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const taskId = 'HDD-UNIFIED-REFRESH-OPERATION-R1';
 const order = [
@@ -113,7 +127,22 @@ export async function runUnified({
   registry,
   onAdoption,
   spawnChild = spawn,
+  profile,
+  clock,
+  onFact,
+  signal,
 }) {
+  if (profile !== undefined)
+    return runFiniteProfile({
+      taskRoot,
+      registry,
+      onAdoption,
+      spawnChild,
+      profile,
+      clock,
+      onFact,
+      signal,
+    });
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
   const pre = await read(preflightPath),
@@ -351,6 +380,358 @@ export async function runUnified({
   return result;
 }
 
+// Versioned finite extension of this coordinator. There is deliberately no live
+// admission for this profile: a future public packet must supply a new binding.
+async function runFiniteProfile({
+  taskRoot,
+  registry,
+  onAdoption,
+  spawnChild,
+  profile,
+  clock,
+  onFact,
+  signal,
+}) {
+  profile = validateProfile(profile);
+  taskRoot = resolve(taskRoot);
+  if (spawnChild === spawn || clock?.mode !== 'SYNTHETIC' || typeof onFact !== 'function')
+    throw Error('OFFLINE_NATIVE_FIXTURE_REQUIRED');
+  for (const root of [registry.root, registry.productDaily.root])
+    if (!root.startsWith(taskRoot + '\\')) throw Error('TASK_OWNERSHIP');
+  const output = join(taskRoot, 'session'),
+    lockPath = join(registry.productDaily.root, 'MARKET_REFRESH.lock');
+  await absent(output);
+  await absent(join(taskRoot, 'SYNTHETIC_ADMISSION.json'));
+  await guardStorage(taskRoot, 128 * 1024 ** 2);
+  const profileSha256 = sha(canonical(profile));
+  const runtimeFiles = {},
+    sourceFiles = {};
+  for (const folder of [
+    'unified-refresh',
+    'trade-feed',
+    'market-refresh',
+    'gas-feed',
+    'protocol-feed',
+    'participant-refresh',
+  ])
+    for (const e of await readdir(join(repo, 'scripts', folder), { withFileTypes: true }))
+      if (e.isFile() && /\.(py|json|mjs)$/.test(e.name)) {
+        const path = `scripts/${folder}/${e.name}`,
+          hash = sha(await readFile(join(repo, path)));
+        runtimeFiles[path] = hash;
+        if (folder === 'market-refresh' && /\.(py|json)$/.test(e.name)) sourceFiles[e.name] = hash;
+      }
+  const lock = await open(lockPath, 'wx');
+  let settled = false,
+    outstanding = false,
+    failure = null,
+    cancelled = false;
+  const began = clock.now(),
+    wall = Date.now() / 1000,
+    contexts = {},
+    disabled = new Set(),
+    jobs = [];
+  let parent = {
+    status: 'ADMITTED',
+    mode: 'SYNTHETIC_OFFLINE_PROFILE',
+    taskId: profileTask,
+    profileSha256,
+    limits: profile.parent,
+    startedAt: new Date().toISOString(),
+    networkSessionCount: 0,
+    networkClosesAtUnixSeconds: wall + profile.parent.seconds - profile.parent.closingReserve,
+    job: null,
+    pending: null,
+    lastClosedMonotonic: null,
+    attempts: 0,
+    extraAttempts: 0,
+    ...Object.fromEntries(counterKeys.map((k) => [k, 0])),
+    observedBytes: 0,
+    returnedEntities: 0,
+    unknownEntityReservations: 0,
+    rpcEndpointAttempts: [0, 0],
+  };
+  try {
+    await lock.writeFile(canonical({ taskId: profileTask, pid: process.pid, output }));
+    await lock.sync();
+    await mkdir(output);
+    await durableJson(join(taskRoot, 'SYNTHETIC_ADMISSION.json'), {
+      taskId: profileTask,
+      profileSha256,
+      output,
+      synthetic: true,
+      networkSessionCount: 0,
+      publicAuthority: false,
+    });
+    await durableJson(join(output, 'PROFILE.json'), profile);
+    await durableJson(join(output, 'PARENT_ACCOUNTING.json'), parent);
+    for (const j of profile.jobs) {
+      const nextDue =
+        profile.jobs.find((x) => x.enabled && x.family === j.family && x.due > j.due)?.due ?? null;
+      const skip = async (reason) => {
+        const fact = {
+          job: j.id,
+          family: j.family,
+          status: 'SKIPPED',
+          reason,
+          nextDue,
+          due: j.due,
+          deadline: j.deadline,
+          elapsed: clock.now() - began,
+          closure: 'NO_CHILD',
+          publication: 'retained',
+          operating: await onFact(j, null),
+        };
+        jobs.push(fact);
+        await durableJson(join(output, j.id + '-SKIPPED.json'), fact);
+      };
+      if (signal?.aborted) {
+        cancelled = true;
+        await skip('CANCELLED');
+        break;
+      }
+      if (!j.enabled || disabled.has(j.family)) {
+        await skip(!j.enabled ? 'DISABLED_PROFILE' : 'DISABLED_CLOSED_FAILURE');
+        continue;
+      }
+      await clock.sleep(Math.max(0, j.due - (clock.now() - began)));
+      const elapsed = clock.now() - began;
+      if (elapsed > j.due + j.maximumStartLag || elapsed >= j.deadline) {
+        await skip('MISSED_DUE_NO_CATCHUP');
+        continue;
+      }
+      parent = await read(join(output, 'PARENT_ACCOUNTING.json'));
+      if (parent.pending !== null || parent.status !== 'ADMITTED')
+        throw Error('PARENT_NOT_SETTLED');
+      const allowance = clipJob(profile, j, parent, elapsed);
+      if (!allowance) {
+        await skip('PARENT_OR_CLOSURE_RESERVE');
+        continue;
+      }
+      await registry.refresh(undefined, true);
+      if (registry.status().error) throw Error('SELECTOR_INTEGRITY');
+      const held = registry.capture();
+      let initial;
+      try {
+        initial = admittedInputs(held, !contexts.gas, contexts);
+      } finally {
+        held.release();
+      }
+      if (
+        j.family === 'participants' &&
+        !(
+          j.target > initial.participant.base.number &&
+          j.target - initial.participant.base.number <= 4096
+        )
+      )
+        throw Error('BOUNDED_PARTICIPANT_TARGET');
+      const jobRoot = join(output, j.id);
+      await mkdir(jobRoot);
+      await mkdir(join(jobRoot, 'temp'));
+      const a = {
+        task: j.family === 'trade' ? 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2' : taskId,
+        authorityTaskId: profileTask,
+        unifiedProfileId: profileId,
+        parentMode: 'OFFLINE_ONLY',
+        parentProfileSha256: profileSha256,
+        synthetic: true,
+        combinedJob: true,
+        job: j.id,
+        family: j.family,
+        jobRoot,
+        nonce: randomBytes(32).toString('hex'),
+        initial,
+        allowance,
+        parentLimits: profile.parent,
+        runtimeFiles,
+        sourceFiles,
+        startedAtUnixSeconds: Date.now() / 1000,
+        deadlineUnixSeconds: Date.now() / 1000 + allowance.seconds,
+        networkClosesAtUnixSeconds:
+          Date.now() / 1000 + allowance.seconds - allowance.publication - 5,
+        networkSeconds: allowance.seconds - allowance.publication - 5,
+        ...(j.family === 'trade'
+          ? {
+              tradeSlot: j.tradeSlot,
+              tradeProfileId: 'unified-single-pair-1',
+              responseCookiePolicyId: 'ignore-response-cookies-no-replay-v1',
+            }
+          : {}),
+      };
+      if (j.family === 'participants') {
+        const plan = {
+          combinedJob: true,
+          unifiedProfileId: profileId,
+          base: initial.participant.base,
+          finalTarget: { number: j.target, hash: null, timestamp: null },
+          windows: [
+            {
+              fromInclusive: initial.participant.base.number,
+              targetNumber: j.target,
+              newBlockSpan: j.target - initial.participant.base.number,
+            },
+          ],
+          graphqlEndpoint: 'https://graph.pulsechain.com/subgraphs/name/pulsechain/hex',
+          rpcEndpoints: ['https://rpc.pulsechain.com/', 'https://rpc-pulsechain.g4mm4.io/'],
+          deployment: 'QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw',
+          maximumBlockStep: 4096,
+          limits: { maximumAffectedParents: 50000, maximumChangedKeysPerFamily: 100000 },
+        };
+        await durableJson(join(jobRoot, 'PLAN.json'), plan);
+        a.planSha256 = sha(await readFile(join(jobRoot, 'PLAN.json')));
+        await durableJson(join(jobRoot, 'FRONTIER.json'), {
+          completedWindows: 0,
+          pin: plan.base,
+          generation: initial.participant.generation,
+          productVersion: initial.product.version,
+        });
+      }
+      await durableJson(join(jobRoot, 'ADMISSION.json'), a);
+      parent.job = j.id;
+      parent.jobAdmissionSha256 = sha(await readFile(join(jobRoot, 'ADMISSION.json')));
+      await replace(join(output, 'PARENT_ACCOUNTING.json'), parent);
+      outstanding = true;
+      const result = await runJob({
+        jobRoot,
+        admission: a,
+        registry,
+        onAdoption,
+        spawnChild,
+        deadline: performance.now() + allowance.seconds * 1000,
+        syncFixtureClock: (t) => clock.synchronize(t),
+        signal,
+        storageGuard: (n = 0) => guardStorage(taskRoot, 128 * 1024 ** 2 + n),
+      });
+      outstanding = false;
+      await durableJson(join(jobRoot, 'COORDINATOR_RESULT.json'), result);
+      if (result.publicationUncertain) {
+        // Native closure is already proved by runJob. Only the current in-memory
+        // owner may use the existing exact intent/certificate recovery contract.
+        const intent = await lstat(join(registry.root, 'INTENT.json')).catch((e) => {
+          if (e.code === 'ENOENT') return null;
+          throw e;
+        });
+        if (intent) {
+          const recovery = await registry.recoverOwnedFailure();
+          await durableJson(join(jobRoot, 'OWNED_RECOVERY.json'), recovery);
+        } else {
+          await registry.refresh(undefined, true);
+          if (registry.status().error) throw Error('PUBLICATION_UNKNOWN');
+          await durableJson(join(jobRoot, 'COMMITTED_REPORTING_FAILURE.json'), {
+            error: result.error,
+            selected: await read(join(registry.root, 'CURRENT.json')),
+            sourceClosed: true,
+          });
+        }
+        throw Error('PUBLICATION_FAILURE_SETTLED_NO_RESTART:' + result.error);
+      }
+      if (result.status === 'QUALIFIED_ADOPTED' && ['market', 'gas'].includes(j.family)) {
+        const p = result.publications[0].publication;
+        contexts[j.family] = j.family === 'market' ? p.pin : p.contextualBlock;
+      }
+      const sampled =
+        j.family === 'trade' && !result.error && result.source.status === 'COMPLETE_SAMPLED_JOB';
+      const exhausted =
+        result.source.feedLocalClosedExhaustion === true && result.publications.length === 0;
+      if (result.status !== 'QUALIFIED_ADOPTED' && !sampled && !exhausted)
+        throw Error(result.error ?? result.source.failure ?? 'UNQUALIFIED_JOB');
+      if (exhausted) {
+        const selected = await read(join(registry.root, 'CURRENT.json'));
+        if (
+          !same(selected.product, initial.product) ||
+          selected.generation !== initial.participant.generation
+        )
+          throw Error('FAILED_JOB_SELECTION_CHANGED');
+        disabled.add(j.family);
+      }
+      const fact = {
+        job: j.id,
+        family: j.family,
+        due: j.due,
+        nextDue,
+        deadline: j.deadline,
+        startedOffset: elapsed,
+        completedOffset: clock.now() - began,
+        delayedSeconds: Math.max(0, elapsed - j.due),
+        status: exhausted ? 'CLOSED_FEED_DISABLED' : sampled ? 'SAMPLED' : 'QUALIFIED',
+        closure: 'KNOWN',
+        publication: result.publications.some((x) => x.publication.changed)
+          ? 'changed'
+          : result.publications.length
+            ? 'no-op'
+            : 'retained',
+        result,
+        operating: await onFact(j, result),
+      };
+      jobs.push(fact);
+      await durableJson(join(jobRoot, 'JOB_RESULT.json'), fact);
+    }
+  } catch (e) {
+    failure = String(e);
+  } finally {
+    try {
+      parent = await read(join(output, 'PARENT_ACCOUNTING.json'));
+      const pending = [];
+      for (const [root, names] of [
+        [registry.root, ['INTENT.json', 'SELECTION.lock', 'RECOVERY.lock']],
+        [
+          registry.productDaily.root,
+          [
+            'PENDING.json',
+            'COMMITTED.json',
+            'WRITER.lock',
+            'SELECTION.lock',
+            'RETENTION_PENDING.json',
+          ],
+        ],
+      ])
+        for (const n of names)
+          if (
+            await lstat(join(root, n)).catch((e) => {
+              if (e.code === 'ENOENT') return null;
+              throw e;
+            })
+          )
+            pending.push(join(root, n));
+      if (outstanding || parent.pending !== null || parent.status !== 'ADMITTED' || pending.length)
+        throw Error('PARENT_CLOSURE_OR_PUBLICATION_UNKNOWN:' + pending.join(','));
+      parent.status = 'CLOSED';
+      parent.closedAt = new Date().toISOString();
+      parent.elapsedSeconds = clock.now() - began;
+      parent.closureReason = failure ?? 'Finite offline profile exhausted; no automatic restart';
+      await replace(join(output, 'PARENT_ACCOUNTING.json'), parent);
+      settled = true;
+    } catch (e) {
+      failure ??= String(e);
+      parent.status = 'CLOSURE_OR_PUBLICATION_UNKNOWN';
+      try {
+        await replace(join(output, 'PARENT_ACCOUNTING.json'), parent);
+      } catch (writeError) {
+        failure += '; ' + String(writeError);
+      }
+    } finally {
+      await lock.close();
+    }
+    if (settled) await unlink(lockPath);
+  }
+  const result = {
+    status:
+      failure || disabled.size ? 'PARTIAL' : cancelled ? 'CANCELLED' : 'OFFLINE_PROFILE_COMPLETE',
+    jobs,
+    failure,
+    accounting: parent,
+    disabledFeeds: [...disabled],
+    networkClosureKnown: settled,
+    networkSessionCount: 0,
+    synthetic: true,
+    publicAuthority: false,
+    noAutomaticRestart: true,
+    indexer: 'PARKED',
+  };
+  await durableJson(join(output, 'RESULT.json'), result);
+  return result;
+}
+
 export async function runJob({
   jobRoot,
   admission,
@@ -360,7 +741,10 @@ export async function runJob({
   spawnChild,
   deadline,
   storageGuard = async () => {},
+  syncFixtureClock,
+  signal,
 }) {
+  const unified = unifiedAdmission(admission);
   const reference = admission.family === 'reference',
     trade = admission.family === 'trade';
   const profile = trade ? tradeProfile(admission) : null;
@@ -413,11 +797,12 @@ export async function runJob({
     retainedTrades = [];
   let marketsAccepted = false,
     publicationUncertain = false;
-  let begunCycle = 0;
+  const firstCycle = unified && trade ? admission.tradeSlot : 1;
+  let begunCycle = firstCycle - 1;
   const serviceChecks = [];
   const observeSlot = async (cycle, sourceResult, publicationResult, check) => {
     if (!operating) return null;
-    if (serviceChecks.some(s => s.cycle === cycle)) throw Error('DUPLICATE_SERVICE_SLOT');
+    if (serviceChecks.some((s) => s.cycle === cycle)) throw Error('DUPLICATE_SERVICE_SLOT');
     check();
     const selected = registry.productDaily.capture();
     let service;
@@ -425,13 +810,24 @@ export async function runJob({
       service = await onSlot({ cycle, sourceResult, publicationResult, selected }, check);
       check();
     } catch (e) {
-      const failed = { cycle, sourceResult, publicationResult, selectedVersion: selected.version,
-        service: { status: 'ERROR', error: String(e) } };
+      const failed = {
+        cycle,
+        sourceResult,
+        publicationResult,
+        selectedVersion: selected.version,
+        service: { status: 'ERROR', error: String(e) },
+      };
       await durableJson(join(jobRoot, `SERVICE_${cycle}.json`), failed);
       serviceChecks.push(failed);
       throw e;
     }
-    const receipt = { cycle, sourceResult, publicationResult, selectedVersion: selected.version, service };
+    const receipt = {
+      cycle,
+      sourceResult,
+      publicationResult,
+      selectedVersion: selected.version,
+      service,
+    };
     await durableJson(join(jobRoot, `SERVICE_${cycle}.json`), receipt);
     serviceChecks.push(receipt);
     return service;
@@ -483,6 +879,8 @@ export async function runJob({
     })());
   let expired;
   const cutoff = new Promise((resolve) => {
+    if (signal?.aborted) return resolve(null);
+    signal?.addEventListener('abort', () => resolve(null), { once: true });
     expired = setTimeout(() => resolve(null), Math.max(1, deadline - performance.now() - 2000));
   });
   const active = () =>
@@ -502,15 +900,29 @@ export async function runJob({
       .then(async () => {
         if (line.length > 32768) throw Error('IPC_BOUND');
         const m = JSON.parse(line);
+        if (unified && m.type !== 'closed') {
+          if (
+            typeof syncFixtureClock !== 'function' ||
+            !Number.isFinite(m.syntheticClockUnixSeconds)
+          )
+            throw Error('SYNTHETIC_CLOCK_REQUIRED');
+          syncFixtureClock(m.syntheticClockUnixSeconds);
+        }
         if (m.type === 'closed') {
           if (closedMessage) {
-            closureProtocolError = trade && admission.authorityTaskId === operatingR2TaskId;
+            closureProtocolError =
+              unified || (trade && admission.authorityTaskId === operatingR2TaskId);
             throw Error('DUPLICATE_CLOSURE');
           }
-          if (trade && admission.authorityTaskId === operatingR2TaskId) {
-            if (Object.keys(m).sort().join(',') !== 'resultBytes,resultSha256,type' ||
-                !Number.isSafeInteger(m.resultBytes) || m.resultBytes < 1 || m.resultBytes > 524288 ||
-                typeof m.resultSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(m.resultSha256))
+          if (unified || (trade && admission.authorityTaskId === operatingR2TaskId)) {
+            if (
+              Object.keys(m).sort().join(',') !== 'resultBytes,resultSha256,type' ||
+              !Number.isSafeInteger(m.resultBytes) ||
+              m.resultBytes < 1 ||
+              m.resultBytes > 524288 ||
+              typeof m.resultSha256 !== 'string' ||
+              !/^[a-f0-9]{64}$/.test(m.resultSha256)
+            )
               throw Error('CLOSED_RESULT_IDENTITY');
             const report = await open(join(jobRoot, 'RESULT.json'), 'r');
             try {
@@ -521,7 +933,9 @@ export async function runJob({
               if (bytesRead !== m.resultBytes || sha(raw.subarray(0, bytesRead)) !== m.resultSha256)
                 throw Error('CLOSED_RESULT_HASH');
               closedMessage = JSON.parse(raw.subarray(0, bytesRead));
-            } finally { await report.close(); }
+            } finally {
+              await report.close();
+            }
           } else closedMessage = m.result;
           return;
         }
@@ -538,15 +952,22 @@ export async function runJob({
           ...(admission.family === 'participants' ? { window: m.window } : { cycle: m.cycle }),
         };
         if (m.type === 'markets' && trade) {
-          if (marketsAccepted || begunCycle || m.cycle !== 0) throw Error('TRADE_MARKETS_ORDER');
+          if (marketsAccepted || begunCycle !== firstCycle - 1 || m.cycle !== 0)
+            throw Error('TRADE_MARKETS_ORDER');
           await admitTradeMarkets(jobRoot, m.markets);
           marketsAccepted = true;
         } else if (m.type === 'skipped' && trade) {
           if (
             !marketsAccepted ||
-            !(m.cycle === begunCycle + 1 || (operating && m.cycle === begunCycle && outcomes.length === begunCycle - 1)) ||
+            !(
+              m.cycle === begunCycle + 1 ||
+              (operating && m.cycle === begunCycle && outcomes.length === begunCycle - firstCycle)
+            ) ||
             m.cycle > profile.cycles ||
-            !(outcomes.length === begunCycle || (operating && outcomes.length === begunCycle - 1 && m.cycle === begunCycle))
+            !(
+              outcomes.length === begunCycle - firstCycle + 1 ||
+              (operating && outcomes.length === begunCycle - firstCycle && m.cycle === begunCycle)
+            )
           )
             throw Error('TRADE_SKIP_ORDER');
           begunCycle = m.cycle;
@@ -559,7 +980,7 @@ export async function runJob({
               !marketsAccepted ||
               m.cycle !== begunCycle + 1 ||
               m.cycle > profile.cycles ||
-              outcomes.length !== begunCycle
+              outcomes.length !== begunCycle - firstCycle + 1
             )
               throw Error('TRADE_CYCLE_ORDER');
             begunCycle = m.cycle;
@@ -581,7 +1002,7 @@ export async function runJob({
           check();
           await durableJson(join(jobRoot, 'WINDOW_1_DRAFT.json'), draft);
         } else if (m.type === 'qualified') {
-          if (trade && (m.cycle !== begunCycle || outcomes.length !== begunCycle - 1))
+          if (trade && (m.cycle !== begunCycle || outcomes.length !== begunCycle - firstCycle))
             throw Error('TRADE_QUALIFICATION_ORDER');
           if (reference && (m.cycle !== begunCycle || publications.length !== begunCycle - 1))
             throw Error('REFERENCE_QUALIFICATION_ORDER');
@@ -601,7 +1022,12 @@ export async function runJob({
             if (!publication.qualified) {
               outcomes.push({ cycle: m.cycle, status: 'UNQUALIFIED', publication });
               await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
-              await observeSlot(m.cycle, publication.sourceResult ?? 'UNQUALIFIED', 'retained', check);
+              await observeSlot(
+                m.cycle,
+                publication.sourceResult ?? 'UNQUALIFIED',
+                'retained',
+                check,
+              );
               check();
               child.stdin.write(JSON.stringify({ ...answer, outcome: 'UNQUALIFIED' }) + '\n');
               return;
@@ -667,7 +1093,12 @@ export async function runJob({
           }
           check();
           const adoption = operating
-            ? await observeSlot(m.cycle, 'QUALIFIED', publication.changed ? 'changed' : 'unchanged', check)
+            ? await observeSlot(
+                m.cycle,
+                'QUALIFIED',
+                publication.changed ? 'changed' : 'unchanged',
+                check,
+              )
             : await onAdoption(selected, check, admission.job);
           check();
           const receipt = { selected, publication, adoption, adoptedAt: new Date().toISOString() };
@@ -688,7 +1119,9 @@ export async function runJob({
       .catch((e) => {
         error ??= String(e);
         publicationUncertain ||=
-          Boolean(e.publicationUncertain) || String(e).includes('PUBLICATION_UNKNOWN');
+          Boolean(e.publicationUncertain) ||
+          String(e).includes('PUBLICATION_UNKNOWN') ||
+          (unified && String(e) === 'Error: PRODUCT_PUBLICATION_UNCERTAIN_LOCK_RETAINED');
         if (child.stdin.writable)
           child.stdin.write(JSON.stringify({ ok: false, reason: error }) + '\n');
       });
@@ -703,14 +1136,35 @@ export async function runJob({
       throw Error('PUBLICATION_SETTLEMENT_UNKNOWN');
     clearTimeout(expired);
     lines.close();
-    const source = await read(join(jobRoot, 'RESULT.json')),
+    let source, accounting;
+    try {
+      source = await read(join(jobRoot, 'RESULT.json'));
       accounting = await read(join(jobRoot, 'ACCOUNTING.json'));
-    if (trade && admission.authorityTaskId === operatingR2TaskId)
+    } catch (e) {
+      if (unified)
+        await durableJson(join(jobRoot, 'NATIVE_CLOSURE.json'), {
+          exit,
+          killed,
+          closureProtocolError,
+          ipcError: error,
+          closedMessageReceived: Boolean(closedMessage),
+          savedResultUnavailable: true,
+          stderr,
+          error: String(e),
+        });
+      throw Error('SAVED_CLOSURE_UNAVAILABLE: ' + String(e) + ' ' + stderr);
+    }
+    if (unified || (trade && admission.authorityTaskId === operatingR2TaskId))
       await durableJson(join(jobRoot, 'NATIVE_CLOSURE.json'), {
-        exit, killed, closureProtocolError, ipcError: error, closedMessageReceived: Boolean(closedMessage),
+        exit,
+        killed,
+        closureProtocolError,
+        ipcError: error,
+        closedMessageReceived: Boolean(closedMessage),
         resultMatchesClosedMessage: same(source, closedMessage),
         accountingMatchesResult: same(source.accounting, accounting),
-        accountingClosed: accounting.status === 'CLOSED', pending: accounting.pending,
+        accountingClosed: accounting.status === 'CLOSED',
+        pending: accounting.pending,
       });
     if (
       killed ||
@@ -723,41 +1177,72 @@ export async function runJob({
       accounting.pending !== null
     )
       throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + (error ?? stderr));
-    if (error && !trade) throw Error(error);
+    if (unified) {
+      const closedAt = Date.parse(accounting.closedAtUtc ?? accounting.closedAt) / 1000;
+      if (!Number.isFinite(closedAt)) throw Error('SYNTHETIC_CLOSING_CLOCK_REQUIRED');
+      syncFixtureClock(closedAt);
+    }
+    if (error && !trade && !unified) throw Error(error);
     const qualified =
       !error &&
       exit.code === 0 &&
       source.status.startsWith('COMPLETE_') &&
-      publications.length === (trade ? profile.cycles : reference ? 2 : 1);
+      publications.length === (unified ? 1 : trade ? profile.cycles : reference ? 2 : 1);
     if (operating) {
       // Terminal closure never restarts acquisition. The active failed slot may
       // receive one safe local read; all later original slots remain explicit gaps.
       for (let cycle = 1; cycle <= profile.cycles; cycle++) {
-        if (serviceChecks.some(s => s.cycle === cycle)) continue;
+        if (serviceChecks.some((s) => s.cycle === cycle)) continue;
         if (cycle === begunCycle && !publicationUncertain && performance.now() < deadline - 2000) {
           try {
             await observeSlot(cycle, 'TERMINAL_ERROR', 'retained_or_refused', () => {
               if (performance.now() >= deadline - 2000) throw Error('SERVICE_CLOSURE_DEADLINE');
             });
             continue;
-          } catch (e) { error ??= String(e); if (serviceChecks.some(s => s.cycle === cycle)) continue; }
+          } catch (e) {
+            error ??= String(e);
+            if (serviceChecks.some((s) => s.cycle === cycle)) continue;
+          }
         }
-        const missing = { cycle, sourceResult: 'UNRUN_TERMINAL', publicationResult: 'retained_or_unknown',
-          selectedVersion: registry.status().productVersion, service: { status: 'NOT_MEASURED' } };
+        const missing = {
+          cycle,
+          sourceResult: 'UNRUN_TERMINAL',
+          publicationResult: 'retained_or_unknown',
+          selectedVersion: registry.status().productVersion,
+          service: { status: 'NOT_MEASURED' },
+        };
         await durableJson(join(jobRoot, `SERVICE_${cycle}.json`), missing);
         serviceChecks.push(missing);
       }
     }
-    const changed = publications.filter(p => p.publication.changed);
-    const separated = changed.some(a => changed.some(b =>
-      Date.parse(b.publication.publishedAt) - Date.parse(a.publication.publishedAt) >= 300000));
-    const servingPass = operating && !error && !publicationUncertain && source.cycles.length === profile.cycles &&
-      serviceChecks.length === profile.cycles && serviceChecks.every(s => s.service.status === 'FRESH') && separated;
+    const changed = publications.filter((p) => p.publication.changed);
+    const separated = changed.some((a) =>
+      changed.some(
+        (b) =>
+          Date.parse(b.publication.publishedAt) - Date.parse(a.publication.publishedAt) >= 300000,
+      ),
+    );
+    const servingPass =
+      operating &&
+      !error &&
+      !publicationUncertain &&
+      source.cycles.length === profile.cycles &&
+      serviceChecks.length === profile.cycles &&
+      serviceChecks.every((s) => s.service.status === 'FRESH') &&
+      separated;
     return {
-      status: operating ? (servingPass ? 'FINITE_SERVING_PASS' : 'PARTIAL') : qualified ? 'QUALIFIED_ADOPTED' : 'PARTIAL',
+      status: operating
+        ? servingPass
+          ? 'FINITE_SERVING_PASS'
+          : 'PARTIAL'
+        : qualified
+          ? 'QUALIFIED_ADOPTED'
+          : 'PARTIAL',
       source,
-      ...(operating ? { serviceChecks, servingPass, changedPublicationsSeparatedBy300Seconds: separated } : {}),
-      ...(trade ? { outcomes, error, publicationUncertain } : {}),
+      ...(operating
+        ? { serviceChecks, servingPass, changedPublicationsSeparatedBy300Seconds: separated }
+        : {}),
+      ...(trade || unified ? { outcomes, error, publicationUncertain } : {}),
       publications,
       exit,
       stderr,
@@ -771,6 +1256,18 @@ export async function runJob({
 }
 
 export async function main(args = process.argv.slice(2)) {
+  if (args[0] === 'plan' && args.length === 2) {
+    console.log(JSON.stringify(validateProfile(await read(resolve(args[1]))), null, 2));
+    return 0;
+  }
+  if (args[0] === 'status' && args.length === 2) {
+    console.log(JSON.stringify(await read(join(resolve(args[1]), 'session/RESULT.json')), null, 2));
+    return 0;
+  }
+  if (args[0] === 'run-fixture' && (args.length === 2 || args.length === 3)) {
+    const { runFixture } = await import('../tests/unified-refresh/operating-fixture.mjs');
+    return await runFixture(resolve(args[1]), args[2] ?? 'mixed', runUnified);
+  }
   if (args.length !== 3 || args[0] !== 'run') {
     console.log(
       'No provider requests. Explicit run TASK_ROOT PREFLIGHT is the finite operating entry; every consumed parent stays closed.',

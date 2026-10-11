@@ -52,7 +52,12 @@ def run_window(s, index, base, exchange, seen):
     opening = rpc('target-open', w['targetNumber'])
     target = agree(opening, plan['finalTarget'] if index == len(plan['windows']) and plan['finalTarget'].get('hash') is not None else None)
     if plan.get('combinedJob'):
-        if len(plan['windows']) != 1 or target['number'] != 27754425:
+        unified=False
+        if plan.get('unifiedProfileId') is not None:
+            from offline_profile import admitted
+            unified=admitted(getattr(s,'admission',{})) and plan['unifiedProfileId']==s.admission['unifiedProfileId']
+            if not unified:raise Stop('Offline participant profile authority')
+        if len(plan['windows']) != 1 or (target['number'] != w['targetNumber'] if unified else target['number'] != 27754425):
             raise Stop('Combined exact participant target')
         plan['finalTarget'] = target
         s.storage.json(s.root / 'RESOLVED_PLAN.json', plan)

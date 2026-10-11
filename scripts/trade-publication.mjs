@@ -10,20 +10,50 @@ import {
 } from '../dist/services/product-daily/trades.js';
 import { marketEvidence } from '../dist/services/product-daily/market.js';
 import { durableJson } from './market-refresh.mjs';
+import { unifiedAdmission } from './unified-refresh/profile.mjs';
 
 export const operatingTaskId = 'HDD-BTC-ETH-OPERATING-REFRESH-R1';
 export const operatingR2TaskId = 'HDD-BTC-ETH-OPERATING-REFRESH-R2';
 export const isOperatingAuthority = (id) => [operatingTaskId, operatingR2TaskId].includes(id);
 export const operatingProfileId = 'operating-16-slots-v1';
-const legacyProfile = Object.freeze({ cycles: 3, logical: 7, attempts: 14, extras: 7,
-  seconds: 600, dispatch: 535, chargedBytes: 32 * 1024 ** 2, objects: 280000 });
-const operatingProfile = Object.freeze({ cycles: 16, logical: 33, attempts: 66, extras: 33,
-  seconds: 1200, dispatch: 1135, chargedBytes: 144 * 1024 ** 2, objects: 1320000 });
+const legacyProfile = Object.freeze({
+  cycles: 3,
+  logical: 7,
+  attempts: 14,
+  extras: 7,
+  seconds: 600,
+  dispatch: 535,
+  chargedBytes: 32 * 1024 ** 2,
+  objects: 280000,
+});
+const operatingProfile = Object.freeze({
+  cycles: 16,
+  logical: 33,
+  attempts: 66,
+  extras: 33,
+  seconds: 1200,
+  dispatch: 1135,
+  chargedBytes: 144 * 1024 ** 2,
+  objects: 1320000,
+});
 export function tradeProfile(admission) {
+  if (unifiedAdmission(admission))
+    return {
+      cycles: 16,
+      logical: 3,
+      attempts: 6,
+      extras: 3,
+      seconds: 600,
+      dispatch: 535,
+      chargedBytes: 6 * 2162688,
+      objects: 120000,
+    };
   if (isOperatingAuthority(admission.authorityTaskId)) {
-    if (admission.tradeProfileId !== operatingProfileId ||
-        admission.job !== 'trade-operating-16-slots' ||
-        admission.responseCookiePolicyId !== 'ignore-response-cookies-no-replay-v1')
+    if (
+      admission.tradeProfileId !== operatingProfileId ||
+      admission.job !== 'trade-operating-16-slots' ||
+      admission.responseCookiePolicyId !== 'ignore-response-cookies-no-replay-v1'
+    )
       throw Error('EXACT_OPERATING_PROFILE');
     return operatingProfile;
   }
@@ -31,15 +61,28 @@ export function tradeProfile(admission) {
   return legacyProfile;
 }
 export function validateOperatingScope(scope) {
-  const n = scope.network, p = operatingProfile;
-  const expected = { maximumPhysicalAttempts: p.attempts, maximumLogicalRequests: p.logical,
-    normalGetCount: p.logical, maximumTotalRetries: p.extras,
-    maximumSessionSecondsIncludingClosure: p.seconds, maximumNewDispatchOffsetSeconds: p.dispatch,
-    maximumChargedBytes: p.chargedBytes, maximumParsedObjectsAcrossResponses: p.objects,
-    perAttemptDurableReservationBytes: 2162688, minimumCompleteAttemptAndClosureReserveSeconds: 65 };
-  if (!isOperatingAuthority(scope.taskId) || Object.entries(expected).some(([k,v]) => n[k] !== v) ||
-      n.plan.cycles !== 16 || n.plan.maximumOrdinaryStartLagSeconds !== 5 ||
-      JSON.stringify(n.plan.cycleOffsetsSeconds) !== JSON.stringify(Array.from({length:16},(_,i)=>i*60)))
+  const n = scope.network,
+    p = operatingProfile;
+  const expected = {
+    maximumPhysicalAttempts: p.attempts,
+    maximumLogicalRequests: p.logical,
+    normalGetCount: p.logical,
+    maximumTotalRetries: p.extras,
+    maximumSessionSecondsIncludingClosure: p.seconds,
+    maximumNewDispatchOffsetSeconds: p.dispatch,
+    maximumChargedBytes: p.chargedBytes,
+    maximumParsedObjectsAcrossResponses: p.objects,
+    perAttemptDurableReservationBytes: 2162688,
+    minimumCompleteAttemptAndClosureReserveSeconds: 65,
+  };
+  if (
+    !isOperatingAuthority(scope.taskId) ||
+    Object.entries(expected).some(([k, v]) => n[k] !== v) ||
+    n.plan.cycles !== 16 ||
+    n.plan.maximumOrdinaryStartLagSeconds !== 5 ||
+    JSON.stringify(n.plan.cycleOffsetsSeconds) !==
+      JSON.stringify(Array.from({ length: 16 }, (_, i) => i * 60))
+  )
     throw Error('OPERATING_SCOPE_LIMITS');
   return p;
 }
@@ -47,31 +90,52 @@ export function validateOperatingScope(scope) {
 /** Check an ordinary response against its selected view and measured wall clock. */
 export function checkTradeService(body, selected, requestStartedAt, responseEndedAt) {
   const served = Date.parse(body.servedAtUtc);
-  if (body.datasetVersion !== selected.version || !Number.isFinite(served) ||
-      served < Math.floor(requestStartedAt / 1000) * 1000 || served > responseEndedAt)
+  if (
+    body.datasetVersion !== selected.version ||
+    !Number.isFinite(served) ||
+    served < Math.floor(requestStartedAt / 1000) * 1000 ||
+    served > responseEndedAt
+  )
     throw Error('SERVICE_SELECTION_OR_CLOCK');
-  for (const asset of ['BTC','ETH']) {
-    const reading = selected.metadata.readings.find(r => r.kind === 'trade' && r.asset === asset);
+  for (const asset of ['BTC', 'ETH']) {
+    const reading = selected.metadata.readings.find((r) => r.kind === 'trade' && r.asset === asset);
     const state = body.freshness?.[asset];
     const key = asset === 'BTC' ? 'btcPriceUsd' : 'ethPriceUsd';
     const elapsed = reading ? (requestStartedAt - Date.parse(reading.observedAtUtc)) / 1000 : null;
     const age = elapsed === null ? null : Math.max(0, Math.floor(elapsed));
-    if (!reading || body[key] !== reading.value || state?.observedAtUtc !== reading.observedAtUtc ||
-        state.ageSeconds !== age || state.staleAfterSeconds !== 300 ||
-        state.status !== (elapsed >= 0 && elapsed <= 300 ? 'fresh' : 'stale'))
+    if (
+      !reading ||
+      body[key] !== reading.value ||
+      state?.observedAtUtc !== reading.observedAtUtc ||
+      state.ageSeconds !== age ||
+      state.staleAfterSeconds !== 300 ||
+      state.status !== (elapsed >= 0 && elapsed <= 300 ? 'fresh' : 'stale')
+    )
       throw Error('SERVICE_VALUE_TIME_OR_AGE');
   }
-  return { status: ['BTC','ETH'].every(a=>body.freshness[a].status==='fresh') ? 'FRESH' : 'STALE',
-    datasetVersion: body.datasetVersion, btcPriceUsd: body.btcPriceUsd, ethPriceUsd: body.ethPriceUsd,
-    servedAtUtc: body.servedAtUtc, BTC: body.freshness.BTC, ETH: body.freshness.ETH,
-    requestStartedAtUtc: new Date(requestStartedAt).toISOString(), responseEndedAtUtc: new Date(responseEndedAt).toISOString() };
+  return {
+    status: ['BTC', 'ETH'].every((a) => body.freshness[a].status === 'fresh') ? 'FRESH' : 'STALE',
+    datasetVersion: body.datasetVersion,
+    btcPriceUsd: body.btcPriceUsd,
+    ethPriceUsd: body.ethPriceUsd,
+    servedAtUtc: body.servedAtUtc,
+    BTC: body.freshness.BTC,
+    ETH: body.freshness.ETH,
+    requestStartedAtUtc: new Date(requestStartedAt).toISOString(),
+    responseEndedAtUtc: new Date(responseEndedAt).toISOString(),
+  };
 }
 
 export async function capturedBody(output, binding, label) {
   const admissionRaw = await readFile(join(output, 'ADMISSION.json'));
   if (admissionRaw.length > 262144) throw Error('TRADE_ADMISSION_BOUND');
-  const admission = JSON.parse(admissionRaw), profile = tradeProfile(admission);
-  if (!Number.isInteger(binding?.attempt) || binding.attempt < 1 || binding.attempt > profile.attempts)
+  const admission = JSON.parse(admissionRaw),
+    profile = tradeProfile(admission);
+  if (
+    !Number.isInteger(binding?.attempt) ||
+    binding.attempt < 1 ||
+    binding.attempt > profile.attempts
+  )
     throw Error('TRADE_CAPTURE_ATTEMPT');
   const dir = join(output, String(binding.attempt).padStart(2, '0'));
   const p = join(dir, 'response.body');
@@ -175,7 +239,9 @@ export async function publishTrade(store, output, message, active, publish, reta
       qualified: false,
       cycle: c,
       reason: 'Empty or stale valid pair; last-good retained',
-      ...(profile.cycles === 16 ? { sourceResult: !btc.selected || !eth.selected ? 'EMPTY' : 'STALE' } : {}),
+      ...(profile.cycles === 16
+        ? { sourceResult: !btc.selected || !eth.selected ? 'EMPTY' : 'STALE' }
+        : {}),
       previous: before.version,
     };
   const auditRaw = await readFile(join(output, auditName));

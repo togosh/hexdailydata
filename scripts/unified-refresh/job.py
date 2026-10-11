@@ -13,6 +13,8 @@ def main(offline_fixture=False):
     from durable import strict_json,digest,save,utc
     from capture_client import Session,WorkerTransport
     from combined import TASK,Combined,ParentTransport,read,atomic
+    from offline_profile import admitted,closed_frame
+    unified=admitted(a)
     if a['task']!=TASK or a['jobRoot']!=str(root) or (a.get('synthetic') and not offline_fixture):
         raise ValueError('Exact public subdivision admission')
     for name,h in a['runtimeFiles'].items():
@@ -40,7 +42,7 @@ def main(offline_fixture=False):
     a['deadlineMonotonic']=now+a['deadlineUnixSeconds']-wall
     a['networkDeadline']=min(parent['networkDeadline'],now+a['networkClosesAtUnixSeconds']-wall)
     a['networkSeconds']=a['networkDeadline']-now
-    s=Bound(root,None,plan) if family=='participants' else Bound(root,None)
+    s=Bound(root,None,plan,synthetic=offline_fixture) if family=='participants' else Bound(root,None,synthetic=offline_fixture)
     s.configure(a,root.parent)
     if offline_fixture:s.state['mode']='SYNTHETIC_OFFLINE_TEST';s.persist()
     save(root/'JOB_CLOCK.json',dict(startedMonotonic=s.started,networkSeconds=s.network_end,
@@ -58,6 +60,7 @@ def main(offline_fixture=False):
         allowance=min(180 if family=='participants' else 30,deadline-s.clock(),s.deadline-s.clock())
         if allowance<=0:raise ValueError('No publication time')
         message['expiresAtUnixSeconds']=time.time()+allowance
+        if unified:message['syntheticClockUnixSeconds']=time.time()
         print(json.dumps(message),flush=True)
         try:answer=incoming.get(timeout=allowance)
         except queue.Empty:raise ValueError('Publication acknowledgement unknown')
@@ -78,7 +81,7 @@ def main(offline_fixture=False):
         s.close(result.get('failure','Combined job closed'))
         result.update(accounting=s.state,parentSubdivision=True,networkSessionCount=0,synthetic=bool(a.get('synthetic')),noAutomaticRestart=True,indexer='PARKED')
         s.storage.json(root/'RESULT.json',result)
-        print(json.dumps({'type':'closed','result':result}),flush=True)
+        print(json.dumps(closed_frame(root,result) if unified else {'type':'closed','result':result}),flush=True)
     return 0 if result['status'].startswith('COMPLETE_') else 2
 
 if __name__=='__main__':raise SystemExit(main())

@@ -1,0 +1,490 @@
+// Real coordinator / native collectors / paired storage / API. No real bases or network.
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { resolve, join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
+import net from 'node:net';
+import dns from 'node:dns';
+import {
+  SavedSourceGenerations,
+  canonical,
+  sha,
+} from '../../dist/services/source-update/generation.js';
+import { ParticipantRegistry, participantPair } from '../../dist/services/source-update/refresh.js';
+import { ACCEPTED } from '../../dist/contracts/saved-generation.js';
+import {
+  createMarketStorage,
+  auditJournal,
+  verifyMarketCertificate,
+} from '../../dist/services/product-daily/storage.js';
+import { productFiles } from '../../dist/services/product-daily/project.js';
+import { ProductDailyStore } from '../../dist/services/product-daily/store.js';
+import { checkGuardCorrections } from './guard-checks.mjs';
+const W = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const T = 'C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\unified-refresh-integration-r2';
+const read = async (p) => JSON.parse(await fs.readFile(p));
+const put = async (p, v) => fs.writeFile(p, JSON.stringify(v, null, 2) + '\n', { flag: 'wx' });
+
+export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
+  assert.equal(resolve(taskRoot), T);
+  assert(
+    [
+      'mixed',
+      'hash',
+      'duplicate',
+      'exit',
+      'missing',
+      'budget',
+      'cancel',
+      'cancel-active',
+      'exhaust',
+      'before-product',
+      'after-product',
+      'participant-stage',
+      'acknowledgement',
+      'unknown-product',
+      'policy-clock',
+      'policy-payout',
+    ].includes(mode),
+  );
+  const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
+  await fs.mkdir(join(root, 'evidence'));
+  process.env.HDD_TASK_ROOT = root;
+  const NativeDate = Date,
+    realNow = performance.now.bind(performance);
+  let now = Date.parse('2026-10-10T23:53:00Z');
+  globalThis.Date = class extends NativeDate {
+    constructor(...a) {
+      super(...(a.length ? a : [now]));
+    }
+    static now() {
+      return now;
+    }
+  };
+  Object.defineProperty(performance, 'now', { configurable: true, value: () => now });
+  const deny = () => {
+    throw Error('DENIED_EXTERNAL_NETWORK');
+  };
+  const originals = {
+    connect: net.Socket.prototype.connect,
+    lookup: dns.lookup,
+    promiseLookup: dns.promises.lookup,
+    fetch: globalThis.fetch,
+  };
+  dns.promises.lookup = deny;
+  dns.lookup = (host, options, callback) => {
+    if (host !== '127.0.0.1') return deny();
+    const cb = typeof options === 'function' ? options : callback;
+    queueMicrotask(() =>
+      options?.all ? cb(null, [{ address: '127.0.0.1', family: 4 }]) : cb(null, '127.0.0.1', 4),
+    );
+  };
+  globalThis.fetch = deny;
+  net.Socket.prototype.connect = function (...args) {
+    const o = args[0];
+    if (typeof o !== 'object' || o.host !== '127.0.0.1') return deny();
+    return originals.connect.apply(this, args);
+  };
+  const clock = {
+    mode: 'SYNTHETIC',
+    now: () => now / 1000,
+    sleep: async (n) => {
+      now += n * 1000;
+    },
+    synchronize: (t) => {
+      // JSON source seconds can carry microseconds; Date.parse closes at ms.
+      assert(t * 1000 >= now - 2);
+      now = Math.max(now, t * 1000);
+    },
+  };
+  const h = sha('tiny immutable synthetic bases; no production records');
+  const empty = (name) => ({
+    root: join(root, name),
+    lowerBound: async () => 0,
+    rowAt: async () => null,
+    close: async () => {},
+    byAddress: async () => null,
+    byNumericId: async () => null,
+  });
+  const base = new SavedSourceGenerations(
+    join(root, 'base-overlay'),
+    empty('holders'),
+    empty('stakes'),
+  );
+  for (const name of ['base-overlay', 'holders', 'stakes']) await fs.mkdir(join(root, name));
+  base.selected = ACCEPTED.generation;
+  base.overlay = {
+    holders: new Map(),
+    stakes: new Map(),
+    addresses: new Map(),
+    numeric: new Map(),
+    owners: new Map(),
+    newHolders: [],
+    newStakes: [],
+    index: '',
+    files: {},
+  };
+  base.consecutive = {
+    generation: ACCEPTED.generation,
+    deployment: ACCEPTED.deployment,
+    target: { number: 27754425, hash: '0x' + sha('synthetic base pin'), timestamp: 1791560565 },
+    // Required descriptor compatibility counters, not loaded/source-census rows.
+    familyVersions: { tokenHolders: h, stakeStarts: h },
+    holderRecordCount: 664435,
+    stakeStartRecordCount: 954715,
+    updateFileSha256: h,
+    updateSha256: h,
+  };
+  let writer,
+    reader,
+    lagging,
+    held,
+    heldExport,
+    app,
+    children = new Set();
+  const starts = [],
+    facts = [];
+  let listenerStart = null,
+    localRequests = 0,
+    observedLocalBytes = 0,
+    chargedLocalBytes = 0;
+  const receipt = {
+    synthetic: true,
+    root,
+    mode,
+    externalRequests: 0,
+    genuineBaseAdmissions: 0,
+    seedInitializations: 0,
+    networkDenied: true,
+    baseSeam: 'Two empty immutable bases, real SavedSourceGenerations consecutiveFork',
+    cases: [],
+  };
+  try {
+    const template = await read(join(T, 'fixtures/template.json'));
+    template.metadata.pair = participantPair(base);
+    const store = await createMarketStorage(join(root, 'product'), productFiles(template));
+    const standalone = new ProductDailyStore(store.root, template.metadata.pair);
+    await standalone.load();
+    let beforePublication = standalone.capture();
+    writer = await ParticipantRegistry.initialize(join(root, 'participants'), store, base);
+    if (
+      [
+        'before-product',
+        'after-product',
+        'participant-stage',
+        'acknowledgement',
+        'unknown-product',
+      ].includes(mode)
+    ) {
+      const publish = writer.publishProduct.bind(writer);
+      writer.publishProduct = (u, options) =>
+        publish(u, {
+          ...options,
+          fault: async (phase) => {
+            if (mode === 'unknown-product' && phase === 'before-product') {
+              await put(join(store.root, 'PENDING.json'), { syntheticUnknown: true });
+              throw Error('SYNTHETIC_UNKNOWN_PRODUCT');
+            }
+            if (phase === mode) throw Error('SYNTHETIC_INTERRUPTION_' + phase);
+          },
+        });
+    }
+    reader = await ParticipantRegistry.open(writer.root, store.root, base);
+    lagging = await ParticipantRegistry.open(writer.root, store.root, base);
+    held = lagging.capture();
+    const initialCsv = Buffer.from(held.product.csv),
+      initialRows = structuredClone(held.product.rows);
+    heldExport = lagging.productDaily.openExport(
+      held.product,
+      held.product.bundleId,
+      'daily',
+      new AbortController().signal,
+    );
+    const { fixture, auth } = await import('../market-feed/access-fixture.mjs');
+    app = await fixture({
+      participants: reader,
+      productDaily: reader.productDaily,
+      sourceGenerations: base,
+    });
+    const inject = app.inject.bind(app);
+    app.inject = async (...args) => {
+      assert(++localRequests <= 64, 'FIXTURE_LOCAL_REQUEST_BOUND');
+      const url = typeof args[0] === 'string' ? args[0] : args[0].url;
+      const reserve = url.includes('/downloads/') ? 5 * 1024 ** 2 : 128 * 1024;
+      chargedLocalBytes += reserve;
+      const response = await inject(...args);
+      observedLocalBytes += Buffer.byteLength(response.body);
+      assert(Buffer.byteLength(response.body) <= reserve, 'METHOD_RESPONSE_BOUND');
+      assert(observedLocalBytes <= 16 * 1024 ** 2, 'FIXTURE_LOCAL_BYTES');
+      return response;
+    };
+    await app.app.listen({ host: '127.0.0.1', port: 0 });
+    listenerStart = realNow();
+    const getLive = async () => {
+      assert(realNow() - listenerStart < 900000);
+      app.controls.now = now;
+      const r = await app.inject('/api/v2/live');
+      assert.equal(r.statusCode, 200, r.body.slice(0, 200));
+      const body = r.json();
+      return {
+        datasetVersion: body.datasetVersion,
+        servedAtUtc: body.servedAtUtc,
+        btcPriceUsd: body.btcPriceUsd,
+        ethPriceUsd: body.ethPriceUsd,
+        freshness: body.freshness,
+        participant: reader.status().generation,
+        readerStatus: reader.status(),
+        sequence: reader.productDaily.capture().metadata.marketStorage?.sequence,
+      };
+    };
+    const onAdoption = async (selected, check) => {
+      check();
+      const live = await getLive();
+      assert.equal(
+        live.datasetVersion,
+        selected.product.version,
+        JSON.stringify(live.readerStatus),
+      );
+      const after = writer.productDaily.capture();
+      if (mode === 'policy-clock' || mode === 'policy-payout') {
+        await standalone.refresh(now);
+        assert.equal(standalone.reloadStatus().error, null);
+        assert.equal(standalone.capture().version, after.version);
+        if (
+          (mode === 'policy-clock' && after.metadata.marketStorage.sequence === 2) ||
+          (mode === 'policy-payout' && after.metadata.coverage.ledgerDates === 2503)
+        )
+          receipt.guardChecks = await checkGuardCorrections(
+            store.root,
+            beforePublication,
+            after,
+            mode === 'policy-clock' ? 'clock' : 'payout',
+          );
+      }
+      beforePublication = after;
+      return live;
+    };
+    const profile = await read(join(W, 'config/unified-refresh-offline.json'));
+    if (mode === 'policy-clock') profile.jobs = profile.jobs.slice(0, 2);
+    else if (mode === 'policy-payout') profile.jobs = profile.jobs.slice(0, 4);
+    else if (mode !== 'mixed') profile.jobs = profile.jobs.slice(0, 1);
+    if (mode === 'budget') {
+      profile.jobs = [
+        profile.jobs[0],
+        {
+          ...structuredClone(profile.jobs[0]),
+          id: 'trade-2',
+          tradeSlot: 2,
+          due: 60,
+          deadline: 660,
+        },
+      ];
+      profile.parent.httpAttempts = 3;
+      profile.parent.httpExtras = 0;
+      profile.parent.httpChargedBytes = 3 * 2162688;
+      for (const j of profile.jobs)
+        Object.assign(j.bounds, { httpAttempts: 3, httpExtras: 0, httpChargedBytes: 3 * 2162688 });
+    }
+    if (mode === 'exhaust') {
+      const market = {
+        ...profile.jobs[0],
+        id: 'market-1',
+        family: 'market',
+        due: 0,
+        tradeSlot: undefined,
+        bounds: (await read(join(W, 'config/unified-refresh-offline.json'))).jobs.find(
+          (j) => j.family === 'market',
+        ).bounds,
+      };
+      profile.jobs = [
+        market,
+        { ...profile.jobs[0], due: 100, deadline: 700 },
+        { ...market, id: 'market-2', due: 160, deadline: 760 },
+      ];
+    }
+    const ac = new AbortController();
+    if (mode === 'cancel') ac.abort();
+    const spawnFixture = (_exe, args, options) => {
+      assert.equal(children.size, 0, 'ONE_NATIVE_CHILD');
+      const jobRoot = args.at(-1),
+        a = JSON.parse(readFileSync(join(jobRoot, 'ADMISSION.json')));
+      const selected = writer.productDaily.capture();
+      const config = {
+        codeBody: join(T, 'fixtures/protocol-code.json'),
+        ...(mode === 'policy-clock' && a.family === 'market' ? { marketLag: 220 } : {}),
+        ...(mode === 'cancel-active' ? { pauseBeforeCollect: true } : {}),
+        previousTrades: Object.fromEntries(
+          selected.metadata.readings.filter((r) => r.kind === 'trade').map((r) => [r.asset, r]),
+        ),
+        ...(a.tradeSlot === 2
+          ? { tradeMode: 'empty' }
+          : a.tradeSlot === 3
+            ? { tradeMode: 'repeat' }
+            : {}),
+        ...(a.tradeSlot === 6 ? { retry: true } : {}),
+        ...(a.tradeSlot === 16 ? { largeResult: true } : {}),
+        ...(a.family === 'participants' ? { delay: 400 } : {}),
+        ...(['hash', 'duplicate', 'exit', 'missing'].includes(mode)
+          ? { closure: mode, largeResult: true }
+          : {}),
+        ...(mode === 'exhaust' ? { exhaust: true } : {}),
+      };
+      writeFileSync(join(jobRoot, 'FIXTURE.json'), JSON.stringify(config) + '\n', { flag: 'wx' });
+      const child = spawn(
+        'python',
+        ['-I', '-S', join(W, 'tests/unified-refresh/operating-native.py'), jobRoot],
+        options,
+      );
+      if (mode === 'cancel-active') setTimeout(() => ac.abort(), 150);
+      children.add(child);
+      child.once('close', () => children.delete(child));
+      starts.push({ job: a.job, pid: child.pid, clock: now });
+      return child;
+    };
+    const result = await runUnified({
+      taskRoot: root,
+      registry: writer,
+      onAdoption,
+      spawnChild: spawnFixture,
+      profile,
+      clock,
+      onFact: async (j, r) => {
+        const f = await getLive();
+        facts.push({ job: j.id, ...f });
+        return f;
+      },
+      signal: ac.signal,
+    });
+    receipt.result = result;
+    receipt.starts = starts;
+    receipt.facts = facts;
+    if (mode === 'mixed') {
+      assert.equal(
+        result.status,
+        'OFFLINE_PROFILE_COMPLETE',
+        result.failure ?? JSON.stringify(result.jobs.at(-1)),
+      );
+      assert.equal(result.accounting.status, 'CLOSED');
+      assert.equal(children.size, 0);
+      await lagging.refresh(undefined, true);
+      assert.equal(lagging.status().error, null);
+      assert.equal(lagging.status().productVersion, writer.status().productVersion);
+      const final = lagging.productDaily.capture();
+      await verifyMarketCertificate(store.root, final);
+      const state = await read(join(store.root, 'STORAGE.json'));
+      assert(state.segment >= 1);
+      assert(state.generations.length <= 2);
+      assert.equal(sha(held.product.csv), sha(initialCsv));
+      const chunks = [];
+      for await (const b of heldExport.stream) chunks.push(b);
+      await heldExport.released;
+      assert.equal(sha(Buffer.concat(chunks)), sha(initialCsv));
+      heldExport = null;
+      // Exact fixed closes, original oracle values/times, and quiet ledger remain unchanged.
+      for (const old of initialRows.filter((r) => r.dateUtc <= '2026-10-09')) {
+        const row = final.rows.find((r) => r.dateUtc === old.dateUtc);
+        for (const k of ['btcPriceUsd', 'ethPriceUsd', 'btcRecordedAtUtc', 'ethRecordedAtUtc'])
+          assert.equal(row[k], old[k]);
+      }
+      const daily = await app.inject('/api/v2/daily?from=2026-10-10&to=2026-10-11&limit=10');
+      assert.equal(daily.statusCode, 200, daily.body);
+      const url = '/api/v2/downloads/' + final.bundleId + '/daily';
+      assert.notEqual((await app.inject(url)).statusCode, 200);
+      const csv = await app.inject({ url, headers: auth() });
+      assert.equal(csv.statusCode, 200, csv.body.slice(0, 200));
+      assert.equal(csv.body, final.csv.toString());
+      const head = await app.inject({ url, method: 'HEAD', headers: auth() });
+      assert.equal(head.statusCode, 200);
+      assert.equal(head.body, '');
+      assert(facts.some((f) => f.freshness.BTC.status === 'stale'));
+      assert.equal(facts.at(-1).freshness.BTC.status, 'fresh');
+      assert.equal(result.jobs.find((j) => j.job === 'trade-2').publication, 'retained');
+      assert.equal(result.jobs.find((j) => j.job === 'trade-3').publication, 'no-op');
+      for (const n of [4, 6, 16])
+        assert(await fs.stat(join(root, `session/trade-${n}/WINDOW_${n}_UPDATE.json`)));
+      assert((await fs.stat(join(root, 'session/trade-16/RESULT.json'))).size > 32768);
+      receipt.journal = await auditJournal(store.root);
+      receipt.storage = state;
+      receipt.cases = [
+        'five native collector families',
+        '16 finite trade slots',
+        'empty/no-op/stale/newer',
+        'UTC boundary',
+        'real paired participant transition',
+        'held export',
+        'lagging ordinary reader',
+        'retention/rotation',
+        'Daily/protected CSV/HEAD',
+        'large compact native closure',
+      ];
+    } else if (
+      ['hash', 'duplicate', 'exit', 'missing', 'unknown-product', 'cancel-active'].includes(mode)
+    ) {
+      assert.equal(result.status, 'PARTIAL');
+      assert.equal(result.networkClosureKnown, false);
+      assert(await fs.stat(join(store.root, 'MARKET_REFRESH.lock')));
+      receipt.cases = ['unknown closure retained/refused'];
+    } else {
+      assert.equal(result.accounting.status, 'CLOSED');
+      receipt.cases = [mode];
+      if (mode.startsWith('policy-')) {
+        assert.equal(result.status, 'OFFLINE_PROFILE_COMPLETE');
+        assert.equal(receipt.guardChecks?.status, 'PASS');
+      }
+      if (['before-product', 'after-product', 'participant-stage'].includes(mode))
+        assert(await fs.stat(join(root, 'session/trade-1/OWNED_RECOVERY.json')));
+      if (mode === 'acknowledgement')
+        assert(await fs.stat(join(root, 'session/trade-1/COMMITTED_REPORTING_FAILURE.json')));
+      if (mode === 'budget') {
+        assert.equal(starts.length, 1);
+        assert(result.jobs.some((j) => j.reason === 'PARENT_OR_CLOSURE_RESERVE'));
+      }
+      if (mode === 'cancel') assert.equal(starts.length, 0);
+      if (mode === 'exhaust') {
+        assert.deepEqual(result.disabledFeeds, ['market']);
+        assert.equal(starts.length, 2);
+      }
+    }
+    receipt.status = 'PASS';
+  } catch (e) {
+    receipt.status = 'FAIL';
+    receipt.failure = String(e);
+    receipt.stack = e.stack;
+    throw e;
+  } finally {
+    if (heldExport) {
+      heldExport.stream.destroy();
+      await heldExport.released.catch(() => {});
+    }
+    held?.release();
+    if (app) await app.close();
+    for (const child of children) {
+      const closed = new Promise((resolve) => child.once('close', resolve));
+      child.kill();
+      await closed;
+    }
+    await lagging?.close();
+    await reader?.close();
+    await writer?.close();
+    await base.close();
+    receipt.resources = {
+      nativeChildrenRemaining: children.size,
+      apiClosed: !app?.app.server.listening,
+      listenerMilliseconds: listenerStart === null ? 0 : realNow() - listenerStart,
+      localRequests,
+      observedLocalBytes,
+      chargedLocalBytes,
+    };
+    globalThis.Date = NativeDate;
+    Object.defineProperty(performance, 'now', { configurable: true, value: realNow });
+    net.Socket.prototype.connect = originals.connect;
+    dns.lookup = originals.lookup;
+    dns.promises.lookup = originals.promiseLookup;
+    globalThis.fetch = originals.fetch;
+    await put(join(root, 'evidence/RESULT.json'), receipt);
+    console.log(JSON.stringify({ status: receipt.status, root, mode, failure: receipt.failure }));
+  }
+  return 0;
+}

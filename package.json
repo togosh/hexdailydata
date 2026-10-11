@@ -38,7 +38,10 @@
     "test:web": "node scripts/test-web.mjs",
     "test:address": "node scripts/test-address.mjs",
     "test:charts": "node scripts/test-charts.mjs",
-    "test:integrated": "node scripts/test-integrated.mjs"
+    "test:integrated": "node scripts/test-integrated.mjs",
+    "refresh:plan": "node scripts/refresh-data.mjs plan config/unified-refresh-offline.json",
+    "refresh:fixture": "node scripts/refresh-data.mjs run-fixture",
+    "refresh:status": "node scripts/refresh-data.mjs status"
   },
   "dependencies": {
     "@fastify/static": "10.1.4",

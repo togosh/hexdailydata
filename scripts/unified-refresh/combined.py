@@ -9,6 +9,7 @@ from pathlib import Path
 from durable import strict_json, encode, digest, save, utc
 from capture_client import Stop, LimitReached
 from retry_policy import CLASSIFICATIONS
+from offline_profile import parent_limits
 
 TASK = 'HDD-UNIFIED-REFRESH-OPERATION-R1'
 MIB = 1024**2
@@ -114,8 +115,8 @@ class Combined:
         if parent['status']!='ADMITTED' or parent['pending'] is not None or parent['job']!=self.admission['job']:
             raise Stop('Parent inactive/unknown/foreign job')
         for k,n in reserved['counts'].items():
-            if parent[k]+n>GLOBAL[k]:raise LimitReached('Parent safety reserve '+k)
-        if any(parent['rpcEndpointAttempts'][i]+reserved['endpointAttempts'][i]>120 for i in (0,1)):
+            if parent[k]+n>parent_limits(self.admission,GLOBAL)[k]:raise LimitReached('Parent safety reserve '+k)
+        if any(parent['rpcEndpointAttempts'][i]+reserved['endpointAttempts'][i]>parent_limits(self.admission,{'rpcAttempts':240})['rpcAttempts']//2 for i in (0,1)):
             raise LimitReached('Parent endpoint safety reserve')
         self.storage.check(2*sum(reserved['counts'][k] for k in ('graphChargedBytes','rpcChargedBytes'))+262144,acquisition=True)
         receipt=dict(attempt=self.state['attempts']+1,query=q,ordinal=self.retry_ordinal,
@@ -188,7 +189,10 @@ class ParentTransport:
         if kind=='rpc':p['rpcEndpointAttempts'][q['endpoint']]+=1
         ordinal=s.retry_ordinal
         if ordinal:p['extraAttempts']+=1;p[kind+'Extras']+=1
-        if any(p[k]>GLOBAL[k] for k in GLOBAL) or p['attempts']>840 or max(p['rpcEndpointAttempts'])>120 or p['graphExtras']>60 or p['rpcExtras']>16:
+        limits=parent_limits(s.admission,{**GLOBAL,'attempts':840,'extras':76,'graphExtras':60,'rpcExtras':16,'chargedBytes':80*MIB})
+        if (any(p[k]>limits[k] for k in GLOBAL) or p['attempts']>limits['attempts']
+            or max(p['rpcEndpointAttempts'])>limits['rpcAttempts']//2 or p['graphExtras']>limits['graphExtras'] or p['rpcExtras']>limits['rpcExtras']
+            or p['extraAttempts']>limits['extras'] or sum(p.get(k+'ChargedBytes',0) for k in ('graph','rpc','http'))>limits['chargedBytes']):
             raise LimitReached('Parent physical ceiling')
         p['pending']=dict(job=s.admission['job'],attempt=n,requestPath=str(Path(request).resolve()),bytes=size,objects=q['maxRows'])
         atomic(s.parent_root/'PARENT_ACCOUNTING.json',p)
@@ -239,7 +243,7 @@ def audit_reservations(root,state,capacity):
             raise ValueError('Combined reservation arithmetic/time')
         reserve(q,r['controls'],c['retryIndex'],totals,limits,capacity,c['startOffsetSeconds'],a['networkSeconds'],r['closing'])
         for k,v in calculated['counts'].items():
-            if r['parentBefore'][k]+v>GLOBAL[k]:raise ValueError('Combined parent reservation')
+            if r['parentBefore'][k]+v>parent_limits(a,GLOBAL)[k]:raise ValueError('Combined parent reservation')
         if c['retryIndex'] and (not last or c['job']!=last['job'] or c['retryIndex']!=last['retryIndex']+1 or c['startOffsetSeconds']+.002<last['startOffsetSeconds']+last['durationSeconds']+WAITS[c['retryIndex']-1]):
             raise ValueError('Combined exact ordinal/wait')
         p=protocol(q);totals['attempts']+=1;totals[p+'Attempts']+=1;totals[p+'ChargedBytes']+=c['chargedBytes'];totals['chargedEntities']+=c['chargedEntities']
