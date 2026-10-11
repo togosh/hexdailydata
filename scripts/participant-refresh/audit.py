@@ -9,6 +9,16 @@ from retry_schedule import enabled, VERSION, WAITS, COUNTERS, ControlReplay, slo
 
 def public_combined_schedule(root, plan):
     """Recognize only this admitted combined profile; historical policies stay fixed."""
+    if plan.get('operatingFormat') is not None:
+        from operating_bridge import admitted
+        raw=(root/'PLAN.json').read_bytes();original=strict_json(raw)
+        a=strict_json((root/'ADMISSION.json').read_bytes());b=strict_json((root/'WINDOW_1_BINDING.json').read_bytes())
+        if (not admitted(a) or a['family']!='participants' or a['planSha256']!=digest(raw)
+            or a['jobRoot']!=str(root.resolve()) or a['initial']['participant']['base']!=plan['base']
+            or {**plan,'finalTarget':original['finalTarget']}!=original or plan['finalTarget']!=b['target']
+            or plan['base']!=b['base'] or len(plan['windows'])!=1 or not 0<plan['finalTarget']['number']-plan['base']['number']<=4096):
+            raise ValueError('Exact operating participant authority/plan')
+        return True
     if plan.get('unifiedProfileId') not in ('unified-five-feed-public-qualification-2','unified-five-feed-public-qualification-3','unified-five-feed-public-qualification-4'):
         return False
     from public_profile import authority,is_public

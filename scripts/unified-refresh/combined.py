@@ -111,8 +111,10 @@ class Combined:
     def budget(self,q,tail,cutoff=None,is_retry=False):
         if self.closed or self.failed or self.state['pending'] is not None:raise Stop('Closed/uncertain combined job')
         reserved=self.phase_check(q,tail)
-        parent=read(self.parent_root/'PARENT_ACCOUNTING.json')
-        if parent['status']!='ADMITTED' or parent['pending'] is not None or parent['job']!=self.admission['job']:
+        if 'operatingFormat' in self.admission:
+            parent={k:0 for k in GLOBAL};parent['rpcEndpointAttempts']=[0,0]
+        else:parent=read(self.parent_root/'PARENT_ACCOUNTING.json')
+        if 'operatingFormat' not in self.admission and (parent['status']!='ADMITTED' or parent['pending'] is not None or parent['job']!=self.admission['job']):
             raise Stop('Parent inactive/unknown/foreign job')
         for k,n in reserved['counts'].items():
             if parent[k]+n>parent_limits(self.admission,GLOBAL)[k]:raise LimitReached('Parent safety reserve '+k)
@@ -127,6 +129,13 @@ class Combined:
                                     receipt['offset'],self.network_end,self.closing)
         self.storage.json(self.root/'combined-reservations'/f"{receipt['attempt']:05d}.json",receipt)
     def attempt(self,q,*args,**kwargs):
+        if 'operatingFormat' in self.admission:
+            from operating_bridge import current
+            cap,value=super().attempt(q,*args,**kwargs)
+            answer=current().settle(cap['attempt'],cap['closureKnown'],bool(cap.get('complete') and cap['entityRows'] is not None),
+                                    cap['chargedBytes'],cap['chargedEntities'])
+            self.storage.json(self.root/'parent-settlements'/f"{cap['attempt']:05d}.json",answer)
+            return cap,value
         parent=read(self.parent_root/'PARENT_ACCOUNTING.json')
         if parent.get('lastClosedMonotonic') is not None:
             self.sleep(max(0,1-(self.clock()-parent['lastClosedMonotonic'])))
@@ -178,6 +187,17 @@ class Combined:
 class ParentTransport:
     def __init__(self,session,physical):self.s=session;self.physical=physical
     def __call__(self,request,deadline,storage):
+        if 'operatingFormat' in self.s.admission:
+            from operating_bridge import current
+            s=self.s;q=read(request)['job'];n=s.state['attempts']
+            r=read(s.root/'combined-reservations'/f'{n:05d}.json')
+            answer=current().permit(request,q,n,s.retry_ordinal,s.capacity(q),q['maxRows'],
+                                     min(deadline,s.admission['networkClosesAtUnixSeconds']),{**r['reserved']['counts'],'endpointAttempts':r['reserved']['endpointAttempts']})
+            r['parentBefore']=answer['parentBefore']
+            atomic(s.root/'combined-reservations'/f'{n:05d}.json',r)
+            # Waiting consumed the original deadline; the exact query and controls are checked again.
+            s.phase_check(q,[])
+            return self.physical(request,min(deadline,s.admission['networkDeadline']),storage)
         s=self.s;p=read(s.parent_root/'PARENT_ACCOUNTING.json');q=read(request)['job']
         if p['status']!='ADMITTED' or p['pending'] is not None:raise Stop('Unknown parent physical slot')
         if s.clock()>=p['networkDeadline'] or s.clock()>=s.admission['networkDeadline']:

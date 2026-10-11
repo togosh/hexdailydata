@@ -53,6 +53,10 @@ def run_window(s, index, base, exchange, seen):
     target = agree(opening, plan['finalTarget'] if index == len(plan['windows']) and plan['finalTarget'].get('hash') is not None else None)
     if plan.get('combinedJob'):
         unified=False
+        if plan.get('operatingFormat') is not None:
+            from operating_bridge import admitted
+            unified=admitted(getattr(s,'admission',{})) and plan['operatingFormat']==s.admission['operatingFormat']
+            if not unified:raise Stop('Operating participant profile authority')
         if plan.get('unifiedProfileId') is not None:
             from offline_profile import admitted
             unified=admitted(getattr(s,'admission',{})) and plan['unifiedProfileId']==s.admission['unifiedProfileId']

@@ -5,6 +5,7 @@ import { wire } from '../market-feed/access-fixture.mjs';
 const R = process.env.HDD_TASK_ROOT;
 assert(
   R?.endsWith('btc-eth-current-reference-freshness-r2') ||
+    R?.endsWith('repeatable-refresh-operations-r1') ||
     R?.endsWith('unified-refresh-public-qualification-r2') ||
     R?.endsWith('unified-refresh-public-qualification-r3') ||
     R?.endsWith('unified-refresh-public-qualification-r4'),

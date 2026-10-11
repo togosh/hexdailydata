@@ -25,11 +25,20 @@ def main(offline_fixture=False):
         raise ValueError('Exact public subdivision admission')
     for name,h in a['runtimeFiles'].items():
         if digest((REPO/name).read_bytes())!=h:raise ValueError('Frozen runtime changed')
-    parent=read(root.parent/'PARENT_ACCOUNTING.json')
-    if parent['status']!='ADMITTED' or parent['job']!=a['job'] or parent['pending'] is not None:
-        raise ValueError('Unknown parent admission')
-    if digest((root/'ADMISSION.json').read_bytes())!=parent['jobAdmissionSha256']:
-        raise ValueError('Exclusive child admission changed')
+    operating='operatingFormat' in a
+    if operating:
+        from operating_bridge import current
+        parent=read(root.parent/'OPERATING_STATE.json')
+        if parent['status']!='RUNNING' or parent['activation']!=a['activation'] or not any(
+            j['id']==a['job'] and j['admissionHash']==digest((root/'ADMISSION.json').read_bytes()) for j in parent['active']):
+            raise ValueError('Exact operating child registration')
+        parent={'networkDeadline':time.monotonic()+a['networkClosesAtUnixSeconds']-time.time()}
+    else:
+        parent=read(root.parent/'PARENT_ACCOUNTING.json')
+        if parent['status']!='ADMITTED' or parent['job']!=a['job'] or parent['pending'] is not None:
+            raise ValueError('Unknown parent admission')
+        if digest((root/'ADMISSION.json').read_bytes())!=parent['jobAdmissionSha256']:
+            raise ValueError('Exclusive child admission changed')
     if (root/'ACCOUNTING.json').exists():raise ValueError('Job already admitted; never resume')
     import collector
     if family=='participants':
@@ -54,14 +63,14 @@ def main(offline_fixture=False):
     save(root/'JOB_CLOCK.json',dict(startedMonotonic=s.started,networkSeconds=s.network_end,
          deadlineMonotonic=s.deadline,networkDeadline=a['networkDeadline'],recordedAt=utc()))
     s.transport=ParentTransport(s,WorkerTransport(a['nonce'],worker_path=HERE/'worker.py'))
-    incoming=queue.Queue()
+    incoming=current().incoming if operating else queue.Queue()
     def reader():
         try:
             for line in sys.stdin:
                 if len(line)>32768:raise ValueError('IPC bound')
                 incoming.put(strict_json(line))
         finally:incoming.put(None)
-    threading.Thread(target=reader,daemon=True).start()
+    if not operating:threading.Thread(target=reader,daemon=True).start()
     def exchange(message,deadline):
         allowance=min(180 if family=='participants' else 30,deadline-s.clock(),s.deadline-s.clock())
         if allowance<=0:raise ValueError('No publication time')

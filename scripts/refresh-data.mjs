@@ -36,6 +36,14 @@ import {
   counterKeys,
 } from './unified-refresh/profile.mjs';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+import {
+  OperatingOwner,
+  operatingTask,
+  operatingFormat,
+  operatingFamilies,
+  validateOperating,
+  operatingStatus,
+} from './unified-refresh/operating.mjs';
 const taskId = 'HDD-UNIFIED-REFRESH-OPERATION-R1';
 const order = [
   'market-1',
@@ -850,6 +858,8 @@ export async function runJob({
   storageGuard = async () => {},
   syncFixtureClock,
   signal,
+  onControl,
+  serializePublication = async (fn) => fn(),
 }) {
   const unified = unifiedAdmission(admission);
   const reference = admission.family === 'reference',
@@ -1009,230 +1019,253 @@ export async function runJob({
       .then(async () => {
         if (line.length > 32768) throw Error('IPC_BOUND');
         const m = JSON.parse(line);
-        if (unified && !publicAdmission(admission) && m.type !== 'closed') {
-          if (
-            typeof syncFixtureClock !== 'function' ||
-            !Number.isFinite(m.syntheticClockUnixSeconds)
-          )
-            throw Error('SYNTHETIC_CLOCK_REQUIRED');
-          syncFixtureClock(m.syntheticClockUnixSeconds);
-        }
-        if (m.type === 'closed') {
-          if (closedMessage) {
-            closureProtocolError =
-              unified || (trade && admission.authorityTaskId === operatingR2TaskId);
-            throw Error('DUPLICATE_CLOSURE');
-          }
-          if (unified || (trade && admission.authorityTaskId === operatingR2TaskId)) {
-            if (
-              Object.keys(m).sort().join(',') !== 'resultBytes,resultSha256,type' ||
-              !Number.isSafeInteger(m.resultBytes) ||
-              m.resultBytes < 1 ||
-              m.resultBytes > 524288 ||
-              typeof m.resultSha256 !== 'string' ||
-              !/^[a-f0-9]{64}$/.test(m.resultSha256)
-            )
-              throw Error('CLOSED_RESULT_IDENTITY');
-            const report = await open(join(jobRoot, 'RESULT.json'), 'r');
-            try {
-              const info = await report.stat();
-              if (!info.isFile() || info.size !== m.resultBytes) throw Error('CLOSED_RESULT_SIZE');
-              const raw = Buffer.alloc(m.resultBytes + 1);
-              const { bytesRead } = await report.read(raw, 0, raw.length, 0);
-              if (bytesRead !== m.resultBytes || sha(raw.subarray(0, bytesRead)) !== m.resultSha256)
-                throw Error('CLOSED_RESULT_HASH');
-              closedMessage = JSON.parse(raw.subarray(0, bytesRead));
-            } finally {
-              await report.close();
-            }
-          } else closedMessage = m.result;
+        if (m.type?.startsWith('operating-')) {
+          if (!admission.operatingFormat || typeof onControl !== 'function')
+            throw Error('OPERATING_CONTROL_NOT_ADMITTED');
+          const reply = await onControl(m);
+          if (!active()) throw Error('OPERATING_CHILD_EXPIRED');
+          child.stdin.write(JSON.stringify(reply) + '\n');
           return;
         }
-        if (!active()) throw Error('EXPIRED_JOB');
-        const remaining = m.expiresAtUnixSeconds * 1000 - Date.now();
-        if (!(remaining > 0 && remaining <= (admission.family === 'participants' ? 181000 : 31000)))
-          throw Error('IPC_DEADLINE');
-        const stopAt = Math.min(deadline, performance.now() + remaining);
-        const check = () => {
-          if (!active() || performance.now() >= stopAt) throw Error('PUBLICATION_DEADLINE');
-        };
-        let answer = {
-          ok: true,
-          ...(admission.family === 'participants' ? { window: m.window } : { cycle: m.cycle }),
-        };
-        if (m.type === 'markets' && trade) {
-          if (marketsAccepted || begunCycle !== firstCycle - 1 || m.cycle !== 0)
-            throw Error('TRADE_MARKETS_ORDER');
-          await admitTradeMarkets(jobRoot, m.markets);
-          marketsAccepted = true;
-        } else if (m.type === 'skipped' && trade) {
-          if (
-            !marketsAccepted ||
-            !(
-              m.cycle === begunCycle + 1 ||
-              (operating && m.cycle === begunCycle && outcomes.length === begunCycle - firstCycle)
-            ) ||
-            m.cycle > profile.cycles ||
-            !(
-              outcomes.length === begunCycle - firstCycle + 1 ||
-              (operating && outcomes.length === begunCycle - firstCycle && m.cycle === begunCycle)
+        const dispatchMessage = async () => {
+          if (unified && !publicAdmission(admission) && m.type !== 'closed') {
+            if (
+              typeof syncFixtureClock !== 'function' ||
+              !Number.isFinite(m.syntheticClockUnixSeconds)
             )
-          )
-            throw Error('TRADE_SKIP_ORDER');
-          begunCycle = m.cycle;
-          outcomes.push({ cycle: m.cycle, status: 'SKIPPED', reason: m.reason });
-          await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
-          await observeSlot(m.cycle, 'SKIPPED', 'retained', check);
-        } else if (m.type === 'begin') {
-          if (trade) {
+              throw Error('SYNTHETIC_CLOCK_REQUIRED');
+            syncFixtureClock(m.syntheticClockUnixSeconds);
+          }
+          if (m.type === 'closed') {
+            if (closedMessage) {
+              closureProtocolError =
+                unified || (trade && admission.authorityTaskId === operatingR2TaskId);
+              throw Error('DUPLICATE_CLOSURE');
+            }
+            if (unified || (trade && admission.authorityTaskId === operatingR2TaskId)) {
+              if (
+                Object.keys(m).sort().join(',') !== 'resultBytes,resultSha256,type' ||
+                !Number.isSafeInteger(m.resultBytes) ||
+                m.resultBytes < 1 ||
+                m.resultBytes > 524288 ||
+                typeof m.resultSha256 !== 'string' ||
+                !/^[a-f0-9]{64}$/.test(m.resultSha256)
+              )
+                throw Error('CLOSED_RESULT_IDENTITY');
+              const report = await open(join(jobRoot, 'RESULT.json'), 'r');
+              try {
+                const info = await report.stat();
+                if (!info.isFile() || info.size !== m.resultBytes)
+                  throw Error('CLOSED_RESULT_SIZE');
+                const raw = Buffer.alloc(m.resultBytes + 1);
+                const { bytesRead } = await report.read(raw, 0, raw.length, 0);
+                if (
+                  bytesRead !== m.resultBytes ||
+                  sha(raw.subarray(0, bytesRead)) !== m.resultSha256
+                )
+                  throw Error('CLOSED_RESULT_HASH');
+                closedMessage = JSON.parse(raw.subarray(0, bytesRead));
+              } finally {
+                await report.close();
+              }
+            } else closedMessage = m.result;
+            return;
+          }
+          if (!active()) throw Error('EXPIRED_JOB');
+          const remaining = m.expiresAtUnixSeconds * 1000 - Date.now();
+          if (!(
+            remaining > 0 && remaining <= (admission.family === 'participants' ? 181000 : 31000)
+          ))
+            throw Error('IPC_DEADLINE');
+          const stopAt = Math.min(deadline, performance.now() + remaining);
+          const check = () => {
+            if (!active() || performance.now() >= stopAt) throw Error('PUBLICATION_DEADLINE');
+          };
+          let answer = {
+            ok: true,
+            ...(admission.family === 'participants' ? { window: m.window } : { cycle: m.cycle }),
+          };
+          if (m.type === 'markets' && trade) {
+            if (marketsAccepted || begunCycle !== firstCycle - 1 || m.cycle !== 0)
+              throw Error('TRADE_MARKETS_ORDER');
+            await admitTradeMarkets(jobRoot, m.markets);
+            marketsAccepted = true;
+          } else if (m.type === 'skipped' && trade) {
             if (
               !marketsAccepted ||
-              m.cycle !== begunCycle + 1 ||
+              !(
+                m.cycle === begunCycle + 1 ||
+                (operating && m.cycle === begunCycle && outcomes.length === begunCycle - firstCycle)
+              ) ||
               m.cycle > profile.cycles ||
-              outcomes.length !== begunCycle - firstCycle + 1
-            )
-              throw Error('TRADE_CYCLE_ORDER');
-            begunCycle = m.cycle;
-          } else if (reference) {
-            if (m.cycle !== begunCycle + 1 || m.cycle > 2 || publications.length !== begunCycle)
-              throw Error('REFERENCE_CYCLE_ORDER');
-            begunCycle = m.cycle;
-          } else if (m.cycle !== 1) throw Error('ONE_CYCLE_ONLY');
-        } else if (m.type === 'prepare' && admission.family === 'participants') {
-          await storageGuard(512 * 1024 ** 2);
-          check();
-          if (m.window !== 1) throw Error('ONE_WINDOW_ONLY');
-          const raw = await readFile(join(jobRoot, 'WINDOW_1_AFTER.json'));
-          if (sha(raw) !== m.afterSha256) throw Error('CAPTURE_AFTER_IDENTITY');
-          const draft = await prepareWindow(registry, JSON.parse(raw), check);
-          const draftBytes = Buffer.byteLength(canonical(draft)) + 1;
-          if (draftBytes > 256 * 1024 ** 2) throw Error('PARTICIPANT_DRAFT_BOUND');
-          await storageGuard(3 * draftBytes + 32 * 1024 ** 2 + 512 * 1024 ** 2);
-          check();
-          await durableJson(join(jobRoot, 'WINDOW_1_DRAFT.json'), draft);
-        } else if (m.type === 'qualified') {
-          if (trade && (m.cycle !== begunCycle || outcomes.length !== begunCycle - firstCycle))
-            throw Error('TRADE_QUALIFICATION_ORDER');
-          if (reference && (m.cycle !== begunCycle || publications.length !== begunCycle - 1))
-            throw Error('REFERENCE_QUALIFICATION_ORDER');
-          await storageGuard(512 * 1024 ** 2);
-          check();
-          let selected, publication;
-          if (trade) {
-            publication = await publishTrade(
-              registry.productDaily,
-              jobRoot,
-              m,
-              active,
-              (update, beforeCommit, captureReference) =>
-                registry.publishProduct(update, { beforeCommit, captureReference }),
-              retainedTrades,
-            );
-            if (!publication.qualified) {
-              outcomes.push({ cycle: m.cycle, status: 'UNQUALIFIED', publication });
-              await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
-              await observeSlot(
-                m.cycle,
-                publication.sourceResult ?? 'UNQUALIFIED',
-                'retained',
-                check,
-              );
-              check();
-              child.stdin.write(JSON.stringify({ ...answer, outcome: 'UNQUALIFIED' }) + '\n');
-              return;
-            }
-            await registry.refresh(undefined, true);
-            selected = await read(join(registry.root, 'CURRENT.json'));
-            if (selected.product.version !== publication.selected.version)
-              throw Error('COORDINATED_PUBLICATION_UNKNOWN');
-          } else if (admission.family === 'participants') {
-            const raw = await readFile(join(jobRoot, 'WINDOW_1_AUDIT.json')),
-              proof = JSON.parse(raw);
-            if (
-              m.window !== 1 ||
-              sha(raw) !== m.auditFileSha256 ||
-              sha(canonical(proof)) !== m.proofSha256
-            )
-              throw Error('PARTICIPANT_SAVED_PROOF');
-            const update = ParticipantUpdateSchema.parse({
-              ...(await read(join(jobRoot, 'WINDOW_1_DRAFT.json'))),
-              proofSha256: m.proofSha256,
-            });
-            const updateBytes = Buffer.byteLength(canonical(update)) + 1;
-            if (updateBytes > 256 * 1024 ** 2) throw Error('PARTICIPANT_UPDATE_BOUND');
-            await storageGuard(2 * updateBytes + 32 * 1024 ** 2 + 512 * 1024 ** 2);
-            check();
-            await durableJson(join(jobRoot, 'WINDOW_1_UPDATE.json'), update);
-            publication = await registry.publish(update, proof, {
-              beforeCommit: check,
-              captureReference: {
-                output: jobRoot,
-                update: 'WINDOW_1_UPDATE.json',
-                updateSha256: sha(await readFile(join(jobRoot, 'WINDOW_1_UPDATE.json'))),
-                audit: 'WINDOW_1_AUDIT.json',
-                auditSha256: sha(raw),
-              },
-            });
-            selected = publication.selected;
-            // A final participant job has no following job to refresh the writer.
-            // Observe the committed compatible pair before same-API verification.
-            await registry.refresh(undefined, true);
-            if (
-              registry.status().error ||
-              registry.status().generation !== selected.generation ||
-              registry.status().productVersion !== selected.product.version
-            )
-              throw Error('COORDINATED_PUBLICATION_UNKNOWN');
-            answer = {
-              ...answer,
-              generation: selected.generation,
-              productVersion: selected.product.version,
-            };
-          } else {
-            const publish = {
-              market: publishCycle,
-              gas: publishGas,
-              protocol: publishProtocol,
-              reference: publishReference,
-            }[admission.family];
-            publication = await publish(
-              registry.productDaily,
-              null,
-              jobRoot,
-              m,
-              active,
-              (_s, _w, update, beforeCommit, _fault, captureReference) =>
-                registry.publishProduct(update, { beforeCommit, captureReference }),
-            );
-            await registry.refresh(undefined, true);
-            selected = await read(join(registry.root, 'CURRENT.json'));
-            if (selected.product.version !== publication.selected.version)
-              throw Error('COORDINATED_PUBLICATION_UNKNOWN');
-          }
-          check();
-          const adoption = operating
-            ? await observeSlot(
-                m.cycle,
-                'QUALIFIED',
-                publication.changed ? 'changed' : 'unchanged',
-                check,
+              !(
+                outcomes.length === begunCycle - firstCycle + 1 ||
+                (operating && outcomes.length === begunCycle - firstCycle && m.cycle === begunCycle)
               )
-            : await onAdoption(selected, check, admission.job);
-          check();
-          const receipt = { selected, publication, adoption, adoptedAt: new Date().toISOString() };
-          await durableJson(
-            join(jobRoot, reference || trade ? `ADOPTION_${m.cycle}.json` : 'ADOPTION.json'),
-            receipt,
-          );
-          publications.push(receipt);
-          if (trade) {
-            outcomes.push({ cycle: m.cycle, status: 'QUALIFIED' });
-            answer.outcome = 'QUALIFIED';
+            )
+              throw Error('TRADE_SKIP_ORDER');
+            begunCycle = m.cycle;
+            outcomes.push({ cycle: m.cycle, status: 'SKIPPED', reason: m.reason });
             await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
-          }
-        } else throw Error('UNEXPECTED_COLLECTOR_PHASE');
-        check();
-        child.stdin.write(JSON.stringify(answer) + '\n');
+            await observeSlot(m.cycle, 'SKIPPED', 'retained', check);
+          } else if (m.type === 'begin') {
+            if (trade) {
+              if (
+                !marketsAccepted ||
+                m.cycle !== begunCycle + 1 ||
+                m.cycle > profile.cycles ||
+                outcomes.length !== begunCycle - firstCycle + 1
+              )
+                throw Error('TRADE_CYCLE_ORDER');
+              begunCycle = m.cycle;
+            } else if (reference) {
+              if (m.cycle !== begunCycle + 1 || m.cycle > 2 || publications.length !== begunCycle)
+                throw Error('REFERENCE_CYCLE_ORDER');
+              begunCycle = m.cycle;
+            } else if (m.cycle !== 1) throw Error('ONE_CYCLE_ONLY');
+          } else if (m.type === 'prepare' && admission.family === 'participants') {
+            await storageGuard(512 * 1024 ** 2);
+            check();
+            if (m.window !== 1) throw Error('ONE_WINDOW_ONLY');
+            const raw = await readFile(join(jobRoot, 'WINDOW_1_AFTER.json'));
+            if (sha(raw) !== m.afterSha256) throw Error('CAPTURE_AFTER_IDENTITY');
+            const draft = await prepareWindow(registry, JSON.parse(raw), check);
+            const draftBytes = Buffer.byteLength(canonical(draft)) + 1;
+            if (draftBytes > 256 * 1024 ** 2) throw Error('PARTICIPANT_DRAFT_BOUND');
+            await storageGuard(3 * draftBytes + 32 * 1024 ** 2 + 512 * 1024 ** 2);
+            check();
+            await durableJson(join(jobRoot, 'WINDOW_1_DRAFT.json'), draft);
+          } else if (m.type === 'qualified') {
+            if (trade && (m.cycle !== begunCycle || outcomes.length !== begunCycle - firstCycle))
+              throw Error('TRADE_QUALIFICATION_ORDER');
+            if (reference && (m.cycle !== begunCycle || publications.length !== begunCycle - 1))
+              throw Error('REFERENCE_QUALIFICATION_ORDER');
+            await storageGuard(512 * 1024 ** 2);
+            check();
+            let selected, publication;
+            if (trade) {
+              publication = await publishTrade(
+                registry.productDaily,
+                jobRoot,
+                m,
+                active,
+                (update, beforeCommit, captureReference) =>
+                  registry.publishProduct(update, { beforeCommit, captureReference }),
+                retainedTrades,
+              );
+              if (!publication.qualified) {
+                outcomes.push({ cycle: m.cycle, status: 'UNQUALIFIED', publication });
+                await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+                await observeSlot(
+                  m.cycle,
+                  publication.sourceResult ?? 'UNQUALIFIED',
+                  'retained',
+                  check,
+                );
+                check();
+                child.stdin.write(JSON.stringify({ ...answer, outcome: 'UNQUALIFIED' }) + '\n');
+                return;
+              }
+              await registry.refresh(undefined, true);
+              selected = await read(join(registry.root, 'CURRENT.json'));
+              if (selected.product.version !== publication.selected.version)
+                throw Error('COORDINATED_PUBLICATION_UNKNOWN');
+            } else if (admission.family === 'participants') {
+              const raw = await readFile(join(jobRoot, 'WINDOW_1_AUDIT.json')),
+                proof = JSON.parse(raw);
+              if (
+                m.window !== 1 ||
+                sha(raw) !== m.auditFileSha256 ||
+                sha(canonical(proof)) !== m.proofSha256
+              )
+                throw Error('PARTICIPANT_SAVED_PROOF');
+              const update = ParticipantUpdateSchema.parse({
+                ...(await read(join(jobRoot, 'WINDOW_1_DRAFT.json'))),
+                proofSha256: m.proofSha256,
+              });
+              const updateBytes = Buffer.byteLength(canonical(update)) + 1;
+              if (updateBytes > 256 * 1024 ** 2) throw Error('PARTICIPANT_UPDATE_BOUND');
+              await storageGuard(2 * updateBytes + 32 * 1024 ** 2 + 512 * 1024 ** 2);
+              check();
+              await durableJson(join(jobRoot, 'WINDOW_1_UPDATE.json'), update);
+              publication = await registry.publish(update, proof, {
+                beforeCommit: check,
+                captureReference: {
+                  output: jobRoot,
+                  update: 'WINDOW_1_UPDATE.json',
+                  updateSha256: sha(await readFile(join(jobRoot, 'WINDOW_1_UPDATE.json'))),
+                  audit: 'WINDOW_1_AUDIT.json',
+                  auditSha256: sha(raw),
+                },
+              });
+              selected = publication.selected;
+              // A final participant job has no following job to refresh the writer.
+              // Observe the committed compatible pair before same-API verification.
+              await registry.refresh(undefined, true);
+              if (
+                registry.status().error ||
+                registry.status().generation !== selected.generation ||
+                registry.status().productVersion !== selected.product.version
+              )
+                throw Error('COORDINATED_PUBLICATION_UNKNOWN');
+              answer = {
+                ...answer,
+                generation: selected.generation,
+                productVersion: selected.product.version,
+              };
+            } else {
+              const publish = {
+                market: publishCycle,
+                gas: publishGas,
+                protocol: publishProtocol,
+                reference: publishReference,
+              }[admission.family];
+              publication = await publish(
+                registry.productDaily,
+                null,
+                jobRoot,
+                m,
+                active,
+                (_s, _w, update, beforeCommit, _fault, captureReference) =>
+                  registry.publishProduct(update, { beforeCommit, captureReference }),
+              );
+              await registry.refresh(undefined, true);
+              selected = await read(join(registry.root, 'CURRENT.json'));
+              if (selected.product.version !== publication.selected.version)
+                throw Error('COORDINATED_PUBLICATION_UNKNOWN');
+            }
+            check();
+            const adoption = operating
+              ? await observeSlot(
+                  m.cycle,
+                  'QUALIFIED',
+                  publication.changed ? 'changed' : 'unchanged',
+                  check,
+                )
+              : await onAdoption(selected, check, admission.job);
+            check();
+            const receipt = {
+              selected,
+              publication,
+              adoption,
+              adoptedAt: new Date().toISOString(),
+            };
+            await durableJson(
+              join(jobRoot, reference || trade ? `ADOPTION_${m.cycle}.json` : 'ADOPTION.json'),
+              receipt,
+            );
+            publications.push(receipt);
+            if (trade) {
+              outcomes.push({ cycle: m.cycle, status: 'QUALIFIED' });
+              answer.outcome = 'QUALIFIED';
+              await durableJson(join(jobRoot, `OUTCOME_${m.cycle}.json`), outcomes.at(-1));
+            }
+          } else throw Error('UNEXPECTED_COLLECTOR_PHASE');
+          check();
+          child.stdin.write(JSON.stringify(answer) + '\n');
+        };
+        if (m.type === 'qualified') await serializePublication(dispatchMessage);
+        else await dispatchMessage();
       })
       .catch((e) => {
         error ??= String(e);
@@ -1373,7 +1406,413 @@ export async function runJob({
   }
 }
 
+// The same runJob parser, native emitters and typed publishers; jobs only overlap
+// while waiting outside the physical permit and serialized publication owners.
+export async function runOperating({
+  taskRoot,
+  registry,
+  onAdoption,
+  spawnChild,
+  clock,
+  onFact,
+  signal,
+  configuration,
+  until,
+  resume = false,
+}) {
+  if (
+    clock?.mode !== 'SYNTHETIC' ||
+    typeof spawnChild !== 'function' ||
+    typeof onFact !== 'function'
+  )
+    throw Error('OPERATING_OFFLINE_INJECTION_REQUIRED');
+  const root = resolve(taskRoot),
+    output = join(root, 'operating');
+  const c = validateOperating(
+    configuration ?? (await read(join(dirname(root), 'OPERATING_CONFIG.json'))),
+  );
+  const runtimeFiles = {},
+    sourceFiles = {};
+  for (const folder of [
+    'unified-refresh',
+    'trade-feed',
+    'market-refresh',
+    'gas-feed',
+    'protocol-feed',
+    'participant-refresh',
+  ])
+    for (const e of await readdir(join(repo, 'scripts', folder), { withFileTypes: true }))
+      if (e.isFile() && /\.(py|mjs|json)$/.test(e.name)) {
+        const p = `scripts/${folder}/${e.name}`;
+        runtimeFiles[p] = sha(await readFile(join(repo, p)));
+        if (folder === 'market-refresh' && /\.(py|json)$/.test(e.name))
+          sourceFiles[e.name] = runtimeFiles[p];
+      }
+  runtimeFiles['scripts/refresh-data.mjs'] = sha(
+    await readFile(join(repo, 'scripts/refresh-data.mjs')),
+  );
+  const allowanceRaw = await readFile(join(repo, 'config/unified-refresh-offline.json'));
+  runtimeFiles['config/unified-refresh-offline.json'] = sha(allowanceRaw);
+  const sourceBinding = sha(canonical(runtimeFiles));
+  const original = JSON.parse(allowanceRaw).jobs;
+  const bounds = Object.fromEntries(original.map((j) => [j.family, j.bounds]));
+  const parentLimits = {};
+  for (const p of ['graph', 'rpc', 'http']) {
+    parentLimits[p + 'Attempts'] = c.total[p].attempts;
+    parentLimits[p + 'Extras'] = c.total[p].extras;
+    parentLimits[p + 'ChargedBytes'] = c.total[p].bytes;
+  }
+  Object.assign(parentLimits, { attempts: 0, extras: 0, chargedBytes: 0, chargedEntities: 0 });
+  for (const p of ['graph', 'rpc', 'http']) {
+    parentLimits.attempts += c.total[p].attempts;
+    parentLimits.extras += c.total[p].extras;
+    parentLimits.chargedBytes += c.total[p].bytes;
+    parentLimits.chargedEntities += c.total[p].objects;
+  }
+  if (
+    !resolve(registry.root).startsWith(root + '\\') &&
+    !resolve(registry.root).startsWith(root + '/')
+  )
+    throw Error('OPERATING_OWNED_SYNTHETIC_REGISTRY');
+  const owner = await OperatingOwner.open(output, c, clock, { resume, sourceBinding });
+  const pending = new Map(),
+    jobs = [],
+    disabled = new Set(owner.state.disabled);
+  const contexts = owner.state.contexts;
+  let probe = clock.now(),
+    failure = null;
+  const cancel = new AbortController();
+  if (signal?.aborted) cancel.abort();
+  signal?.addEventListener('abort', () => cancel.abort(), { once: true });
+  const stopStarts = Math.min(until ?? c.expiresAt - 1800, c.expiresAt - 90);
+  const start = async (family) => {
+    const startTime = clock.now(),
+      nativeStart = performance.now();
+    let id;
+    try {
+      id = await owner.allocate(family);
+    } catch (e) {
+      if (String(e) !== 'Error: OPERATING_JOB_BOUND') throw e;
+      disabled.add(family);
+      await owner.exclusive(async () => {
+        owner.state.disabled = [...disabled];
+        owner.state.feeds[family].quarantine = 'OPERATING_JOB_BOUND';
+        await owner.save();
+      });
+      return; // Preserve already-admitted jobs' closing opportunities.
+    }
+    const jobRoot = join(output, id);
+    const allowance = {
+      ...bounds[family],
+      seconds: Math.min(
+        bounds[family].seconds,
+        c.families[family].deadline,
+        c.expiresAt - startTime,
+      ),
+    };
+    if (allowance.seconds < bounds[family].seconds) {
+      disabled.add(family);
+      return;
+    }
+    await registry.refresh(undefined, true);
+    if (registry.status().error) throw Error('OPERATING_SELECTOR_INTEGRITY');
+    const held = registry.capture();
+    let initial;
+    try {
+      initial = admittedInputs(held, !contexts.gas, contexts);
+    } finally {
+      held.release();
+    }
+    const span = c.participants.maximumWindowBlocks;
+    if (
+      family === 'participants' &&
+      owner.state.participantBlocks + span > c.participants.maximumActivationBlocks
+    ) {
+      disabled.add(family);
+      return;
+    }
+    await mkdir(jobRoot);
+    await mkdir(join(jobRoot, 'temp'));
+    const a = {
+      task: family === 'trade' ? 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2' : taskId,
+      authorityTaskId: operatingTask,
+      operatingFormat,
+      activation: owner.state.activation,
+      parentMode: 'OFFLINE_ONLY',
+      parentProfileSha256: owner.state.configSha256,
+      sourceBindingSha256: sourceBinding,
+      synthetic: true,
+      combinedJob: true,
+      job: id,
+      family,
+      jobRoot,
+      nonce: randomBytes(32).toString('hex'),
+      initial,
+      allowance,
+      parentLimits,
+      runtimeFiles,
+      sourceFiles,
+      startedAtUnixSeconds: startTime,
+      deadlineUnixSeconds: startTime + allowance.seconds,
+      networkClosesAtUnixSeconds: startTime + allowance.seconds - allowance.publication - 5,
+      networkSeconds: allowance.seconds - allowance.publication - 5,
+      ...(family === 'trade'
+        ? {
+            tradeSlot: 1,
+            tradeProfileId: 'unified-single-pair-1',
+            responseCookiePolicyId: 'ignore-response-cookies-no-replay-v1',
+          }
+        : {}),
+    };
+    if (family === 'participants') {
+      const plan = {
+        combinedJob: true,
+        operatingFormat,
+        base: initial.participant.base,
+        finalTarget: {
+          number: initial.participant.base.number + span,
+          hash: null,
+          timestamp: null,
+        },
+        windows: [
+          {
+            fromInclusive: initial.participant.base.number,
+            targetNumber: initial.participant.base.number + span,
+            newBlockSpan: span,
+          },
+        ],
+        graphqlEndpoint: 'https://graph.pulsechain.com/subgraphs/name/pulsechain/hex',
+        rpcEndpoints: ['https://rpc.pulsechain.com/', 'https://rpc-pulsechain.g4mm4.io/'],
+        deployment: 'QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw',
+        maximumBlockStep: 4096,
+        limits: { maximumAffectedParents: 50000, maximumChangedKeysPerFamily: 100000 },
+      };
+      await durableJson(join(jobRoot, 'PLAN.json'), plan);
+      a.planSha256 = sha(await readFile(join(jobRoot, 'PLAN.json')));
+      await durableJson(join(jobRoot, 'FRONTIER.json'), {
+        completedWindows: 0,
+        pin: plan.base,
+        generation: initial.participant.generation,
+        productVersion: initial.product.version,
+      });
+      await owner.exclusive(async () => {
+        owner.state.participantBlocks += span;
+        await owner.save();
+      });
+    }
+    await durableJson(join(jobRoot, 'ADMISSION.json'), a);
+    try {
+      await owner.register(
+        family,
+        sha(await readFile(join(jobRoot, 'ADMISSION.json'))),
+        id,
+        a.deadlineUnixSeconds,
+        allowance,
+      );
+    } catch (e) {
+      if (
+        !/OPERATING_(ACTIVE_RESERVATIONS|ROLLING_ADMISSION_RESERVE|ENDPOINT_ADMISSION_RESERVE|JOB_BOUND)/.test(
+          String(e),
+        )
+      )
+        throw e;
+      disabled.add(family);
+      await owner.exclusive(async () => {
+        owner.state.disabled = [...disabled];
+        owner.state.feeds[family].quarantine = String(e);
+        await owner.save();
+      });
+      await owner.receipt('REFUSED_' + id + '.json', {
+        job: id,
+        family,
+        reason: String(e),
+        nativeStarted: false,
+      });
+      return;
+    }
+    // Coalesce missed ticks; never enqueue a catch-up burst for a family.
+    await owner.scheduleNext(family, startTime);
+    if (
+      cancel.signal.aborted ||
+      clock.now() >= a.deadlineUnixSeconds ||
+      performance.now() >= nativeStart + allowance.seconds * 1000
+    )
+      throw Error('OPERATING_PREPARATION_CANCELLED_OR_EXPIRED');
+    const p = runJob({
+      jobRoot,
+      admission: a,
+      registry,
+      onAdoption,
+      spawnChild,
+      deadline: nativeStart + allowance.seconds * 1000,
+      signal: cancel.signal,
+      syncFixtureClock: (t) => {
+        if (t > clock.now() + 0.002) throw Error('CHILD_CLOCK_AHEAD');
+      },
+      onControl: (m) => owner.control(id, m),
+      serializePublication: (fn) => owner.publication(id, fn),
+      storageGuard: (n) => owner.storage(n),
+    })
+      .then(async (result) => {
+        await durableJson(join(jobRoot, 'COORDINATOR_RESULT.json'), result);
+        if (['market', 'gas'].includes(family) && result.publications.length) {
+          const p = result.publications.at(-1).publication;
+          contexts[family] = family === 'market' ? p.pin : p.contextualBlock;
+        }
+        const changed = result.publications.some((p) =>
+          family === 'participants'
+            ? p.selected.generation !== initial.participant.generation
+            : p.publication.previous !== p.publication.selected.version,
+        );
+        const resultRaw = await readFile(join(jobRoot, 'COORDINATOR_RESULT.json'));
+        const fact = {
+          job: id,
+          family,
+          startedAt: startTime,
+          completedAt: clock.now(),
+          status: result.status,
+          publication: changed ? 'changed' : result.publications.length ? 'no-op' : 'retained',
+          receipt: {
+            file: id + '/COORDINATOR_RESULT.json',
+            bytes: resultRaw.length,
+            sha256: sha(resultRaw),
+          },
+        };
+        if (result.publicationUncertain) throw Error('OPERATING_PUBLICATION_UNKNOWN');
+        if (
+          result.status === 'PARTIAL' &&
+          !(family === 'trade' && !result.error && result.source.status.startsWith('COMPLETE_'))
+        )
+          disabled.add(family);
+        await owner.exclusive(async () => {
+          owner.state.disabled = [...disabled];
+          owner.state.contexts = contexts;
+          await owner.save();
+        });
+        await owner.receipt('JOB_' + id + '.json', fact);
+        jobs.push(fact);
+        if (jobs.length > 64) jobs.shift();
+        await owner.finish(id, result, fact);
+        await onFact({ id, family }, result);
+      })
+      .catch(async (e) => {
+        failure ??= String(e);
+        cancel.abort();
+        await owner
+          .exclusive(async () => {
+            owner.state.status = 'UNKNOWN';
+            await owner.save();
+          })
+          .catch(() => {});
+      })
+      .finally(() => pending.delete(id));
+    pending.set(id, p);
+  };
+  try {
+    let spins = 0;
+    while (pending.size || clock.now() < stopStarts) {
+      if (++spins > 200000) throw Error('OPERATING_PUMP_BOUND');
+      if (signal?.aborted || failure || owner.state.status !== 'RUNNING') break;
+      for (const f of operatingFamilies)
+        if (
+          clock.now() < stopStarts &&
+          c.families[f].enabled &&
+          !disabled.has(f) &&
+          !Array.from(owner.jobs.values()).some((j) => j.family === f) &&
+          clock.now() >= owner.state.due[f]
+        )
+          await start(f);
+      await owner.pump();
+      if (clock.now() >= probe) {
+        await onFact(
+          { id: 'timeline-' + Math.floor(probe - c.startsAt), family: 'timeline' },
+          null,
+        );
+        probe += 20;
+      }
+      const idle = owner.idleTime();
+      if (idle !== null) {
+        const due = operatingFamilies
+          .filter(
+            (f) =>
+              c.families[f].enabled &&
+              !disabled.has(f) &&
+              !Array.from(owner.jobs.values()).some((j) => j.family === f),
+          )
+          .map((f) => owner.state.due[f])
+          .filter((n) => n > clock.now() && n < stopStarts);
+        const next = Math.min(
+          idle,
+          probe,
+          ...due,
+          clock.now() < stopStarts ? stopStarts : Infinity,
+          c.expiresAt,
+        );
+        if (next > clock.now()) await clock.sleep(next - clock.now());
+        if (clock.now() >= c.expiresAt) throw Error('OPERATING_EXPIRED');
+      }
+      await new Promise((r) => setTimeout(r, 2));
+    }
+    if (signal?.aborted) throw Error('OPERATING_CANCELLED');
+    if (failure) throw Error(failure);
+    if (owner.state.status !== 'RUNNING') throw Error('OPERATING_TERMINAL_PROTECTION');
+    await Promise.all(pending.values());
+    await owner.close(until ? 'PAUSED' : 'CLOSED');
+  } catch (e) {
+    failure ??= String(e);
+    cancel.abort();
+    await owner
+      .exclusive(async () => {
+        owner.state.status = 'UNKNOWN';
+        await owner.save();
+      })
+      .catch((e) => {
+        failure += '; state write: ' + String(e);
+      });
+  } finally {
+    // No reset/recovery on uncertain native or publication state.
+    if (failure || signal?.aborted) {
+      cancel.abort();
+      for (const q of owner.queue.splice(0)) q.reject(Error('OPERATING_STOPPED'));
+      for (const q of owner.waiters.splice(0)) q.reject(Error('OPERATING_STOPPED'));
+    }
+    await Promise.allSettled(pending.values());
+    await owner.lock.close().catch(() => {});
+  }
+  const result = {
+    status: failure ? 'PARTIAL' : 'OFFLINE_OPERATING_COMPLETE',
+    failure,
+    mode: 'OFFLINE_ONLY',
+    networkSessionCount: 0,
+    externalRequests: 0,
+    genuineBaseAdmissions: 0,
+    jobs,
+    jobReferences: 'JOB_<monotonic-job-id>.json',
+    recentJobLimit: 64,
+    accounting: owner.state,
+    maximumPublicationWriters: owner.maxWriters,
+  };
+  await durableJson(
+    join(output, `RUN_${String(owner.state.run).padStart(8, '0')}_RESULT.json`),
+    result,
+  );
+  return result;
+}
+
 export async function main(args = process.argv.slice(2)) {
+  if (args[0] === 'operating-plan' && args.length === 2) {
+    console.log(JSON.stringify(validateOperating(await read(resolve(args[1]))), null, 2));
+    return 0;
+  }
+  if (args[0] === 'operating-status' && args.length === 2) {
+    console.log(JSON.stringify(await operatingStatus(args[1]), null, 2));
+    return 0;
+  }
+  if (args[0] === 'operating-offline' && args.length === 2) {
+    const { runFixture } = await import('../tests/unified-refresh/operating-fixture.mjs');
+    return runFixture(resolve(args[1]), 'repeatable', runOperating);
+  }
+  if (args[0]?.startsWith('operating-')) throw Error('NO_OPERATING_PUBLIC_AUTHORITY');
   if (
     args.length === 1 &&
     ['public-qualification-r2', 'public-qualification-r3', 'public-qualification-r4'].includes(

@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import dns from 'node:dns';
+import { syncBuiltinESMExports } from 'node:module';
 import {
   SavedSourceGenerations,
   canonical,
@@ -33,6 +34,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   assert(
     [
       priorTask,
+      priorTask.replace('unified-refresh-integration-r2', 'repeatable-refresh-operations-r1'),
       priorTask.replace(
         'unified-refresh-integration-r2',
         'unified-refresh-public-qualification-r4',
@@ -49,6 +51,16 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   assert(
     [
+      'repeatable',
+      'operating-smoke',
+      'operating-cancel-retry',
+      'operating-cancel-physical',
+      'operating-cancel-completion',
+      'operating-parent-stop',
+      'operating-receipt-failure',
+      'operating-job-capacity',
+      'operating-parent-death',
+      'serial-blocked',
       'r4-all',
       'result-limit',
       'result-over',
@@ -84,6 +96,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     ].includes(mode),
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
+  const operatingSmall = mode.startsWith('operating-');
   await fs.mkdir(join(root, 'evidence'));
   process.env.HDD_TASK_ROOT = root;
   const NativeDate = Date,
@@ -102,6 +115,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     throw Error('DENIED_EXTERNAL_NETWORK');
   };
   const originals = {
+    open: fs.open,
     connect: net.Socket.prototype.connect,
     lookup: dns.lookup,
     promiseLookup: dns.promises.lookup,
@@ -184,6 +198,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     children = new Set();
   const starts = [],
     facts = [];
+  let operatingTradeJobs = 0;
   let listenerStart = null,
     localRequests = 0,
     observedLocalBytes = 0,
@@ -257,7 +272,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     );
     const inject = app.inject.bind(app);
     app.inject = async (...args) => {
-      assert(++localRequests <= 128, 'FIXTURE_LOCAL_REQUEST_BOUND');
+      assert(++localRequests <= (mode === 'repeatable' ? 512 : 128), 'FIXTURE_LOCAL_REQUEST_BOUND');
       const url = typeof args[0] === 'string' ? args[0] : args[0].url;
       const reserve = url.includes('/downloads/') ? 5 * 1024 ** 2 : 128 * 1024;
       chargedLocalBytes += reserve;
@@ -289,6 +304,15 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     const onAdoption = async (selected, check) => {
       check();
       const live = await getLive();
+      if (mode === 'repeatable')
+        return {
+          ...live,
+          expectedSelected: selected.product.version,
+          immediateAdoption:
+            live.datasetVersion === selected.product.version
+              ? 'ADOPTED'
+              : 'WAITING_NORMAL_ONE_SECOND_READER_POLL',
+        };
       assert.equal(
         live.datasetVersion,
         selected.product.version,
@@ -361,6 +385,16 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         { ...market, id: 'market-2', due: 160, deadline: 760 },
       ];
     }
+    if (mode === 'serial-blocked') {
+      const whole = await read(join(W, 'config/unified-refresh-offline.json'));
+      const market = structuredClone(whole.jobs.find((j) => j.family === 'market'));
+      const part = structuredClone(whole.jobs.find((j) => j.family === 'participants'));
+      const trade = structuredClone(whole.jobs.find((j) => j.family === 'trade'));
+      Object.assign(market, { due: 0, deadline: 600 });
+      Object.assign(part, { due: 30, deadline: 1830 });
+      Object.assign(trade, { due: 60, deadline: 660 });
+      profile.jobs = [market, part, trade];
+    }
     const ac = new AbortController();
     if (mode === 'cancel') ac.abort();
     if (['prepare-delay', 'cancel-prepared', 'prepare-within', 'prepare-reserve'].includes(mode)) {
@@ -387,13 +421,32 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       };
     }
     const spawnFixture = (_exe, args, options) => {
-      assert.equal(children.size, 0, 'ONE_NATIVE_CHILD');
+      assert(children.size < (mode === 'repeatable' ? 5 : 1), 'BOUNDED_NATIVE_CHILDREN');
       const jobRoot = args.at(-1),
         a = JSON.parse(readFileSync(join(jobRoot, 'ADMISSION.json')));
       const selected = writer.productDaily.capture();
+      const tradeOrdinal = a.family === 'trade' ? ++operatingTradeJobs : 0;
       const config = {
         codeBody: join(T, 'fixtures/protocol-code.json'),
-        actualMain: T.endsWith('unified-refresh-public-qualification-r4'),
+        actualMain:
+          mode === 'repeatable' ||
+          operatingSmall ||
+          mode === 'serial-blocked' ||
+          T.endsWith('unified-refresh-public-qualification-r4'),
+        ...(operatingSmall
+          ? {
+              noBodyRetry: !['operating-cancel-physical', 'operating-parent-death'].includes(mode),
+              physicalPause: ['operating-cancel-physical', 'operating-parent-death'].includes(mode),
+            }
+          : {}),
+        ...(mode === 'repeatable' && a.family === 'market' ? { parserDelay: 110 } : {}),
+        ...(mode === 'repeatable' &&
+        a.family === 'market' &&
+        starts.filter((x) => x.job.startsWith('market-')).length === 0
+          ? { graphRetries: 1 }
+          : {}),
+        ...(mode === 'repeatable' && a.family === 'trade' ? { responseCookie: true } : {}),
+        ...(mode === 'repeatable' && tradeOrdinal === 1 ? { noBodyRetry: true } : {}),
         ...(mode === 'r3-final'
           ? { closureAuthority: 'HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3' }
           : {}),
@@ -409,7 +462,17 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
             : {}),
         ...(a.tradeSlot === 6 ? { retry: true } : {}),
         ...(a.tradeSlot === 16 ? { largeResult: true } : {}),
-        ...(a.family === 'participants' ? { delay: 400 } : {}),
+        ...(mode === 'repeatable' && tradeOrdinal === 2 ? { tradeMode: 'repeat' } : {}),
+        ...(mode === 'repeatable' && tradeOrdinal >= 3 && tradeOrdinal <= 8
+          ? { emptyETH: true }
+          : {}),
+        ...(mode === 'repeatable' && tradeOrdinal === 17 ? { largeResult: true } : {}),
+        ...(a.family === 'participants'
+          ? {
+              delay: mode === 'repeatable' ? 405 : 400,
+              ...(mode === 'repeatable' ? { auditDelay: 75 } : {}),
+            }
+          : {}),
         ...([
           'hash',
           'duplicate',
@@ -437,16 +500,77 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       );
       if (mode === 'cancel-active') setTimeout(() => ac.abort(), 150);
       children.add(child);
+      if (operatingSmall)
+        writeFileSync(
+          join(jobRoot, 'SYNTHETIC_NATIVE_PID.json'),
+          JSON.stringify({ pid: child.pid, parent: process.pid }) + '\n',
+          { flag: 'wx' },
+        );
       child.once('close', () => children.delete(child));
+      if (operatingSmall && mode !== 'operating-smoke') {
+        let buffered = '';
+        child.stdout.on('data', (bytes) => {
+          buffered += bytes.toString();
+          const lines = buffered.split('\n');
+          buffered = lines.pop();
+          for (const line of lines) {
+            let m;
+            try {
+              m = JSON.parse(line);
+            } catch {
+              continue;
+            }
+            if (
+              (mode === 'operating-cancel-retry' &&
+                m.type === 'operating-wait' &&
+                m.seconds >= 2) ||
+              (mode === 'operating-cancel-completion' && m.type === 'closed') ||
+              (mode === 'operating-parent-stop' && m.type === 'operating-permit')
+            )
+              ac.abort();
+          }
+        });
+        if (mode === 'operating-cancel-physical') {
+          const timer = setInterval(() => {
+            if (existsSync(join(jobRoot, '01/PHYSICAL_STARTED.json'))) {
+              clearInterval(timer);
+              ac.abort();
+            }
+          }, 5);
+          child.once('close', () => clearInterval(timer));
+        }
+      }
       starts.push({ job: a.job, pid: child.pid, clock: now });
       return child;
     };
+    let configuration;
+    if (mode === 'operating-receipt-failure') {
+      fs.open = async (path, ...args) => {
+        if (String(path).endsWith('NATIVE_CLOSURE.json'))
+          throw Error('SYNTHETIC_FAILURE_RECEIPT_WRITE');
+        return originals.open(path, ...args);
+      };
+      syncBuiltinESMExports();
+    }
+    if (operatingSmall) {
+      configuration = await read(join(T, 'fixtures/OPERATING_CONFIG.json'));
+      configuration.expiresAt = configuration.startsAt + 1801;
+      for (const [f, v] of Object.entries(configuration.families)) {
+        v.enabled = f === 'trade';
+        v.period = 600;
+      }
+      if (mode === 'operating-job-capacity') {
+        configuration.storage.jobs = 1;
+        configuration.families.market.enabled = true;
+      }
+    }
     const result = await runUnified({
       taskRoot: root,
       registry: writer,
       onAdoption,
       spawnChild: spawnFixture,
       profile,
+      configuration,
       clock,
       onFact: async (j, r) => {
         const f = await getLive();
@@ -475,7 +599,279 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         'Exact R4 jobs/timing/caps translated only to OFFLINE_ONLY/unified-five-feed-offline-1; exact public documents tested separately; real public paths reject injected transports/clocks.';
     }
     receipt.facts = facts;
-    if (['mixed', 'qualification', 'r3-final', 'r4-all'].includes(mode)) {
+    if (operatingSmall) {
+      assert.equal(children.size, 0);
+      if (['operating-smoke', 'operating-job-capacity'].includes(mode)) {
+        assert.equal(result.status, 'OFFLINE_OPERATING_COMPLETE', result.failure);
+        assert.equal(result.jobs[0].status, 'QUALIFIED_ADOPTED');
+        assert.equal(result.accounting.totals.http.attempts, 4);
+        assert.equal(result.accounting.totals.http.extras, 1);
+        const first = await read(join(root, 'operating', result.jobs[0].job, '01/AUDIT.json'));
+        assert(first.closed && !first.complete && first.networkConnectionBegan);
+        assert.equal(first.chargedObjects, 20000);
+        if (mode === 'operating-job-capacity') {
+          assert.equal(result.accounting.completed, 1);
+          assert.equal(starts.length, 1);
+          assert.equal(result.accounting.feeds.market.quarantine, 'OPERATING_JOB_BOUND');
+        }
+        const selected = writer.productDaily.capture();
+        const download = '/api/v2/downloads/' + selected.bundleId + '/daily';
+        const { keys } = await import('../market-feed/access-fixture.mjs');
+        assert(
+          [401, 403].includes(
+            (await app.inject({ url: download, headers: auth(keys.invalid) })).statusCode,
+          ),
+        );
+        const { applyMarketUpdate } = await import('../../dist/services/product-daily/market.js');
+        const oldTrade = selected.metadata.readings.find((r) => r.kind === 'trade');
+        const older = {
+          ...oldTrade,
+          observedAtUtc: new Date(Date.parse(oldTrade.observedAtUtc) - 1000).toISOString(),
+        };
+        assert.throws(() =>
+          applyMarketUpdate(
+            { ...selected, exceptions: [] },
+            {
+              readings: [older],
+              liquidityHistory: [],
+              receiptSha256: sha('SYNTHETIC regression refusal'),
+            },
+          ),
+        );
+        const { prepareWindow } = await import('../../scripts/participant-refresh.mjs');
+        const h = writer.capture();
+        const priorPin = { ...h.sourceGenerations.identity.snapshot };
+        h.release();
+        await assert.rejects(
+          prepareWindow(writer, {
+            base: {
+              number: priorPin.number - 1,
+              hash: priorPin.hash,
+              timestamp: priorPin.timestamp,
+            },
+          }),
+          /IMMEDIATELY_SELECTED_BASE/,
+        );
+        assert.equal(writer.status().productVersion, selected.version);
+        receipt.affectedGuards = [
+          'invalid synthetic key refused',
+          'source-time regression refused',
+          'different participant predecessor refused',
+          'selected product preserved',
+        ];
+      } else {
+        assert.equal(result.status, 'PARTIAL');
+        assert.match(result.failure, /CANCEL|TERMINAL|UNKNOWN|Error/);
+        assert.equal(result.accounting.status, 'UNKNOWN');
+      }
+      receipt.operatingFocused = {
+        mode,
+        status: result.status,
+        completed: result.accounting.completed,
+        pending: result.accounting.pending,
+      };
+    } else if (mode === 'serial-blocked') {
+      const part = result.jobs.find((j) => j.family === 'participants');
+      const trade = result.jobs.find((j) => j.family === 'trade');
+      assert(part && trade, JSON.stringify(result).slice(-2000));
+      assert.equal(part.status, 'QUALIFIED');
+      assert.equal(trade.status, 'SKIPPED');
+      assert.equal(starts.length, 2);
+      receipt.counterexample = {
+        testedCoordinator: 'runUnified whole-job await',
+        fastFeedBeforeParticipantCompleted: false,
+        dueTradeSkipped: true,
+        decisiveProgressAssertionWouldFail: true,
+      };
+    } else if (mode === 'repeatable') {
+      // The operating control/result holds bounded references, never all lifetime source reports.
+      for (const j of result.jobs) {
+        const raw = await fs.readFile(join(root, 'operating', j.receipt.file));
+        assert.equal(sha(raw), j.receipt.sha256);
+        j.result = JSON.parse(raw);
+      }
+      assert.equal(
+        result.status,
+        'OFFLINE_OPERATING_COMPLETE',
+        JSON.stringify(result).slice(-5000),
+      );
+      assert(
+        result.jobs.every(
+          (j) =>
+            j.status === 'QUALIFIED_ADOPTED' ||
+            (j.family === 'trade' &&
+              !j.result.error &&
+              j.result.source.status.startsWith('COMPLETE_')),
+        ),
+        'NO_UNEXPECTED_NATIVE_FAILURE',
+      );
+      assert.equal(result.maximumPublicationWriters, 1);
+      assert.equal(result.accounting.maxPhysical, 1);
+      assert.equal(children.size, 0);
+      const part = result.jobs.find((j) => j.family === 'participants');
+      assert(part, 'ACTUAL_PARTICIPANT_REQUIRED');
+      assert(
+        result.jobs.filter((j) => j.family === 'trade' && j.completedAt < part.completedAt)
+          .length >= 3,
+        'OTHER_FEEDS_DURING_PARTICIPANT_WAIT',
+      );
+      assert(
+        result.jobs.some((j) => j.family === 'gas' && j.completedAt < part.completedAt),
+        'GAS_DURING_WAIT',
+      );
+      assert.equal(part.status, 'QUALIFIED_ADOPTED');
+      assert(
+        result.jobs.some(
+          (j) =>
+            j.family === 'market' &&
+            j.startedAt < part.completedAt &&
+            j.completedAt > part.completedAt &&
+            j.status === 'QUALIFIED_ADOPTED',
+        ),
+        'PARTICIPANT_ADVANCE_BEFORE_COLLECTED_PRODUCT_PUBLICATION',
+      );
+      assert(
+        facts.filter((f) => f.job.startsWith('timeline-')).length >= 20,
+        'INDEPENDENT_TIMELINE',
+      );
+      assert(result.jobs.filter((j) => j.family === 'trade').length > 16, 'MORE_THAN_LEGACY_16');
+      assert(
+        facts.some(
+          (f) =>
+            f.job.startsWith('timeline-') &&
+            f.freshness.ETH.status === 'stale' &&
+            f.ethPriceUsd !== null,
+        ),
+        'HONEST_EMPTY_PAIR_AGING',
+      );
+      assert(
+        facts.filter((f) => f.job.startsWith('timeline-')).at(-1).freshness.ETH.status === 'fresh',
+        'RECOVERY_MEASURED',
+      );
+      const partRoot = join(root, 'operating', part.job),
+        auditWait = await read(join(partRoot, 'AUDIT_WAIT.json'));
+      assert(
+        result.jobs.some(
+          (j) =>
+            j.family === 'trade' &&
+            j.completedAt > auditWait.startedAt &&
+            j.completedAt < auditWait.endedAt &&
+            j.publication === 'changed',
+        ),
+        'PRICE_ADVANCE_DURING_PARTICIPANT_AUDIT',
+      );
+      const physical = [];
+      for (const j of result.jobs) {
+        const jr = join(root, 'operating', j.job);
+        const ledger =
+          j.family === 'trade'
+            ? j.result.source.accounting.requests
+            : (await fs.readFile(join(jr, 'LEDGER.jsonl'), 'utf8'))
+                .trim()
+                .split('\n')
+                .map(JSON.parse);
+        for (const row of ledger) {
+          const p =
+            j.family === 'trade'
+              ? join(jr, String(row.attempt).padStart(2, '0'))
+              : join(jr, 'captures', String(row.attempt).padStart(5, '0'));
+          const start = await read(join(p, 'PHYSICAL_STARTED.json')),
+            end = await read(join(p, 'PHYSICAL_CLOSED.json'));
+          assert.equal(start.nonce, end.nonce);
+          physical.push({ job: j.job, start: start.at, end: end.closedAt, permit: start.permit });
+          const q = await read(join(p, 'request.json'));
+          assert(
+            !('headers' in q) && !('cookies' in q) && !('authorization' in q),
+            'NO_OUTGOING_REPLAY',
+          );
+        }
+      }
+      physical.sort((a, b) => a.permit - b.permit);
+      for (let i = 1; i < physical.length; i++)
+        assert(physical[i].start >= physical[i - 1].end + 1, 'INDEPENDENT_PHYSICAL_SERIAL_PACING');
+      receipt.physicalMeasurement = {
+        requests: physical.length,
+        maximumConcurrent: 1,
+        intervals: physical,
+        source: 'actual common worker physical-entry/closure receipts and exclusive physical lock',
+      };
+      await lagging.refresh(undefined, true);
+      assert.equal(lagging.status().error, null);
+      assert.equal(lagging.status().productVersion, writer.status().productVersion);
+      const final = lagging.productDaily.capture();
+      await verifyMarketCertificate(store.root, final);
+      const chunks = [];
+      for await (const b of heldExport.stream) chunks.push(b);
+      await heldExport.released;
+      heldExport = null;
+      assert.equal(sha(Buffer.concat(chunks)), sha(initialCsv));
+      for (const old of initialRows.filter((r) => r.dateUtc <= '2026-10-09')) {
+        const row = final.rows.find((r) => r.dateUtc === old.dateUtc);
+        for (const k of ['btcPriceUsd', 'ethPriceUsd', 'btcRecordedAtUtc', 'ethRecordedAtUtc'])
+          assert.equal(row[k], old[k]);
+      }
+      const url = '/api/v2/downloads/' + final.bundleId + '/daily';
+      assert.notEqual((await app.inject(url)).statusCode, 200);
+      const csv = await app.inject({ url, headers: auth() });
+      assert.equal(csv.statusCode, 200);
+      assert.equal(csv.body, final.csv.toString());
+      assert.equal((await app.inject({ url, method: 'HEAD', headers: auth() })).statusCode, 200);
+      receipt.journal = await auditJournal(store.root);
+      receipt.storage = await read(join(store.root, 'STORAGE.json'));
+      receipt.cases = [
+        'actual native five families',
+        'cooperative physical permits',
+        'serialized actual paired storage',
+        '405-second participant wait',
+        'delayed market',
+        'independent timeline API',
+        'held CSV and missed-generation adoption',
+      ];
+      process.env.HDD_TASK_ROOT = T;
+      const { finalProof } = await import('../../scripts/unified-refresh/final-proof.mjs');
+      const { createBudget } = await import('../trade-feed/budget.mjs');
+      const { restoreProof } = await import('../trade-feed/final.mjs');
+      process.env.HDD_TASK_ROOT = T;
+      const budget = createBudget(join(root, 'evidence'), {
+        attempts: 200,
+        bytes: 256 * 1024 ** 2,
+        apiSeconds: 900,
+      });
+      const save = (name, value) =>
+        put(join(root, 'evidence', 'SYNTHETIC_' + name + '.json'), {
+          ...value,
+          synthetic: true,
+          genuineBaseAdmissions: 0,
+        });
+      heldExport = lagging.productDaily.openExport(
+        held.product,
+        held.product.bundleId,
+        'daily',
+        new AbortController().signal,
+      );
+      const proof = await finalProof({
+        T: root,
+        real: writer,
+        seed: held.product,
+        f: app,
+        heldExport,
+        save,
+        synthetic: true,
+      });
+      heldExport = null;
+      await fs.mkdir(join(root, 'temp'));
+      await restoreProof({
+        R: root,
+        profile: { productRoot: store.root, participantRoot: writer.root },
+        final: proof,
+        save,
+        admittedBase: base,
+        budget,
+        baseAdmissionCount: 0,
+      });
+      receipt.finalizationAccounting = budget.snapshot();
+      receipt.finalization = 'SYNTHETIC_BACKUP_RESTORE_PASS';
+    } else if (['mixed', 'qualification', 'r3-final', 'r4-all'].includes(mode)) {
       assert.equal(
         result.status,
         'OFFLINE_PROFILE_COMPLETE',
@@ -737,6 +1133,8 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     dns.lookup = originals.lookup;
     dns.promises.lookup = originals.promiseLookup;
     globalThis.fetch = originals.fetch;
+    fs.open = originals.open;
+    syncBuiltinESMExports();
     await put(join(root, 'evidence/RESULT.json'), receipt);
     console.log(JSON.stringify({ status: receipt.status, root, mode, failure: receipt.failure }));
   }

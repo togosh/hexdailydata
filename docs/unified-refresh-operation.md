@@ -378,3 +378,23 @@ checks and held-export preservation passed using one admitted base handle set.
 Two final previews were captured; all resources closed. The immediate rollback
 is sequence 70, separate from original HDS evidence. Do not rerun the spent entry.
 Default/status/plan remain network-free; there is no installed continuous service.
+
+## Repeatable operations, offline edition
+
+The existing refresh command adds `operating-plan`, `operating-status` and
+`operating-offline`, with version `unified-operating-offline-1`. There is no
+public activation authority for this mode. The task return supplies its tested
+profile, runbook, cadence estimate, native/API/restore receipts and limitations.
+
+One coordinator owns request permits/accounting and one publication queue. At
+most one collector per family waits concurrently. Retry/audit waits release the
+physical slot; request/hash/expiry/liability permits and durable closure receipts
+enforce serial physical requests. Active-job allowances protect closing controls.
+Typed updates use the current validated product with unchanged participant and
+protocol predecessor checks. Normal API reader polling remains unchanged.
+
+Bounded control state references immutable job receipts. Due periods coalesce;
+expiry, total/rolling budgets, storage limits, monotonic IDs and clean-pause
+receipts survive restart. Unknown/terminal operations refuse readmission. Legacy
+finite validators and consumed public sessions retain their original meanings.
+Genuine sequence 71 remains read-only. No continuous service is installed.

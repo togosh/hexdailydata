@@ -1092,3 +1092,20 @@ runtime change followed the live run. All 5,004 fixed closes, 2,504 payout perio
 Current feeds were stale at final serving, as disclosed; this is not continuous
 operation or deployment qualification. Main unchanged; indexer/reconstruction
 PARKED. Detailed original failures and actual evidence are in the R4 return.
+
+## Repeatable Refresh Operations R1 — 2026-10-11
+
+The existing coordinator now has a distinct offline operating profile, one durable
+request owner and one publication queue. Five actual native families can wait
+cooperatively while all physical attempts stay serial. The synthetic mixed run
+completed 40 jobs (18 trade) with 636 physical fixture attempts, showed progress
+during participant retry/audit waits and delayed market work, exposed stale empty
+pairs honestly, and passed paired storage/API and compact backup/restore checks.
+Maintained scheduling state crossed 125 jobs and two clean restart boundaries.
+Focused cancellation, capacity, closure/refund and abrupt-parent-loss checks retain
+protection and charges. All original failed fixtures remain in the task return.
+
+This is offline qualification, with zero external calls or genuine base admissions.
+Accepted sequence 71 and original roots remain untouched. Public activation,
+continuous freshness, provider capacity, commercial use and deployment remain
+unqualified. No scheduler installed; indexer/reconstruction PARKED.

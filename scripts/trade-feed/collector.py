@@ -74,8 +74,12 @@ def main(offline_fixture=False):
     unified=admitted(a)
     assert 0<=time.time()-a['startedAtUnixSeconds']<=30
     for p,h in a['runtimeFiles'].items():assert digest((W/p).read_bytes())==h,p
-    session=Session(root,a);incoming=queue.Queue()
-    start_reader(incoming)
+    session=Session(root,a)
+    if 'operatingFormat' in a:
+        from operating_bridge import current
+        incoming=current().incoming
+    else:
+        incoming=queue.Queue();start_reader(incoming)
     def exchange(kind,cycle,**extra):
         session.check(31)
         msg={'type':kind,'cycle':cycle,'expiresAtUnixSeconds':time.time()+30,**extra}

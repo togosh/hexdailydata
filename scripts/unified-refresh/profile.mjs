@@ -1,5 +1,6 @@
 // Finite profile policy for the existing coordinator. This version is offline only.
 import { z } from 'zod';
+import { operatingAdmission } from './operating.mjs';
 import { publicAuthority, exactPublicProfile, publicAdmission } from './public-profile.mjs';
 export const profileId = 'unified-five-feed-offline-1';
 export const profileTask = 'HDD-UNIFIED-REFRESH-INTEGRATION-R2';
@@ -128,6 +129,7 @@ export function validateProfile(value) {
   return live ? { ...p, format: value.format, mode: 'OWNER_AUTHORIZED_PUBLIC' } : p;
 }
 export function unifiedAdmission(a) {
+  if (operatingAdmission(a)) return true;
   if (publicAdmission(a)) return true;
   if (a.unifiedProfileId === undefined) return false;
   if (
