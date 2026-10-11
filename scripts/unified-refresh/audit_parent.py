@@ -1,5 +1,6 @@
 """Saved-only global replay; no provider imports or mutable execution."""
-import json,hashlib
+import json,hashlib,sys
+sys.dont_write_bytecode=True
 from pathlib import Path
 KEYS=['attempts','extraAttempts','graphAttempts','rpcAttempts','graphExtras','rpcExtras',
       'graphChargedBytes','rpcChargedBytes','chargedEntities','observedBytes','returnedEntities','unknownEntityReservations']
@@ -101,7 +102,21 @@ def audit_profile(root):
                 start=reservation['pending']['startedMonotonic']
                 charged=2162688;objects=c['chargedObjects'];observed=c['wireBytes']+c['headerBytes']
                 returned=objects if c['complete'] else 0;unknown=0 if c['complete'] else objects;extra=c['retryOrdinal']
-                raw=(d/f'{n:02d}/response.body').read_bytes()
+                folder=d/f'{n:02d}';body=folder/'response.body'
+                if body.exists():raw=body.read_bytes()
+                else:
+                    # A reaped terminal worker may never have produced a body.
+                    # This is uncertainty charged in full, never an empty success.
+                    if (c['complete'] is not False or c['closed'] is not True
+                        or c['native']['reaped'] is not True or c['bodyBytes']!=0 or c['wireBytes']!=0
+                        or c['bodySha256']!=hashlib.sha256(b'').hexdigest() or c['chargedObjects']!=20000
+                        or c['status'] is not None or c.get('transportComplete') is not False
+                        or c!=read(folder/'AUDIT.json') or c!=captures[-1]
+                        or read(d/'RESULT.json')['status']!='PARTIAL'
+                        or state['closureKnown'] is not True):raise ValueError('GET missing-body closure/uncertainty evidence')
+                    meta=read(folder/'response.json') if (folder/'response.json').exists() else {}
+                    if meta.get('complete') or meta.get('status') is not None:raise ValueError('GET missing accepted body')
+                    raw=b''
                 if hashlib.sha256(raw).hexdigest()!=c['bodySha256'] or len(raw)!=c['bodyBytes'] or not c['closed']:
                     raise ValueError('GET saved body/closure')
                 for key in keys:

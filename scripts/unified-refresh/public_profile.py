@@ -1,6 +1,8 @@
 """Exact public qualification authority, independent of all consumed grants."""
-import json,re,time,datetime,math
+import json,re,time,datetime,math,sys
 from pathlib import Path
+sys.dont_write_bytecode=True
+sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'market-refresh'))
 from durable import strict_json,digest
 
 TASK='HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R2'

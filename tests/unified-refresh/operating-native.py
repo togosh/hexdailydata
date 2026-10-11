@@ -46,6 +46,8 @@ if family=='trade':
         p=Path(args[-1]);q=strict_json(p.read_bytes());count+=1
         assert q['method']=='GET' and q['url'] in URLS and 'headers' not in q
         label=q['label'];status=200
+        if f.get('noBody'):
+            return dict(reaped=True,timeout=False,exit=1,seconds=.01,stdout='',stderr='synthetic worker pre-response failure')
         if label=='markets':
             value=[dict(market_symbol=x.lower()+'usd',base_currency=x,counter_currency='USD',market_type='SPOT',trading='Enabled') for x in ('BTC','ETH')]
         elif f.get('retry') and count==2:status=503;value={'error':'synthetic unavailable'}

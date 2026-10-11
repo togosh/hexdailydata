@@ -1,5 +1,6 @@
 """One admitted subdivision; never creates a public parent or renews a budget."""
 import sys, time, queue, threading, json
+sys.dont_write_bytecode=True
 from pathlib import Path
 HERE=Path(__file__).resolve().parent
 REPO=HERE.parents[1]

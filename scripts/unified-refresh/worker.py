@@ -1,5 +1,6 @@
 """A parent pending reservation precedes each unchanged feed-specific HTTP gate."""
 import sys,json,time,importlib.util
+sys.dont_write_bytecode=True
 from pathlib import Path
 HERE=Path(__file__).resolve().parent
 

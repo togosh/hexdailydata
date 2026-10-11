@@ -43,6 +43,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     [
       'mixed',
       'qualification',
+      'no-body',
       'hash',
       'duplicate',
       'exit',
@@ -378,6 +379,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
           ? { closure: mode, largeResult: true }
           : {}),
         ...(mode === 'exhaust' ? { exhaust: true } : {}),
+        ...(mode === 'no-body' ? { noBody: true } : {}),
       };
       writeFileSync(join(jobRoot, 'FIXTURE.json'), JSON.stringify(config) + '\n', { flag: 'wx' });
       const child = spawn(
@@ -520,6 +522,16 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     } else {
       assert.equal(result.accounting.status, 'CLOSED');
       receipt.cases = [mode];
+      if (mode === 'no-body') {
+        assert.equal(result.status, 'PARTIAL');
+        assert.equal(result.accounting.attempts, 1);
+        assert.equal(result.accounting.httpChargedBytes, 2162688);
+        assert.equal(result.accounting.chargedEntities, 20000);
+        assert.equal(result.accounting.returnedEntities, 0);
+        assert.equal(result.accounting.unknownEntityReservations, 20000);
+        assert.equal(writer.status().productVersion, held.product.version);
+        assert.equal(existsSync(join(root, 'session/trade-1/01/response.body')), false);
+      }
       if (mode.startsWith('policy-')) {
         assert.equal(result.status, 'OFFLINE_PROFILE_COMPLETE');
         assert.equal(receipt.guardChecks?.status, 'PASS');
