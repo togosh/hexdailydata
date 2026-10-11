@@ -1056,3 +1056,15 @@ sequence 50, participant-last fixed window, collector/auditor retry parity and
 final-writer adoption correction implemented. Focused offline gates pass with
 original failures retained. Public execution remains conditional on independent
 preflight and freshly loaded actual paired readiness; no result claimed yet.
+
+2026-10-11 — R3 public qualification closed PARTIAL after three GETs. One real
+BTC/ETH pair committed and reached the same API at sequence 51 (ages 7/43 seconds).
+The local trade completion emitter omitted the exact R3 compact-frame binding;
+the parent stopped and the remaining 22 jobs never ran. The narrow emitter fix
+and actual native/finalization regressions passed offline, without another session.
+Independent review approved exact saved-closure reconciliation and task-owned
+closure-only lock settlement; original partial records remain unchanged. Final
+preservation/access, compact backup/restore and two stale-aware views passed.
+Only four October 11 benchmark value/time cells changed; participant frontier
+remains 27,758,521. Two genuine base admissions are closed; main/original data
+unchanged, indexer and paid reconstruction PARKED. No automatic follow-on.

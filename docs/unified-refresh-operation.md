@@ -289,3 +289,44 @@ This is one finite 23-job qualification, with skips and stale intervals reported
 from actual observations. It is neither an installed scheduler nor a guarantee
 that every feed stays fresh. Public outcome and final reviewed identities belong
 to this task's result and must not be inferred from the offline gate.
+
+### R3 actual partial outcome and offline closure
+
+The R3 command above is now **consumed; do not rerun**. Executed source was
+5f5bb22fd6d78f762a39909aadae8eee7c634fee. Three GETs (zero extras, RPC or GraphQL)
+used 6,488,064 charged bytes, 104,109 observed body/header bytes and 287 objects.
+BTC 82845.82 at 2026-10-11T03:23:23Z and ETH 2503.67 at 03:22:47Z committed
+atomically to sequence 51 and reached the same running API at 03:23:30Z, ages
+7 and 43 seconds. Twelve response cookies were ignored without replay; public
+derivatives are sanitized. The other 22 jobs never ran, including the participant
+window. Frontier 27,758,521 and all quiet feeds remain unchanged.
+
+The trade completion emitter recognized R2 but omitted R3 and emitted the legacy
+full-result frame. The parent correctly rejected it with CLOSED_RESULT_IDENTITY.
+Commit 85d71fa22515876b3975d8bdaf2a6d273204ff8f adds only that exact R3 binding
+and actual-emitter regressions; 32-KiB framing and 512-KiB result limits remain.
+Native and direct refusal tests passed offline. No public restart followed.
+
+The original parent PARTIAL/unknown-closure receipt is immutable. A distinct
+saved-only reconciliation proved workers reaped, collector exit 0, CLOSED child
+accounting, matching journal/certificate and both committed pointers. After the
+same independent reviewer approved the exact plan/wrapper, only this task's
+dead-owner closure-only lock was durably preserved and retired. Interrupted
+synthetic settlement re-entry is refused with protection retained. No generic
+unlock, publication or pointer edit occurs in the settlement.
+
+Offline finalization used a fresh real paired application, retained original
+base handles for isolated compact restore, and denied original writable roots.
+All 117,735 CSV cells were compared; only four October 11 BTC/ETH price/time
+cells differ. The 5,004 fixed closes/null quote times, old oracle observations,
+2,504 payout periods, 90 historical liquidity buckets and participant view remain.
+Rollback export verification is a saved-snapshot comparison, not a relabelled
+original live held-export result. Protected full CSV/HEAD/304 and ordinary routes
+passed with explicitly synthetic account/meter seams. Two genuine previews show
+stale status; no observation time was renewed by recovery or backup.
+
+The final compact backup preserves sequence-50 rollback and external base
+references. Two real admissions, one final backup and one restore completed;
+all owned processes/connections closed. This qualifies that saved result and
+offline correction, not the 22 unrun jobs, continuous freshness or production
+operation. The task's final report separates public and offline evidence.

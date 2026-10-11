@@ -664,3 +664,14 @@ are both retained. Final preservation/access/compact restore passed, resources
 closed, and no continuous freshness or recurring-operation approval is claimed.
 The public command and marker are spent; see the dated result in
 `docs/unified-refresh-operation.md` and the task's reviewed return.
+
+Unified Refresh Public Qualification R3 is also consumed. Its first three GETs
+qualified one BTC/ETH pair at sequence 51, but a local R3 completion-frame binding
+defect stopped the parent before the other 22 jobs. The final source fixes that
+binding; it does not authorize rerunning the command or completing the schedule.
+The original partial accounting remains intact. Separate reviewed offline proof
+established native closure and exact committed state, permitting only retirement
+of the preserved, dead-owner task lock. No price or pointer changed in recovery.
+One final compact backup/restore and normal access/preservation checks passed;
+all real resources closed. The task-owned recovery/finalization entries are spent.
+The selected prices retain their true source times and are stale at final review.
