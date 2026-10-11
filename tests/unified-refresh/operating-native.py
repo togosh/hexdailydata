@@ -39,7 +39,7 @@ def frame(path,value,status=200):
 if family=='trade':
     from client import Session,URLS,RESERVATION
     sys.path.insert(0,str(W/'scripts/trade-feed'))
-    from collector import collect,start_reader
+    from collector import collect,start_reader,closure_frame
     count=0
     def transport(args,env,wait,reap):
         global count
@@ -79,7 +79,8 @@ if family=='trade':
     finally:s.close(result.get('failure','Offline job closed'))
     result.update(accounting=s.state,networkSessionCount=0,synthetic=True,noAutomaticRestart=True)
     if f.get('largeResult'):result['boundedSyntheticDiagnostic']='x'*40000
-    save(root/'RESULT.json',result);message=closed_frame(root,result)
+    save(root/'RESULT.json',result)
+    message=closure_frame(root,result,f['closureAuthority']) if f.get('closureAuthority') else closed_frame(root,result)
     if f.get('closure')=='hash':message['resultSha256']='0'*64
     if f.get('closure')!='missing':print(json.dumps(message),flush=True)
     if f.get('closure')=='duplicate':print(json.dumps(message),flush=True)

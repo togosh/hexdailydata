@@ -383,6 +383,9 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       const selected = writer.productDaily.capture();
       const config = {
         codeBody: join(T, 'fixtures/protocol-code.json'),
+        ...(mode === 'r3-final'
+          ? { closureAuthority: 'HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3' }
+          : {}),
         ...(mode === 'policy-clock' && a.family === 'market' ? { marketLag: 220 } : {}),
         ...(mode === 'cancel-active' ? { pauseBeforeCollect: true } : {}),
         previousTrades: Object.fromEntries(

@@ -10,8 +10,8 @@ from authority import validate_authority, trade_profile, OPERATING_AUTHORITIES, 
 def closure_frame(root, result, authority):
     # R2's 66-attempt accounting can exceed the unchanged 32 KiB IPC frame cap.
     # Bind the already durable local report, rather than send its full ledger twice.
-    from public_profile import TASK as PUBLIC_TASK
-    if authority in (OPERATING_R2_AUTHORITY,PUBLIC_TASK):
+    from public_profile import TASK as PUBLIC_TASK, R3_PROFILE, authority as public_authority
+    if authority in (OPERATING_R2_AUTHORITY,PUBLIC_TASK,public_authority(R3_PROFILE)['task']):
         raw = (root/'RESULT.json').read_bytes()
         if not 0 < len(raw) <= 524288: raise ValueError('Closed result bound')
         if strict_json(raw) != result: raise ValueError('Closed result mismatch')
