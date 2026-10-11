@@ -4,9 +4,9 @@
   "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r3",
   "packetHashes": {
     "packet/INPUTS.json": "b2b786158f794674172fe5d23201efa9c7859ba49976de28153669d981cec9a1",
-    "packet/MANIFEST.json": "ad7415207acba2a42dee5cb84800b7034bf4b7b938403a930d7468ac5b56e06f",
+    "packet/MANIFEST.json": "ea6b6c19a72c8b630d1634574213b49a5878e6870313c7f0c87673e89834cd0e",
     "packet/OWNER_AUTHORITY.md": "af6a576f17e7899d2b590eb12c045b1194432dfc8713a8d1cd9d023e9007a2a1",
-    "packet/SCOPE.json": "6cb207746a5493a5001af958ee9006d41dd11a4fdf2a4c2c8d4a41a58cd31783",
+    "packet/SCOPE.json": "9df13584a0fe1d9538fafec67e656f985ba75efaa9a87e665b892468e9724f7d",
     "packet/TASK.md": "a1323bef500961f8eca15d1847c628b11a0419396b04c3d8c2e1f40641af6326"
   },
   "public": {
@@ -242,7 +242,7 @@
     "reservedBytes": 16384,
     "reservedObjects": 16,
     "ownerLock": "session/OPERATING_OWNER.lock",
-    "rule": "Never settle, delete, rename, recover, resume, repair or import this prior owner/session state. Its 43 charges and original failure remain immutable. Recorded retrospective physical closure does not change original accounting. Only the separately verified clean sequence72/71 product+participant backup is a seed for the explicitly new activation."
+    "rule": "Never settle, delete, rename, recover, resume, repair or import this prior R1 owner/session state. Its43 charges and original failure remain immutable. Retrospective physical closure does not change original accounting. The new R3 seed is only the separately verified clean sequence80/79 product/participant backup from the accepted R2 return."
   },
   "additionalOldStateProtection": {
     "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r2",
