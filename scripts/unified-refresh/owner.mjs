@@ -34,6 +34,15 @@ async function put(p, v) {
   await writeFile(p, JSON.stringify(v, null, 2) + '\n');
 }
 
+export function readinessRoutes(date) {
+  assert(/^\d{4}-\d{2}-\d{2}$/.test(date));
+  return [
+    '/api/v2/daily?from=' + date + '&to=' + date + '&limit=1',
+    '/api/v2/holders?limit=1',
+    '/api/v2/stakes?limit=1',
+  ];
+}
+
 export async function runReviewedPublic(runUnified) {
   assert.equal(resolve(process.cwd()), W);
   assert.equal(await realpath(T), T);
@@ -109,7 +118,12 @@ export async function runReviewedPublic(runUnified) {
   };
   ledger.entries.push(entry);
   await put(admissionsPath, ledger);
-  const save = (n, v) => put(join(T, 'evidence', n + '.json'), v);
+  const attemptEvidence = join(T, 'evidence', 'owner-attempt-' + entry.ordinal);
+  await mkdir(attemptEvidence);
+  const save = async (n, v) => {
+    await put(join(attemptEvidence, n + '.json'), v);
+    await put(join(T, 'evidence', n + '.json'), v);
+  };
   let base,
     real,
     reader,
@@ -215,12 +229,10 @@ export async function runReviewedPublic(runUnified) {
       };
     };
     const ready = await observe();
-    for (const path of [
-      '/api/v2/daily?limit=1',
-      '/api/v2/holders?limit=1',
-      '/api/v2/stakes?limit=1',
-    ])
-      assert.equal((await f.inject(path)).statusCode, 200);
+    for (const path of readinessRoutes(seed.metadata.through)) {
+      const response = await f.inject(path);
+      assert.equal(response.statusCode, 200, path + ': ' + response.body.slice(0, 500));
+    }
     assert(
       [401, 403].includes(
         (await f.inject('/api/v2/downloads/' + seed.bundleId + '/daily')).statusCode,
