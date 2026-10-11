@@ -1,4 +1,4 @@
-﻿# Progress
+ï»¿# Progress
 
 | Task | State | Commit / measured result |
 |---|---|---|
@@ -59,7 +59,7 @@ SQL/sync regression evidence is reused from initial candidate `6f4ef60`. A cold 
 page used 2 HTTP / 107 logical calls / 49,714 bytes; ten requested cold pages delivered
 three and returned seven quota outcomes within fixed allowances. Four latest metric
 keys used 32,768 SQL relation bytes. These are offline synthetic measurements, not live
-latency/capacity proof. All Task04 disposable Docker resources were removed. Tasks01–03,
+latency/capacity proof. All Task04 disposable Docker resources were removed. Tasks01â€“03,
 the acquisition correction and original evidence remain preserved. Canary PREPARED /
 NOT_RUN, launcher NOT_CONFIGURED; no live/v1 access, push or deployment. This status-only
 commit is separate from reviewed code. Task05 is next sequential task and remains unstarted.
@@ -69,14 +69,14 @@ bounded publication/read/retirement services, migration4/seed3 and worker daily/
 commands. All affected final checks passed on `a9bf7be`; unchanged 12-group SQL evidence
 is reused from the implementation tree committed as `86182c3`. Independent SQL/file
 probes closed concurrent reader admission, prior grace and portable consumer-marker
-findings; DB-only restore continues native sync540→548 and exports a new verified UUID.
+findings; DB-only restore continues native sync540â†’548 and exports a new verified UUID.
 Under combined2CPU/4GiB, the1M-stake/500k-account fixture ranked in4.17s and exported
 207,050,547 CSV bytes in24.82s, with35 metric ticks/140 writes and a complete address
 request. Quota-clock time is simulated; disk records are milestones, not continuous
 peaks. Windows directory fsync returned EPERM and publication fails closed; Linux
 durability/crash recovery passed. Historical market endpoints remain NOT_CONFIGURED;
-sampled OHLC/peg_assumed limitations remain explicit. Tasks01–04, acquisition correction,
-migrations1–3 and original evidence are preserved. Task-owned disposable resources were
+sampled OHLC/peg_assumed limitations remain explicit. Tasks01â€“04, acquisition correction,
+migrations1â€“3 and original evidence are preserved. Task-owned disposable resources were
 removed. Canary NOT_RUN; no live/v1 access, push or deployment. This final status-only
 commit follows independent PASS. Task06 is next eligible and has not started.
 
@@ -86,7 +86,7 @@ refresh. Independent probes found and closed verification cancellation/crash/ret
 malformed-input errors. Final affected checks passed on `c7ae880`; unchanged scale
 success paths reuse `751353c` under combined2CPU/4GiB. Mixed native reads stayed useful
 through injected price failures, quota-denied overlays and new-bundle verification.
-Provider time is synthetic; the512MiB runner reached its memory ceiling. Tasks01–05,
+Provider time is synthetic; the512MiB runner reached its memory ceiling. Tasks01â€“05,
 acquisition correction and original evidence are preserved. No canary/live/v1 runtime
 or data/push/deployment. This status-only commit follows independent PASS. Tasks07/08
 are next eligible but unstarted; source feasibility still precedes major Task07 work.
@@ -100,7 +100,7 @@ recovery and separate-process lock-loss/SIGKILL retries. Final affected checks p
 is tied to `feaceaf6`; the1M-stake/500k-account shape at `2aa18c1` backed up in46.404s and
 restored in116.704s with198 Home reads/0 failures. Its helper reached512MiB; this is no
 production headroom claim. Small valid fixtures separately prove exact forward replay
-and unknown post-snapshot market loss. Tasks01–06, sparse acquisition and original
+and unknown post-snapshot market loss. Tasks01â€“06, sparse acquisition and original
 evidence remain preserved. Task-owned Docker resources/images are cleaned; ignored
 test files remain locally, including reviewer Temp folders retained after a deletion
 policy rejection. Off-host/live/TLS/reboot/production qualification and canary NOT_RUN;
@@ -428,7 +428,7 @@ temporary parents fixed; builder and reviewer each passed 115/115 in clean copie
 Thirty million-row simulated days, compiled mixed traffic, exact replay/seed/HDS,
 backup/restore/process failures, fresh Windows dev/release and browser regressions
 are evidenced under `artifacts/task-09/20260921-rc1/` with original failures retained.
-Mixed 50-visitor reads all succeeded; current cold addresses delivered 4–5/minute vs 10
+Mixed 50-visitor reads all succeeded; current cold addresses delivered 4â€“5/minute vs 10
 target (33/100 complete). Owner/profile decision remains unanswered; no exception
 is inferred. Measured Home headline/chart p95 1.516/2.077 s; large-shape today estimate
 unavailable. DB/worker hit memory caps without OOM; no production-headroom claim.
@@ -748,11 +748,11 @@ commit/package identities are recorded in the separate history-bootstrap R2 retu
 No external requests, SQL, main merge, push, deployment or indexer restart.
 
 
-### 2026-10-08 — Unified daily/latest local milestone
+### 2026-10-08 â€” Unified daily/latest local milestone
 
 Implemented normal daily/live/Home/CSV selection over the immutable bootstrap and ledger, automatically selected paired saved Search/address/stake readers, strict selector migration, precise UTC reporting and primary reference prices. File-backed publication/rollback and small restore passed; actual application/access and bounded desktop/mobile preview evidence retained. Live feeds remain null/stale, complete export release remains gated, and main/indexer/old stores remain untouched. See UNIFIED_DAILY.md and the task return for review, exact identities and limitations.
 
-### 2026-10-08 — Bounded PulseX market proof
+### 2026-10-08 â€” Bounded PulseX market proof
 
 Added retained market observations and bounded tracked-pool liquidity to the same
 Daily/Live/Home service, with exact arithmetic, unchanged historical reference
@@ -765,7 +765,7 @@ identical and market values remain unavailable. Raw observations and all failure
 are retained in the pulsex-market-feed-r1 return. No main merge, deployment,
 scheduler, database access or indexer restart.
 
-### 2026-10-08 — Four-pool PulseX qualification
+### 2026-10-08 â€” Four-pool PulseX qualification
 
 Qualified two current observations and 90 historical UTC dates for the fixed
 four-pool source-derived USD method. The one session closed after 152 POSTs,
@@ -777,7 +777,7 @@ failure remains recorded with its focused correction. The observations are
 qualified but stale under the unchanged 300-second rule. Original R1 remains
 PARTIAL_NOT_PROMOTABLE; main, prior datasets and parked indexer are unchanged.
 
-### 2026-10-08 — Finite automatic market refresh
+### 2026-10-08 â€” Finite automatic market refresh
 
 Maintained the accepted current-only collector and automatic validated publication
 in tracked feature code. The same running local API adopted three generations at
@@ -791,7 +791,7 @@ finite result is not continuous or indefinite operation. The 4,096-object bound 
 retention prerequisite remain. Separate review and commit/archive identities are in
 the market-refresh-job-r1 return. No scheduler, main merge, deployment or indexer work.
 
-### 2026-10-09 — Bounded market storage and offline recovery
+### 2026-10-09 â€” Bounded market storage and offline recovery
 
 Implemented a compact recent window, daily/key checkpoints, full retained update
 journal, identity-checked generation retention, backup/restore and conservative
@@ -804,7 +804,7 @@ requests. Native filesystem failure evidence remains retained. Permanent schedul
 physical power-loss qualification and a later live soak remain NOT_RUN. Main stays
 unmerged, accepted data stays unchanged, and indexer remains PARKED.
 
-### 2026-10-09 — Bounded PulseChain gas feed
+### 2026-10-09 â€” Bounded PulseChain gas feed
 
 Added the official node's measured gas suggestion to the same Daily/Live/Home/CSV
 model through the existing validated storage/publication path. One independently
@@ -822,7 +822,7 @@ Gas becomes stale after 300 seconds; no scheduler is installed. BTC/ETH feeds,
 broader gas/history coverage and holder/stake/protocol refresh remain pending.
 Main remains unmerged, prior roots unchanged and indexer PARKED.
 
-### 2026-10-09 — Participant catch-up R2
+### 2026-10-09 â€” Participant catch-up R2
 
 Completed the seven bounded source windows through block 27,750,329 and published
 each compatible holder/stake/product selection to the same running local API.
@@ -842,7 +842,7 @@ one genuine compact restore and four desktop/mobile views passed. The reviewed
 source/evidence identity is in participant-catchup-refresh-r2; main is unmerged,
 all owned processes are closed and the indexer remains PARKED.
 
-### 2026-10-09 — BTC and ETH saved reference feed
+### 2026-10-09 â€” BTC and ETH saved reference feed
 
 Added the two standard Ethereum Chainlink USD references through the existing
 coordinated participant/product publisher. One finite session closed after 62
@@ -960,7 +960,7 @@ qualified at slots 1, 2, 3 and 6; three publications advanced product sequence
 25 to 28 and five ordinary same-server Live checks were fresh. Slots 4 and 5
 had empty ETH samples and retained the pair without refreshing its timestamps.
 Slot 6 publication failed locally because the adapter emitted ROUND_6 filenames
-outside the storage contract. Slots 7–16 were not queried. No serving PASS.
+outside the storage contract. Slots 7â€“16 were not queried. No serving PASS.
 The operating adapter now uses supported WINDOW_n references; actual synthetic
 storage/journal/certificate/reader tests at slots 4/6/16 pass. This correction
 was tested after closure and was not rerun publicly. The genuine participant
@@ -983,7 +983,7 @@ trial remains PARTIAL, with its consumed session and evidence unchanged.
 BTC/ETH Operating Refresh R2 (2026-10-10) completed all 16 source pairs and
 16 fresh ordinary reads on the same API. Thirty-three HTTP 200 responses used
 no retries and 71,368,704 conservatively charged bytes. Sixteen publications
-advanced sequence 28 to 44; measured BTC ages were 5–26 seconds and ETH 4–22.
+advanced sequence 28 to 44; measured BTC ages were 5â€“26 seconds and ETH 4â€“22.
 The original overall result is nevertheless PARTIAL: the 43,488-character
 closing report exceeded the coordinator's unchanged 32,768-character IPC bound.
 Collector accounting is CLOSED with no pending request, but the owner correctly
@@ -1028,7 +1028,7 @@ payout append, participant pairing, retention, held/lagging readers and protecte
 CSV passed offline; focused negative guards and original failures are retained.
 This grants no public run, genuine-data mutation or service installation.
 
-2026-10-11 — Unified Refresh Public Qualification R2: exact new public authority,
+2026-10-11 â€” Unified Refresh Public Qualification R2: exact new public authority,
 loaded paired readiness, finite parent accounting and compact native closure
 implemented and checked. One real parent closed PARTIAL after 162 attempts.
 Five publications reached sequence 49; two payout periods appended, two fresh
@@ -1039,8 +1039,8 @@ Final access/preservation/backup/restore and stale-aware previews passed. Main
 and original roots are unchanged; all owned resources closed. No automatic
 follow-on, scheduler or indexer/reconstruction work.
 
-2026-10-11 — Owner-authorized offline participant completion: applied the saved
-27,754,425–27,758,521 window through the maintained paired publisher, advancing
+2026-10-11 â€” Owner-authorized offline participant completion: applied the saved
+27,754,425â€“27,758,521 window through the maintained paired publisher, advancing
 only this task's candidate from sequence 49 to 50. All 1,427 selected before/after
 records matched, ordinary same-API adoption and held views passed, and an exact
 repeat was a no-op. The represented view now has 664,651 holder rows and 954,949
@@ -1051,13 +1051,13 @@ base admission (three cumulative). Original closed PARTIAL and sealed return
 remain unchanged. Separate continuation evidence records the result; no public
 retry, scheduler or automatic follow-on is authorized.
 
-2026-10-11 — R3 unified qualification preparation: exact new authority from
+2026-10-11 â€” R3 unified qualification preparation: exact new authority from
 sequence 50, participant-last fixed window, collector/auditor retry parity and
 final-writer adoption correction implemented. Focused offline gates pass with
 original failures retained. Public execution remains conditional on independent
 preflight and freshly loaded actual paired readiness; no result claimed yet.
 
-2026-10-11 — R3 public qualification closed PARTIAL after three GETs. One real
+2026-10-11 â€” R3 public qualification closed PARTIAL after three GETs. One real
 BTC/ETH pair committed and reached the same API at sequence 51 (ages 7/43 seconds).
 The local trade completion emitter omitted the exact R3 compact-frame binding;
 the parent stopped and the remaining 22 jobs never ran. The narrow emitter fix
@@ -1069,13 +1069,13 @@ Only four October 11 benchmark value/time cells changed; participant frontier
 remains 27,758,521. Two genuine base admissions are closed; main/original data
 unchanged, indexer and paid reconstruction PARKED. No automatic follow-on.
 
-2026-10-11 — R4 completion-contract preparation: unified trade and non-trade
+2026-10-11 â€” R4 completion-contract preparation: unified trade and non-trade
 children now use the same durable-result formatter after exact admission; no
 per-edition serializer list. Final denied-network 23-job native/paired-store
 gate and focused authority, retry/auditor, malformed closure and exact-size
 checks passed. The new R4 public grant remains conditional on separate review
 and a freshly loaded real paired API from the exact sequence-51 compact backup.
-# Unified Refresh Public Qualification R4 result — 2026-10-11
+# Unified Refresh Public Qualification R4 result â€” 2026-10-11
 
 The shared admitted-child completion contract passed the actual 23-job native
 offline gate and separate preflight at `910159f`. One genuine session then
@@ -1093,7 +1093,7 @@ Current feeds were stale at final serving, as disclosed; this is not continuous
 operation or deployment qualification. Main unchanged; indexer/reconstruction
 PARKED. Detailed original failures and actual evidence are in the R4 return.
 
-## Repeatable Refresh Operations R1 — 2026-10-11
+## Repeatable Refresh Operations R1 â€” 2026-10-11
 
 The existing coordinator now has a distinct offline operating profile, one durable
 request owner and one publication queue. Five actual native families can wait
@@ -1166,7 +1166,7 @@ only eight October 11 trade/gas value/time cells changed. Compact 80/79 backup,
 isolated restore, protected access and desktop/mobile previews passed. Both
 base admissions closed. This does not change the original public PARTIAL result.
 
-### Repeatable public qualification R3 — separate owner-authorized activation
+### Repeatable public qualification R3 â€” separate owner-authorized activation
 
 R3 begins from the reviewed clean sequence80/79 backup and corrected R2 source.
 The numerical public bounds, source methods, five-feed cadence and participant
@@ -1176,7 +1176,7 @@ pre-worker refusal without inventing a receipt or settling its pending permit.
 Focused R3 entry/binding/refusal checks precede the same independent review and
 freshly loaded paired readiness; old operating commands remain refused.
 
-### Repeatable public qualification R3 — saved result and startup closure correction
+### Repeatable public qualification R3 â€” saved result and startup closure correction
 
 The authorized R3 run at c79aab9 ended PARTIAL after 103 charged permits and five
 paired publications (80 to 85). Three trade pairs, gas and protocol were adopted;
@@ -1205,11 +1205,12 @@ Public qualification and final results are recorded only after actual execution.
 
 ## Repeatable operating R4 result
 
-The one R4 activation closed normally:33jobs,309charged attempts,31paired
-publications and2retained outcomes; sequence85 advanced to116. Participant
-window27,762,617?27,766,713 completed. Market retained its prior values after
-one known no-dispatch mandatory-control reserve refusal; the other feeds
-continued. Overall feed qualification is partial, not a continuous freshness SLA.
-One genuine base admission, compact backup/restore, protected-access and history
-checks, and two previews passed; owned resources closed. Original R1/R2/R3
-UNKNOWN states remain unchanged. The R4 command is consumed; no automatic follow-on.
+The one R4 activation closed normally: 33 jobs, 309 charged attempts, 31 paired
+publications and two retained outcomes; sequence 85 advanced to 116. Participant
+window 27,762,617 to 27,766,713 completed. Market retained its prior values after
+one known no-dispatch refusal to preserve mandatory closing-control time; the
+other feeds continued. Overall feed qualification is partial, not a continuous
+freshness SLA. One genuine base admission, compact backup/restore, protected-access
+and history checks, and two previews passed; owned resources closed. Original
+R1/R2/R3 UNKNOWN states remain unchanged. The R4 command is consumed; no automatic
+follow-on.
