@@ -1202,3 +1202,14 @@ third historical worker/collector closure separately; it does not settle old
 accounting. The current command is `node scripts/refresh-data.mjs
 operating-public-qualification-r4`; old operating commands remain refused.
 Public qualification and final results are recorded only after actual execution.
+
+## Repeatable operating R4 result
+
+The one R4 activation closed normally:33jobs,309charged attempts,31paired
+publications and2retained outcomes; sequence85 advanced to116. Participant
+window27,762,617?27,766,713 completed. Market retained its prior values after
+one known no-dispatch mandatory-control reserve refusal; the other feeds
+continued. Overall feed qualification is partial, not a continuous freshness SLA.
+One genuine base admission, compact backup/restore, protected-access and history
+checks, and two previews passed; owned resources closed. Original R1/R2/R3
+UNKNOWN states remain unchanged. The R4 command is consumed; no automatic follow-on.
