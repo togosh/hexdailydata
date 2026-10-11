@@ -1075,3 +1075,20 @@ per-edition serializer list. Final denied-network 23-job native/paired-store
 gate and focused authority, retry/auditor, malformed closure and exact-size
 checks passed. The new R4 public grant remains conditional on separate review
 and a freshly loaded real paired API from the exact sequence-51 compact backup.
+# Unified Refresh Public Qualification R4 result — 2026-10-11
+
+The shared admitted-child completion contract passed the actual 23-job native
+offline gate and separate preflight at `910159f`. One genuine session then
+completed all 23 jobs, 279 attempts and seven permitted GraphQL extras. Twenty
+coherent publications advanced sequence 51 to 71; three empty trade pairs retained
+last-good values. Participant frontier: 27,762,617. Final preservation/access,
+compact backup/restore and two previews passed with one reused base admission.
+All owned resources closed automatically; no recovery or second session.
+
+The post-session saved-parent negative test needed its expected public refusal
+message corrected; both real saved and offline cases now pass. No production
+runtime change followed the live run. All 5,004 fixed closes, 2,504 payout periods,
+90 historical liquidity buckets and original oracle evidence remain exact.
+Current feeds were stale at final serving, as disclosed; this is not continuous
+operation or deployment qualification. Main unchanged; indexer/reconstruction
+PARKED. Detailed original failures and actual evidence are in the R4 return.

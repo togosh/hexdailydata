@@ -675,3 +675,21 @@ of the preserved, dead-owner task lock. No price or pointer changed in recovery.
 One final compact backup/restore and normal access/preservation checks passed;
 all real resources closed. The task-owned recovery/finalization entries are spent.
 The selected prices retain their true source times and are stale at final review.
+
+Unified Refresh Public Qualification R4 consumed its one reviewed session on
+2026-10-11. All 23 jobs completed with matching compact native completion and
+known automatic closure. The same API adopted 20 publications, sequence 51 to
+71; empty ETH samples in trade slots 1, 7 and 14 retained the prior atomic pair.
+The fixed participant frontier advanced to 27,762,617. Accounting: 279 physical
+attempts (59 GraphQL, 172 RPC, 48 GET), seven GraphQL extras, 105,196,234 charged
+bytes and 7,690 family-defined object units. The public parent closed in 1,505.123
+seconds. No recovery, saved-only publication or second session was used.
+
+The actual tested `node scripts/refresh-data.mjs public-qualification-r4` command
+is now spent. Its task marker/accounting must not be reset or reused. One genuine
+base admission was reused for readiness, serving and final compact restore;
+preservation, protected access, held CSV and desktop/mobile checks passed, and
+all owned resources closed. Final BTC/ETH and other current feeds were truthfully
+stale after participant work; 15/16 post-trade measurements had fresh pairs.
+Finite completion does not qualify continuous freshness or install a service.
+See the R4 return for exact source, selected/rollback identities and limitations.

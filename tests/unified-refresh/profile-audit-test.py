@@ -23,7 +23,8 @@ cases = []
 profile = original(root / 'PROFILE.json')
 admitted = next(j['id'] for j in profile['jobs'] if (root / j['id'] / 'ADMISSION.json').exists())
 mutations = [
-    ('profile identity', 'PROFILE.json', lambda x: x['parent'].__setitem__('seconds', x['parent']['seconds'] + 1), 'Profile parent identity/limits'),
+    ('profile identity', 'PROFILE.json', lambda x: x['parent'].__setitem__('seconds', x['parent']['seconds'] + 1),
+     'Saved public root/profile' if profile.get('mode') == 'OWNER_AUTHORIZED_PUBLIC' else 'Profile parent identity/limits'),
     ('parent binding', 'PARENT_ACCOUNTING.json', lambda x: x.__setitem__('profileSha256', '0' * 64), 'Profile parent identity/limits'),
     ('parent limits', 'PARENT_ACCOUNTING.json', lambda x: x['limits'].__setitem__('attempts', 999), 'Profile parent identity/limits'),
     ('child binding', admitted + '/ADMISSION.json', lambda x: x.__setitem__('parentProfileSha256', '0' * 64), 'Profile child identity/limits'),

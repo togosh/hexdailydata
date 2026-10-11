@@ -358,3 +358,23 @@ corrupt already-emitted frames, including the original small inline mismatch.
 The exact 512-KiB result is accepted and an over-limit result is refused. An owner
 cleanup recheck also ensures base closure despite restore/reporting failures.
 Real source outcomes are reported separately after the single authorized run.
+# R4 finite qualification result (2026-10-11)
+
+The reviewed `public-qualification-r4` grant is consumed. The executed source was
+`910159fab698a7f14c7986eda7376e5d286991b0`; all five actual child families used the
+shared compact completion contract. All 23 scheduled jobs closed normally.
+The same real paired API adopted 20 publications (51 → 71), retaining the pair
+for empty ETH trade slots 1/7/14. The fixed participant window ended at 27,762,617.
+No runtime source fix, recovery, manual selection, restart or second session.
+
+The public parent used 279 attempts, seven GraphQL extras, 105,196,234 charged
+bytes and 7,690 object/entity units over 1,505.123 seconds. BTC/ETH were fresh in
+15 of 16 post-slot measurements; both market, gas and protocol observations were
+fresh on adoption. All current feeds were stale at final serving after participant
+work. PLS/USD remains unavailable. Independent feed clocks remain intact.
+
+One compact backup/isolated restore, protected GET/HEAD/304/unauthenticated CSV
+checks and held-export preservation passed using one admitted base handle set.
+Two final previews were captured; all resources closed. The immediate rollback
+is sequence 70, separate from original HDS evidence. Do not rerun the spent entry.
+Default/status/plan remain network-free; there is no installed continuous service.
