@@ -44,6 +44,15 @@ import {
   validateOperating,
   operatingStatus,
 } from './unified-refresh/operating.mjs';
+import {
+  liveOperating,
+  liveOperatingFormat,
+  boundaryOperatingFormat,
+  operatingPolicy,
+  boundedOperatingConfig,
+  validateOperatingReady,
+  RealOperatingClock,
+} from './unified-refresh/operating-authority.mjs';
 const taskId = 'HDD-UNIFIED-REFRESH-OPERATION-R1';
 const order = [
   'market-1',
@@ -1028,7 +1037,13 @@ export async function runJob({
           return;
         }
         const dispatchMessage = async () => {
-          if (unified && !publicAdmission(admission) && m.type !== 'closed') {
+          if (
+            unified &&
+            !publicAdmission(admission) &&
+            !liveOperating(admission) &&
+            admission.clockMode !== 'REAL_EPOCH' &&
+            m.type !== 'closed'
+          ) {
             if (
               typeof syncFixtureClock !== 'function' ||
               !Number.isFinite(m.syntheticClockUnixSeconds)
@@ -1328,7 +1343,12 @@ export async function runJob({
       accounting.pending !== null
     )
       throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + (error ?? stderr));
-    if (unified && !publicAdmission(admission)) {
+    if (
+      unified &&
+      !publicAdmission(admission) &&
+      !liveOperating(admission) &&
+      admission.clockMode !== 'REAL_EPOCH'
+    ) {
       const closedAt = Date.parse(accounting.closedAtUtc ?? accounting.closedAt) / 1000;
       if (!Number.isFinite(closedAt)) throw Error('SYNTHETIC_CLOSING_CLOCK_REQUIRED');
       syncFixtureClock(closedAt);
@@ -1397,6 +1417,17 @@ export async function runJob({
       publications,
       exit,
       stderr,
+      ...(unified
+        ? {
+            native: {
+              known: true,
+              exit,
+              closedMessageReceived: true,
+              accountingClosed: true,
+              pending: null,
+            },
+          }
+        : {}),
     };
   } finally {
     clearTimeout(expired);
@@ -1419,18 +1450,44 @@ export async function runOperating({
   configuration,
   until,
   resume = false,
+  mode = 'OFFLINE_ONLY',
+  loadedRuntimeFiles,
 }) {
+  const live = mode === 'OWNER_AUTHORIZED_PUBLIC',
+    boundary = mode === 'DENIED_NETWORK_TEST';
+  if (live) {
+    if (
+      clock !== undefined ||
+      (spawnChild !== undefined && spawnChild !== spawn) ||
+      configuration !== undefined ||
+      until !== undefined ||
+      resume
+    )
+      throw Error('OPERATING_PUBLIC_INJECTION_REFUSED');
+    clock = new RealOperatingClock();
+    spawnChild = spawn;
+  }
   if (
-    clock?.mode !== 'SYNTHETIC' ||
+    (!live && !boundary && clock?.mode !== 'SYNTHETIC') ||
+    (boundary && clock?.mode !== 'REAL_EPOCH') ||
+    !['OFFLINE_ONLY', 'OWNER_AUTHORIZED_PUBLIC', 'DENIED_NETWORK_TEST'].includes(mode) ||
     typeof spawnChild !== 'function' ||
     typeof onFact !== 'function'
   )
     throw Error('OPERATING_OFFLINE_INJECTION_REQUIRED');
   const root = resolve(taskRoot),
-    output = join(root, 'operating');
-  const c = validateOperating(
-    configuration ?? (await read(join(dirname(root), 'OPERATING_CONFIG.json'))),
-  );
+    output = join(root, live ? 'session' : 'operating');
+  if (
+    boundary &&
+    !root.startsWith(join(operatingPolicy.root, 'fixtures') + '\\') &&
+    !root.startsWith(join(operatingPolicy.root, 'fixtures') + '/')
+  )
+    throw Error('OPERATING_BOUNDARY_ROOT');
+  let c = live
+    ? null
+    : validateOperating(
+        configuration ?? (await read(join(dirname(root), 'OPERATING_CONFIG.json'))),
+      );
   const runtimeFiles = {},
     sourceFiles = {};
   for (const folder of [
@@ -1453,9 +1510,21 @@ export async function runOperating({
   );
   const allowanceRaw = await readFile(join(repo, 'config/unified-refresh-offline.json'));
   runtimeFiles['config/unified-refresh-offline.json'] = sha(allowanceRaw);
+  runtimeFiles['config/repeatable-operating-public-1.json'] = sha(
+    await readFile(join(repo, 'config/repeatable-operating-public-1.json')),
+  );
+  let readiness;
+  if (live) {
+    readiness = await validateOperatingReady({ root, registry, loadedRuntimeFiles, repo });
+    Object.assign(runtimeFiles, readiness.runtimeFiles);
+    c = validateOperating(boundedOperatingConfig(clock.now()));
+  }
   const sourceBinding = sha(canonical(runtimeFiles));
   const original = JSON.parse(allowanceRaw).jobs;
-  const bounds = Object.fromEntries(original.map((j) => [j.family, j.bounds]));
+  const bounds =
+    live || boundary
+      ? operatingPolicy.public.childAllowances
+      : Object.fromEntries(original.map((j) => [j.family, j.bounds]));
   const parentLimits = {};
   for (const p of ['graph', 'rpc', 'http']) {
     parentLimits[p + 'Attempts'] = c.total[p].attempts;
@@ -1469,11 +1538,36 @@ export async function runOperating({
     parentLimits.chargedBytes += c.total[p].bytes;
     parentLimits.chargedEntities += c.total[p].objects;
   }
+  if (c.aggregate)
+    Object.assign(parentLimits, {
+      attempts: c.aggregate.attempts,
+      chargedBytes: c.aggregate.bytes,
+      chargedEntities: c.aggregate.objects,
+    });
   if (
     !resolve(registry.root).startsWith(root + '\\') &&
     !resolve(registry.root).startsWith(root + '/')
   )
     throw Error('OPERATING_OWNED_SYNTHETIC_REGISTRY');
+  const parentNonce = live ? randomBytes(32).toString('hex') : null;
+  if (live) {
+    await absent(output);
+    await mkdir(output);
+    await durableJson(join(root, 'PUBLIC_ADMISSION.json'), {
+      taskId: operatingPolicy.task,
+      output,
+      synthetic: false,
+      nonce: parentNonce,
+      startsAt: c.startsAt,
+      admissionEndsAt: c.admissionEndsAt,
+      expiresAt: c.expiresAt,
+      clockOrigin: clock.origin,
+      preflightSha256: readiness.preflightSha256,
+      scopeSha256: readiness.scopeSha256,
+      sourceBindingSha256: sourceBinding,
+    });
+    await durableJson(join(output, 'CONFIG.json'), c);
+  }
   const owner = await OperatingOwner.open(output, c, clock, { resume, sourceBinding });
   const pending = new Map(),
     jobs = [],
@@ -1484,7 +1578,9 @@ export async function runOperating({
   const cancel = new AbortController();
   if (signal?.aborted) cancel.abort();
   signal?.addEventListener('abort', () => cancel.abort(), { once: true });
-  const stopStarts = Math.min(until ?? c.expiresAt - 1800, c.expiresAt - 90);
+  const stopStarts = boundary
+    ? Math.min(until ?? c.admissionEndsAt, c.admissionEndsAt)
+    : (c.admissionEndsAt ?? Math.min(until ?? c.expiresAt - 1800, c.expiresAt - 90));
   const start = async (family) => {
     const startTime = clock.now(),
       nativeStart = performance.now();
@@ -1535,13 +1631,21 @@ export async function runOperating({
     await mkdir(join(jobRoot, 'temp'));
     const a = {
       task: family === 'trade' ? 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2' : taskId,
-      authorityTaskId: operatingTask,
-      operatingFormat,
+      authorityTaskId: live || boundary ? operatingPolicy.task : operatingTask,
+      operatingFormat: c.format,
       activation: owner.state.activation,
-      parentMode: 'OFFLINE_ONLY',
+      parentMode: mode,
       parentProfileSha256: owner.state.configSha256,
       sourceBindingSha256: sourceBinding,
-      synthetic: true,
+      synthetic: !live,
+      ...(live || boundary ? { clockMode: 'REAL_EPOCH', activationExpiresAt: c.expiresAt } : {}),
+      ...(live
+        ? {
+            parentNonce,
+            preflightSha256: readiness.preflightSha256,
+            scopeSha256: readiness.scopeSha256,
+          }
+        : {}),
       combinedJob: true,
       job: id,
       family,
@@ -1554,8 +1658,15 @@ export async function runOperating({
       sourceFiles,
       startedAtUnixSeconds: startTime,
       deadlineUnixSeconds: startTime + allowance.seconds,
-      networkClosesAtUnixSeconds: startTime + allowance.seconds - allowance.publication - 5,
-      networkSeconds: allowance.seconds - allowance.publication - 5,
+      networkClosesAtUnixSeconds: Math.min(
+        c.dispatchEndsAt ?? Infinity,
+        startTime + allowance.seconds - allowance.publication - 5,
+      ),
+      networkSeconds:
+        Math.min(
+          c.dispatchEndsAt ?? Infinity,
+          startTime + allowance.seconds - allowance.publication - 5,
+        ) - startTime,
       ...(family === 'trade'
         ? {
             tradeSlot: 1,
@@ -1567,7 +1678,7 @@ export async function runOperating({
     if (family === 'participants') {
       const plan = {
         combinedJob: true,
-        operatingFormat,
+        operatingFormat: c.format,
         base: initial.participant.base,
         finalTarget: {
           number: initial.participant.base.number + span,
@@ -1679,6 +1790,19 @@ export async function runOperating({
           },
         };
         if (result.publicationUncertain) throw Error('OPERATING_PUBLICATION_UNKNOWN');
+        if (live || boundary) {
+          if (!result.native?.known || result.error)
+            throw Error('OPERATING_TERMINAL_CHILD:' + String(result.error));
+          if (
+            result.status === 'PARTIAL' &&
+            !result.source.status.startsWith('COMPLETE_') &&
+            result.source.feedLocalClosedExhaustion !== true
+          )
+            throw Error(
+              'OPERATING_TERMINAL_SOURCE:' +
+                String(result.source.failure ?? result.source.accounting?.closureReason),
+            );
+        }
         if (
           result.status === 'PARTIAL' &&
           !(family === 'trade' && !result.error && result.source.status.startsWith('COMPLETE_'))
@@ -1748,16 +1872,34 @@ export async function runOperating({
           clock.now() < stopStarts ? stopStarts : Infinity,
           c.expiresAt,
         );
-        if (next > clock.now()) await clock.sleep(next - clock.now());
+        if (next > clock.now())
+          await clock.sleep(Math.min(next - clock.now(), live || boundary ? 0.05 : Infinity));
         if (clock.now() >= c.expiresAt) throw Error('OPERATING_EXPIRED');
       }
-      await new Promise((r) => setTimeout(r, 2));
+      await new Promise((r) => setTimeout(r, live || boundary ? 20 : 2));
     }
     if (signal?.aborted) throw Error('OPERATING_CANCELLED');
     if (failure) throw Error(failure);
     if (owner.state.status !== 'RUNNING') throw Error('OPERATING_TERMINAL_PROTECTION');
     await Promise.all(pending.values());
-    await owner.close(until ? 'PAUSED' : 'CLOSED');
+    if (live || boundary) {
+      for (const [base, names] of [
+        [output, ['PHYSICAL_ACTIVE.lock']],
+        [registry.root, ['INTENT.json', 'SELECTION.lock', 'RECOVERY.lock']],
+        [
+          registry.productDaily.root,
+          [
+            'PENDING.json',
+            'COMMITTED.json',
+            'WRITER.lock',
+            'SELECTION.lock',
+            'RETENTION_PENDING.json',
+          ],
+        ],
+      ])
+        for (const n of names) await absent(join(base, n));
+    }
+    await owner.close(!live && !boundary && until ? 'PAUSED' : 'CLOSED');
   } catch (e) {
     failure ??= String(e);
     cancel.abort();
@@ -1780,12 +1922,24 @@ export async function runOperating({
     await owner.lock.close().catch(() => {});
   }
   const result = {
-    status: failure ? 'PARTIAL' : 'OFFLINE_OPERATING_COMPLETE',
+    status: failure ? 'PARTIAL' : live ? 'FINITE_OPERATING_CLOSED' : 'OFFLINE_OPERATING_COMPLETE',
     failure,
-    mode: 'OFFLINE_ONLY',
-    networkSessionCount: 0,
-    externalRequests: 0,
-    genuineBaseAdmissions: 0,
+    mode,
+    networkSessionCount: live ? 1 : 0,
+    externalRequests: live ? null : 0,
+    chargedPhysicalAttempts: Object.values(owner.state.totals).reduce((n, v) => n + v.attempts, 0),
+    dispatchEvidence: {
+      ...owner.state.dispatchEvidence,
+      unknownDispatchReservations:
+        Object.values(owner.state.totals).reduce((n, v) => n + v.attempts, 0) -
+        (owner.state.dispatchEvidence?.observedHttpResponses ?? 0) -
+        (owner.state.dispatchEvidence?.knownNoNetworkDispatch ?? 0),
+    },
+    ...(live ? {} : { genuineBaseAdmissions: 0 }),
+    networkClosureKnown:
+      owner.state.status === 'CLOSED' &&
+      owner.state.pending === null &&
+      owner.state.active.length === 0,
     jobs,
     jobReferences: 'JOB_<monotonic-job-id>.json',
     recentJobLimit: 64,
@@ -1800,6 +1954,10 @@ export async function runOperating({
 }
 
 export async function main(args = process.argv.slice(2)) {
+  if (args[0] === 'operating-public-qualification-r1' && args.length === 1) {
+    const { runReviewedPublic } = await import('./unified-refresh/owner.mjs');
+    return runReviewedPublic(runOperating, liveOperatingFormat);
+  }
   if (args[0] === 'operating-plan' && args.length === 2) {
     console.log(JSON.stringify(validateOperating(await read(resolve(args[1]))), null, 2));
     return 0;

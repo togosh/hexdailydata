@@ -26,6 +26,10 @@ def main(offline_fixture=False):
     for name,h in a['runtimeFiles'].items():
         if digest((REPO/name).read_bytes())!=h:raise ValueError('Frozen runtime changed')
     operating='operatingFormat' in a
+    real_bridge=None
+    if operating and a.get('clockMode')=='REAL_EPOCH':
+        from operating_bridge import initialize_real
+        real_bridge=initialize_real(root,a)
     if operating:
         from operating_bridge import current
         parent=read(root.parent/'OPERATING_STATE.json')
@@ -50,14 +54,19 @@ def main(offline_fixture=False):
         from session import ProtocolSession as Base
     else:Base=Session
     class Bound(Combined,Base):pass
-    now=time.monotonic();wall=time.time()
+    now=real_bridge.clock() if real_bridge else time.monotonic();wall=real_bridge.clock.epoch() if real_bridge else time.time()
     if 'networkDeadline' not in parent:
         parent['networkDeadline']=now+parent['networkClosesAtUnixSeconds']-wall
         atomic(root.parent/'PARENT_ACCOUNTING.json',parent)
     a['deadlineMonotonic']=now+a['deadlineUnixSeconds']-wall
     a['networkDeadline']=min(parent['networkDeadline'],now+a['networkClosesAtUnixSeconds']-wall)
     a['networkSeconds']=a['networkDeadline']-now
-    s=Bound(root,None,plan,synthetic=offline_fixture) if family=='participants' else Bound(root,None,synthetic=offline_fixture)
+    if real_bridge:
+        a['deadlineMonotonic']=real_bridge.clock.to_mono(a['deadlineUnixSeconds'])
+        a['networkDeadline']=real_bridge.clock.to_mono(a['networkClosesAtUnixSeconds'])
+        a['networkSeconds']=a['networkDeadline']-now
+    clock_args=dict(clock=real_bridge.clock,sleep=real_bridge.sleep) if real_bridge else {}
+    s=Bound(root,None,plan,synthetic=offline_fixture,**clock_args) if family=='participants' else Bound(root,None,synthetic=offline_fixture,**clock_args)
     s.configure(a,root.parent)
     if offline_fixture:s.state['mode']='SYNTHETIC_OFFLINE_TEST';s.persist()
     save(root/'JOB_CLOCK.json',dict(startedMonotonic=s.started,networkSeconds=s.network_end,
@@ -75,7 +84,7 @@ def main(offline_fixture=False):
         allowance=min(180 if family=='participants' else 30,deadline-s.clock(),s.deadline-s.clock())
         if allowance<=0:raise ValueError('No publication time')
         message['expiresAtUnixSeconds']=time.time()+allowance
-        if unified and not public:message['syntheticClockUnixSeconds']=time.time()
+        if unified and not public and not real_bridge:message['syntheticClockUnixSeconds']=time.time()
         print(json.dumps(message),flush=True)
         try:answer=incoming.get(timeout=allowance)
         except queue.Empty:raise ValueError('Publication acknowledgement unknown')

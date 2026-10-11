@@ -53,6 +53,10 @@ class WorkerTransport:
             result['childStarted']=started;result['childReaped']=closed
             result['connectionClosed']=closed and (result.get('connectionClosed') or parent_failure=='transport_timeout' or parent_failure=='owner_cancellation')
             if not closed:result.update(failureKind='unknown_closure',complete=False)
+            # Only this enclosing process owns the Popen handle and observes wait.
+            self.last_lifecycle=dict(ownerPid=os.getpid(),workerPid=self.child.pid if self.child else None,
+                childStarted=started,childReaped=closed,exitCode=self.child.returncode if self.child else None,
+                connectionClosed=bool(result['connectionClosed']))
             if closed:self.child=None
         return result
 

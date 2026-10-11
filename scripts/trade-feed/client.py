@@ -14,15 +14,33 @@ native_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(nati
 native=native_module.native
 def worker_native(args, env, wait=27, reap=2):
     # This child reads files only. The collector must retain its own command pipe.
-    return native(args, env, wait, reap, stdin=subprocess.DEVNULL)
+    # Observe the exact handle opened by the maintained native routine. No worker
+    # message or fixture flag is allowed to stand in for this enclosing wait.
+    popen=native_module.subprocess.Popen;handles=[]
+    def opened(*a,**kw):
+        child=popen(*a,**kw);handles.append(child);return child
+    native_module.subprocess.Popen=opened
+    try:result=native(args, env, wait, reap, stdin=subprocess.DEVNULL)
+    finally:native_module.subprocess.Popen=popen
+    if len(handles)!=1:raise ValueError('Exact request worker ownership')
+    child=handles[0]
+    result['ownership']=dict(ownerPid=os.getpid(),workerPid=child.pid,childStarted=True,
+        childReaped=result['reaped'] is True and child.poll() is not None,exitCode=child.returncode)
+    return result
 TASK='HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2'
 URLS=('https://www.bitstamp.net/api/v2/markets/','https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute','https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute')
 CAP=2097152; HEADER=65536; RESERVATION=2162688
 class ObjectBoundError(ValueError):pass
 class SlotMissed(ValueError):pass
+class KnownClosedExhaustion(ValueError):pass
 
 def exact_request(method,url):
     if method!='GET' or url not in URLS: raise ValueError('Exact GET URL required')
+
+def native_window(permit, now):
+    """Queueing consumes the original physical deadline, including reap time."""
+    remaining=permit['expiresAt']-now
+    return None if remaining<=3 else (min(27,remaining-2.1),2)
 
 def parsed_objects(raw):
     def unique(pairs):
@@ -52,8 +70,16 @@ class Session:
         self.cookie_policy = cookie_policy(admission)
         self.parent_accounting=parent_accounting
         from public_profile import is_public
-        self.unified_public=is_public(admission)
-        if self.unified_public:
+        from operating_authority import live
+        self.operating_live=live(admission)
+        self.unified_public=is_public(admission) or self.operating_live
+        if self.operating_live:
+            from operating_bridge import current
+            b=current()
+            if runner is not worker_native or mono is not b.clock or sleep!=b.sleep or wall!=b.clock.epoch:raise ValueError('Live operating native clock/transport')
+            from offline_profile import TradeParent
+            self.parent_accounting=TradeParent(root,admission,mono,sleep,wall=wall)
+        elif self.unified_public:
             if runner is not worker_native or mono is not time.monotonic or wall is not time.time or sleep is not time.sleep:
                 raise ValueError('Public real transport/clock required')
             from offline_profile import TradeParent
@@ -104,8 +130,17 @@ class Session:
                 save(folder/'LOCAL_SKIP.json',{'status':'SKIPPED','reason':'Durable preparation exceeded slot','networkRequests':0,'reservedBytes':RESERVATION,'reservedObjects':20000})
                 raise SlotMissed('Slot start expired after reservation')
             spawn_at=self.wall()
-            if self.parent_accounting:self.parent_accounting.before(q)
-            life=self.runner([sys.executable,'-I','-S',str(W/'scripts/trade-feed/worker.py'),str(request)],env,27,2)
+            permit=self.parent_accounting.before(q) if self.parent_accounting else None
+            window=native_window(permit,self.wall()) if self.a.get('clockMode')=='REAL_EPOCH' else (27,2)
+            if window is None:
+                life=dict(reaped=True,timeout=False,interrupted=None,exit=None,seconds=0,stdout='',stderr='',
+                    ownership=dict(ownerPid=os.getpid(),workerPid=None,childStarted=False,childReaped=False,exitCode=None))
+                save(folder/'NATIVE_NO_DISPATCH.json',dict(requestSha256=digest(request.read_bytes()),permit=permit['id'],nonce=permit['nonce'],
+                    ownerPid=os.getpid(),reason='Original permit has no native/reap time',networkRequests=0,at=self.wall()))
+            else:life=self.runner([sys.executable,'-I','-S',str(W/'scripts/trade-feed/worker.py'),str(request)],env,*window)
+            if self.a.get('clockMode')=='REAL_EPOCH':
+                from operating_bridge import native_closure
+                native_closure(request,self.root,self.a,life['ownership'],self.wall())
             for key,limit in [('stdout',2048),('stderr',2048),('interrupted',1024)]:
                 if life.get(key):life[key]=str(life[key]).encode()[:limit].decode(errors='ignore')
             closed=life['reaped'] is True
@@ -159,6 +194,7 @@ class Session:
                         count=20000
             except BaseException as e:integrity=str(e)
             if meta.get('failureKind')=='terminal' and not local_skip:integrity=meta.get('error','Terminal transport')
+            if window is None:integrity='Original permit expired before native spawn'
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
             isolated_grant = self.unified_public or self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, *OPERATING_AUTHORITIES)
@@ -186,6 +222,7 @@ class Session:
             if complete and meta.get('status')==200 and life['exit']==0 and not life['timeout']:
                 return {'attempt':s['attempts'],'bodySha256':row['bodySha256'],'bodyBytes':len(raw),'objects':count}
             if ordinal==0 and retryable(row, require_network_begin=isolated_grant):continue
+            if self.a.get('clockMode')=='REAL_EPOCH' and ordinal==1 and retryable(row,require_network_begin=True):raise KnownClosedExhaustion('Recognized identical-query retry exhausted')
             raise ValueError('Terminal or exhausted request: '+str(meta.get('status')))
     def close(self,reason):
         self.state.update(status='CLOSED' if self.state['closureKnown'] and self.state['pending'] is None else 'UNKNOWN',closureReason=reason,closedAtUtc=utc(),elapsedSeconds=self.mono()-self.start)

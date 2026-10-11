@@ -4,6 +4,7 @@ sys.dont_write_bytecode = True
 import time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent/'unified-refresh'))
 from diagnostics import Phases
 
 RECOVERY = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\btc-eth-current-reference-freshness-r2\transport-recovery-r1')
@@ -22,7 +23,8 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
     from authority import trade_profile
     profile=trade_profile(a)
     from public_profile import is_public
-    deadline = a['networkClosesAtUnixSeconds']-65 if is_public(a) else a['startedAtUnixSeconds'] + profile['dispatch']
+    from operating_authority import live
+    deadline = a['networkClosesAtUnixSeconds']-65 if is_public(a) or live(a) else a['startedAtUnixSeconds'] + profile['dispatch']
     if q['dispatchByUnixSeconds'] != deadline:
         raise ValueError('Dispatch deadline binding')
     if a.get('tradeProfileId') and q.get('tradeProfileId') != a['tradeProfileId']:
@@ -101,7 +103,8 @@ def main():
             if event.startswith('socket.'):
                 raise PermissionError('OFFLINE_NETWORK_DENIED')
         sys.addaudithook(deny)
-    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2, UNIFIED, UNIFIED_R3, UNIFIED_R4)) else None
+    from operating_authority import POLICY
+    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2, UNIFIED, UNIFIED_R3, UNIFIED_R4,Path(POLICY['root']))) else None
     try:
         if phases:
             phases.emit('worker_entry', synthetic=offline)
@@ -135,6 +138,10 @@ def main():
                 phases.emit('runtime_binding_progress', files=index)
         if phases:
             phases.emit('runtime_binding_complete')
+        if 'operatingFormat' in a:
+            spec=importlib.util.spec_from_file_location('operating_physical_worker',W/'scripts/unified-refresh/worker.py')
+            gate=importlib.util.module_from_spec(spec);spec.loader.exec_module(gate)
+            gate.live_physical_gate(request,session,a)
         spec = importlib.util.spec_from_file_location('bounded_get', W/'scripts/benchmark-reference/get_worker.py')
         m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(m)

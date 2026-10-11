@@ -177,7 +177,7 @@ export async function settlementEvidence(p, m, family) {
         closed === true &&
         !complete &&
         r.native?.reaped === true &&
-        r.native.exit !== null &&
+        (r.native.exit !== null || r.native.ownership?.childStarted === false) &&
         m.objects === p.objects &&
         m.bytes === p.bytes &&
         !r.status &&
@@ -201,22 +201,57 @@ export async function settlementEvidence(p, m, family) {
       'OPERATING_ABSENT_PHASE_VALUES',
     );
   }
-  if (closed && transport)
+  if (closed && transport && family !== 'trade')
     assert(
-      transport.childReaped === true && transport.connectionClosed === true,
+      (p.closureMode === 'unified-operating-offline-1'
+        ? transport.childReaped === true
+        : r.childReaped === true) && transport.connectionClosed === true,
       'OPERATING_NATIVE_CLOSURE_RECEIPT',
     );
   if (closed) {
     const physical = await read(join(folder, 'PHYSICAL_CLOSED.json'));
+    if (p.closureMode === 'unified-operating-public-1')
+      assert(
+        physical.syntheticResponse === false && physical.deniedBoundaryTest === false,
+        'OPERATING_REAL_CLOSURE_REQUIRED',
+      );
     assert(
       physical.permit === p.id &&
         physical.nonce === p.nonce &&
         physical.job === p.job &&
         physical.attempt === p.attempt &&
         physical.connectionClosed === true &&
-        physical.childReaped === true,
+        (physical.childReaped === true || physical.noChildStarted === true),
       'OPERATING_PHYSICAL_CLOSURE_BINDING',
     );
+    if (physical.syntheticResponse === false) {
+      const n = physical.native;
+      const noChild = physical.noChildStarted === true;
+      assert(
+        n &&
+          n.ownerPid === physical.proofOwnerPid &&
+          n.workerPid === physical.workerPid &&
+          (noChild
+            ? n.childStarted === false && n.workerPid === null && n.exitCode === null
+            : n.childReaped === true && n.exitCode !== null),
+        'OPERATING_ENCLOSING_NATIVE_PROOF',
+      );
+      const started = await optional('PHYSICAL_STARTED.json');
+      assert(Boolean(started) === physical.physicalStarted, 'OPERATING_PHYSICAL_START_PROOF');
+      if (started) assert(JSON.parse(started).workerPid === n.workerPid, 'OPERATING_REAP_PID');
+      if (noChild) {
+        const proof = JSON.parse(await fs.readFile(join(folder, 'NATIVE_NO_DISPATCH.json')));
+        assert(
+          !started &&
+            proof.ownerPid === n.ownerPid &&
+            proof.permit === p.id &&
+            proof.nonce === p.nonce &&
+            proof.networkRequests === 0 &&
+            proof.requestSha256 === p.requestSha256,
+          'OPERATING_NO_CHILD_PROOF',
+        );
+      }
+    }
   }
   if (family === 'trade' && closed) assert(r.native.reaped === true, 'OPERATING_TRADE_REAP');
   return r;

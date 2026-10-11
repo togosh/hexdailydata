@@ -48,7 +48,7 @@ def operating_physical_enter(request,root,a,clock):
             from protocol import validate_job
             method,url,body=validate_job(q)
         if method!=req['method'] or url!=req['url'] or body!=(request.parent/'request.body').read_bytes():raise ValueError('Operating physical query changed')
-    raw=json.dumps(dict(permit=p['id'],nonce=p['nonce'],job=a['job'],attempt=p['attempt'],at=now)).encode()
+    raw=json.dumps(dict(permit=p['id'],nonce=p['nonce'],job=a['job'],attempt=p['attempt'],at=now,workerPid=os.getpid())).encode()
     with (root.parent/'PHYSICAL_ACTIVE.lock').open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
     with (request.parent/'PHYSICAL_STARTED.json').open('xb') as f:f.write(raw);f.flush();os.fsync(f.fileno())
     # Re-read after hashing and durable writes, immediately before response I/O.
@@ -65,10 +65,61 @@ def operating_physical_close(request,root,token,now):
     with (request.parent/'PHYSICAL_CLOSED.json').open('x') as f:json.dump(value,f);f.flush();os.fsync(f.fileno())
     lock.unlink()
 
+def record_native_closure(request,root,a,life,now):
+    """Called by the enclosing collector only AFTER its exact worker was waited.
+    No real worker writes or asserts its own childReaped evidence.
+    """
+    import os
+    from operating_authority import live,boundary
+    if not (live(a) or boundary(a)):raise ValueError('Native operating closure mode')
+    root=Path(root);request=Path(request)
+    not_started=life.get('childStarted') is False and life.get('workerPid') is None and life.get('exitCode') is None
+    if (life.get('ownerPid')!=os.getpid() or (not not_started and (life.get('childReaped') is not True
+        or life.get('exitCode') is None or not isinstance(life.get('workerPid'),int)))):
+        raise ValueError('Exact native worker closure unavailable')
+    state=json.loads((root.parent/'OPERATING_STATE.json').read_bytes());p=state['pending']
+    if not p or p['job']!=a['job'] or p['requestPath']!=str(request.resolve()):raise ValueError('Native closure pending identity')
+    started=request.parent/'PHYSICAL_STARTED.json';lock=root.parent/'PHYSICAL_ACTIVE.lock'
+    token=started.read_bytes() if started.exists() else None
+    if not_started:
+        proof=json.loads((request.parent/'NATIVE_NO_DISPATCH.json').read_bytes())
+        if token or lock.exists() or proof['ownerPid']!=os.getpid() or proof['permit']!=p['id'] or proof['nonce']!=p['nonce'] or proof['networkRequests']!=0:raise ValueError('Unproved no-child closure')
+    if token:
+        value=json.loads(token)
+        if lock.read_bytes()!=token or value['workerPid']!=life['workerPid'] or value['permit']!=p['id'] or value['nonce']!=p['nonce']:raise ValueError('Native physical owner changed')
+    else:
+        if lock.exists():raise ValueError('Unowned physical lock')
+        value=dict(permit=p['id'],nonce=p['nonce'],job=a['job'],attempt=p['attempt'],at=None,workerPid=life['workerPid'])
+    value.update(closedAt=now,connectionClosed=True,childReaped=not not_started,noChildStarted=not_started,syntheticResponse=False,
+        deniedBoundaryTest=boundary(a),proofOwnerPid=os.getpid(),physicalStarted=token is not None,native=life)
+    with (request.parent/'PHYSICAL_CLOSED.json').open('x',encoding='utf-8') as f:json.dump(value,f);f.flush();os.fsync(f.fileno())
+    if token:lock.unlink()
+
+def live_physical_gate(request,root,a):
+    from operating_authority import live,validate
+    if not live(a):raise ValueError('Worker has no live operating grant')
+    validate(a,root,request)
+    operating_physical_enter(request,root,a,time.time)
+    # Hashing and all leaf validation consume the same original permit. Check at
+    # DNS/connect/send too; opening a socket cannot outlive a queued permit.
+    def deadline_gate(event,args):
+        if event in ('socket.getaddrinfo','socket.connect','http.client.send'):
+            state=json.loads((Path(root).parent/'OPERATING_STATE.json').read_bytes());p=state.get('pending')
+            if state['status']!='RUNNING' or not p or p['requestPath']!=str(Path(request).resolve()) or time.time()>=p['expiresAt']:
+                raise ValueError('Operating network deadline/owner')
+    sys.addaudithook(deadline_gate)
+
 def main():
     request=Path(sys.argv[1]).resolve();root=request.parents[2]
     a=json.loads((root/'ADMISSION.json').read_bytes())
-    if 'operatingFormat' in a:raise ValueError('Operating mode has no public network authority')
+    if 'operatingFormat' in a:
+        folder={'market':'market-refresh','gas':'gas-feed','protocol':'protocol-feed','participants':'participant-refresh'}[a['family']]
+        sys.path[:0]=[str(HERE),str(HERE.parent/folder),str(HERE.parent/'market-refresh')]
+        live_physical_gate(request,root,a)
+        file=HERE.parent/folder/('http_worker.py' if a['family']=='market' else 'worker.py')
+        spec=importlib.util.spec_from_file_location('bound_feed_worker',file)
+        module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+        return module.main()
     parent=json.loads((root.parent/'PARENT_ACCOUNTING.json').read_bytes())
     if (a['task']!='HDD-UNIFIED-REFRESH-OPERATION-R1' or parent['status']!='ADMITTED'
         or parent['job']!=a['job'] or parent['pending']['requestPath']!=str(request)

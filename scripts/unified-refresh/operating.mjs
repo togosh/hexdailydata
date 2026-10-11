@@ -3,6 +3,13 @@ import fs from 'node:fs/promises';
 import { resolve, join, dirname } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { permitLiability, settlementEvidence } from './operating-validation.mjs';
+import {
+  liveOperating,
+  liveOperatingFormat,
+  boundaryOperatingFormat,
+  validateBoundedOperating,
+  operatingPolicy,
+} from './operating-authority.mjs';
 import { fileURLToPath } from 'node:url';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const operatingTask = 'HDD-REPEATABLE-REFRESH-OPERATIONS-R1';
@@ -19,6 +26,8 @@ const exact = (x, keys) =>
 const integer = (x, min, max) =>
   check(Number.isSafeInteger(x) && x >= min && x <= max, 'OPERATING_INTEGER');
 export function validateOperating(c) {
+  if ([liveOperatingFormat, boundaryOperatingFormat].includes(c?.format))
+    return validateBoundedOperating(c);
   exact(c, [
     'format',
     'mode',
@@ -69,6 +78,17 @@ export function validateOperating(c) {
 }
 export function operatingAdmission(a) {
   if (a?.operatingFormat === undefined) return false;
+  if (liveOperating(a)) return true;
+  if (a.operatingFormat === boundaryOperatingFormat) {
+    check(
+      a.authorityTaskId === operatingPolicy.task &&
+        a.parentMode === 'DENIED_NETWORK_TEST' &&
+        a.synthetic === true &&
+        a.clockMode === 'REAL_EPOCH',
+      'OPERATING_BOUNDARY_MODE',
+    );
+    return true;
+  }
   check(
     a.operatingFormat === operatingFormat &&
       a.authorityTaskId === operatingTask &&
@@ -134,10 +154,16 @@ export class OperatingOwner {
   static async open(root, config, clock, { resume = false, sourceBinding } = {}) {
     const c = validateOperating(config);
     check(
-      clock?.mode === 'SYNTHETIC' && /^[a-f0-9]{64}$/.test(sourceBinding),
+      (c.format === operatingFormat ? clock?.mode === 'SYNTHETIC' : clock?.mode === 'REAL_EPOCH') &&
+        /^[a-f0-9]{64}$/.test(sourceBinding),
       'SYNTHETIC_OWNER_REQUIRED',
     );
     root = resolve(root);
+    if (c.format === liveOperatingFormat)
+      check(
+        !resume && root === join(operatingPolicy.root, 'session'),
+        'OPERATING_PUBLIC_NO_RESUME_OR_RELOCATION',
+      );
     await fs.mkdir(root, { recursive: true });
     const now = clock.now();
     check(now >= c.startsAt && now < c.expiresAt, 'OPERATING_ACTIVATION_EXPIRED');
@@ -176,7 +202,8 @@ export class OperatingOwner {
           if (e.code !== 'ENOENT') throw e;
         }
         s = {
-          format: operatingFormat,
+          format: c.format,
+          clockOrigin: clock.origin ?? null,
           root,
           activation: randomUUID(),
           configSha256: hash(c),
@@ -192,6 +219,7 @@ export class OperatingOwner {
           rolling: [],
           active: [],
           completed: 0,
+          startedByFamily: Object.fromEntries(operatingFamilies.map((f) => [f, 0])),
           participantBlocks: 0,
           due: Object.fromEntries(operatingFamilies.map((f) => [f, c.startsAt])),
           latest: {},
@@ -205,7 +233,8 @@ export class OperatingOwner {
           disabled: [],
           endpointAttempts: { rpc: [0, 0], graph: [0, 0] },
           maxPhysical: 0,
-          externalRequests: 0,
+          externalRequests: c.format === liveOperatingFormat ? null : 0,
+          dispatchEvidence: { observedHttpResponses: 0, knownNoNetworkDispatch: 0 },
         };
       }
       await lock.writeFile(
@@ -361,6 +390,14 @@ export class OperatingOwner {
         this.state.completed + this.jobs.size < this.config.storage.jobs,
         'OPERATING_JOB_BOUND',
       );
+      if (this.config.maximumJobsByFamily) {
+        check(
+          this.now() < this.config.admissionEndsAt &&
+            this.state.startedByFamily[family] < this.config.maximumJobsByFamily[family],
+          'OPERATING_JOB_BOUND',
+        );
+        this.state.startedByFamily[family]++;
+      }
       const id = family + '-' + String(this.state.nextJob++).padStart(8, '0');
       await this.save();
       return id;
@@ -401,6 +438,7 @@ export class OperatingOwner {
       const all = this.liabilities();
       add(all, caps);
       check(fits(this.state.totals, all, this.config.total), 'OPERATING_ACTIVE_RESERVATIONS');
+      this.checkAggregate(all);
       const rollingUsed = zeros();
       for (const b of this.state.rolling)
         if (b.at > this.now() - this.config.rolling.seconds) add(rollingUsed, b.cost);
@@ -518,6 +556,10 @@ export class OperatingOwner {
         Number.isFinite(m.seconds) && m.seconds >= 0 && m.seconds <= 600,
         'OPERATING_WAIT_BOUND',
       );
+      check(
+        this.now() + m.seconds < Math.min(j.deadline, this.config.expiresAt),
+        'OPERATING_WAIT_EXPIRED',
+      );
       j.phase = 'WAIT';
       return new Promise((resolve, reject) =>
         this.waiters.push({ job, at: this.now() + m.seconds, resolve, reject }),
@@ -534,13 +576,17 @@ export class OperatingOwner {
     return this.exclusive(async () => {
       const now = this.now();
       for (const w of [...this.waiters])
-        if (w.at <= now) {
+        if (w.at <= now || now >= (this.jobs.get(w.job)?.deadline ?? 0)) {
           this.waiters.splice(this.waiters.indexOf(w), 1);
           const j = this.jobs.get(w.job);
           if (j) j.phase = 'RUNNING';
-          w.resolve({ ok: true, now });
+          if (!j || now >= j.deadline) w.reject(Error('OPERATING_WAIT_EXPIRED'));
+          else w.resolve({ ok: true, now });
         }
-      if (this.state.status !== 'RUNNING' || now >= this.config.expiresAt) {
+      if (
+        this.state.status !== 'RUNNING' ||
+        now >= (this.config.dispatchEndsAt ?? this.config.expiresAt)
+      ) {
         for (const q of this.queue.splice(0)) q.reject(Error('OPERATING_DISPATCH_CLOSED'));
         return;
       }
@@ -590,6 +636,7 @@ export class OperatingOwner {
         for (const b of this.state.rolling) add(used, b.cost);
         const protection = this.liabilities(job);
         add(protection, cost);
+        this.checkAggregate(protection);
         check(
           fits(j.spent, cost, j.caps) &&
             fits(this.state.totals, protection, this.config.total) &&
@@ -608,6 +655,7 @@ export class OperatingOwner {
             });
           r[m.protocol].objects = m.reserved.chargedEntities ?? m.objects;
           add(r, this.liabilities(job));
+          this.checkAggregate(r);
           check(
             fits(this.state.totals, r, this.config.total) &&
               fits(used, r, this.config.rolling.limits),
@@ -624,6 +672,7 @@ export class OperatingOwner {
           attempt: m.attempt,
           nonce: randomUUID(),
           protocol: m.protocol,
+          closureMode: this.config.format,
           endpoint: m.endpoint,
           requestPath: path,
           querySha256: m.querySha256,
@@ -631,7 +680,11 @@ export class OperatingOwner {
           retry: m.retry,
           bytes: m.bytes,
           objects: m.objects,
-          expiresAt: Math.min(m.expiresAt, j.deadline, this.config.expiresAt),
+          expiresAt: Math.min(
+            m.expiresAt,
+            j.deadline,
+            this.config.dispatchEndsAt ?? this.config.expiresAt,
+          ),
           at: now,
         };
         add(this.state.totals, cost);
@@ -685,6 +738,15 @@ export class OperatingOwner {
       rpcEndpointAttempts: [...this.state.endpointAttempts.rpc],
     };
   }
+  checkAggregate(reserved) {
+    if (!this.config.aggregate) return;
+    for (const k of ['attempts', 'bytes', 'objects'])
+      check(
+        protocols.reduce((n, p) => n + this.state.totals[p][k] + reserved[p][k], 0) <=
+          this.config.aggregate[k],
+        'OPERATING_AGGREGATE_RESERVE',
+      );
+  }
   async settle(job, m) {
     const p = this.state.pending,
       j = this.jobs.get(job);
@@ -700,7 +762,16 @@ export class OperatingOwner {
     check(typeof m.closed === 'boolean', 'OPERATING_CLOSURE_REQUIRED');
     integer(m.bytes, 0, p.bytes);
     integer(m.objects, 0, p.objects);
-    await settlementEvidence(p, m, j.family);
+    const capture = await settlementEvidence(p, m, j.family);
+    if (this.state.dispatchEvidence && m.closed) {
+      const physical = JSON.parse(
+        await fs.readFile(join(dirname(p.requestPath), 'PHYSICAL_CLOSED.json')),
+      );
+      if (Number.isInteger(capture.status) && capture.status >= 100 && capture.status <= 599)
+        this.state.dispatchEvidence.observedHttpResponses++;
+      else if (physical.noChildStarted === true || physical.physicalStarted === false)
+        this.state.dispatchEvidence.knownNoNetworkDispatch++;
+    }
     const now = this.now();
     // Unknown/incomplete physical observations keep their entire prior reservation.
     if (m.closed && m.complete) {

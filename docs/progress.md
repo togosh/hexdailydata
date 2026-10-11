@@ -1109,3 +1109,11 @@ This is offline qualification, with zero external calls or genuine base admissio
 Accepted sequence 71 and original roots remain untouched. Public activation,
 continuous freshness, provider capacity, commercial use and deployment remain
 unqualified. No scheduler installed; indexer/reconstruction PARKED.
+
+The next isolated operating qualification adds exact public authority, real
+clock conversion, cancellable IPC waits and enclosing-native closure proofs.
+Its focused denied-network test retained the 121-second participant wait while
+other feeds progressed. Actual five-family worker-entry refusals and delayed
+request-timeout checks are separate from the reused forty-job offline campaign.
+Public and genuine-data results belong to that task's final reviewed report;
+the source implementation alone is not evidence that public execution passed.

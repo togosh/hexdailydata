@@ -398,3 +398,27 @@ expiry, total/rolling budgets, storage limits, monotonic IDs and clean-pause
 receipts survive restart. Unknown/terminal operations refuse readmission. Legacy
 finite validators and consumed public sessions retain their original meanings.
 Genuine sequence 71 remains read-only. No continuous service is installed.
+
+## One finite public operating qualification
+
+`node scripts/refresh-data.mjs operating-public-qualification-r1` is bound to
+the exact repeatable-refresh-public-qualification-r1 root, packet, reviewed
+frozen source and fresh paired API readiness. It is not a reusable live command.
+The ordinary plan/status commands remain inert; offline authority cannot launch
+a real worker. A consumed marker or uncertain owner cannot be resumed or reset.
+
+This profile permits job starts for 1,200 seconds, then drains admitted work
+within its original deadlines and a 2,400-second whole-operation ceiling.
+The final 180 seconds reserve closure. Caps are 20 trade, five market, seven
+gas, four protocol and one fixed participant job, with 1,376 physical attempts
+and 480 MiB aggregate charges plus tighter protocol/rolling/endpoint limits.
+Each process converts its own monotonic origin to epoch only at the IPC boundary.
+Queue time consumes the original request deadline. A worker never certifies its
+own reaping: the enclosing collector waits its exact native handle before
+settlement. Unknown closure or publication preserves protection and stops work.
+
+The API is measured normally every 20 seconds, including waits and no-ops.
+An adoption check may report the reader's ordinary one-second check interval;
+it does not force refresh or renew an observation time. Freshness, source
+qualification, publication and finite operational closure are separate results.
+No permanent schedule, continuous-freshness SLA or commercial permission is added.

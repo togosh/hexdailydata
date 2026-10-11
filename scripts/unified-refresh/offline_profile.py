@@ -44,7 +44,7 @@ class TradeParent:
             answer=current().permit(request,q,q['attempt'],q['retryOrdinal'],2162688,20000,
                                     min(self.wall()+30,self.a['networkClosesAtUnixSeconds']-65))
             save(self.root/'parent-reservations'/f"{q['attempt']:05d}.json",answer)
-            return
+            return answer['permit']
         p=self.read();a=self.a;b=a['allowance'];lim=a['parentLimits']
         if (p['status']!='ADMITTED' or p['job']!=a['job'] or p['pending'] is not None
                 or p['jobAdmissionSha256']!=digest((self.root/'ADMISSION.json').read_bytes())):

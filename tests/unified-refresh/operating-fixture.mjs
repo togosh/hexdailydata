@@ -23,6 +23,10 @@ import {
 import { productFiles } from '../../dist/services/product-daily/project.js';
 import { ProductDailyStore } from '../../dist/services/product-daily/store.js';
 import { checkGuardCorrections } from './guard-checks.mjs';
+import {
+  RealOperatingClock,
+  boundedOperatingConfig,
+} from '../../scripts/unified-refresh/operating-authority.mjs';
 const W = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const priorTask =
   'C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\unified-refresh-integration-r2';
@@ -35,6 +39,10 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     [
       priorTask,
       priorTask.replace('unified-refresh-integration-r2', 'repeatable-refresh-operations-r1'),
+      priorTask.replace(
+        'unified-refresh-integration-r2',
+        'repeatable-refresh-public-qualification-r1',
+      ),
       priorTask.replace(
         'unified-refresh-integration-r2',
         'unified-refresh-public-qualification-r4',
@@ -52,6 +60,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   assert(
     [
       'repeatable',
+      'native-boundary',
       'operating-smoke',
       'operating-cancel-retry',
       'operating-cancel-physical',
@@ -97,6 +106,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
   const operatingSmall = mode.startsWith('operating-');
+  const boundary = mode === 'native-boundary';
   await fs.mkdir(join(root, 'evidence'));
   process.env.HDD_TASK_ROOT = root;
   const NativeDate = Date,
@@ -111,6 +121,11 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     }
   };
   Object.defineProperty(performance, 'now', { configurable: true, value: () => now });
+  if (boundary) {
+    globalThis.Date = NativeDate;
+    Object.defineProperty(performance, 'now', { configurable: true, value: realNow });
+    now = NativeDate.now();
+  }
   const deny = () => {
     throw Error('DENIED_EXTERNAL_NETWORK');
   };
@@ -135,18 +150,20 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     if (typeof o !== 'object' || o.host !== '127.0.0.1') return deny();
     return originals.connect.apply(this, args);
   };
-  const clock = {
-    mode: 'SYNTHETIC',
-    now: () => now / 1000,
-    sleep: async (n) => {
-      now += n * 1000;
-    },
-    synchronize: (t) => {
-      // JSON source seconds can carry microseconds; Date.parse closes at ms.
-      assert(t * 1000 >= now - 2);
-      now = Math.max(now, t * 1000);
-    },
-  };
+  const clock = boundary
+    ? new RealOperatingClock()
+    : {
+        mode: 'SYNTHETIC',
+        now: () => now / 1000,
+        sleep: async (n) => {
+          now += n * 1000;
+        },
+        synchronize: (t) => {
+          // JSON source seconds can carry microseconds; Date.parse closes at ms.
+          assert(t * 1000 >= now - 2);
+          now = Math.max(now, t * 1000);
+        },
+      };
   const h = sha('tiny immutable synthetic bases; no production records');
   const empty = (name) => ({
     root: join(root, name),
@@ -286,6 +303,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     listenerStart = realNow();
     const getLive = async () => {
       assert(realNow() - listenerStart < 900000);
+      if (boundary) now = NativeDate.now();
       app.controls.now = now;
       const r = await app.inject('/api/v2/live');
       assert.equal(r.statusCode, 200, r.body.slice(0, 200));
@@ -304,7 +322,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     const onAdoption = async (selected, check) => {
       check();
       const live = await getLive();
-      if (mode === 'repeatable')
+      if (mode === 'repeatable' || boundary)
         return {
           ...live,
           expectedSelected: selected.product.version,
@@ -421,7 +439,10 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       };
     }
     const spawnFixture = (_exe, args, options) => {
-      assert(children.size < (mode === 'repeatable' ? 5 : 1), 'BOUNDED_NATIVE_CHILDREN');
+      assert(
+        children.size < (mode === 'repeatable' || boundary ? 5 : 1),
+        'BOUNDED_NATIVE_CHILDREN',
+      );
       const jobRoot = args.at(-1),
         a = JSON.parse(readFileSync(join(jobRoot, 'ADMISSION.json')));
       const selected = writer.productDaily.capture();
@@ -446,6 +467,13 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
           ? { graphRetries: 1 }
           : {}),
         ...(mode === 'repeatable' && a.family === 'trade' ? { responseCookie: true } : {}),
+        ...(boundary
+          ? {
+              realClockBoundary: true,
+              tradeMode: tradeOrdinal === 1 ? 'empty' : 'fresh',
+              delay: a.family === 'participants' ? 121 : 0,
+            }
+          : {}),
         ...(mode === 'repeatable' && tradeOrdinal === 1 ? { noBodyRetry: true } : {}),
         ...(mode === 'r3-final'
           ? { closureAuthority: 'HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3' }
@@ -469,7 +497,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         ...(mode === 'repeatable' && tradeOrdinal === 17 ? { largeResult: true } : {}),
         ...(a.family === 'participants'
           ? {
-              delay: mode === 'repeatable' ? 405 : 400,
+              delay: boundary ? 121 : mode === 'repeatable' ? 405 : 400,
               ...(mode === 'repeatable' ? { auditDelay: 75 } : {}),
             }
           : {}),
@@ -495,7 +523,17 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       writeFileSync(join(jobRoot, 'FIXTURE.json'), JSON.stringify(config) + '\n', { flag: 'wx' });
       const child = spawn(
         'python',
-        ['-I', '-S', join(W, 'tests/unified-refresh/operating-native.py'), jobRoot],
+        [
+          '-I',
+          '-S',
+          join(
+            W,
+            boundary
+              ? 'tests/unified-refresh/operating-boundary-native.py'
+              : 'tests/unified-refresh/operating-native.py',
+          ),
+          jobRoot,
+        ],
         options,
       );
       if (mode === 'cancel-active') setTimeout(() => ac.abort(), 150);
@@ -544,6 +582,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       return child;
     };
     let configuration;
+    if (boundary) configuration = boundedOperatingConfig(clock.now(), true);
     if (mode === 'operating-receipt-failure') {
       fs.open = async (path, ...args) => {
         if (String(path).endsWith('NATIVE_CLOSURE.json'))
@@ -578,10 +617,63 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         return f;
       },
       signal: ac.signal,
+      ...(boundary ? { mode: 'DENIED_NETWORK_TEST', until: configuration.startsAt + 62 } : {}),
     });
     receipt.result = result;
     receipt.starts = starts;
-    if (mode === 'r4-all') {
+    if (boundary) {
+      assert.equal(
+        result.status,
+        'OFFLINE_OPERATING_COMPLETE',
+        JSON.stringify(result).slice(-6000),
+      );
+      assert.equal(result.accounting.status, 'CLOSED');
+      assert.equal(result.maximumPublicationWriters, 1);
+      assert.equal(result.accounting.maxPhysical, 1);
+      assert.deepEqual([...new Set(result.jobs.map((j) => j.family))].sort(), [
+        'gas',
+        'market',
+        'participants',
+        'protocol',
+        'trade',
+      ]);
+      const part = result.jobs.find((j) => j.family === 'participants');
+      assert(result.jobs.some((j) => j.family === 'trade' && j.completedAt < part.completedAt));
+      receipt.completionMatrix = [];
+      for (const j of result.jobs) {
+        const jr = join(root, 'operating', j.job),
+          r = await read(join(jr, 'COORDINATOR_RESULT.json'));
+        const native = await read(join(jr, 'NATIVE_CLOSURE.json'));
+        assert(
+          native.exit.code === 0 &&
+            !native.killed &&
+            !native.closureProtocolError &&
+            !native.ipcError &&
+            native.closedMessageReceived &&
+            native.resultMatchesClosedMessage &&
+            native.accountingMatchesResult &&
+            native.accountingClosed &&
+            native.pending === null &&
+            !r.error,
+          JSON.stringify({ native, error: r.error }),
+        );
+        assert(r.source.status.startsWith('COMPLETE_'), JSON.stringify(r.source).slice(-3500));
+        receipt.completionMatrix.push({
+          job: j.job,
+          family: j.family,
+          status: j.status,
+          emitter: await read(join(jr, 'COMPLETION_EMITTER.json')),
+          native,
+        });
+      }
+      receipt.cases = [
+        'actual five-family native emitter/parser/publisher/storage/reader',
+        'real epoch/local monotonic conversion',
+        '121-second IPC wait with other-feed progress',
+        'actual child wait before physical settlement',
+        'empty trade completion',
+      ];
+    } else if (mode === 'r4-all') {
       assert.equal(starts.length, 23);
       receipt.completionMatrix = await Promise.all(
         starts.map(async (s) => ({

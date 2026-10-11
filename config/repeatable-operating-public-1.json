@@ -1,0 +1,236 @@
+{
+  "task": "HDD-REPEATABLE-REFRESH-PUBLIC-QUALIFICATION-R1",
+  "format": "unified-operating-public-1",
+  "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r1",
+  "packetHashes": {
+    "packet/TASK.md": "6b71b514a9a12968d4a2cdd6a1e96d5e6d84055bc66d2f8f973c9e2c6a84acaf",
+    "packet/SCOPE.json": "934f5764c79ee698f3d172e06768022efa1fe722121006feae2632aec9241aff",
+    "packet/INPUTS.json": "8447d9bcb32c4c7e302e92fdb7dfa4e8de4e4518f3e2de8ff084e906f340c4d0",
+    "packet/PLANNER_DISPOSITION.md": "0155a20d9dc36cd9440adfebc06e1dc19d37e4e2e08be3297c972d45ec0fbeb2"
+  },
+  "public": {
+    "sessions": 1,
+    "spending": 0,
+    "credentials": false,
+    "providerAccountAccess": false,
+    "startRule": "Atomically bind startsAt=T0 to actual UTC and a local monotonic origin after the reviewed loaded-app readiness, immediately before activation; one assignment only.",
+    "newJobAdmissionSeconds": 1200,
+    "sessionSecondsIncludingClosure": 2400,
+    "finalClosureReserveSeconds": 180,
+    "lastNewJobAt": "strictly before T0+1200; no overdue burst; maximum one job per family",
+    "dispatchCutoff": "min(exact child/control deadline, T0+2220); finish closure by T0+2400",
+    "restart": "No deliberate public pause/restart is required or authorized in this finite qualification. Known-closed terminal session stays consumed. Offline pause/restart tests are reused; no public renewal.",
+    "families": {
+      "trade": {
+        "periodSeconds": 60,
+        "maximumJobs": 20,
+        "deadlineSeconds": 600
+      },
+      "market": {
+        "periodSeconds": 240,
+        "maximumJobs": 5,
+        "deadlineSeconds": 600
+      },
+      "gas": {
+        "periodSeconds": 180,
+        "maximumJobs": 7,
+        "deadlineSeconds": 600
+      },
+      "protocol": {
+        "periodSeconds": 300,
+        "maximumJobs": 4,
+        "deadlineSeconds": 600
+      },
+      "participants": {
+        "periodSeconds": 3600,
+        "maximumJobs": 1,
+        "deadlineSeconds": 1800
+      }
+    },
+    "maximumJobs": 37,
+    "globalMaximumPhysicalAttempts": 1376,
+    "protocolReservationLimits": {
+      "http": {
+        "attempts": 120,
+        "bytes": 268435456,
+        "objects": 2400000,
+        "extras": 60
+      },
+      "graph": {
+        "attempts": 1400,
+        "bytes": 100663296,
+        "objects": 200000,
+        "extras": 72
+      },
+      "rpc": {
+        "attempts": 640,
+        "bytes": 134217728,
+        "objects": 500000,
+        "extras": 34
+      }
+    },
+    "rolling": {
+      "seconds": 600,
+      "limits": {
+        "http": {
+          "attempts": 72,
+          "bytes": 167772160,
+          "objects": 1440000,
+          "extras": 36
+        },
+        "graph": {
+          "attempts": 800,
+          "bytes": 83886080,
+          "objects": 200000,
+          "extras": 72
+        },
+        "rpc": {
+          "attempts": 400,
+          "bytes": 67108864,
+          "objects": 350000,
+          "extras": 34
+        }
+      }
+    },
+    "endpointAttemptLimits": {
+      "rpc": [
+        320,
+        320
+      ],
+      "graph": [
+        700,
+        700
+      ]
+    },
+    "reservationNote": "Graph total 1400 is deliberately high enough for the maintained half-total per-endpoint closing reserve of a 552-attempt participant child. It is not a target. Exact family/job caps also bind: all child maxima sum to 1376 physical attempts; the explicit global cap is 1376.",
+    "maximumChargedBytes": 503316480,
+    "maximumChargedObjects": 3100000,
+    "nativeChildrenMaximum": 5,
+    "physicalConcurrency": 1,
+    "publicationWriters": 1,
+    "minimumSecondsAfterKnownClosure": 1,
+    "childAllowances": {
+      "trade": {
+        "httpAttempts": 6,
+        "httpExtras": 3,
+        "httpChargedBytes": 12976128,
+        "controlGraphExtras": 0,
+        "controlRpcExtras": 0,
+        "graphAttempts": 0,
+        "rpcAttempts": 0,
+        "graphChargedBytes": 0,
+        "rpcChargedBytes": 0,
+        "chargedEntities": 120000,
+        "graphExtras": 0,
+        "rpcExtras": 0,
+        "seconds": 600,
+        "publication": 35
+      },
+      "market": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 1,
+        "controlRpcExtras": 0,
+        "graphAttempts": 24,
+        "rpcAttempts": 56,
+        "graphChargedBytes": 2097152,
+        "rpcChargedBytes": 2097152,
+        "chargedEntities": 10000,
+        "graphExtras": 4,
+        "rpcExtras": 0,
+        "seconds": 600,
+        "publication": 35
+      },
+      "gas": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 0,
+        "controlRpcExtras": 0,
+        "graphAttempts": 0,
+        "rpcAttempts": 24,
+        "graphChargedBytes": 0,
+        "rpcChargedBytes": 6291456,
+        "chargedEntities": 20000,
+        "graphExtras": 0,
+        "rpcExtras": 2,
+        "seconds": 600,
+        "publication": 35
+      },
+      "protocol": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 0,
+        "controlRpcExtras": 0,
+        "graphAttempts": 0,
+        "rpcAttempts": 28,
+        "graphChargedBytes": 0,
+        "rpcChargedBytes": 6291456,
+        "chargedEntities": 10000,
+        "graphExtras": 0,
+        "rpcExtras": 4,
+        "seconds": 600,
+        "publication": 35
+      },
+      "participants": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 2,
+        "controlRpcExtras": 0,
+        "graphAttempts": 552,
+        "rpcAttempts": 24,
+        "graphChargedBytes": 62914560,
+        "rpcChargedBytes": 2097152,
+        "chargedEntities": 120000,
+        "graphExtras": 52,
+        "rpcExtras": 4,
+        "seconds": 1800,
+        "publication": 180
+      }
+    },
+    "participant": {
+      "from": 27762617,
+      "to": 27766713,
+      "maximumNewBlocks": 4096,
+      "maximumActivationBlocks": 4096,
+      "maximumWindows": 1,
+      "priorHash": "0x3e2e5bf8d66f6f048bd2678a054859d46bf7f2598675403fae5db62e61b3deb6",
+      "priorTimestamp": 1791644675,
+      "deployment": "QmSsv8uvNLbfJCQARk7xd9iNouNmaoqZCrqEwRaFCHJMCw"
+    },
+    "urls": {
+      "get": [
+        "https://www.bitstamp.net/api/v2/markets/",
+        "https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute",
+        "https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute"
+      ],
+      "rpc": [
+        "https://rpc.pulsechain.com/",
+        "https://rpc-pulsechain.g4mm4.io/"
+      ],
+      "graphql": [
+        "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex",
+        "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2",
+        "https://graph.pulsechain.com/subgraphs/name/pulsechain/hex"
+      ]
+    },
+    "methods": "Exact maintained family validators only: existing fixed pool/token identities, two-endpoint state/header controls, bounded gas/protocol calls, fixed participant-window pagination and parent resolution; no additional query families, introspection, historical candles, logs, routes or fallback providers.",
+    "retryPolicy": "Existing per-family recognized-error, identical-query, ordinal and closing-reserve rules unchanged; participant allowed slow tiers unchanged. Every attempt consumes this activation. Pre-network startup unknown/timeout, unknown native closure or integrity/auth/pin conflict is terminal, never an automatic probe/retry.",
+    "cookies": "Ignore response Set-Cookie without storage/replay in requests; retain auth/challenge, redirect and TLS refusals. Sanitize distributable evidence only; preserve original response/source tokens locally."
+  },
+  "selection": {
+    "sequence": 71,
+    "productVersion": "8d3d020e02a2c4b68fca3a67f93bbf2c3a67feb70e3b6bac67791bc96479a51c",
+    "participantGeneration": "c182da939f433aa88973730281c0f1bb41c1f54ae8be1722ff06ce2d962d5b62",
+    "participantFrontier": {
+      "hash": "0x3e2e5bf8d66f6f048bd2678a054859d46bf7f2598675403fae5db62e61b3deb6",
+      "number": 27762617,
+      "timestamp": 1791644675
+    },
+    "immediateRollbackSequence": 70,
+    "backupSha256": "1ee51e07d4bd250b964e873297165e64f6110e09b5f2c92530fc9157fafc5ba2"
+  }
+}

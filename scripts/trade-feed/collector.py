@@ -74,7 +74,11 @@ def main(offline_fixture=False):
     unified=admitted(a)
     assert 0<=time.time()-a['startedAtUnixSeconds']<=30
     for p,h in a['runtimeFiles'].items():assert digest((W/p).read_bytes())==h,p
-    session=Session(root,a)
+    real_bridge=None
+    if 'operatingFormat' in a and a.get('clockMode')=='REAL_EPOCH':
+        from operating_bridge import initialize_real
+        real_bridge=initialize_real(root,a)
+    session=Session(root,a,mono=real_bridge.clock,wall=real_bridge.clock.epoch,sleep=real_bridge.sleep) if real_bridge else Session(root,a)
     if 'operatingFormat' in a:
         from operating_bridge import current
         incoming=current().incoming
@@ -83,7 +87,7 @@ def main(offline_fixture=False):
     def exchange(kind,cycle,**extra):
         session.check(31)
         msg={'type':kind,'cycle':cycle,'expiresAtUnixSeconds':time.time()+30,**extra}
-        if offline_fixture:msg['syntheticClockUnixSeconds']=time.time()
+        if offline_fixture and not real_bridge:msg['syntheticClockUnixSeconds']=time.time()
         print(__import__('json').dumps(msg),flush=True)
         answer=incoming.get(timeout=30)
         if not answer.get('ok') or answer.get('cycle')!=cycle:raise ValueError('Owner refused: '+str(answer))
@@ -91,12 +95,13 @@ def main(offline_fixture=False):
     outcomes=[];status='PARTIAL';reason='Not completed'
     try:
         operating=a.get('authorityTaskId') in OPERATING_AUTHORITIES
-        outcomes=collect(session,exchange,outcomes=outcomes if operating or unified else None)
+        outcomes=collect(session,exchange,clock=real_bridge.clock,sleep=real_bridge.sleep,outcomes=outcomes) if real_bridge else collect(session,exchange,outcomes=outcomes if operating or unified else None)
         status='COMPLETE_SAMPLED_JOB' if unified and len(outcomes)==1 else 'COMPLETE_FRESH_CYCLES' if len(outcomes)==session.profile['cycles'] and all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
         reason='All original slots accounted'
     except BaseException as e:reason=type(e).__name__+': '+str(e)
     finally:session.close(reason)
     result={'status':status,'accounting':session.state,'cycles':outcomes,'networkSessionCount':1,'noAutomaticRestart':True}
+    if a.get('clockMode')=='REAL_EPOCH':result['feedLocalClosedExhaustion']=reason.startswith('KnownClosedExhaustion: ')
     save(root/'RESULT.json',result)
     print(__import__('json').dumps(closure_frame(root,result,a.get('authorityTaskId'),unified=unified)),flush=True)
     return 0 if status.startswith('COMPLETE_') else 2

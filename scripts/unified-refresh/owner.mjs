@@ -9,6 +9,7 @@ import https from 'node:https';
 import dns from 'node:dns';
 import { syncBuiltinESMExports } from 'node:module';
 import { publicAuthority, publicProfile } from './public-profile.mjs';
+import { operatingPolicy, liveOperatingFormat } from './operating-authority.mjs';
 import { finalProof } from './final-proof.mjs';
 import {
   canonical,
@@ -43,8 +44,31 @@ export function readinessRoutes(date) {
   ];
 }
 
+// Preserve the reader's ordinary polling interval; never force reader refresh.
+export async function finalOrdinaryAdoption(
+  observe,
+  save,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+) {
+  const samples = [];
+  for (let n = 0; n < 5; n++) {
+    if (n) await sleep(1050);
+    const sample = await observe();
+    samples.push(sample);
+    if (!sample.adoptionPending) {
+      await save('FINAL_ORDINARY_ADOPTION', { status: 'PASS', samples });
+      return sample;
+    }
+  }
+  await save('FINAL_ORDINARY_ADOPTION', { status: 'FAIL', samples });
+  throw Error('FINAL_ORDINARY_READER_ADOPTION_NOT_OBSERVED');
+}
+
 export async function runReviewedPublic(runUnified, profileId = publicProfile) {
-  const authority = publicAuthority(profileId);
+  const operating = profileId === liveOperatingFormat;
+  const authority = operating
+    ? { ...operatingPolicy, profileHash: sha(canonical(operatingPolicy)) }
+    : publicAuthority(profileId);
   assert(authority, 'EXACT_PUBLIC_OWNER_AUTHORITY');
   const { task: publicTask, root: T, profileHash: publicProfileHash, packetHashes } = authority;
   assert.equal(resolve(process.cwd()), W);
@@ -182,7 +206,9 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
       real = await ParticipantRegistry.open(profile.participantRoot, profile.productRoot, base);
     }
     seed = real.productDaily.capture();
-    const expected = (await read(join(T, 'packet/INPUTS.json'))).initialSelection;
+    const expected = operating
+      ? plan.initialSelection
+      : (await read(join(T, 'packet/INPUTS.json'))).initialSelection;
     assert.equal(seed.version, expected.version);
     assert.equal(seed.manifestSha256, expected.manifestSha256);
     assert.equal(sha(seed.csv), expected.csvSha256);
@@ -232,20 +258,26 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
     budget.listening(f);
     const observe = async () => {
       f.controls.now = Date.now();
+      const queryStartedAtUtc = new Date().toISOString();
       const response = await budget.measuredWire(f, '/api/v2/live');
       assert.equal(response.statusCode, 200);
       const body = JSON.parse(response.body);
-      assert.equal(body.datasetVersion, real.productDaily.capture().version);
+      const selectedVersion = real.productDaily.capture().version;
+      if (!operating) assert.equal(body.datasetVersion, selectedVersion);
       return {
         status: 'MEASURED',
         pid: process.pid,
         origin,
         sourceAndFreshness: body,
         participant: reader.status(),
+        selectedVersion,
+        adoptionPending: body.datasetVersion !== selectedVersion,
+        queryStartedAtUtc,
         measuredAtUtc: new Date().toISOString(),
       };
     };
     const ready = await observe();
+    assert.equal(ready.adoptionPending, false, 'BASELINE_API_PAIR');
     for (const path of readinessRoutes(seed.metadata.through)) {
       const response = await f.inject(path);
       assert.equal(response.statusCode, 200, path + ': ' + response.body.slice(0, 500));
@@ -285,8 +317,12 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
     result = await runUnified({
       taskRoot: T,
       registry: real,
-      profile: await read(join(T, 'packet/PUBLIC_PROFILE.json')),
-      preflightPath: join(T, 'PREFLIGHT.json'),
+      ...(operating
+        ? { mode: 'OWNER_AUTHORIZED_PUBLIC' }
+        : {
+            profile: await read(join(T, 'packet/PUBLIC_PROFILE.json')),
+            preflightPath: join(T, 'PREFLIGHT.json'),
+          }),
       loadedRuntimeFiles: plan.runtimeFiles,
       onAdoption: async (selected, check) => {
         check();
@@ -294,11 +330,16 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
         check();
         return served;
       },
-      onFact: observe,
+      onFact: async (job) => {
+        const value = await observe();
+        if (operating) await durableJson(join(T, 'evidence', `SERVED_${job.id}.json`), value);
+        return value;
+      },
     });
     await save('PUBLIC_RESULT', result);
     console.log('PUBLIC_PARENT_CLOSED ' + result.status);
     if (!result.networkClosureKnown) throw Error('PUBLIC_PARENT_CLOSURE_UNKNOWN');
+    if (operating) await finalOrdinaryAdoption(observe, save);
     final = await finalProof({ T, real, seed, f, heldExport, save });
     heldExport = null;
     if (final.backup) await previews({ R: T, origin, save, f, budget });
@@ -356,7 +397,9 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
     });
     console.log('PUBLIC_OWNER_CLOSED ' + entry.status);
   }
-  return !failure && result?.status === 'PUBLIC_PROFILE_COMPLETE' ? 0 : 2;
+  return !failure && ['PUBLIC_PROFILE_COMPLETE', 'FINITE_OPERATING_CLOSED'].includes(result?.status)
+    ? 0
+    : 2;
 }
 
 // Unconditional base closure also applies when a restore failure receipt cannot be written.

@@ -693,3 +693,12 @@ all owned resources closed. Final BTC/ETH and other current feeds were truthfull
 stale after participant work; 15/16 post-trade measurements had fresh pairs.
 Finite completion does not qualify continuous freshness or install a service.
 See the R4 return for exact source, selected/rollback identities and limitations.
+
+The finite repeatable operating entry is
+`node scripts/refresh-data.mjs operating-public-qualification-r1`.
+It requires its own unspent exact task marker, frozen-source review and a newly
+loaded actual paired API. It cannot reuse R4 or any old grant. See
+`docs/unified-refresh-operation.md` and the exact task packet for timing,
+reservations, closure and task-owned restore limits. Do not install this entry
+as a service or reuse it after terminal closure. Inspect the task return for
+actual served ages and any partial outcome before considering later operation.

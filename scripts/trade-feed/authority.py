@@ -63,6 +63,8 @@ def cookie_policy(admission):
 
 def validate_authority(admission, session):
     session = Path(session).resolve()
+    from operating_authority import live,validate
+    if live(admission):return validate(admission,session)
     from public_profile import is_public,validate_authority as validate_public
     if is_public(admission):return validate_public(admission,session)
     recovery = any(session.is_relative_to(root) for root in (ROOT, ISOLATION_ROOT, COOKIE_ROOT, OPERATING_ROOT, OPERATING_R2_ROOT)) or 'authorityTaskId' in admission

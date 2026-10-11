@@ -191,13 +191,19 @@ class ParentTransport:
             from operating_bridge import current
             s=self.s;q=read(request)['job'];n=s.state['attempts']
             r=read(s.root/'combined-reservations'/f'{n:05d}.json')
+            bridge=current()
+            epoch_deadline=bridge.clock.to_epoch(deadline) if hasattr(bridge.clock,'to_epoch') else deadline
             answer=current().permit(request,q,n,s.retry_ordinal,s.capacity(q),q['maxRows'],
-                                     min(deadline,s.admission['networkClosesAtUnixSeconds']),{**r['reserved']['counts'],'endpointAttempts':r['reserved']['endpointAttempts']})
+                                     min(epoch_deadline,s.admission['networkClosesAtUnixSeconds']),{**r['reserved']['counts'],'endpointAttempts':r['reserved']['endpointAttempts']})
             r['parentBefore']=answer['parentBefore']
             atomic(s.root/'combined-reservations'/f'{n:05d}.json',r)
             # Waiting consumed the original deadline; the exact query and controls are checked again.
             s.phase_check(q,[])
-            return self.physical(request,min(deadline,s.admission['networkDeadline']),storage)
+            result=self.physical(request,min(deadline,s.admission['networkDeadline']),storage)
+            if hasattr(bridge.clock,'epoch'):
+                from operating_bridge import native_closure
+                native_closure(request,s.root,s.admission,self.physical.last_lifecycle,bridge.clock.epoch())
+            return result
         s=self.s;p=read(s.parent_root/'PARENT_ACCOUNTING.json');q=read(request)['job']
         if p['status']!='ADMITTED' or p['pending'] is not None:raise Stop('Unknown parent physical slot')
         if s.clock()>=p['networkDeadline'] or s.clock()>=s.admission['networkDeadline']:
