@@ -1,5 +1,5 @@
 """Exact offline subdivision. This is never a public admission mechanism."""
-import re
+import re,time
 from pathlib import Path
 from durable import strict_json, save, digest
 
@@ -7,6 +7,8 @@ TASK = 'HDD-UNIFIED-REFRESH-INTEGRATION-R2'
 PROFILE = 'unified-five-feed-offline-1'
 
 def admitted(a):
+    from public_profile import is_public
+    if is_public(a):return True
     if 'unifiedProfileId' not in a:return False
     if (a.get('unifiedProfileId') != PROFILE or a.get('authorityTaskId') != TASK
             or a.get('synthetic') is not True or a.get('parentMode') != 'OFFLINE_ONLY'
@@ -24,9 +26,9 @@ def closed_frame(root,result):
 
 class TradeParent:
     """Same durable single physical slot; GET charges remain conservative."""
-    def __init__(self,root,a,clock,sleep):
+    def __init__(self,root,a,clock,sleep,wall=None):
         if not admitted(a) or a['family']!='trade':raise ValueError('Offline trade parent required')
-        self.root=Path(root);self.a=a;self.clock=clock;self.sleep=sleep
+        self.root=Path(root);self.a=a;self.clock=clock;self.sleep=sleep;self.wall=wall or clock
         self.file=self.root.parent/'PARENT_ACCOUNTING.json'
         for name in ('parent-reservations','parent-settlements'):(self.root/name).mkdir()
     def read(self):return strict_json(self.file.read_bytes())
@@ -39,7 +41,7 @@ class TradeParent:
                 or p['jobAdmissionSha256']!=digest((self.root/'ADMISSION.json').read_bytes())):
             raise ValueError('Parent GET slot/admission unknown')
         if p.get('lastClosedMonotonic') is not None:self.sleep(max(0,1-(self.clock()-p['lastClosedMonotonic'])))
-        if self.clock()+65>=min(p['networkClosesAtUnixSeconds'],a['networkClosesAtUnixSeconds']):
+        if self.wall()+65>=min(p['networkClosesAtUnixSeconds'],a['networkClosesAtUnixSeconds']):
             raise ValueError('Parent GET closure reserve')
         n=q['attempt'];extra=q['retryOrdinal']
         # Remaining child and parent bounds are both enforced before dispatch.

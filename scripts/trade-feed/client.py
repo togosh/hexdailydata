@@ -51,11 +51,19 @@ class Session:
         self.root=Path(root);self.a=admission;self.runner=runner;self.mono=mono;self.wall=wall;self.sleep=sleep
         self.cookie_policy = cookie_policy(admission)
         self.parent_accounting=parent_accounting
+        from public_profile import is_public
+        self.unified_public=is_public(admission)
+        if self.unified_public:
+            if runner is not worker_native or mono is not time.monotonic or wall is not time.time or sleep is not time.sleep:
+                raise ValueError('Public real transport/clock required')
+            from offline_profile import TradeParent
+            self.parent_accounting=TradeParent(root,admission,mono,sleep,wall=wall)
         self.profile = trade_profile(admission)
         if self.cookie_policy and runner is worker_native:
             validate_authority(admission, self.root)
         if (self.root/'ACCOUNTING.json').exists():raise ValueError('Consumed session')
         self.start=mono();self.remaining=self.profile['seconds']-(wall()-admission['startedAtUnixSeconds']);self.last=None
+        if self.unified_public:self.remaining=min(self.remaining,admission['deadlineUnixSeconds']-wall())
         if not 0<self.remaining<=self.profile['seconds']:raise ValueError('Admission time')
         self.state={'status':'ADMITTED','startedAtUtc':utc(),'attempts':0,'logicalRequests':0,'extras':0,'chargedBytes':0,'observedWireBytes':0,'observedBodyBytes':0,'observedHeaderBytes':0,'diagnosticBytes':0,'chargedObjects':0,'pending':None,'closureKnown':True,'requests':[]}
         self.persist()
@@ -77,6 +85,7 @@ class Session:
             folder=self.root/f"{s['attempts']+1:02d}";folder.mkdir()
             request=folder/'request.json'
             q={'method':'GET','url':url,'label':label,'attempt':s['attempts']+1,'retryOrdinal':ordinal,'nonce':self.a['nonce'],'dispatchByUnixSeconds':self.a['startedAtUnixSeconds']+self.profile['dispatch']}
+            if self.unified_public:q['dispatchByUnixSeconds']=self.a['networkClosesAtUnixSeconds']-65
             if self.a.get('tradeProfileId'):
                 q['tradeProfileId']=self.a['tradeProfileId']
             if ordinal==0 and slot_deadline is not None:
@@ -152,7 +161,7 @@ class Session:
             if meta.get('failureKind')=='terminal' and not local_skip:integrity=meta.get('error','Terminal transport')
             row={**q,'closed':closed,'complete':complete,'status':meta.get('status'),'failureKind':('timeout' if life['timeout'] else meta.get('failureKind')),'integrityFailure':integrity,'native':life,'bodySha256':digest(raw),'headersSha256':digest(headers),'bodyBytes':len(raw),'wireBytes':len(raw)+(len(framing) if framing else 0),'headerBytes':len(headers),'chargedObjects':count,'closedAtUtc':utc() if closed else None}
             row.update(diagnosticBytes=diagnostics,phaseBytes=len(phase_raw),phaseSha256=digest(phase_raw),lastEstablishedPhase=phases[-1]['event'] if phases else 'worker_entry_not_established',spawnToEntrySeconds=phases[0]['unixSeconds']-spawn_at if phases else None)
-            isolated_grant = self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, *OPERATING_AUTHORITIES)
+            isolated_grant = self.unified_public or self.a.get('authorityTaskId') in (ISOLATION_AUTHORITY, COOKIE_AUTHORITY, *OPERATING_AUTHORITIES)
             if isolated_grant:
                 row['networkConnectionBegan'] = any(p.get('event')=='dns_tcp_tls_connection_begin' for p in phases)
             if self.cookie_policy:

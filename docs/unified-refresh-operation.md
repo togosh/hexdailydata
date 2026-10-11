@@ -170,3 +170,27 @@ The `NEXT_PUBLIC_QUALIFICATION.md` in the return is a proposal only. A later
 public scope must bind current targets, runtime, per-feed budgets, source times
 and reviewed closure before execution. All old grants remain consumed. Saved
 sequence 44, the completed offline recovery, main and parked work are unchanged.
+
+## Bounded public qualification R2
+
+`node scripts/refresh-data.mjs public-qualification-r2` is a separate exact grant
+for `unified-refresh-public-qualification-r2`. Default, status, plan and the prior
+offline profile remain network-free. The command requires the frozen source/input
+plan and independent PASS, restores the compact sequence 44 pair once into this
+task's new runtime, opens the real paired API from those bytes, and records fresh
+readiness before exclusive public admission. It is not a reusable scheduler.
+
+The fixed profile has 16 independent three-GET trade jobs, two market/liquidity,
+two gas, two protocol/payout, and one participant window ending at 27,758,521.
+One parent owns every request and the 3,600-second clock including its 180-second
+closing reserve. Native workers bind the same task/profile/nonce, frozen code,
+parent pending reservation and child allowance. A consumed or uncertain marker
+cannot be resumed. Missed slots remain skipped; source success, paired adoption,
+served freshness and closure are reported separately. This sparse schedule does
+not qualify continuous five-minute freshness for every feed.
+
+The foreground owner reuses admitted immutable bases for final compact restore;
+all writable roots are task-owned. Synthetic preflight uses empty base handles,
+real publication/storage and denied networking. Genuine final proof additionally
+browses the complete holder/stake stores. Actual source/public results and final
+identities belong in the qualification return, not in an operator default.

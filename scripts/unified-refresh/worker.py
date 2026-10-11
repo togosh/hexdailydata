@@ -12,8 +12,12 @@ def main():
         or time.time()>=min(parent['networkClosesAtUnixSeconds'],a['networkClosesAtUnixSeconds'])):
         raise ValueError('Unbound/expired parent request')
     folder={'market':'market-refresh','gas':'gas-feed','protocol':'protocol-feed','participants':'participant-refresh'}[a['family']]
-    sys.path[:0]=[str(HERE.parent/folder),str(HERE.parent/'market-refresh')]
+    sys.path[:0]=[str(HERE),str(HERE.parent/folder),str(HERE.parent/'market-refresh')]
     from durable import digest
+    if a.get('unifiedProfileId') is not None:
+        from public_profile import is_public,validate_authority
+        if not is_public(a):raise ValueError('Offline profile cannot perform network requests')
+        validate_authority(a,root,request)
     if digest((root/'ADMISSION.json').read_bytes())!=parent['jobAdmissionSha256']:
         raise ValueError('Exclusive child admission changed')
     repo=HERE.parents[1]

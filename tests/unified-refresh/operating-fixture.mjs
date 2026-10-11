@@ -23,15 +23,26 @@ import { productFiles } from '../../dist/services/product-daily/project.js';
 import { ProductDailyStore } from '../../dist/services/product-daily/store.js';
 import { checkGuardCorrections } from './guard-checks.mjs';
 const W = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const T = 'C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\unified-refresh-integration-r2';
+const priorTask =
+  'C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\unified-refresh-integration-r2';
 const read = async (p) => JSON.parse(await fs.readFile(p));
 const put = async (p, v) => fs.writeFile(p, JSON.stringify(v, null, 2) + '\n', { flag: 'wx' });
 
 export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
-  assert.equal(resolve(taskRoot), T);
+  const T = resolve(taskRoot);
+  assert(
+    [
+      priorTask,
+      priorTask.replace(
+        'unified-refresh-integration-r2',
+        'unified-refresh-public-qualification-r2',
+      ),
+    ].includes(T),
+  );
   assert(
     [
       'mixed',
+      'qualification',
       'hash',
       'duplicate',
       'exit',
@@ -208,14 +219,23 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       new AbortController().signal,
     );
     const { fixture, auth } = await import('../market-feed/access-fixture.mjs');
-    app = await fixture({
-      participants: reader,
-      productDaily: reader.productDaily,
-      sourceGenerations: base,
-    });
+    app = await fixture(
+      {
+        participants: reader,
+        productDaily: reader.productDaily,
+        sourceGenerations: base,
+      },
+      mode === 'qualification'
+        ? {
+            evidenceRoot: join(root, 'evidence'),
+            webRoot: join(W, 'dist/web'),
+            account: { webRoot: join(W, 'account/dist/ui'), register: async () => {} },
+          }
+        : {},
+    );
     const inject = app.inject.bind(app);
     app.inject = async (...args) => {
-      assert(++localRequests <= 64, 'FIXTURE_LOCAL_REQUEST_BOUND');
+      assert(++localRequests <= 128, 'FIXTURE_LOCAL_REQUEST_BOUND');
       const url = typeof args[0] === 'string' ? args[0] : args[0].url;
       const reserve = url.includes('/downloads/') ? 5 * 1024 ** 2 : 128 * 1024;
       chargedLocalBytes += reserve;
@@ -225,7 +245,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       assert(observedLocalBytes <= 16 * 1024 ** 2, 'FIXTURE_LOCAL_BYTES');
       return response;
     };
-    await app.app.listen({ host: '127.0.0.1', port: 0 });
+    const origin = await app.app.listen({ host: '127.0.0.1', port: 0 });
     listenerStart = realNow();
     const getLive = async () => {
       assert(realNow() - listenerStart < 900000);
@@ -274,7 +294,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     const profile = await read(join(W, 'config/unified-refresh-offline.json'));
     if (mode === 'policy-clock') profile.jobs = profile.jobs.slice(0, 2);
     else if (mode === 'policy-payout') profile.jobs = profile.jobs.slice(0, 4);
-    else if (mode !== 'mixed') profile.jobs = profile.jobs.slice(0, 1);
+    else if (!['mixed', 'qualification'].includes(mode)) profile.jobs = profile.jobs.slice(0, 1);
     if (mode === 'budget') {
       profile.jobs = [
         profile.jobs[0],
@@ -388,7 +408,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     receipt.result = result;
     receipt.starts = starts;
     receipt.facts = facts;
-    if (mode === 'mixed') {
+    if (['mixed', 'qualification'].includes(mode)) {
       assert.equal(
         result.status,
         'OFFLINE_PROFILE_COMPLETE',
@@ -448,6 +468,48 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         'Daily/protected CSV/HEAD',
         'large compact native closure',
       ];
+      if (mode === 'qualification') {
+        const { finalProof } = await import('../../scripts/unified-refresh/final-proof.mjs');
+        process.env.HDD_TASK_ROOT = T;
+        const { createBudget } = await import('../trade-feed/budget.mjs');
+        const { restoreProof, previews } = await import('../trade-feed/final.mjs');
+        const budget = createBudget(join(root, 'evidence'), {
+          attempts: 200,
+          bytes: 256 * 1024 ** 2,
+          apiSeconds: 900,
+        });
+        const save = (name, value) => put(join(root, 'evidence', name + '.json'), value);
+        heldExport = lagging.productDaily.openExport(
+          held.product,
+          held.product.bundleId,
+          'daily',
+          new AbortController().signal,
+        );
+        const proof = await finalProof({
+          T: root,
+          real: writer,
+          seed: held.product,
+          f: app,
+          heldExport,
+          save,
+          synthetic: true,
+        });
+        heldExport = null;
+        await fs.mkdir(join(root, 'temp'));
+        await previews({ R: root, origin, save, f: app, budget });
+        // Same restore orchestration, with previous mutable roots actively denied.
+        await restoreProof({
+          R: root,
+          profile: { productRoot: store.root, participantRoot: writer.root },
+          final: proof,
+          save,
+          admittedBase: base,
+          budget,
+          baseAdmissionCount: 0,
+        });
+        receipt.finalization = 'PASS';
+        receipt.finalizationAccounting = budget.snapshot();
+      }
     } else if (
       ['hash', 'duplicate', 'exit', 'missing', 'unknown-product', 'cancel-active'].includes(mode)
     ) {
@@ -514,6 +576,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     receipt.status = 'FAIL';
     receipt.failure = String(e);
     receipt.stack = e.stack;
+    await put(join(root, 'evidence/INITIAL_FAILURE.json'), { error: String(e), stack: e.stack });
     throw e;
   } finally {
     if (heldExport) {
@@ -527,10 +590,19 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       child.kill();
       await closed;
     }
-    await lagging?.close();
-    await reader?.close();
-    await writer?.close();
-    await base.close();
+    receipt.closeErrors = [];
+    for (const [name, resource] of [
+      ['lagging', lagging],
+      ['reader', reader],
+      ['writer', writer],
+      ['base', base],
+    ]) {
+      try {
+        await resource?.close();
+      } catch (e) {
+        receipt.closeErrors.push({ name, error: String(e) });
+      }
+    }
     receipt.resources = {
       nativeChildrenRemaining: children.size,
       apiClosed: !app?.app.server.listening,

@@ -15,6 +15,11 @@ def main(offline_fixture=False):
     from combined import TASK,Combined,ParentTransport,read,atomic
     from offline_profile import admitted,closed_frame
     unified=admitted(a)
+    from public_profile import is_public,validate_authority
+    public=is_public(a)
+    if public:
+        if offline_fixture:raise ValueError('Public admission cannot inject transport')
+        validate_authority(a,root)
     if a['task']!=TASK or a['jobRoot']!=str(root) or (a.get('synthetic') and not offline_fixture):
         raise ValueError('Exact public subdivision admission')
     for name,h in a['runtimeFiles'].items():
@@ -60,7 +65,7 @@ def main(offline_fixture=False):
         allowance=min(180 if family=='participants' else 30,deadline-s.clock(),s.deadline-s.clock())
         if allowance<=0:raise ValueError('No publication time')
         message['expiresAtUnixSeconds']=time.time()+allowance
-        if unified:message['syntheticClockUnixSeconds']=time.time()
+        if unified and not public:message['syntheticClockUnixSeconds']=time.time()
         print(json.dumps(message),flush=True)
         try:answer=incoming.get(timeout=allowance)
         except queue.Empty:raise ValueError('Publication acknowledgement unknown')

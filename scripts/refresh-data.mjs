@@ -9,6 +9,12 @@ import {
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  publicTask,
+  publicProfile,
+  validatePublicReady,
+  publicAdmission,
+} from './unified-refresh/public-profile.mjs';
 import { randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
@@ -131,6 +137,7 @@ export async function runUnified({
   clock,
   onFact,
   signal,
+  loadedRuntimeFiles,
 }) {
   if (profile !== undefined)
     return runFiniteProfile({
@@ -142,6 +149,8 @@ export async function runUnified({
       clock,
       onFact,
       signal,
+      preflightPath,
+      loadedRuntimeFiles,
     });
   taskRoot = resolve(taskRoot);
   preflightPath = resolve(preflightPath);
@@ -391,17 +400,40 @@ async function runFiniteProfile({
   clock,
   onFact,
   signal,
+  preflightPath,
+  loadedRuntimeFiles,
 }) {
   profile = validateProfile(profile);
   taskRoot = resolve(taskRoot);
-  if (spawnChild === spawn || clock?.mode !== 'SYNTHETIC' || typeof onFact !== 'function')
+  const live = profile.format === publicProfile;
+  let publicPre;
+  if (live) {
+    if (spawnChild !== spawn || clock !== undefined || typeof onFact !== 'function')
+      throw Error('PUBLIC_REAL_CLOCK_TRANSPORT_REQUIRED');
+    publicPre = await validatePublicReady({
+      taskRoot,
+      registry,
+      preflightPath,
+      loadedRuntimeFiles,
+      repo,
+    });
+    clock = {
+      mode: 'REAL',
+      now: () => performance.now() / 1000,
+      sleep: (n) => new Promise((r) => setTimeout(r, n * 1000)),
+    };
+  } else if (spawnChild === spawn || clock?.mode !== 'SYNTHETIC' || typeof onFact !== 'function')
     throw Error('OFFLINE_NATIVE_FIXTURE_REQUIRED');
   for (const root of [registry.root, registry.productDaily.root])
     if (!root.startsWith(taskRoot + '\\')) throw Error('TASK_OWNERSHIP');
   const output = join(taskRoot, 'session'),
     lockPath = join(registry.productDaily.root, 'MARKET_REFRESH.lock');
   await absent(output);
-  await absent(join(taskRoot, 'SYNTHETIC_ADMISSION.json'));
+  await absent(join(taskRoot, live ? 'PUBLIC_ADMISSION.json' : 'SYNTHETIC_ADMISSION.json'));
+  if (live) {
+    const disk = await statfs(taskRoot);
+    if (disk.bavail * disk.bsize < 20 * 1024 ** 3) throw Error('ADMISSION_DISK');
+  }
   await guardStorage(taskRoot, 128 * 1024 ** 2);
   const profileSha256 = sha(canonical(profile));
   const runtimeFiles = {},
@@ -421,7 +453,9 @@ async function runFiniteProfile({
         runtimeFiles[path] = hash;
         if (folder === 'market-refresh' && /\.(py|json)$/.test(e.name)) sourceFiles[e.name] = hash;
       }
+  if (live) Object.assign(runtimeFiles, publicPre.runtimeFiles);
   const lock = await open(lockPath, 'wx');
+  const parentNonce = live ? randomBytes(32).toString('hex') : undefined;
   let settled = false,
     outstanding = false,
     failure = null,
@@ -434,12 +468,13 @@ async function runFiniteProfile({
     jobs = [];
   let parent = {
     status: 'ADMITTED',
-    mode: 'SYNTHETIC_OFFLINE_PROFILE',
-    taskId: profileTask,
+    mode: live ? 'OWNER_AUTHORIZED_PUBLIC' : 'SYNTHETIC_OFFLINE_PROFILE',
+    taskId: live ? publicTask : profileTask,
+    ...(live ? { nonce: parentNonce, preflightSha256: publicPre.preflightSha256 } : {}),
     profileSha256,
     limits: profile.parent,
     startedAt: new Date().toISOString(),
-    networkSessionCount: 0,
+    networkSessionCount: live ? 1 : 0,
     networkClosesAtUnixSeconds: wall + profile.parent.seconds - profile.parent.closingReserve,
     job: null,
     pending: null,
@@ -453,17 +488,27 @@ async function runFiniteProfile({
     rpcEndpointAttempts: [0, 0],
   };
   try {
-    await lock.writeFile(canonical({ taskId: profileTask, pid: process.pid, output }));
+    await lock.writeFile(
+      canonical({ taskId: live ? publicTask : profileTask, pid: process.pid, output }),
+    );
     await lock.sync();
-    await mkdir(output);
-    await durableJson(join(taskRoot, 'SYNTHETIC_ADMISSION.json'), {
-      taskId: profileTask,
+    await durableJson(join(taskRoot, live ? 'PUBLIC_ADMISSION.json' : 'SYNTHETIC_ADMISSION.json'), {
+      taskId: live ? publicTask : profileTask,
       profileSha256,
       output,
-      synthetic: true,
-      networkSessionCount: 0,
-      publicAuthority: false,
+      synthetic: !live,
+      networkSessionCount: live ? 1 : 0,
+      publicAuthority: live,
+      ...(live
+        ? {
+            nonce: parentNonce,
+            preflightSha256: publicPre.preflightSha256,
+            scopeSha256: publicPre.scopeSha256,
+            startedAt: parent.startedAt,
+          }
+        : {}),
     });
+    await mkdir(output);
     await durableJson(join(output, 'PROFILE.json'), profile);
     await durableJson(join(output, 'PARENT_ACCOUNTING.json'), parent);
     for (const j of profile.jobs) {
@@ -534,11 +579,18 @@ async function runFiniteProfile({
       await mkdir(join(jobRoot, 'temp'));
       const a = {
         task: j.family === 'trade' ? 'HDD-BTC-ETH-CURRENT-REFERENCE-FRESHNESS-R2' : taskId,
-        authorityTaskId: profileTask,
-        unifiedProfileId: profileId,
-        parentMode: 'OFFLINE_ONLY',
+        authorityTaskId: live ? publicTask : profileTask,
+        unifiedProfileId: profile.format,
+        parentMode: live ? 'OWNER_AUTHORIZED_PUBLIC' : 'OFFLINE_ONLY',
         parentProfileSha256: profileSha256,
-        synthetic: true,
+        synthetic: !live,
+        ...(live
+          ? {
+              parentNonce,
+              preflightSha256: publicPre.preflightSha256,
+              scopeSha256: publicPre.scopeSha256,
+            }
+          : {}),
         combinedJob: true,
         job: j.id,
         family: j.family,
@@ -564,7 +616,7 @@ async function runFiniteProfile({
       if (j.family === 'participants') {
         const plan = {
           combinedJob: true,
-          unifiedProfileId: profileId,
+          unifiedProfileId: profile.format,
           base: initial.participant.base,
           finalTarget: { number: j.target, hash: null, timestamp: null },
           windows: [
@@ -626,7 +678,7 @@ async function runFiniteProfile({
         onAdoption,
         spawnChild,
         deadline: childDeadline,
-        syncFixtureClock: (t) => clock.synchronize(t),
+        syncFixtureClock: live ? undefined : (t) => clock.synchronize(t),
         signal,
         storageGuard: (n = 0) => guardStorage(taskRoot, 128 * 1024 ** 2 + n),
       });
@@ -661,8 +713,22 @@ async function runFiniteProfile({
         j.family === 'trade' && !result.error && result.source.status === 'COMPLETE_SAMPLED_JOB';
       const exhausted =
         result.source.feedLocalClosedExhaustion === true && result.publications.length === 0;
-      if (result.status !== 'QUALIFIED_ADOPTED' && !sampled && !exhausted)
+      if (result.status !== 'QUALIFIED_ADOPTED' && !sampled && !exhausted) {
+        const failed = {
+          job: j.id,
+          family: j.family,
+          due: j.due,
+          deadline: j.deadline,
+          startedOffset: dispatchOffset,
+          status: 'TERMINAL_SOURCE_OR_LOCAL_FAILURE',
+          closure: 'KNOWN',
+          result,
+          operating: await onFact(j, result),
+        };
+        jobs.push(failed);
+        await durableJson(join(jobRoot, 'JOB_RESULT.json'), failed);
         throw Error(result.error ?? result.source.failure ?? 'UNQUALIFIED_JOB');
+      }
       if (exhausted) {
         const selected = await read(join(registry.root, 'CURRENT.json'));
         if (
@@ -730,7 +796,7 @@ async function runFiniteProfile({
       parent.status = 'CLOSED';
       parent.closedAt = new Date().toISOString();
       parent.elapsedSeconds = clock.now() - began;
-      parent.closureReason = failure ?? 'Finite offline profile exhausted; no automatic restart';
+      parent.closureReason = failure ?? 'Finite profile exhausted; no automatic restart';
       await replace(join(output, 'PARENT_ACCOUNTING.json'), parent);
       settled = true;
     } catch (e) {
@@ -748,15 +814,21 @@ async function runFiniteProfile({
   }
   const result = {
     status:
-      failure || disabled.size ? 'PARTIAL' : cancelled ? 'CANCELLED' : 'OFFLINE_PROFILE_COMPLETE',
+      failure || disabled.size || (live && jobs.some((j) => j.status === 'SKIPPED'))
+        ? 'PARTIAL'
+        : cancelled
+          ? 'CANCELLED'
+          : live
+            ? 'PUBLIC_PROFILE_COMPLETE'
+            : 'OFFLINE_PROFILE_COMPLETE',
     jobs,
     failure,
     accounting: parent,
     disabledFeeds: [...disabled],
     networkClosureKnown: settled,
-    networkSessionCount: 0,
-    synthetic: true,
-    publicAuthority: false,
+    networkSessionCount: live ? 1 : 0,
+    synthetic: !live,
+    publicAuthority: live,
     noAutomaticRestart: true,
     indexer: 'PARKED',
   };
@@ -934,7 +1006,7 @@ export async function runJob({
       .then(async () => {
         if (line.length > 32768) throw Error('IPC_BOUND');
         const m = JSON.parse(line);
-        if (unified && m.type !== 'closed') {
+        if (unified && !publicAdmission(admission) && m.type !== 'closed') {
           if (
             typeof syncFixtureClock !== 'function' ||
             !Number.isFinite(m.syntheticClockUnixSeconds)
@@ -1211,7 +1283,7 @@ export async function runJob({
       accounting.pending !== null
     )
       throw Error('NATIVE_OR_ACCOUNTING_CLOSURE_UNKNOWN: ' + (error ?? stderr));
-    if (unified) {
+    if (unified && !publicAdmission(admission)) {
       const closedAt = Date.parse(accounting.closedAtUtc ?? accounting.closedAt) / 1000;
       if (!Number.isFinite(closedAt)) throw Error('SYNTHETIC_CLOSING_CLOCK_REQUIRED');
       syncFixtureClock(closedAt);
@@ -1290,6 +1362,10 @@ export async function runJob({
 }
 
 export async function main(args = process.argv.slice(2)) {
+  if (args.length === 1 && args[0] === 'public-qualification-r2') {
+    const { runReviewedPublic } = await import('./unified-refresh/owner.mjs');
+    return runReviewedPublic(runUnified);
+  }
   if (args[0] === 'plan' && args.length === 2) {
     console.log(JSON.stringify(validateProfile(await read(resolve(args[1]))), null, 2));
     return 0;

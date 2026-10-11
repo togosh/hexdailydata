@@ -11,6 +11,7 @@ ISOLATION = RECOVERY.parent/'worker-stdin-isolation-r1'
 COOKIES = RECOVERY.parent/'response-cookie-handling-r1'
 OPERATING = RECOVERY.parent/'operating-refresh-r1'
 OPERATING_R2 = RECOVERY.parent/'operating-refresh-r2'
+UNIFIED = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\unified-refresh-public-qualification-r2')
 
 
 def perform_request(q, a, folder, perform, clock=time.time, connection=None, phases=None):
@@ -18,7 +19,8 @@ def perform_request(q, a, folder, perform, clock=time.time, connection=None, pha
     connection = connection or http.client.HTTPSConnection
     from authority import trade_profile
     profile=trade_profile(a)
-    deadline = a['startedAtUnixSeconds'] + profile['dispatch']
+    from public_profile import is_public
+    deadline = a['networkClosesAtUnixSeconds']-65 if is_public(a) else a['startedAtUnixSeconds'] + profile['dispatch']
     if q['dispatchByUnixSeconds'] != deadline:
         raise ValueError('Dispatch deadline binding')
     if a.get('tradeProfileId') and q.get('tradeProfileId') != a['tradeProfileId']:
@@ -90,14 +92,14 @@ def main():
         return 0
     request = Path(args[-1]).resolve()
     if offline:
-        if not any(request.is_relative_to(root/'fixtures') for root in (RECOVERY, ISOLATION)):
+        if not any(request.is_relative_to(root/'fixtures') for root in (RECOVERY, ISOLATION, UNIFIED)):
             raise ValueError('Exact synthetic fixture root required')
 
         def deny(event, values):
             if event.startswith('socket.'):
                 raise PermissionError('OFFLINE_NETWORK_DENIED')
         sys.addaudithook(deny)
-    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2)) else None
+    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2, UNIFIED)) else None
     try:
         if phases:
             phases.emit('worker_entry', synthetic=offline)
@@ -120,6 +122,8 @@ def main():
             assert a['fixtureIdentity'] == 'SYNTHETIC_OFFLINE_WORKER_PREFIX'
         else:
             validate_authority(a, session)
+            from public_profile import is_public,validate_authority as validate_public
+            if is_public(a):validate_public(a,session,request)
         if phases:
             phases.emit('admission_shape_validated')
             phases.emit('runtime_binding_begin', count=len(a['runtimeFiles']))

@@ -50,6 +50,17 @@ def audit_profile(root):
     root=Path(root);profile=read(root/'PROFILE.json');keys=KEYS+['httpAttempts','httpExtras','httpChargedBytes']
     profile_hash=hashlib.sha256(json.dumps(profile,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
     final=read(root/'PARENT_ACCOUNTING.json')
+    live=profile.get('format')=='unified-five-feed-public-qualification-2'
+    if live:
+        from public_profile import ROOT,TASK,PROFILE_HASH,PACKET,is_public,digest
+        if root.resolve()!=ROOT/'session' or profile_hash!=PROFILE_HASH:raise ValueError('Saved public root/profile')
+        marker=read(ROOT/'PUBLIC_ADMISSION.json');pre=read(ROOT/'PREFLIGHT.json');plan=read(ROOT/'FROZEN_PLAN.json');review=read(ROOT/'evidence/PREFLIGHT_REVIEW.json')
+        if (marker['taskId']!=TASK or marker['nonce']!=final['nonce'] or marker['profileSha256']!=profile_hash
+            or final['preflightSha256']!=digest((ROOT/'PREFLIGHT.json').read_bytes()) or review['verdict']!='PASS'
+            or review['planSha256']!=digest((ROOT/'FROZEN_PLAN.json').read_bytes()) or review['candidateCommit']!=plan['commit']
+            or pre['reviewSha256']!=digest((ROOT/'evidence/PREFLIGHT_REVIEW.json').read_bytes())
+            or pre['readySha256']!=digest((ROOT/'evidence/READY.json').read_bytes())
+            or any(digest((ROOT/p).read_bytes())!=h for p,h in PACKET.items())):raise ValueError('Saved public binding')
     if final['profileSha256']!=profile_hash or final['limits']!=profile['parent']:
         raise ValueError('Profile parent identity/limits')
     totals={k:0 for k in keys};eps=[0,0];last=None;jobs=[]
@@ -58,9 +69,12 @@ def audit_profile(root):
         if not d.exists():continue
         a=read(d/'ADMISSION.json')
         ah=hashlib.sha256((d/'ADMISSION.json').read_bytes()).hexdigest()
-        if (a['job']!=j['id'] or a['family']!=j['family'] or not a['synthetic'] or a['parentMode']!='OFFLINE_ONLY'
+        if (a['job']!=j['id'] or a['family']!=j['family'] or (not live and (not a['synthetic'] or a['parentMode']!='OFFLINE_ONLY'))
             or a['parentProfileSha256']!=profile_hash or a['parentLimits']!=profile['parent']):
             raise ValueError('Profile child identity/limits')
+        if live and (not is_public(a) or a['parentNonce']!=final['nonce'] or a['preflightSha256']!=final['preflightSha256']
+                     or a['runtimeFiles']!=plan['runtimeFiles'] or a['jobRoot']!=str(d)
+                     or any(a['allowance'][k]>v for k,v in j['bounds'].items())):raise ValueError('Saved public child binding')
         if (d/'DISPATCH_SKIPPED.json').exists():
             skipped=read(d/'DISPATCH_SKIPPED.json');fact=read(root/(j['id']+'-SKIPPED.json'))
             if (skipped['jobAdmissionSha256']!=ah or skipped['parentProfileSha256']!=profile_hash
@@ -115,7 +129,7 @@ def audit_profile(root):
         jobs.append(dict(job=j['id'],attempts=len(captures)))
     if any(final[k]!=v for k,v in totals.items()) or final['rpcEndpointAttempts']!=eps or final['status']!='CLOSED' or final['pending'] is not None or final['lastClosedMonotonic']!=last:
         raise ValueError('Profile final reconciliation')
-    return dict(status='PASS',synthetic=True,savedOnly=True,totals=totals,jobs=jobs,externalRequests=0)
+    return dict(status='PASS',synthetic=not live,savedOnly=True,totals=totals,jobs=jobs,externalRequests=totals['attempts'] if live else 0)
 if __name__=='__main__':
     import sys
     print(json.dumps(audit(sys.argv[1]),indent=2))

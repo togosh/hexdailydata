@@ -10,7 +10,8 @@ from authority import validate_authority, trade_profile, OPERATING_AUTHORITIES, 
 def closure_frame(root, result, authority):
     # R2's 66-attempt accounting can exceed the unchanged 32 KiB IPC frame cap.
     # Bind the already durable local report, rather than send its full ledger twice.
-    if authority == OPERATING_R2_AUTHORITY:
+    from public_profile import TASK as PUBLIC_TASK
+    if authority in (OPERATING_R2_AUTHORITY,PUBLIC_TASK):
         raw = (root/'RESULT.json').read_bytes()
         if not 0 < len(raw) <= 524288: raise ValueError('Closed result bound')
         if strict_json(raw) != result: raise ValueError('Closed result mismatch')
@@ -79,9 +80,10 @@ def main():
         return answer
     outcomes=[];status='PARTIAL';reason='Not completed'
     try:
-        operating=a.get('authorityTaskId') in OPERATING_AUTHORITIES
-        outcomes=collect(session,exchange,outcomes=outcomes if operating else None)
-        status='COMPLETE_FRESH_CYCLES' if len(outcomes)==session.profile['cycles'] and all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
+        from public_profile import is_public
+        unified=is_public(a);operating=a.get('authorityTaskId') in OPERATING_AUTHORITIES
+        outcomes=collect(session,exchange,outcomes=outcomes if operating or unified else None)
+        status='COMPLETE_SAMPLED_JOB' if unified and len(outcomes)==1 else 'COMPLETE_FRESH_CYCLES' if len(outcomes)==session.profile['cycles'] and all(o['status']=='QUALIFIED' for o in outcomes) else 'PARTIAL'
         reason='All original slots accounted'
     except BaseException as e:reason=type(e).__name__+': '+str(e)
     finally:session.close(reason)
