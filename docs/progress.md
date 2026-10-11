@@ -1050,3 +1050,9 @@ backup/restore passed using the same base handles; zero public requests, one new
 base admission (three cumulative). Original closed PARTIAL and sealed return
 remain unchanged. Separate continuation evidence records the result; no public
 retry, scheduler or automatic follow-on is authorized.
+
+2026-10-11 — R3 unified qualification preparation: exact new authority from
+sequence 50, participant-last fixed window, collector/auditor retry parity and
+final-writer adoption correction implemented. Focused offline gates pass with
+original failures retained. Public execution remains conditional on independent
+preflight and freshly loaded actual paired readiness; no result claimed yet.

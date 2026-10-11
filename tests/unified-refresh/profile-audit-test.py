@@ -20,12 +20,14 @@ root = Path(sys.argv[1]).resolve()
 original = audit_parent.read
 assert audit_parent.audit(root)['status'] == 'PASS'
 cases = []
+profile = original(root / 'PROFILE.json')
+admitted = next(j['id'] for j in profile['jobs'] if (root / j['id'] / 'ADMISSION.json').exists())
 mutations = [
     ('profile identity', 'PROFILE.json', lambda x: x['parent'].__setitem__('seconds', x['parent']['seconds'] + 1), 'Profile parent identity/limits'),
     ('parent binding', 'PARENT_ACCOUNTING.json', lambda x: x.__setitem__('profileSha256', '0' * 64), 'Profile parent identity/limits'),
     ('parent limits', 'PARENT_ACCOUNTING.json', lambda x: x['limits'].__setitem__('attempts', 999), 'Profile parent identity/limits'),
-    ('child binding', 'trade-1/ADMISSION.json', lambda x: x.__setitem__('parentProfileSha256', '0' * 64), 'Profile child identity/limits'),
-    ('child limits', 'trade-1/ADMISSION.json', lambda x: x['parentLimits'].__setitem__('attempts', 999), 'Profile child identity/limits'),
+    ('child binding', admitted + '/ADMISSION.json', lambda x: x.__setitem__('parentProfileSha256', '0' * 64), 'Profile child identity/limits'),
+    ('child limits', admitted + '/ADMISSION.json', lambda x: x['parentLimits'].__setitem__('attempts', 999), 'Profile child identity/limits'),
     ('final endpoint counters', 'PARENT_ACCOUNTING.json', lambda x: x['rpcEndpointAttempts'].__setitem__(0, x['rpcEndpointAttempts'][0] + 1), 'Profile final reconciliation'),
 ]
 if (root / 'trade-1/DISPATCH_SKIPPED.json').exists():

@@ -13,15 +13,33 @@ PROFILE_HASH='4be3bc10f5702140177c7753e6d5281d8c766a821f82ea6c55728ea95bde17c4'
 PACKET={'packet/SCOPE.json':'74da822b99a6fab67e859044d0f6ea3efac43f6fcd0afb64abec96c9d9bec8c5',
         'packet/INPUTS.json':'15ba1c74180836f3a2126017819a2832b9b134438762d8d569b3bd260dc3eb03',
         'packet/PUBLIC_PROFILE.json':'3f1b44f0fe4719d893f9bcfabc4f3d72f6d789c1b9b2df496f87a7b8eee5bbad'}
+
+R3_PROFILE='unified-five-feed-public-qualification-3'
+R3_ROOT=Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\unified-refresh-public-qualification-r3')
+R3_PACKET={'packet/SCOPE.json':'92d27b17d571dbd674bd70c3b5d4d3990674c0eaab46a1003e933f7aeeeeac64',
+           'packet/INPUTS.json':'ce345b5aea9e1a5ed03e13c4248fb6adab55802415dac148b16dfd4dd639f924',
+           'packet/PUBLIC_PROFILE.json':'2bf3e9a23de15296b52fc493b47a02e0fdca10d4b0c26c21bebe6372aa4d41f6'}
+def authority(profile):
+    if profile==PROFILE:return dict(task=TASK,profile=PROFILE,root=ROOT,profileHash=PROFILE_HASH,packet=PACKET,base=27754425,target=27758521)
+    if profile==R3_PROFILE:return dict(task='HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3',profile=R3_PROFILE,root=R3_ROOT,
+        profileHash='c438cd9b773a473d8a6fe77a285a21146ee7266ad0cc285f95835fd21b8862b4',packet=R3_PACKET,base=27758521,target=27762617,
+        basePin={'number':27758521,'hash':'0x4f4c970d7c5e3f2bfe00120934a3647913bdbf598ce1b8529e674ecf9b6176fa','timestamp':1791602675})
+    return None
+
 def canonical_hash(value):return digest(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode())
 def is_public(a):
-    if a.get('unifiedProfileId')!=PROFILE:return False
+    config=authority(a.get('unifiedProfileId'))
+    if config is None:return False
+    TASK=config['task'];PROFILE_HASH=config['profileHash']
     if (a.get('authorityTaskId')!=TASK or a.get('synthetic') is not False or a.get('parentMode')!='OWNER_AUTHORIZED_PUBLIC'
         or a.get('parentProfileSha256')!=PROFILE_HASH or not re.fullmatch('[a-f0-9]{64}',a.get('parentNonce',''))
         or not re.fullmatch('[a-f0-9]{64}',a.get('preflightSha256',''))):raise ValueError('Exact public child authority')
     return True
 
 def validate_documents(a,root,profile,marker,pre,ready,review,plan,parent):
+    config=authority(a.get('unifiedProfileId'))
+    if config is None:raise ValueError('Exact public profile')
+    ROOT=config['root'];TASK=config['task'];PROFILE=config['profile'];PROFILE_HASH=config['profileHash'];PACKET=config['packet']
     if not is_public(a) or root!=ROOT/'session'/a['job'] or a['jobRoot']!=str(root):raise ValueError('Exact public root')
     if canonical_hash(profile)!=PROFILE_HASH or profile['format']!=PROFILE or profile['mode']!='OWNER_AUTHORIZED_PUBLIC':raise ValueError('Exact public profile')
     jobs=[j for j in profile['jobs'] if j['id']==a['job']]
@@ -54,6 +72,9 @@ def validate_documents(a,root,profile,marker,pre,ready,review,plan,parent):
     if a['deadlineUnixSeconds']>parent['networkClosesAtUnixSeconds'] or a['networkClosesAtUnixSeconds']>a['deadlineUnixSeconds']-a['allowance']['publication']-5:raise ValueError('Public deadline binding')
 
 def validate_authority(a,root,request=None):
+    config=authority(a.get('unifiedProfileId'))
+    if config is None:raise ValueError('Exact public authority')
+    ROOT=config['root'];PACKET=config['packet']
     root=Path(root).resolve()
     def raw(name):return (ROOT/name).read_bytes()
     def read(name):return strict_json(raw(name))
@@ -70,7 +91,8 @@ def validate_authority(a,root,request=None):
     if time.time()>=min(parent['networkClosesAtUnixSeconds'],a['networkClosesAtUnixSeconds']):raise ValueError('Public dispatch expired')
     if a['family']=='participants':
         p=strict_json((root/'PLAN.json').read_bytes())
-        if digest((root/'PLAN.json').read_bytes())!=a['planSha256'] or p['base']['number']!=27754425 or p['finalTarget']['number']!=27758521 or p['windows']!=[{'fromInclusive':27754425,'targetNumber':27758521,'newBlockSpan':4096}]:raise ValueError('Public fixed participant window')
+        if digest((root/'PLAN.json').read_bytes())!=a['planSha256'] or p['base']['number']!=config['base'] or p['finalTarget']['number']!=config['target'] or p['windows']!=[{'fromInclusive':config['base'],'targetNumber':config['target'],'newBlockSpan':4096}]:raise ValueError('Public fixed participant window')
+        if config.get('basePin') and (p['base']!=config['basePin'] or a['initial']['participant']['base']!=config['basePin']):raise ValueError('Public exact predecessor pin')
     if request is not None:
         q=strict_json(Path(request).read_bytes());pending=parent['pending']
         if not pending or pending['job']!=a['job']:raise ValueError('Public physical reservation missing')

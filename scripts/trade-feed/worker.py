@@ -13,6 +13,7 @@ OPERATING = RECOVERY.parent/'operating-refresh-r1'
 OPERATING_R2 = RECOVERY.parent/'operating-refresh-r2'
 UNIFIED = Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\unified-refresh-public-qualification-r2')
 
+UNIFIED_R3 = UNIFIED.parent/'unified-refresh-public-qualification-r3'
 
 def perform_request(q, a, folder, perform, clock=time.time, connection=None, phases=None):
     import http.client
@@ -92,14 +93,14 @@ def main():
         return 0
     request = Path(args[-1]).resolve()
     if offline:
-        if not any(request.is_relative_to(root/'fixtures') for root in (RECOVERY, ISOLATION, UNIFIED)):
+        if not any(request.is_relative_to(root/'fixtures') for root in (RECOVERY, ISOLATION, UNIFIED, UNIFIED_R3)):
             raise ValueError('Exact synthetic fixture root required')
 
         def deny(event, values):
             if event.startswith('socket.'):
                 raise PermissionError('OFFLINE_NETWORK_DENIED')
         sys.addaudithook(deny)
-    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2, UNIFIED)) else None
+    phases = Phases(request.parent) if any(request.is_relative_to(root) for root in (RECOVERY, ISOLATION, COOKIES, OPERATING, OPERATING_R2, UNIFIED, UNIFIED_R3)) else None
     try:
         if phases:
             phases.emit('worker_entry', synthetic=offline)

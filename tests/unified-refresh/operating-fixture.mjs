@@ -35,12 +35,17 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       priorTask,
       priorTask.replace(
         'unified-refresh-integration-r2',
+        'unified-refresh-public-qualification-r3',
+      ),
+      priorTask.replace(
+        'unified-refresh-integration-r2',
         'unified-refresh-public-qualification-r2',
       ),
     ].includes(T),
   );
   assert(
     [
+      'r3-final',
       'mixed',
       'qualification',
       'no-body',
@@ -147,7 +152,11 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   base.consecutive = {
     generation: ACCEPTED.generation,
     deployment: ACCEPTED.deployment,
-    target: { number: 27754425, hash: '0x' + sha('synthetic base pin'), timestamp: 1791560565 },
+    target: {
+      number: mode === 'r3-final' ? 27758521 : 27754425,
+      hash: '0x' + sha('synthetic base pin'),
+      timestamp: 1791560565,
+    },
     // Required descriptor compatibility counters, not loaded/source-census rows.
     familyVersions: { tokenHolders: h, stakeStarts: h },
     holderRecordCount: 664435,
@@ -227,7 +236,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         productDaily: reader.productDaily,
         sourceGenerations: base,
       },
-      mode === 'qualification'
+      ['qualification', 'r3-final'].includes(mode)
         ? {
             evidenceRoot: join(root, 'evidence'),
             webRoot: join(W, 'dist/web'),
@@ -293,10 +302,21 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       beforePublication = after;
       return live;
     };
-    const profile = await read(join(W, 'config/unified-refresh-offline.json'));
+    const profile =
+      mode === 'r3-final'
+        ? {
+            ...(await read(join(T, 'packet/PUBLIC_PROFILE.json'))),
+            format: 'unified-five-feed-offline-1',
+            mode: 'OFFLINE_ONLY',
+          }
+        : await read(join(W, 'config/unified-refresh-offline.json'));
+    if (mode === 'r3-final')
+      for (const j of profile.jobs)
+        j.enabled = ['trade-15', 'trade-16', 'participants-1'].includes(j.id);
     if (mode === 'policy-clock') profile.jobs = profile.jobs.slice(0, 2);
     else if (mode === 'policy-payout') profile.jobs = profile.jobs.slice(0, 4);
-    else if (!['mixed', 'qualification'].includes(mode)) profile.jobs = profile.jobs.slice(0, 1);
+    else if (!['mixed', 'qualification', 'r3-final'].includes(mode))
+      profile.jobs = profile.jobs.slice(0, 1);
     if (mode === 'budget') {
       profile.jobs = [
         profile.jobs[0],
@@ -412,7 +432,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     receipt.result = result;
     receipt.starts = starts;
     receipt.facts = facts;
-    if (['mixed', 'qualification'].includes(mode)) {
+    if (['mixed', 'qualification', 'r3-final'].includes(mode)) {
       assert.equal(
         result.status,
         'OFFLINE_PROFILE_COMPLETE',
@@ -426,7 +446,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       const final = lagging.productDaily.capture();
       await verifyMarketCertificate(store.root, final);
       const state = await read(join(store.root, 'STORAGE.json'));
-      assert(state.segment >= 1);
+      if (mode !== 'r3-final') assert(state.segment >= 1);
       assert(state.generations.length <= 2);
       assert.equal(sha(held.product.csv), sha(initialCsv));
       const chunks = [];
@@ -451,28 +471,37 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       assert.equal(head.statusCode, 200);
       assert.equal(head.body, '');
       assert(facts.some((f) => f.freshness.BTC.status === 'stale'));
-      assert.equal(facts.at(-1).freshness.BTC.status, 'fresh');
+      assert.equal(facts.at(-1).freshness.BTC.status, mode === 'r3-final' ? 'stale' : 'fresh');
       assert.equal(result.jobs.find((j) => j.job === 'trade-2').publication, 'retained');
-      assert.equal(result.jobs.find((j) => j.job === 'trade-3').publication, 'no-op');
+      if (mode !== 'r3-final')
+        assert.equal(result.jobs.find((j) => j.job === 'trade-3').publication, 'no-op');
       assert.equal(result.jobs.find((j) => j.job === 'participants-1').publication, 'changed');
-      for (const n of [4, 6, 16])
+      for (const n of mode === 'r3-final' ? [15, 16] : [4, 6, 16])
         assert(await fs.stat(join(root, `session/trade-${n}/WINDOW_${n}_UPDATE.json`)));
       assert((await fs.stat(join(root, 'session/trade-16/RESULT.json'))).size > 32768);
       receipt.journal = await auditJournal(store.root);
       receipt.storage = state;
-      receipt.cases = [
-        'five native collector families',
-        '16 finite trade slots',
-        'empty/no-op/stale/newer',
-        'UTC boundary',
-        'real paired participant transition',
-        'held export',
-        'lagging ordinary reader',
-        'retention/rotation',
-        'Daily/protected CSV/HEAD',
-        'large compact native closure',
-      ];
-      if (mode === 'qualification') {
+      receipt.cases =
+        mode === 'r3-final'
+          ? [
+              'actual late trade slots 15/16 and basename captures',
+              'final consecutive participant collector/auditor/paired publication',
+              'unchanged quiet prices and honest aging after participant wait',
+              'held and lagging readers, full CSV/access, native compact closure',
+            ]
+          : [
+              'five native collector families',
+              '16 finite trade slots',
+              'empty/no-op/stale/newer',
+              'UTC boundary',
+              'real paired participant transition',
+              'held export',
+              'lagging ordinary reader',
+              'retention/rotation',
+              'Daily/protected CSV/HEAD',
+              'large compact native closure',
+            ];
+      if (mode === 'qualification' || mode === 'r3-final') {
         const { finalProof } = await import('../../scripts/unified-refresh/final-proof.mjs');
         process.env.HDD_TASK_ROOT = T;
         const { createBudget } = await import('../trade-feed/budget.mjs');
@@ -500,7 +529,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         });
         heldExport = null;
         await fs.mkdir(join(root, 'temp'));
-        await previews({ R: root, origin, save, f: app, budget });
+        if (mode === 'qualification') await previews({ R: root, origin, save, f: app, budget });
         // Same restore orchestration, with previous mutable roots actively denied.
         await restoreProof({
           R: root,

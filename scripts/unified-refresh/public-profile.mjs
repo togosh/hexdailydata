@@ -11,22 +11,51 @@ export const packetHashes = Object.freeze({
   'packet/PUBLIC_PROFILE.json': '3f1b44f0fe4719d893f9bcfabc4f3d72f6d789c1b9b2df496f87a7b8eee5bbad',
 });
 export const publicProfileHash = '4be3bc10f5702140177c7753e6d5281d8c766a821f82ea6c55728ea95bde17c4';
+
+export const publicR3 = Object.freeze({
+  task: 'HDD-UNIFIED-REFRESH-PUBLIC-QUALIFICATION-R3',
+  profile: 'unified-five-feed-public-qualification-3',
+  root: String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\unified-refresh-public-qualification-r3`,
+  profileHash: 'c438cd9b773a473d8a6fe77a285a21146ee7266ad0cc285f95835fd21b8862b4',
+  packetHashes: Object.freeze({
+    'packet/SCOPE.json': '92d27b17d571dbd674bd70c3b5d4d3990674c0eaab46a1003e933f7aeeeeac64',
+    'packet/INPUTS.json': 'ce345b5aea9e1a5ed03e13c4248fb6adab55802415dac148b16dfd4dd639f924',
+    'packet/PUBLIC_PROFILE.json':
+      '2bf3e9a23de15296b52fc493b47a02e0fdca10d4b0c26c21bebe6372aa4d41f6',
+  }),
+  sequence: 50,
+});
+export function publicAuthority(profile) {
+  if (profile === publicProfile)
+    return {
+      task: publicTask,
+      profile: publicProfile,
+      root: publicRoot,
+      profileHash: publicProfileHash,
+      packetHashes,
+      sequence: 44,
+    };
+  return profile === publicR3.profile ? publicR3 : null;
+}
+
 export function exactPublicProfile(p) {
+  const authority = publicAuthority(p?.format);
   if (
-    p.format !== publicProfile ||
+    !authority ||
     p.mode !== 'OWNER_AUTHORIZED_PUBLIC' ||
-    sha(canonical(p)) !== publicProfileHash
+    sha(canonical(p)) !== authority.profileHash
   )
     throw Error('EXACT_PUBLIC_PROFILE_REQUIRED');
   return p;
 }
 export function publicAdmission(a) {
-  if (a.unifiedProfileId !== publicProfile) return false;
+  const authority = publicAuthority(a.unifiedProfileId);
+  if (!authority) return false;
   if (
-    a.authorityTaskId !== publicTask ||
+    a.authorityTaskId !== authority.task ||
     a.synthetic !== false ||
     a.parentMode !== 'OWNER_AUTHORIZED_PUBLIC' ||
-    a.parentProfileSha256 !== publicProfileHash ||
+    a.parentProfileSha256 !== authority.profileHash ||
     !/^[a-f0-9]{64}$/.test(a.parentNonce ?? '') ||
     !/^[a-f0-9]{64}$/.test(a.preflightSha256 ?? '')
   )
@@ -49,6 +78,13 @@ export async function validatePublicReady({
   loadedRuntimeFiles,
   repo,
 }) {
+  const authority = resolve(taskRoot) === publicR3.root ? publicR3 : publicAuthority(publicProfile);
+  const {
+    task: publicTask,
+    root: publicRoot,
+    profileHash: publicProfileHash,
+    packetHashes,
+  } = authority;
   if (
     resolve(taskRoot) !== publicRoot ||
     resolve(preflightPath) !== join(publicRoot, 'PREFLIGHT.json')
@@ -104,7 +140,7 @@ export async function validatePublicReady({
     selected.version !== pre.initialProductVersion ||
     selected.manifestSha256 !== pre.initialManifestSha256 ||
     state.generation !== pre.initialGeneration ||
-    selected.metadata.marketStorage.sequence !== 44
+    selected.metadata.marketStorage.sequence !== authority.sequence
   )
     throw Error('PUBLIC_INITIAL_PAIR_CHANGED');
   return { ...pre, preflightSha256: sha(await readFile(preflightPath)) };

@@ -265,3 +265,27 @@ receipts. Its command is consumed and is not a scheduler or public retry command
 The original public PARTIAL, unrun jobs, archives and charges remain unchanged.
 This offline completion does not qualify continuous feed freshness or authorize
 another public run. Main and all original data remain untouched.
+
+### R3 finite qualification
+
+The separately authorized R3 profile starts with the exact sequence-50 compact
+backup and puts its sole participant window (27,758,521 to 27,762,617) after all
+sixteen trade slots and the two observations each for market, gas and protocol.
+The maintained foreground entry is `node scripts/refresh-data.mjs public-qualification-r3`.
+It requires the exact new packet, frozen source and independent preflight review,
+then restores only the new owned runtime and proves freshly loaded paired-API
+readiness before exclusive admission. Defaults and status remain offline. A
+spent or uncertain session cannot be restarted with this command.
+
+R3 has distinct exact Node/Python authority bindings. Historical grants and
+policies are unchanged. The participant semantic auditor validates the same
+predecessor pin and slow-retry authority as the collector. A final participant
+publication refreshes the coordinator's writer view before same-API verification;
+ordinary reader and storage guards remain intact. Focused synthetic checks cover
+late slots, that final boundary, held exports, native closure, compact restore
+and supported publication failure settlement. Original failed tests are retained.
+
+This is one finite 23-job qualification, with skips and stale intervals reported
+from actual observations. It is neither an installed scheduler nor a guarantee
+that every feed stays fresh. Public outcome and final reviewed identities belong
+to this task's result and must not be inferred from the offline gate.

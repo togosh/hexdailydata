@@ -10,8 +10,8 @@ import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'n
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  publicTask,
-  publicProfile,
+  publicAuthority,
+  publicR3,
   validatePublicReady,
   publicAdmission,
 } from './unified-refresh/public-profile.mjs';
@@ -405,7 +405,9 @@ async function runFiniteProfile({
 }) {
   profile = validateProfile(profile);
   taskRoot = resolve(taskRoot);
-  const live = profile.format === publicProfile;
+  const authority = publicAuthority(profile.format);
+  const live = Boolean(authority),
+    publicTask = authority?.task;
   let publicPre;
   if (live) {
     if (spawnChild !== spawn || clock !== undefined || typeof onFact !== 'function')
@@ -1171,6 +1173,15 @@ export async function runJob({
               },
             });
             selected = publication.selected;
+            // A final participant job has no following job to refresh the writer.
+            // Observe the committed compatible pair before same-API verification.
+            await registry.refresh(undefined, true);
+            if (
+              registry.status().error ||
+              registry.status().generation !== selected.generation ||
+              registry.status().productVersion !== selected.product.version
+            )
+              throw Error('COORDINATED_PUBLICATION_UNKNOWN');
             answer = {
               ...answer,
               generation: selected.generation,
@@ -1362,9 +1373,15 @@ export async function runJob({
 }
 
 export async function main(args = process.argv.slice(2)) {
-  if (args.length === 1 && args[0] === 'public-qualification-r2') {
+  if (
+    args.length === 1 &&
+    ['public-qualification-r2', 'public-qualification-r3'].includes(args[0])
+  ) {
     const { runReviewedPublic } = await import('./unified-refresh/owner.mjs');
-    return runReviewedPublic(runUnified);
+    return runReviewedPublic(
+      runUnified,
+      args[0] === 'public-qualification-r3' ? publicR3.profile : undefined,
+    );
   }
   if (args[0] === 'plan' && args.length === 2) {
     console.log(JSON.stringify(validateProfile(await read(resolve(args[1]))), null, 2));

@@ -8,7 +8,7 @@ import tls from 'node:tls';
 import https from 'node:https';
 import dns from 'node:dns';
 import { syncBuiltinESMExports } from 'node:module';
-import { publicTask, publicRoot as T, publicProfileHash, packetHashes } from './public-profile.mjs';
+import { publicAuthority, publicProfile } from './public-profile.mjs';
 import { finalProof } from './final-proof.mjs';
 import {
   canonical,
@@ -43,7 +43,10 @@ export function readinessRoutes(date) {
   ];
 }
 
-export async function runReviewedPublic(runUnified) {
+export async function runReviewedPublic(runUnified, profileId = publicProfile) {
+  const authority = publicAuthority(profileId);
+  assert(authority, 'EXACT_PUBLIC_OWNER_AUTHORITY');
+  const { task: publicTask, root: T, profileHash: publicProfileHash, packetHashes } = authority;
   assert.equal(resolve(process.cwd()), W);
   assert.equal(await realpath(T), T);
   await absent(join(T, 'session'));
@@ -183,13 +186,27 @@ export async function runReviewedPublic(runUnified) {
     assert.equal(seed.version, expected.version);
     assert.equal(seed.manifestSha256, expected.manifestSha256);
     assert.equal(sha(seed.csv), expected.csvSha256);
-    assert.equal(seed.metadata.marketStorage.sequence, 44);
+    assert.equal(seed.metadata.marketStorage.sequence, expected.sequence);
     assert.equal(real.status().generation, expected.participantGeneration);
-    assert.equal(seed.metadata.coverage.ledgerDates, 2502);
-    assert.equal(seed.rows.length, 2504);
+    assert.equal(seed.metadata.coverage.ledgerDates, expected.ledgerPeriods);
+    assert.equal(seed.rows.length, expected.reportingRows);
+    if (expected.sequence === 50) {
+      const heldInitial = real.capture();
+      try {
+        const snapshot = heldInitial.sourceGenerations.identity.snapshot;
+        assert.equal(snapshot.number, expected.participantFrontier);
+        assert.equal(snapshot.hash, expected.participantHash);
+        assert.equal(
+          new Date(snapshot.timestamp * 1000).toISOString(),
+          expected.participantObservedAtUtc,
+        );
+      } finally {
+        heldInitial.release();
+      }
+    }
     await save('INITIAL_SELECTION', {
       ...real.status(),
-      sequence: 44,
+      sequence: expected.sequence,
       csvSha256: sha(seed.csv),
       pid: process.pid,
     });

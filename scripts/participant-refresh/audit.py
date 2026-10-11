@@ -9,11 +9,15 @@ from retry_schedule import enabled, VERSION, WAITS, COUNTERS, ControlReplay, slo
 
 def public_combined_schedule(root, plan):
     """Recognize only this admitted combined profile; historical policies stay fixed."""
-    if plan.get('unifiedProfileId')!='unified-five-feed-public-qualification-2':return False
-    from public_profile import ROOT,PACKET,is_public
+    from public_profile import authority,is_public
+    config=authority(plan.get('unifiedProfileId'))
+    if config is None:return False
+    ROOT=config['root'];PACKET=config['packet']
     raw=(root/'PLAN.json').read_bytes();original=strict_json(raw)
     admission=strict_json((root/'ADMISSION.json').read_bytes())
     binding=strict_json((root/'WINDOW_1_BINDING.json').read_bytes())
+    if config.get('basePin') and plan['base']!=config['basePin']:
+        raise ValueError('Exact combined public predecessor pin')
     if (not plan.get('combinedJob') or not is_public(admission) or admission['family']!='participants'
         or admission['job']!='participants-1' or root.resolve()!=ROOT/'session/participants-1'
         or admission['planSha256']!=digest(raw) or admission['scopeSha256']!=PACKET['packet/SCOPE.json']
@@ -21,7 +25,7 @@ def public_combined_schedule(root, plan):
         or {**plan,'finalTarget':original['finalTarget']}!=original
         or plan['base']!=admission['initial']['participant']['base']
         or plan['finalTarget']!=binding['target'] or plan['base']!=binding['base']
-        or plan['finalTarget']['number']!=27758521 or plan['base']['number']!=27754425):
+        or plan['finalTarget']['number']!=config['target'] or plan['base']['number']!=config['base']):
         raise ValueError('Exact combined public retry authority/plan')
     return True
 

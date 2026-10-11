@@ -1,6 +1,6 @@
 // Finite profile policy for the existing coordinator. This version is offline only.
 import { z } from 'zod';
-import { publicProfile, exactPublicProfile, publicAdmission } from './public-profile.mjs';
+import { publicAuthority, exactPublicProfile, publicAdmission } from './public-profile.mjs';
 export const profileId = 'unified-five-feed-offline-1';
 export const profileTask = 'HDD-UNIFIED-REFRESH-INTEGRATION-R2';
 export const families = ['market', 'gas', 'protocol', 'participants', 'trade'];
@@ -64,7 +64,7 @@ const schema = z.strictObject({
   jobs: z.array(job).min(1).max(64),
 });
 export function validateProfile(value) {
-  const live = value?.format === publicProfile;
+  const live = Boolean(publicAuthority(value?.format));
   if (live) exactPublicProfile(value);
   const p = schema.parse(live ? { ...value, format: profileId, mode: 'OFFLINE_ONLY' } : value),
     seen = new Set();
@@ -125,7 +125,7 @@ export function validateProfile(value) {
     p.parent.graphExtras + p.parent.rpcExtras + p.parent.httpExtras > p.parent.extras
   )
     throw Error('PARENT_AGGREGATE_LIMIT');
-  return live ? { ...p, format: publicProfile, mode: 'OWNER_AUTHORIZED_PUBLIC' } : p;
+  return live ? { ...p, format: value.format, mode: 'OWNER_AUTHORIZED_PUBLIC' } : p;
 }
 export function unifiedAdmission(a) {
   if (publicAdmission(a)) return true;

@@ -52,9 +52,11 @@ def audit_profile(root):
     root=Path(root);profile=read(root/'PROFILE.json');keys=KEYS+['httpAttempts','httpExtras','httpChargedBytes']
     profile_hash=hashlib.sha256(json.dumps(profile,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
     final=read(root/'PARENT_ACCOUNTING.json')
-    live=profile.get('format')=='unified-five-feed-public-qualification-2'
+    from public_profile import authority
+    config=authority(profile.get('format'));live=config is not None
     if live:
-        from public_profile import ROOT,TASK,PROFILE_HASH,PACKET,is_public,digest
+        from public_profile import is_public,digest
+        ROOT=config['root'];TASK=config['task'];PROFILE_HASH=config['profileHash'];PACKET=config['packet']
         if root.resolve()!=ROOT/'session' or profile_hash!=PROFILE_HASH:raise ValueError('Saved public root/profile')
         marker=read(ROOT/'PUBLIC_ADMISSION.json');pre=read(ROOT/'PREFLIGHT.json');plan=read(ROOT/'FROZEN_PLAN.json');review=read(ROOT/'evidence/PREFLIGHT_REVIEW.json')
         if (marker['taskId']!=TASK or marker['nonce']!=final['nonce'] or marker['profileSha256']!=profile_hash
