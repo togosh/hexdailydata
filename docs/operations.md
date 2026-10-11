@@ -737,3 +737,10 @@ The narrow corrected transport records a post-grant mandatory-reserve refusal
 before any worker is called. It requires exact enclosing no-dispatch proof, keeps
 the full charge, accepts no data, performs no retry and disables only that closed
 feed. Other integrity or uncertain-closure failures still stop all dispatch.
+
+R2 saved-only completion and finalization subsequently passed. The exact already
+committed trade product was paired at sequence 80, with immediate rollback 79;
+it was not fetched or published again. One compact backup/isolated restore,
+normal access/preservation checks and two stale previews passed. Both genuine
+base admissions and all owned application/browser handles are closed. The
+operating parent remains UNKNOWN and consumed independently of this clean pair.

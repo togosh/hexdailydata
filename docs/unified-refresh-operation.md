@@ -481,3 +481,11 @@ retry. A known closed local refusal disables that feed; arbitrary failures still
 stop the owner. The denied-network composed test proves another family proceeds
 to normal publication and serving, plus thirteen strict acceptance/refusal cases.
 These are offline correction results, not a second live qualification.
+
+The task's separately reviewed saved-data completion matched intent, exact
+qualified trade captures, journal record 80, its certificate and predecessor 79.
+Only the existing staged participant/product pointer finished; participant
+generation and all product data stayed fixed. Original controls were retained.
+Saved-only API/access/preservation, compact 80/79 backup/restore and two final
+stale previews passed with two closed base admissions. The reopened predecessor
+CSV proof is labelled offline; it is not invented original in-flight evidence.
