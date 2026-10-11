@@ -8,6 +8,7 @@ assert(
     R?.endsWith('repeatable-refresh-public-qualification-r1') ||
     R?.endsWith('repeatable-refresh-public-qualification-r2') ||
     R?.endsWith('repeatable-refresh-public-qualification-r3') ||
+    R?.endsWith('repeatable-refresh-public-qualification-r4') ||
     R?.endsWith('repeatable-refresh-operations-r1') ||
     R?.endsWith('unified-refresh-public-qualification-r2') ||
     R?.endsWith('unified-refresh-public-qualification-r3') ||
