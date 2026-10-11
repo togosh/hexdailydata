@@ -97,7 +97,7 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
   await verify();
   if (operating)
     await durableJson(
-      join(T, 'evidence/PRIOR_OWNER_SAFETY.json'),
+      join(T, 'evidence', `PRIOR_OWNER_SAFETY_${process.pid}_${Date.now()}.json`),
       await verifyPriorOperatingSafety(),
     );
   const deny = () => {
