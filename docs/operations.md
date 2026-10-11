@@ -654,3 +654,13 @@ the original failed fixtures are preserved. The real mixed synthetic schedule an
 focused accounting/native-closure/refusal checks qualify offline behavior. Genuine
 sequence 44 is read-only, no new bases or network are admitted, and this profile
 does not authorize a public run or operating service.
+
+Unified Refresh Public Qualification R2 subsequently consumed its distinct
+owner-authorized parent session and closed PARTIAL after 162 attempts. The new
+local candidate reached sequence 49 through five coherent publications; the
+participant window was captured but not published because of a local auditor
+retry-policy mismatch. The narrow saved-only correction and original failure
+are both retained. Final preservation/access/compact restore passed, resources
+closed, and no continuous freshness or recurring-operation approval is claimed.
+The public command and marker are spent; see the dated result in
+`docs/unified-refresh-operation.md` and the task's reviewed return.

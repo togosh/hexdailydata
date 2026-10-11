@@ -2,6 +2,7 @@
 import json,hashlib,sys
 sys.dont_write_bytecode=True
 from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parent))
 KEYS=['attempts','extraAttempts','graphAttempts','rpcAttempts','graphExtras','rpcExtras',
       'graphChargedBytes','rpcChargedBytes','chargedEntities','observedBytes','returnedEntities','unknownEntityReservations']
 ORDER=['market-1','gas-1','protocol-1','participants-1','market-2','gas-2','protocol-2']

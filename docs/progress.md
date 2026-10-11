@@ -1027,3 +1027,14 @@ the two narrow product-file corrections. Actual 16-slot mixed publication,
 payout append, participant pairing, retention, held/lagging readers and protected
 CSV passed offline; focused negative guards and original failures are retained.
 This grants no public run, genuine-data mutation or service installation.
+
+2026-10-11 — Unified Refresh Public Qualification R2: exact new public authority,
+loaded paired readiness, finite parent accounting and compact native closure
+implemented and checked. One real parent closed PARTIAL after 162 attempts.
+Five publications reached sequence 49; two payout periods appended, two fresh
+BTC/ETH pairs served, fixed history preserved. The participant window's 57 saved
+captures passed only after a narrow local auditor correction; it stays
+unpublished and the original PARTIAL stays immutable. Sixteen jobs never ran.
+Final access/preservation/backup/restore and stale-aware previews passed. Main
+and original roots are unchanged; all owned resources closed. No automatic
+follow-on, scheduler or indexer/reconstruction work.

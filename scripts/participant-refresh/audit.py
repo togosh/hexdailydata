@@ -7,10 +7,32 @@ from retry_policy import classify_error_only, CLASSIFICATIONS
 from queries import validate_job, validate_data, validate_rpc, capacity, objects, make_job, FAMILIES, DEPLOYMENT
 from retry_schedule import enabled, VERSION, WAITS, COUNTERS, ControlReplay, slow_eligible, requirements
 
+def public_combined_schedule(root, plan):
+    """Recognize only this admitted combined profile; historical policies stay fixed."""
+    if plan.get('unifiedProfileId')!='unified-five-feed-public-qualification-2':return False
+    from public_profile import ROOT,PACKET,is_public
+    raw=(root/'PLAN.json').read_bytes();original=strict_json(raw)
+    admission=strict_json((root/'ADMISSION.json').read_bytes())
+    binding=strict_json((root/'WINDOW_1_BINDING.json').read_bytes())
+    if (not plan.get('combinedJob') or not is_public(admission) or admission['family']!='participants'
+        or admission['job']!='participants-1' or root.resolve()!=ROOT/'session/participants-1'
+        or admission['planSha256']!=digest(raw) or admission['scopeSha256']!=PACKET['packet/SCOPE.json']
+        or admission['unifiedProfileId']!=plan['unifiedProfileId']
+        or {**plan,'finalTarget':original['finalTarget']}!=original
+        or plan['base']!=admission['initial']['participant']['base']
+        or plan['finalTarget']!=binding['target'] or plan['base']!=binding['base']
+        or plan['finalTarget']['number']!=27758521 or plan['base']['number']!=27754425):
+        raise ValueError('Exact combined public retry authority/plan')
+    return True
+
+def retry_maximum(q, previous, standalone, exact_public_combined):
+    return 5 if (standalone or exact_public_combined) and slow_eligible(q,previous) else 2
+
 def audit_captures(root, plan, state, window=None, terminal=False):
     root = Path(root)
     r2 = enabled(plan)
     combined = bool(plan.get('combinedJob'))
+    public_slow=public_combined_schedule(root,plan)
     if combined:
         from combined import audit_reservations
         audit_reservations(root, state, capacity)
@@ -121,7 +143,7 @@ def audit_captures(root, plan, state, window=None, terminal=False):
                 raise ValueError('Unrecognized retry')
             value = None
         if cap['retry']:
-            maximum = 5 if r2 and slow_eligible(q, last) else 2
+            maximum = retry_maximum(q,last,r2,public_slow)
             if last is None or last['usable'] or (not last['retryable']) or (last['job'] != q) or (cap['retryOf'] != last['attempt']) or (cap['originalAttempt'] != last['originalAttempt']) or (cap['retryIndex'] != last['retryIndex'] + 1) or (not 1 <= cap['retryIndex'] <= maximum):
                 raise ValueError('One exact retry ordinal')
             if cap['startOffsetSeconds'] + 0.002 < last['startOffsetSeconds'] + last['durationSeconds'] + WAITS[cap['retryIndex'] - 1]:

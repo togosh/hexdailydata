@@ -194,3 +194,38 @@ all writable roots are task-owned. Synthetic preflight uses empty base handles,
 real publication/storage and denied networking. Genuine final proof additionally
 browses the complete holder/stake stores. Actual source/public results and final
 identities belong in the qualification return, not in an operator default.
+
+### Actual R2 result: closed partial, 11 October 2026 UTC
+
+The exact command above is now consumed. Do not rerun it: the task's
+`PUBLIC_ADMISSION.json` and `session/PARENT_ACCOUNTING.json` record one closed
+parent, 162 attempts (55 GraphQL, 98 RPC, 9 GET), eight GraphQL extras and
+20,766,880 charged bytes. Five publications advanced the new candidate from
+sequence 44 to 49 on the same API: one HEX/four-pool observation, one gas,
+one protocol/two-period append and two BTC/ETH pairs. The first trade sample
+had an empty ETH array and retained both previous prices/times. Sixteen later
+scheduled jobs did not run after the terminal local audit failure.
+
+The participant collector captured all 57 responses and closing controls, but
+the auditor still applied the older two-extra ceiling to an authorized slow
+data retry. Publication did not occur. The saved-only correction requires this
+exact public admission, plan, root and window; it retains query identity,
+recognized-error, closure, reservation, wait and ordinal checks. The unchanged
+saved window now verifies, while historical policies still reject it under
+their original bounds. This retrospective proof does not change the original
+PARTIAL result or selected participant frontier 27,754,425.
+
+Final selected product is `e345c1013a2179da15045535929c0bb33448f20e0cc0effe723090f7d17049c0`:
+2,505 reporting rows, 2,504 ledger periods, 5,004 unchanged fixed closes and
+90 unchanged historical liquidity dates. Final preservation/access, compact
+backup and isolated restore passed with reused base handles. Two real previews
+show stale quotes honestly; two fresh trade deliveries do not prove continuous
+freshness. No recovery or post-session publication was performed. All owned
+resources closed; main, original roots and parked work remain unchanged.
+
+Use `REPORT.md`, `evidence/PER_JOB_RESULTS.json`, `evidence/PARENT_AUDIT.json`
+and the exact source/return identities in the qualification return. Final
+source includes the narrow saved-audit correction; the live run used commit
+`c0ccf2e1f315c088d90a84f98fd2b451ceb27809`. A future application of the captured
+unpublished participant window requires its own scoped offline integration;
+another public qualification requires fresh authority.
