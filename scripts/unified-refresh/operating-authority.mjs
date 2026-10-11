@@ -28,6 +28,18 @@ export function validatePriorProcessObservations(expectedPids, observed, lastClo
   }
   check(remaining.size === 0, 'OPERATING_PRIOR_PROCESS_MISSING');
 }
+// Windows can reuse a historical worker PID for a protected system process.
+// Only its exact local creation time can qualify reuse; an unreadable or absent
+// fallback is uncertainty, never proof that the old process has closed.
+export function priorProcessCommand(pids) {
+  check(
+    pids.length > 0 &&
+      new Set(pids).size === pids.length &&
+      pids.every((p) => Number.isInteger(p) && p > 0),
+    'OPERATING_PRIOR_PID',
+  );
+  return `$ErrorActionPreference='Stop'; $ids=@(${pids.join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; $stamp=$p.StartTime; $method='Get-Process'; if($null -eq $stamp){$exact=@(Get-CimInstance -ClassName Win32_Process -Filter ("ProcessId = "+$idValue) -Property ProcessId,CreationDate -OperationTimeoutSec 5); if($exact.Count -ne 1 -or $exact[0].ProcessId -ne $idValue -or $null -eq $exact[0].CreationDate){throw 'OPERATING_PRIOR_CREATION_UNKNOWN'}; $stamp=$exact[0].CreationDate; $method='local exact Win32_Process CreationDate'}; [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$stamp.ToUniversalTime().ToString('o');observationMethod=$method}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+}
 // New authority never settles an older UNKNOWN owner. Inspect its exact native
 // closure and current process identities before opening the new genuine runtime.
 export async function verifyPriorOperatingSafety() {
@@ -77,7 +89,7 @@ export async function verifyPriorOperatingSafety() {
     [...pids].every((p) => Number.isInteger(p) && p > 0),
     'OPERATING_PRIOR_PID',
   );
-  const command = `$ErrorActionPreference='Stop'; $ids=@(${[...pids].join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; $stamp=$p.StartTime.ToUniversalTime().ToString('o'); [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$stamp}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+  const command = priorProcessCommand([...pids]);
   const observed = JSON.parse(
     execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
       encoding: 'utf8',
@@ -260,7 +272,7 @@ async function verifyReapedPriorSafety() {
     [...pids].every((p) => Number.isInteger(p) && p > 0),
     'OPERATING_PRIOR_PID',
   );
-  const command = `$ErrorActionPreference='Stop'; $ids=@(${[...pids].join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$p.StartTime.ToUniversalTime().ToString('o')}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+  const command = priorProcessCommand([...pids]);
   const observations = JSON.parse(
     execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
       encoding: 'utf8',
@@ -391,7 +403,7 @@ async function verifyAdditionalPriorSafety() {
     [...pids].every((p) => Number.isInteger(p) && p > 0),
     'OPERATING_PRIOR_PID',
   );
-  const command = `$ErrorActionPreference='Stop'; $ids=@(${[...pids].join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$p.StartTime.ToUniversalTime().ToString('o')}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+  const command = priorProcessCommand([...pids]);
   const observed = JSON.parse(
     execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
       encoding: 'utf8',
