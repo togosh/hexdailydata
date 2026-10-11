@@ -710,3 +710,9 @@ session or permission to remove its lock. Saved-only finalization may inspect
 the exact committed selection under its separately reviewed task-local plan;
 it never settles or reopens the public coordinator. A longer operating cadence
 and reliable cross-family public progression remain unqualified.
+
+The task's saved-only finalization is complete: normal API/access, preservation,
+compact backup/restore and two previews passed without changing sequence 72.
+The backup contains sequence 72 and immediate rollback 71 with exact external
+base references. It does not include permission to resume the consumed owner.
+All owned application/base handles closed; the protected parent record remains.

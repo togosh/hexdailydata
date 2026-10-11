@@ -1128,3 +1128,10 @@ enclosing proof and full charges. Cancellation now records actual native handle
 closure on its final path. Focused replay/refusal and real denied-network
 cancellation checks pass; no second public activation was made. Final preservation,
 backup and restore results are separate from public cadence qualification.
+
+Saved-only finalization subsequently passed on the same sequence-72 candidate:
+117,735 CSV cells reconciled, with only four October 11 BTC/ETH value/time cells
+changed. Normal access checks, one compact backup/isolated restore and two stale
+previews passed. Two genuine base admissions are closed. The original parent
+UNKNOWN state and lock remain intact; no settlement, publication or public rerun
+occurred during finalization. Main and original roots remain unchanged.
