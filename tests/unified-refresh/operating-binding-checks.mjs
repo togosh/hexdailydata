@@ -62,7 +62,7 @@ assert.throws(
     }),
   /AGGREGATE/,
 );
-const priorNative = join(T, 'fixtures/operating-native-boundary-ACloLq/operating');
+const priorNative = join(T, 'reference/native-boundary');
 const charged = [];
 for (const family of ['trade', 'market', 'gas', 'protocol']) {
   const id = jobs.find((id) => id.startsWith(family + '-'));
@@ -124,7 +124,7 @@ await o.close();
 cases.push(
   'five initial reservations, charged fast completions, all four renewals with participant retained, independent aggregate1376 refusal',
 );
-const prior = join(T, 'fixtures/operating-native-boundary-ACloLq/operating');
+const prior = join(T, 'reference/native-boundary');
 const read = async (p) => JSON.parse(await fs.readFile(p));
 const result = await read(join(prior, 'RUN_00000001_RESULT.json'));
 assert.equal(result.accounting.status, 'CLOSED');

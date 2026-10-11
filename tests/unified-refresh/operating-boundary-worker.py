@@ -16,6 +16,22 @@ from durable import save,encode,digest,strict_json
 from worker import operating_physical_enter
 operating_physical_enter(request,root,a,time.time)
 q=strict_json(request.read_bytes())
+if (family=='gas' and f.get('timeoutTip') and q.get('job',{}).get('method')=='eth_maxPriorityFeePerGas'
+    and q['job']['endpoint']==1 and not (root/'TIMEOUT_TRIGGER.json').exists()):
+    # The real enclosing WorkerTransport must time out, kill and wait this child.
+    # No response or closure receipt is injected by this I/O seam.
+    save(root/'TIMEOUT_TRIGGER.json',dict(workerPid=os.getpid(),request=str(request),at=time.time(),networkingDenied=True))
+    import http_worker
+    class BlockedConnection:
+        def __init__(self,*args,**kwargs):pass
+        def request(self,*args,**kwargs):time.sleep(90)
+        def close(self):pass
+    http_worker.http.client.HTTPSConnection=BlockedConnection
+    # The maintained HTTP function writes its own initial transport envelope.
+    # Only I/O is denied/stalled; the Popen owner generates actual kill/wait proof.
+    http_worker.perform(q['method'],q['url'],(request.parent/'request.body').read_bytes(),
+        request.parent/'response.body',request.parent/'transport.json',16384)
+    raise AssertionError('Actual enclosing request cutoff did not terminate timeout fixture')
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 def frame(value):

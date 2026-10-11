@@ -8,9 +8,9 @@ sys.dont_write_bytecode=True
 from pathlib import Path
 import json,hashlib,time,os,copy,importlib.util,importlib.machinery,subprocess,uuid
 W=Path(__file__).resolve().parents[2]
-T=Path(r'C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\repeatable-refresh-public-qualification-r1')
 sys.path[:0]=[str(W/'scripts/unified-refresh'),str(W/'scripts/trade-feed'),str(W/'scripts/market-refresh')]
 import operating_authority as authority
+T=Path(authority.POLICY['root'])
 def deny(event,args):
     if event.startswith('socket.'):raise PermissionError('HARD_DENIED_NETWORK')
 sys.addaudithook(deny)
@@ -24,7 +24,7 @@ def load(name,path):
 
 def worker_case(base,family,case):
     fixture=base/(family+'-'+case);fixture.mkdir();policy=copy.deepcopy(authority.POLICY);policy['root']=str(fixture);authority.POLICY=policy
-    source=T/'fixtures/operating-native-boundary-ACloLq/operating'
+    source=T/'reference/native-boundary'
     original=next(p for p in source.iterdir() if p.is_dir() and p.name.startswith(family+'-'))
     a=read(original/'ADMISSION.json');job=fixture/'session'/a['job'];job.mkdir(parents=True)
     request=job/('01' if family=='trade' else 'captures/00001')/'request.json';request.parent.mkdir(parents=True)
@@ -32,7 +32,7 @@ def worker_case(base,family,case):
     start=time.time();config=authority.bounded_config(start)
     runtime={str(p.relative_to(W)).replace('\\','/'):sha(raw(p)) for folder in ('scripts/unified-refresh','scripts/trade-feed','scripts/market-refresh','scripts/participant-refresh','scripts/gas-feed','scripts/protocol-feed') for p in (W/folder).iterdir() if p.is_file() and p.suffix in ('.py','.mjs','.json')}
     runtime['config/repeatable-operating-public-1.json']=sha(raw(W/'config/repeatable-operating-public-1.json'))
-    a.update(operatingFormat=authority.LIVE,parentMode='OWNER_AUTHORIZED_PUBLIC',synthetic=False,jobRoot=str(job),
+    a.update(operatingFormat=authority.LIVE,authorityTaskId=policy['task'],parentMode='OWNER_AUTHORIZED_PUBLIC',synthetic=False,jobRoot=str(job),
         startedAtUnixSeconds=start,deadlineUnixSeconds=start+a['allowance']['seconds'],activationExpiresAt=start+2400,
         networkClosesAtUnixSeconds=min(start+2220,start+a['allowance']['seconds']-a['allowance']['publication']-5),
         runtimeFiles=runtime,parentNonce='b'*64,sourceBindingSha256=sha(authority.canonical(runtime)),

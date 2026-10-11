@@ -45,6 +45,10 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       ),
       priorTask.replace(
         'unified-refresh-integration-r2',
+        'repeatable-refresh-public-qualification-r2',
+      ),
+      priorTask.replace(
+        'unified-refresh-integration-r2',
         'unified-refresh-public-qualification-r4',
       ),
       priorTask.replace(
@@ -61,6 +65,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     [
       'repeatable',
       'native-boundary',
+      'native-timeout',
       'operating-smoke',
       'operating-cancel-retry',
       'operating-cancel-physical',
@@ -106,7 +111,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
   const operatingSmall = mode.startsWith('operating-');
-  const boundary = mode === 'native-boundary';
+  const boundary = ['native-boundary', 'native-timeout'].includes(mode);
   await fs.mkdir(join(root, 'evidence'));
   process.env.HDD_TASK_ROOT = root;
   const NativeDate = Date,
@@ -470,8 +475,9 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         ...(boundary
           ? {
               realClockBoundary: true,
-              tradeMode: tradeOrdinal === 1 ? 'empty' : 'fresh',
-              delay: a.family === 'participants' ? 121 : 0,
+              tradeMode: mode === 'native-boundary' && tradeOrdinal === 1 ? 'empty' : 'fresh',
+              timeoutTip: mode === 'native-timeout' && a.family === 'gas',
+              delay: mode === 'native-boundary' && a.family === 'participants' ? 121 : 0,
             }
           : {}),
         ...(mode === 'repeatable' && tradeOrdinal === 1 ? { noBodyRetry: true } : {}),
@@ -497,7 +503,13 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         ...(mode === 'repeatable' && tradeOrdinal === 17 ? { largeResult: true } : {}),
         ...(a.family === 'participants'
           ? {
-              delay: boundary ? 121 : mode === 'repeatable' ? 405 : 400,
+              delay: boundary
+                ? mode === 'native-boundary'
+                  ? 121
+                  : 0
+                : mode === 'repeatable'
+                  ? 405
+                  : 400,
               ...(mode === 'repeatable' ? { auditDelay: 75 } : {}),
             }
           : {}),
@@ -649,7 +661,8 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         'trade',
       ]);
       const part = result.jobs.find((j) => j.family === 'participants');
-      assert(result.jobs.some((j) => j.family === 'trade' && j.completedAt < part.completedAt));
+      if (mode === 'native-boundary')
+        assert(result.jobs.some((j) => j.family === 'trade' && j.completedAt < part.completedAt));
       receipt.completionMatrix = [];
       for (const j of result.jobs) {
         const jr = join(root, 'operating', j.job),
@@ -680,10 +693,68 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       receipt.cases = [
         'actual five-family native emitter/parser/publisher/storage/reader',
         'real epoch/local monotonic conversion',
-        '121-second IPC wait with other-feed progress',
+        mode === 'native-boundary'
+          ? '121-second IPC wait with other-feed progress'
+          : 'native timeout followed by another family completing',
         'actual child wait before physical settlement',
-        'empty trade completion',
+        mode === 'native-boundary'
+          ? 'empty trade completion'
+          : 'genuine worker timeout with full charge and no accepted data',
       ];
+      if (mode === 'native-timeout') {
+        const gas = result.jobs.find((j) => j.family === 'gas');
+        const gr = join(root, 'operating', gas.job);
+        const trigger = await read(join(gr, 'TIMEOUT_TRIGGER.json'));
+        const dir = dirname(trigger.request);
+        const capture = await read(join(dir, 'capture.json'));
+        const physical = await read(join(dir, 'PHYSICAL_CLOSED.json'));
+        const request = await read(trigger.request);
+        const permit = await read(
+          join(root, 'operating', `PERMIT_${String(physical.permit).padStart(8, '0')}.json`),
+        );
+        const settlement = await read(
+          join(root, 'operating', `SETTLEMENT_${String(physical.permit).padStart(8, '0')}.json`),
+        );
+        assert.equal(capture.failureKind, 'transport_timeout');
+        assert.equal(capture.responseBytes, 0);
+        assert.equal(capture.usable, false);
+        assert.equal(capture.status, null);
+        assert.equal(physical.workerPid, trigger.workerPid);
+        assert(
+          physical.native.childReaped &&
+            physical.connectionClosed &&
+            physical.native.exitCode !== null,
+        );
+        assert.notEqual(physical.workerPid, physical.proofOwnerPid);
+        assert.equal(settlement.complete, false);
+        assert.equal(settlement.bytes, permit.bytes);
+        assert.equal(settlement.objects, permit.objects);
+        assert.equal(result.accounting.pending, null);
+        const next = await read(
+          join(root, 'operating', `PERMIT_${String(physical.permit + 1).padStart(8, '0')}.json`),
+        );
+        assert.notEqual(next.job.split('-')[0], 'gas');
+        assert(next.at >= settlement.at + 1);
+        const continued = result.jobs.find((j) => j.job === next.job);
+        assert(
+          continued &&
+            continued.completedAt > settlement.at &&
+            continued.status === 'QUALIFIED_ADOPTED',
+        );
+        assert(facts.some((f) => f.job === continued.job && f.datasetVersion));
+        receipt.timeoutProgression = {
+          trigger,
+          request,
+          permit,
+          settlement,
+          physical,
+          next,
+          continued,
+          noUsableTimeoutData: true,
+          pendingCleared: true,
+          networkingDenied: true,
+        };
+      }
     } else if (mode === 'r4-all') {
       assert.equal(starts.length, 23);
       receipt.completionMatrix = await Promise.all(
@@ -718,6 +789,8 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
           assert.equal(result.accounting.feeds.market.quarantine, 'OPERATING_JOB_BOUND');
         }
         const selected = writer.productDaily.capture();
+        const { finalAccessProof } = await import('../../scripts/unified-refresh/final-proof.mjs');
+        receipt.finalAccess = await finalAccessProof(app, selected);
         const download = '/api/v2/downloads/' + selected.bundleId + '/daily';
         const { keys } = await import('../market-feed/access-fixture.mjs');
         assert(

@@ -9,7 +9,7 @@ sys.dont_write_bytecode=True
 W=Path(__file__).resolve().parents[2];root=Path(sys.argv[1]).resolve()
 a=json.loads((root/'ADMISSION.json').read_bytes());f=json.loads((root/'FIXTURE.json').read_bytes())
 assert a['synthetic'] is True and a['authorityTaskId'] in ('HDD-UNIFIED-REFRESH-INTEGRATION-R2','HDD-REPEATABLE-REFRESH-OPERATIONS-R1')
-assert any(x in root.parts for x in ('unified-refresh-integration-r2','unified-refresh-public-qualification-r2','unified-refresh-public-qualification-r3','unified-refresh-public-qualification-r4','repeatable-refresh-operations-r1','repeatable-refresh-public-qualification-r1'))
+assert any(x in root.parts for x in ('unified-refresh-integration-r2','unified-refresh-public-qualification-r2','unified-refresh-public-qualification-r3','unified-refresh-public-qualification-r4','repeatable-refresh-operations-r1','repeatable-refresh-public-qualification-r1','repeatable-refresh-public-qualification-r2'))
 def deny(*args,**kwargs):raise AssertionError('DENIED_EXTERNAL_DNS_SOCKET_OR_CHILD')
 socket.getaddrinfo=socket.create_connection=socket.socket.connect=socket.socket.connect_ex=deny
 subprocess.Popen=os.system=deny

@@ -9,7 +9,11 @@ import https from 'node:https';
 import dns from 'node:dns';
 import { syncBuiltinESMExports } from 'node:module';
 import { publicAuthority, publicProfile } from './public-profile.mjs';
-import { operatingPolicy, liveOperatingFormat } from './operating-authority.mjs';
+import {
+  operatingPolicy,
+  liveOperatingFormat,
+  verifyPriorOperatingSafety,
+} from './operating-authority.mjs';
 import { finalProof } from './final-proof.mjs';
 import {
   canonical,
@@ -91,6 +95,11 @@ export async function runReviewedPublic(runUnified, profileId = publicProfile) {
       assert.equal(sha(await readFile(join(T, p))), h, 'INPUT_CHANGED:' + p);
   };
   await verify();
+  if (operating)
+    await durableJson(
+      join(T, 'evidence/PRIOR_OWNER_SAFETY.json'),
+      await verifyPriorOperatingSafety(),
+    );
   const deny = () => {
     throw Error('OWNER_EXTERNAL_NETWORK_DENIED');
   };

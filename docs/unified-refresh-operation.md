@@ -443,3 +443,23 @@ These changes have focused saved-receipt/refusal and actual native cancellation
 evidence. They were not exercised in another public run. Saved-only API,
 preservation and compact restore work does not upgrade the original PARTIAL
 result or establish the unrun twenty-minute schedule.
+
+### R2 conditional qualification
+
+The distinct entry `node scripts/refresh-data.mjs operating-public-qualification-r2`
+uses the existing `unified-operating-public-1` format with the exact R2 packet,
+source, root and sequence 72/71 clean backup. The R1 command is no longer a live
+entry. R1's UNKNOWN parent, pending permit 43, full charge and owner lock remain
+immutable. Admission rechecks its original evidence and exact process ownership;
+no old session state is restored, settled or unlocked.
+
+Before genuine bases open, a denied-network test stalls the actual HTTP I/O path
+and lets its enclosing WorkerTransport perform the real timeout, kill and wait.
+The corrected validator must fully charge that empty failure and let another
+family publish through the ordinary paired API. Five exact R2 native entries and
+reservation boundaries are checked separately. Accepted 40-job, 121-second wait,
+refusal and cancellation evidence is reused where the executed code is unchanged.
+
+The numerical limits and source methods above remain unchanged. A reviewed frozen
+plan and a newly loaded paired application are mandatory. This conditional grant
+does not qualify provider availability, continuous freshness or permanent service.

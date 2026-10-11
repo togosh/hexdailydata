@@ -10,6 +10,38 @@ import {
 } from '../../dist/services/product-daily/market.js';
 import { backupParticipants } from '../participant-refresh-backup.mjs';
 
+export async function finalAccessProof(f, p) {
+  const { auth, keys } = await import('../../tests/market-feed/access-fixture.mjs');
+  const url = '/api/v2/downloads/' + p.bundleId + '/daily';
+  assert([401, 403].includes((await f.inject(url)).statusCode));
+  assert([401, 403].includes((await f.inject({ url, headers: auth(keys.invalid) })).statusCode));
+  const downloaded = await f.inject({ url, headers: auth() });
+  assert.equal(downloaded.statusCode, 200);
+  assert.equal(sha(downloaded.body), sha(p.csv));
+  const head = await f.inject({ url, method: 'HEAD', headers: auth() });
+  assert.equal(head.statusCode, 200);
+  assert.equal(head.body, '');
+  for (const method of ['GET', 'HEAD'])
+    assert.equal(
+      (
+        await f.inject({
+          url,
+          method,
+          headers: { ...auth(), 'if-none-match': downloaded.headers.etag },
+        })
+      ).statusCode,
+      304,
+    );
+  return {
+    status: 'PASS',
+    absentKey: 'REFUSED',
+    invalidKey: 'REFUSED',
+    paidGet: 'EXACT_CSV',
+    head: 'EMPTY_200',
+    conditionalGetHead: 304,
+  };
+}
+
 export async function finalProof({ T, real, seed, f, heldExport, save, synthetic = false }) {
   const p = real.productDaily.capture();
   preserveMarketHistory(seed, p);
@@ -66,26 +98,8 @@ export async function finalProof({ T, real, seed, f, heldExport, save, synthetic
     assert.equal(r.statusCode, 200, url + ': ' + r.body.slice(0, 500));
     responses[url] = r.json();
   }
-  const { auth } = await import('../../tests/market-feed/access-fixture.mjs');
-  const url = '/api/v2/downloads/' + p.bundleId + '/daily';
-  assert([401, 403].includes((await f.inject(url)).statusCode));
-  const downloaded = await f.inject({ url, headers: auth() });
-  assert.equal(downloaded.statusCode, 200);
-  assert.equal(sha(downloaded.body), sha(p.csv));
-  const head = await f.inject({ url, method: 'HEAD', headers: auth() });
-  assert.equal(head.statusCode, 200);
-  assert.equal(head.body, '');
-  for (const method of ['GET', 'HEAD'])
-    assert.equal(
-      (
-        await f.inject({
-          url,
-          method,
-          headers: { ...auth(), 'if-none-match': downloaded.headers.etag },
-        })
-      ).statusCode,
-      304,
-    );
+  const access = await finalAccessProof(f, p);
+  await save('FINAL_ACCESS', access);
   await save('FINAL_NORMAL_API', responses);
   await save('PRESERVATION', {
     status: 'PASS',

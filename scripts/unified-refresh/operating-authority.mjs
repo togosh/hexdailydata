@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { readFile, lstat } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { canonical, sha } from '../../dist/services/source-update/generation.js';
 export const operatingPolicy = JSON.parse(
   readFileSync(new URL('../../config/repeatable-operating-public-1.json', import.meta.url)),
@@ -11,6 +12,94 @@ export const boundaryOperatingFormat = 'unified-operating-denied-boundary-1';
 const check = (v, why) => {
   if (!v) throw Error(why);
 };
+export function validatePriorProcessObservations(expectedPids, observed, lastClose) {
+  check(
+    Array.isArray(observed) && observed.length === expectedPids.length,
+    'OPERATING_PRIOR_PROCESS_OBSERVATIONS',
+  );
+  const remaining = new Set(expectedPids);
+  for (const p of observed) {
+    check(remaining.delete(p.pid), 'OPERATING_PRIOR_PROCESS_IDENTITY');
+    check(
+      p.status === 'ABSENT' ||
+        (p.status === 'PRESENT' && Date.parse(p.startedAtUtc) / 1000 > lastClose),
+      'OPERATING_PRIOR_PROCESS_UNCERTAIN',
+    );
+  }
+  check(remaining.size === 0, 'OPERATING_PRIOR_PROCESS_MISSING');
+}
+// New authority never settles an older UNKNOWN owner. Inspect its exact native
+// closure and current process identities before opening a genuine R2 runtime.
+export async function verifyPriorOperatingSafety() {
+  const old = operatingPolicy.oldStateProtection;
+  check(old && old.root !== operatingPolicy.root, 'OPERATING_PRIOR_OWNER_BOUNDARY');
+  const proof = JSON.parse(
+    await readFile(join(operatingPolicy.root, 'reference/OLD_STATE_BINDINGS.json')),
+  );
+  check(proof.root === old.root && proof.physical.length === 43, 'OPERATING_PRIOR_PROOF');
+  for (const item of proof.files) {
+    const path = resolve(old.root, item.path);
+    check(path.startsWith(old.root + '\\'), 'OPERATING_PRIOR_PATH');
+    check(sha(await readFile(path)) === item.sha256, 'OPERATING_PRIOR_STATE_CHANGED');
+  }
+  const state = JSON.parse(await readFile(join(old.root, 'session/OPERATING_STATE.json')));
+  check(
+    state.status === 'UNKNOWN' &&
+      state.pending.id === 43 &&
+      state.pending.bytes === 16384 &&
+      state.pending.objects === 16,
+    'OPERATING_PRIOR_PROTECTION',
+  );
+  const pids = new Set([proof.oldOwner.pid]);
+  let lastClose = 0;
+  for (const item of proof.physical) {
+    const permit = JSON.parse(
+      await readFile(join(old.root, 'session', `PERMIT_${String(item.id).padStart(8, '0')}.json`)),
+    );
+    const captureRoot = resolve(permit.requestPath, '..');
+    check(captureRoot.startsWith(old.root + '\\session\\'), 'OPERATING_PRIOR_CAPTURE_PATH');
+    const close = JSON.parse(await readFile(join(captureRoot, 'PHYSICAL_CLOSED.json')));
+    check(
+      close.permit === permit.id &&
+        close.nonce === permit.nonce &&
+        close.childReaped === true &&
+        close.connectionClosed === true &&
+        close.native?.childReaped === true &&
+        Number.isInteger(close.native.exitCode) &&
+        close.workerPid !== close.proofOwnerPid,
+      'OPERATING_PRIOR_PHYSICAL_CLOSURE',
+    );
+    pids.add(close.workerPid);
+    pids.add(close.proofOwnerPid);
+    lastClose = Math.max(lastClose, close.closedAt);
+  }
+  check(
+    [...pids].every((p) => Number.isInteger(p) && p > 0),
+    'OPERATING_PRIOR_PID',
+  );
+  const command = `$ErrorActionPreference='Stop'; $ids=@(${[...pids].join(',')}); $rows=@(foreach($idValue in $ids){try {$p=Get-Process -Id $idValue -ErrorAction Stop; $stamp=$p.StartTime.ToUniversalTime().ToString('o'); [pscustomobject]@{pid=$idValue;status='PRESENT';startedAtUtc=$stamp}} catch {if($_.FullyQualifiedErrorId -eq 'NoProcessFoundForGivenId,Microsoft.PowerShell.Commands.GetProcessCommand'){[pscustomobject]@{pid=$idValue;status='ABSENT'}}else{throw}}}); ConvertTo-Json -InputObject $rows -Compress`;
+  const observed = JSON.parse(
+    execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', command], {
+      encoding: 'utf8',
+      timeout: 10000,
+      windowsHide: true,
+    }),
+  );
+  validatePriorProcessObservations([...pids], observed, lastClose);
+  return {
+    status: 'PASS',
+    atUtc: new Date().toISOString(),
+    checkedFiles: proof.files.length,
+    physicalReaps: 43,
+    inspectedPids: [...pids],
+    observations: observed,
+    reusedPids: observed.filter((p) => p.status === 'PRESENT'),
+    oldParent: 'UNKNOWN_UNCHANGED',
+    pendingPermit: 43,
+    oldLockPreserved: true,
+    actions: 'READ_ONLY_NO_SETTLEMENT',
+  };
+}
 export function liveOperating(a) {
   if (a?.operatingFormat !== liveOperatingFormat) return false;
   check(

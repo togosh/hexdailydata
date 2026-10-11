@@ -716,3 +716,11 @@ compact backup/restore and two previews passed without changing sequence 72.
 The backup contains sequence 72 and immediate rollback 71 with exact external
 base references. It does not include permission to resume the consumed owner.
 All owned application/base handles closed; the protected parent record remains.
+
+R2 provides the separately authorized one-use entry
+`node scripts/refresh-data.mjs operating-public-qualification-r2`. It uses only
+the verified clean sequence 72/71 backup in a new owned runtime. Its preflight
+checks R1's unchanged evidence and confirms each recorded old PID is absent or
+a demonstrably later process; lookup uncertainty stops admission. It never
+settles R1 or removes its lock. The existing numerical limits remain unchanged.
+Actual qualification belongs to the R2 result, not this command's availability.

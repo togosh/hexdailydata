@@ -1,12 +1,16 @@
 {
-  "task": "HDD-REPEATABLE-REFRESH-PUBLIC-QUALIFICATION-R1",
+  "task": "HDD-REPEATABLE-REFRESH-PUBLIC-QUALIFICATION-R2",
   "format": "unified-operating-public-1",
-  "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r1",
+  "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r2",
   "packetHashes": {
-    "packet/TASK.md": "6b71b514a9a12968d4a2cdd6a1e96d5e6d84055bc66d2f8f973c9e2c6a84acaf",
-    "packet/SCOPE.json": "934f5764c79ee698f3d172e06768022efa1fe722121006feae2632aec9241aff",
-    "packet/INPUTS.json": "8447d9bcb32c4c7e302e92fdb7dfa4e8de4e4518f3e2de8ff084e906f340c4d0",
-    "packet/PLANNER_DISPOSITION.md": "0155a20d9dc36cd9440adfebc06e1dc19d37e4e2e08be3297c972d45ec0fbeb2"
+    "packet/FIRST_MESSAGE.txt": "9d2883be1c1baf8f00f77e6e9f304eb34e570c087a3783ca6a537b429c13ab0c",
+    "packet/INPUTS.json": "ddb8e136a03ceac00dfd341301637f189666fd91bd09e3bfebe8b127cc80f074",
+    "packet/MANIFEST.json": "875d60ad26057dc8e215e001e3d32fa86481fd377adab9deb97114d582ff75d3",
+    "packet/PLANNER_DISPOSITION.md": "20b4c68c2fe8d6f90a111eb490441d9d86021d92db0ec0c4c431fa7c5a421604",
+    "packet/PLANNER_VERIFICATION.json": "9515c36acb91fb902db3ffb02dd5090d85a0d9f04dcbf396d628684db33234ea",
+    "packet/README.md": "09812dc725d82f2b929f871531a21bb8bfc37a8b48f326af21f2188498e24e9e",
+    "packet/SCOPE.json": "85ca5963d13d5b7fdae1032302cd4f2447ac8bd94d1937b8f811cc07173f367a",
+    "packet/TASK.md": "00da0371f0337a13c6bbdb720d272d0f3074e26c5000962949263c8f485d02ce"
   },
   "public": {
     "sessions": 1,
@@ -222,15 +226,25 @@
     "cookies": "Ignore response Set-Cookie without storage/replay in requests; retain auth/challenge, redirect and TLS refusals. Sanitize distributable evidence only; preserve original response/source tokens locally."
   },
   "selection": {
-    "sequence": 71,
-    "productVersion": "8d3d020e02a2c4b68fca3a67f93bbf2c3a67feb70e3b6bac67791bc96479a51c",
+    "sequence": 72,
+    "productVersion": "625ea58dfc169666e837e097b74eb3fd607511b9b851052e6c1a0ac3b8835f20",
     "participantGeneration": "c182da939f433aa88973730281c0f1bb41c1f54ae8be1722ff06ce2d962d5b62",
     "participantFrontier": {
       "hash": "0x3e2e5bf8d66f6f048bd2678a054859d46bf7f2598675403fae5db62e61b3deb6",
       "number": 27762617,
       "timestamp": 1791644675
     },
-    "immediateRollbackSequence": 70,
-    "backupSha256": "1ee51e07d4bd250b964e873297165e64f6110e09b5f2c92530fc9157fafc5ba2"
+    "immediateRollbackSequence": 71,
+    "backupSha256": "35b9673157b09484378eea97dfeaabbd71127691802fdab4c3f3cddcf5a69549",
+    "productManifestSha256": "a5cf1e407d978c9a17ee492dff23369b5e50d9b15920c2c57f12deeccab68aea"
+  },
+  "oldStateProtection": {
+    "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r1",
+    "parentStatus": "UNKNOWN",
+    "pendingPermit": 43,
+    "reservedBytes": 16384,
+    "reservedObjects": 16,
+    "ownerLock": "session/OPERATING_OWNER.lock",
+    "rule": "Never settle, delete, rename, recover, resume, repair or import this prior owner/session state. Its 43 charges and original failure remain immutable. Recorded retrospective physical closure does not change original accounting. Only the separately verified clean sequence72/71 product+participant backup is a seed for the explicitly new activation."
   }
 }

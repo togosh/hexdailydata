@@ -1135,3 +1135,10 @@ changed. Normal access checks, one compact backup/isolated restore and two stale
 previews passed. Two genuine base admissions are closed. The original parent
 UNKNOWN state and lock remain intact; no settlement, publication or public rerun
 occurred during finalization. Main and original roots remain unchanged.
+
+R2 preparation rebinds the existing operating format to the new exact task and
+clean sequence 72/71 backup, while preserving the old UNKNOWN owner. A focused
+native timeout/progression test and exact five-family entry checks precede any
+genuine admission. The new conditional authority retains every original numeric
+cap and source method. Final public results are recorded separately after the
+single activation; preparation alone does not qualify the operating cadence.
