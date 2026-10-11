@@ -14,6 +14,11 @@ sys.path[:0]=[str(W/'scripts/unified-refresh'),str(W/'scripts'/folder),str(W/'sc
 os.environ['HDD_TASK_ROOT']=str(root)
 from durable import save,encode,digest,strict_json
 from worker import operating_physical_enter
+if family=='gas' and f.get('startupTimeout'):
+    # Stall before physical entry/envelope: real enclosing process must kill/wait.
+    save(root/'STARTUP_TIMEOUT_TRIGGER.json',dict(workerPid=os.getpid(),networkingDenied=True,request=str(request)))
+    time.sleep(90)
+    raise AssertionError('Enclosing startup cutoff not enforced')
 operating_physical_enter(request,root,a,time.time)
 q=strict_json(request.read_bytes())
 if (family=='gas' and f.get('timeoutTip') and q.get('job',{}).get('method')=='eth_maxPriorityFeePerGas'

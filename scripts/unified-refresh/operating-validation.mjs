@@ -171,7 +171,32 @@ export async function settlementEvidence(p, m, family) {
   );
   const transportRaw = await optional(family === 'trade' ? 'response.json' : 'transport.json');
   const transport = transportRaw ? JSON.parse(transportRaw) : null;
-  if (savedBody === null || transport === null) {
+  // A timed-out worker can leave a default envelope or no envelope before entry.
+  // Only the enclosing process's exact reaping proof can establish its closure.
+  const enclosingTimeout =
+    ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
+    family !== 'trade' &&
+    closed === true &&
+    r.complete === false &&
+    r.usable === false &&
+    r.entityRows === null &&
+    r.bodyDurable === true &&
+    savedBody !== null &&
+    !complete &&
+    r.failureKind === 'transport_timeout' &&
+    r.status === null &&
+    r.childStarted === true &&
+    r.childReaped === true &&
+    r.connectionClosed === true &&
+    r.responseBytes === 0 &&
+    body.length === 0 &&
+    (transport === null ||
+      (transport.status === null &&
+        transport.complete === false &&
+        transport.connectionClosed === false)) &&
+    m.bytes === p.bytes &&
+    m.objects === p.objects;
+  if ((savedBody === null || transport === null) && !enclosingTimeout) {
     assert(
       family === 'trade' &&
         closed === true &&
@@ -201,25 +226,6 @@ export async function settlementEvidence(p, m, family) {
       'OPERATING_ABSENT_PHASE_VALUES',
     );
   }
-  // A timed-out worker can leave the default (not closed) transport envelope.
-  // Only the enclosing process's exact reaping proof can establish its closure.
-  const enclosingTimeout =
-    ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
-    family !== 'trade' &&
-    closed === true &&
-    !complete &&
-    r.failureKind === 'transport_timeout' &&
-    r.status === null &&
-    r.childStarted === true &&
-    r.childReaped === true &&
-    r.connectionClosed === true &&
-    r.responseBytes === 0 &&
-    body.length === 0 &&
-    transport?.status === null &&
-    transport?.complete === false &&
-    transport?.connectionClosed === false &&
-    m.bytes === p.bytes &&
-    m.objects === p.objects;
   const noDispatch =
     ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
     family !== 'trade' &&
@@ -267,6 +273,8 @@ export async function settlementEvidence(p, m, family) {
           physical.proofOwnerPid !== physical.workerPid,
         'OPERATING_TIMEOUT_ENCLOSING_PROOF',
       );
+    if (enclosingTimeout && transport === null)
+      assert(physical.physicalStarted === false, 'OPERATING_ABSENT_ENVELOPE_AFTER_START');
     if (p.closureMode === 'unified-operating-public-1')
       assert(
         physical.syntheticResponse === false && physical.deniedBoundaryTest === false,

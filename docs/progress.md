@@ -1175,3 +1175,20 @@ new authority checks their saved closures, current PID ownership and R2's sealed
 pre-worker refusal without inventing a receipt or settling its pending permit.
 Focused R3 entry/binding/refusal checks precede the same independent review and
 freshly loaded paired readiness; old operating commands remain refused.
+
+### Repeatable public qualification R3 — saved result and startup closure correction
+
+The authorized R3 run at c79aab9 ended PARTIAL after 103 charged permits and five
+paired publications (80 to 85). Three trade pairs, gas and protocol were adopted;
+market and participant acquisition were incomplete. Original parent UNKNOWN,
+pending permit 103 and its full 1 MiB / 128-object reservation remain immutable.
+All 103 enclosing worker reaps and nine collector closures were saved; the last
+worker timed out before its transport envelope/physical-entry receipt. This is
+not evidence of an upstream HTTP failure.
+
+The corrected validator accepts only that exact empty, durable, full-charge,
+known-reaped timeout shape. Missing physical entry remains terminal: settlement
+is recorded in new operations, then parent protection stops retries/dispatch.
+The actual network-denied native fixture and 19 refusal/reproduction checks pass.
+This offline correction does not change the original R3 accounting or grant a new
+public run. Saved-only preservation/access/compact restore is reported separately.

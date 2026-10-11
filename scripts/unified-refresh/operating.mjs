@@ -763,10 +763,15 @@ export class OperatingOwner {
     integer(m.bytes, 0, p.bytes);
     integer(m.objects, 0, p.objects);
     const capture = await settlementEvidence(p, m, j.family);
+    let startupTimeout = false;
     if (this.state.dispatchEvidence && m.closed) {
       const physical = JSON.parse(
         await fs.readFile(join(dirname(p.requestPath), 'PHYSICAL_CLOSED.json')),
       );
+      startupTimeout =
+        capture.failureKind === 'transport_timeout' &&
+        physical.physicalStarted === false &&
+        physical.noChildStarted === false;
       if (Number.isInteger(capture.status) && capture.status >= 100 && capture.status <= 599)
         this.state.dispatchEvidence.observedHttpResponses++;
       else if (physical.noChildStarted === true || physical.physicalStarted === false)
@@ -787,10 +792,14 @@ export class OperatingOwner {
       this.state.pending = null;
       this.state.lastClosed = now;
     } else this.state.status = 'UNKNOWN';
+    // A proved reaped startup timeout settles liability, but never authorizes
+    // retry or another physical dispatch. Retain terminal parent protection.
+    if (startupTimeout) this.state.status = 'UNKNOWN';
     j.lastSettled = p.attempt;
     j.phase = 'RUNNING';
     await this.save();
     await this.receipt(`SETTLEMENT_${String(p.id).padStart(8, '0')}.json`, { ...m, at: now });
+    if (startupTimeout) throw Error('OPERATING_PRE_NETWORK_TIMEOUT_TERMINAL');
     return { ok: true, now, parent: await this.parentSnapshot() };
   }
   publication(job, fn) {

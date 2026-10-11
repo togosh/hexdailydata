@@ -38,6 +38,10 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   assert(
     [
       priorTask,
+      priorTask.replace(
+        'unified-refresh-integration-r2',
+        'repeatable-refresh-public-qualification-r3',
+      ),
       priorTask.replace('unified-refresh-integration-r2', 'repeatable-refresh-operations-r1'),
       priorTask.replace(
         'unified-refresh-integration-r2',
@@ -65,6 +69,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     [
       'repeatable',
       'native-boundary',
+      'native-startup-timeout',
       'native-timeout',
       'native-reserve',
       'operating-smoke',
@@ -112,7 +117,12 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
   const operatingSmall = mode.startsWith('operating-');
-  const boundary = ['native-boundary', 'native-timeout', 'native-reserve'].includes(mode);
+  const boundary = [
+    'native-boundary',
+    'native-timeout',
+    'native-startup-timeout',
+    'native-reserve',
+  ].includes(mode);
   await fs.mkdir(join(root, 'evidence'));
   process.env.HDD_TASK_ROOT = root;
   const NativeDate = Date,
@@ -477,6 +487,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
           ? {
               realClockBoundary: true,
               tradeMode: mode === 'native-boundary' && tradeOrdinal === 1 ? 'empty' : 'fresh',
+              startupTimeout: mode === 'native-startup-timeout' && a.family === 'gas',
               timeoutTip: mode === 'native-timeout' && a.family === 'gas',
               postGrantReserve: mode === 'native-reserve' && a.family === 'market',
               delay: mode === 'native-boundary' && a.family === 'participants' ? 121 : 0,
@@ -651,7 +662,47 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     });
     receipt.result = result;
     receipt.starts = starts;
-    if (boundary) {
+    if (mode === 'native-startup-timeout') {
+      assert.equal(result.status, 'PARTIAL');
+      assert.match(
+        result.failure,
+        /OPERATING_PRE_NETWORK_TIMEOUT_TERMINAL|OPERATING_TERMINAL_PROTECTION/,
+      );
+      assert.equal(result.accounting.status, 'UNKNOWN');
+      assert.equal(result.accounting.pending, null);
+      const permits = (await fs.readdir(join(root, 'operating'))).filter((n) => /^PERMIT_/.test(n));
+      const p = await read(join(root, 'operating', permits.sort().at(-1)));
+      assert(p.job.startsWith('gas-'));
+      assert.equal(p.attempt, 1);
+      assert.equal(result.chargedPhysicalAttempts, p.id);
+      const c = await read(join(dirname(p.requestPath), 'capture.json'));
+      const close = await read(join(dirname(p.requestPath), 'PHYSICAL_CLOSED.json'));
+      const settlement = await read(
+        join(root, 'operating', `SETTLEMENT_${String(p.id).padStart(8, '0')}.json`),
+      );
+      assert.equal(c.failureKind, 'transport_timeout');
+      assert.equal(c.usable, false);
+      assert.equal(c.responseBytes, 0);
+      assert.equal(close.physicalStarted, false);
+      assert.equal(close.syntheticResponse, false);
+      assert.equal(close.native.childStarted, true);
+      assert.equal(close.native.childReaped, true);
+      assert(Number.isInteger(close.native.exitCode));
+      assert(!existsSync(join(dirname(p.requestPath), 'transport.json')));
+      assert(!existsSync(join(dirname(p.requestPath), 'PHYSICAL_STARTED.json')));
+      assert.equal(settlement.bytes, p.bytes);
+      assert.equal(settlement.objects, p.objects);
+      assert.equal(writer.status().productVersion, held.product.version);
+      assert.equal(result.jobs.length, 0);
+      receipt.cases = [
+        'actual worker killed/reaped before entry',
+        'empty durable capture without envelope',
+        'full-charge settlement',
+        'terminal before retry/next physical request',
+        'last-good product unchanged',
+      ];
+      receipt.startupTimeout = { permit: p, capture: c, physical: close, settlement };
+    } else if (boundary) {
       assert.equal(
         result.status,
         'OFFLINE_OPERATING_COMPLETE',
@@ -836,7 +887,9 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         'Exact R4 jobs/timing/caps translated only to OFFLINE_ONLY/unified-five-feed-offline-1; exact public documents tested separately; real public paths reject injected transports/clocks.';
     }
     receipt.facts = facts;
-    if (operatingSmall) {
+    if (mode === 'native-startup-timeout') {
+      assert.equal(children.size, 0);
+    } else if (operatingSmall) {
       assert.equal(children.size, 0);
       if (['operating-smoke', 'operating-job-capacity'].includes(mode)) {
         assert.equal(result.status, 'OFFLINE_OPERATING_COMPLETE', result.failure);
