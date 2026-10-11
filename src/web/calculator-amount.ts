@@ -1,3 +1,4 @@
+import type { ProductHomeResponseSchema } from '../contracts/product-daily.ts';
 import type { z } from 'zod';
 import type { HomeResponseSchema } from '../contracts/api.ts';
 import { UINT72_MAX } from '../domain/calculator.ts';
@@ -101,7 +102,8 @@ export function usdToHearts(usd: string, price: string): bigint {
     p = exactPrice(price);
   const hearts = (cents * p.denominator * HEARTS_PER_HEX) / (100n * p.numerator);
   if (hearts === 0n) throw new Error('USD amount converts to less than 0.00000001 HEX.');
-  if (hearts > UINT72_MAX) throw new Error('Converted HEX exceeds the supported principal limit.');
+  if (hearts > UINT72_MAX)
+    throw new Error('Converted HEX exceeds the supported principal limit.');
   return hearts;
 }
 export function hexHearts(text: string): bigint {
@@ -136,6 +138,39 @@ export function qualifiedAmountPrice(
   try {
     exactPrice(price.value.usdPerHex);
     return price;
+  } catch {
+    return null;
+  }
+}
+
+/** Conversion requires a coherent product generation and the original HEX source time. */
+export function qualifiedProductAmountPrice(
+  home: z.infer<typeof ProductHomeResponseSchema> | undefined,
+  inputVersion: string | undefined,
+  now: number,
+  error?: string,
+) {
+  const freshness = home?.live.freshness.HEX;
+  const at = Date.parse(freshness?.observedAtUtc ?? '');
+  if (
+    error ||
+    !inputVersion ||
+    home?.chain !== 'pulsechain' ||
+    home.live.chain !== 'pulsechain' ||
+    home.datasetVersion !== inputVersion ||
+    home.live.datasetVersion !== inputVersion ||
+    freshness?.status !== 'fresh' ||
+    freshness.staleAfterSeconds !== 300 ||
+    !Number.isFinite(now) ||
+    !Number.isFinite(at) ||
+    at > now ||
+    now - at > 300000 ||
+    home.live.hexPriceUsd === null
+  )
+    return null;
+  try {
+    exactPrice(home.live.hexPriceUsd);
+    return { usdPerHex: home.live.hexPriceUsd, observedAtUtc: freshness.observedAtUtc! };
   } catch {
     return null;
   }

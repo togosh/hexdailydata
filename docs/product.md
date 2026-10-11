@@ -1,3 +1,21 @@
+# Current saved-product availability
+
+Mainline consolidation connects the existing Calculator to exact admitted raw rate
+and payout inputs and the normal Home contract. USD conversion requires compatible
+product identities and qualified HEX source time; missing USD still permits HEX
+shares with a usable raw rate. Historical means remain scenarios. Original daily,
+participant and price semantics do not change.
+
+Bounded source lists/address/stake detail, Daily/Live, labelled fixed sample CSVs
+and an explicit profile-based ordinary entry are implemented locally. Canonical
+maturities/events, advanced filtering, activated paid accounts, complete public
+exports and production freshness are not delivered here. The retained requirements
+below remain requirements where unqualified; unavailable is not completed.
+
+One normal product has no provider/era/generation picker. Historical Ethereum-origin
+reference observations stay distinct from PulseChain performance. Source consolidation
+does not overwrite any accepted value, remove any gap or enable old reconstruction.
+
 # Product contract
 
 These decisions come from the owner's v2 answers in this conversation. They override

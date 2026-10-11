@@ -23,7 +23,8 @@ export interface ApiDependencies {
   sourceHolders?: SourceHolderReader;
   db?: ReadDatabase;
   addresses?: Pick<AddressService, 'get' | 'stake'>;
-  downloads?: Pick<ExportService, 'catalog' | 'openStream'> & Partial<Pick<ExportService, 'root'>>;
+  downloads?: Pick<ExportService, 'catalog' | 'openStream'> &
+    Partial<Pick<ExportService, 'root'>>;
   close?: () => Promise<void>;
 }
 export function sqlBaseline(db: ReadDatabase): AddressBaseline {
@@ -36,12 +37,21 @@ export function sqlBaseline(db: ReadDatabase): AddressBaseline {
 }
 /** Connection setup is bounded; file verification runs independently of serving native data. */
 export async function openDependencies(env = process.env): Promise<ApiDependencies> {
-  if (env.HDD_V2_PRODUCT_PROFILE) {
+  const mode = env.HDD_V2_API_MODE ?? 'product';
+  if (mode === 'product') {
+    if (
+      !env.HDD_V2_PRODUCT_PROFILE ||
+      env.HDD_V2_DB_HOST ||
+      env.HDD_V2_ALLOW_LIVE_RPC === 'true' ||
+      env.HDD_V2_EXPORT_PATH
+    )
+      throw Error('PRODUCT_PROFILE_REQUIRED_WITHOUT_LEGACY_RUNTIME');
     const { readProductProfile, openProductDependencies } =
       await import('../services/product-daily/open.ts');
     return openProductDependencies(await readProductProfile(env.HDD_V2_PRODUCT_PROFILE));
   }
-  if (!env.HDD_V2_DB_HOST) return {};
+  if (mode !== 'legacy-sql' || env.HDD_V2_PRODUCT_PROFILE || !env.HDD_V2_DB_HOST)
+    throw Error('EXPLICIT_LEGACY_SQL_CONFIGURATION_REQUIRED');
   const db = new ReadDatabase(databaseConfig('api', env));
   let addresses: Awaited<ReturnType<typeof openAddressService>> | undefined;
   if (env.HDD_V2_ALLOW_LIVE_RPC === 'true') {

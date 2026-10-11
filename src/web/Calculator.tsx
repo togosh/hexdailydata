@@ -1,12 +1,18 @@
 import { useEffect, useState, type ComponentProps } from 'react';
 import { flushSync } from 'react-dom';
-import { HomeResponseSchema } from '../contracts/api.ts';
+import { ProductHomeResponseSchema } from '../contracts/product-daily.ts';
 import { CalculatorResponseSchema } from '../contracts/reads.ts';
 import { quoteStake, payoutScenario } from '../domain/calculator.ts';
 import { contractDayAt } from '../domain/day.ts';
 import { parseUnits, formatUnits, displayRatio, rational } from '../domain/units.ts';
 import { endpoint, useResource, useClock } from './api.ts';
-import { observationState, observationLabel, dayLabel, dayDate, numberText } from './format.ts';
+import {
+  observationState,
+  observationLabel,
+  dayLabel,
+  dayDate,
+  numberText,
+} from './format.ts';
 import { Value, Copy } from './components.tsx';
 import { Icon } from './visuals.tsx';
 import {
@@ -17,7 +23,7 @@ import {
   usdToHearts,
   hexHearts,
   currentUsdEquivalent,
-  qualifiedAmountPrice,
+  qualifiedProductAmountPrice,
   formatAmount,
   ungroupAmount,
   type AmountFields,
@@ -62,7 +68,7 @@ function saved(): AmountFields {
 }
 export default function Calculator() {
   const input = useResource(endpoint('/calculator/inputs'), CalculatorResponseSchema, true);
-  const market = useResource(endpoint('/home'), HomeResponseSchema, true);
+  const market = useResource(endpoint('/home'), ProductHomeResponseSchema, true);
   const now = useClock(),
     rate = input.data?.shareRate;
   const state = observationState(rate, now);
@@ -80,16 +86,20 @@ export default function Calculator() {
     } catch {}
   }, [fields]);
   const day = contractDayAt(BigInt(Math.floor(now / 1000)));
-  const price = market.data?.live.price;
-  const priceState = observationState(price, now);
-  const amountPrice = qualifiedAmountPrice(market.data, now, market.error);
+  const amountPrice = qualifiedProductAmountPrice(
+    market.data,
+    input.data?.datasetVersion,
+    now,
+    market.error,
+  );
+  const priceState = amountPrice ? 'fresh' : 'unavailable';
   let principal: bigint | undefined;
   let amountError = '';
   try {
     if (fields.unit === 'HEX') principal = hexHearts(fields.hex);
     else {
       usdCents(fields.usd);
-      if (amountPrice) principal = usdToHearts(fields.usd, amountPrice.value.usdPerHex);
+      if (amountPrice) principal = usdToHearts(fields.usd, amountPrice.usdPerHex);
     }
   } catch (e) {
     amountError = e instanceof Error ? e.message : 'Check the amount.';
@@ -103,7 +113,7 @@ export default function Calculator() {
   const future =
     fields.futureMode === 'current'
       ? priceState === 'fresh'
-        ? (price?.value?.usdPerHex ?? '')
+        ? (amountPrice?.usdPerHex ?? '')
         : ''
       : fields.future;
   const signature = JSON.stringify([
@@ -114,7 +124,7 @@ export default function Calculator() {
     day,
     fields.unit === 'USD' ? amountPrice : null,
   ]);
-  const usable = !input.loading && state !== 'unavailable' && !!rate?.value;
+  const usable = !input.loading && !input.error && state !== 'unavailable' && !!rate?.value;
   const currentError = error?.signature === signature ? error.message : '';
   const visibleError = amountError || priceReason || currentError;
   const shown =
@@ -233,19 +243,24 @@ export default function Calculator() {
                 />
               </label>
             </div>
-            <div className="calculator-amount-help" id="calculator-amount-help" aria-live="polite">
+            <div
+              className="calculator-amount-help"
+              id="calculator-amount-help"
+              aria-live="polite"
+            >
               {principal !== undefined && amountPrice && (
                 <>
                   <p data-testid="amount-equivalent">
                     {fields.unit === 'USD'
                       ? `Estimated HEX: ${formatAmount(formatUnits(principal, 8), 2)}`
-                      : `Estimated USD: $${formatAmount(currentUsdEquivalent(principal, amountPrice.value.usdPerHex), 2)}`}
+                      : `Estimated USD: $${formatAmount(currentUsdEquivalent(principal, amountPrice.usdPerHex), 2)}`}
                   </p>
                 </>
               )}
               {fields.unit === 'HEX' && !amountPrice && (
                 <p className="meta">
-                  Current USD equivalent unavailable. HEX calculations do not need a market price.
+                  Current USD equivalent unavailable. HEX calculations do not need a market
+                  price.
                 </p>
               )}
             </div>
@@ -325,7 +340,11 @@ export default function Calculator() {
                   <dt>Future USD value</dt>
                   <dd>
                     {shown?.scenario?.usd ? (
-                      <Value value={displayRatio(shown.scenario.usd, 8)} places={2} prefix="$" />
+                      <Value
+                        value={displayRatio(shown.scenario.usd, 8)}
+                        places={2}
+                        prefix="$"
+                      />
                     ) : (
                       '—'
                     )}
@@ -335,7 +354,11 @@ export default function Calculator() {
               <p className="calculator-hint">
                 Rewards:{' '}
                 {shown?.scenario ? (
-                  <Value value={displayRatio(shown.scenario.rewardHex, 8)} places={3} unit="HEX" />
+                  <Value
+                    value={displayRatio(shown.scenario.rewardHex, 8)}
+                    places={3}
+                    unit="HEX"
+                  />
                 ) : (
                   '—'
                 )}
@@ -374,25 +397,25 @@ export default function Calculator() {
                   : ''}
           </summary>
           <div className="calculator-notes-body">
+            <p>Admitted source-derived USD estimate; fees and slippage excluded.</p>
             <p>
-              Spot estimate; fees and slippage excluded.
-              {price?.value?.valuation === 'peg_assumed' && ' USD peg assumed.'}
+              USD and HEX keep separate drafts. Switching units recalls that unit’s amount.
             </p>
-            <p>USD and HEX keep separate drafts. Switching units recalls that unit’s amount.</p>
             <p>
-              USD-to-HEX conversion rounds down to eight decimals (one heart). The current-price
-              amount conversion is separate from the hypothetical future price.
+              USD-to-HEX conversion rounds down to eight decimals (one heart). The
+              current-price amount conversion is separate from the hypothetical future price.
             </p>
-            {price?.value && (
-              <p className="calculator-price-source">
-                Current price observation ({priceState}): ${price.value.usdPerHex} / HEX. Observed
-                at {price.observedAt}; source block {price.asOf.blockNumber} at{' '}
-                {price.asOf.blockTimestamp}. Method: {price.method}; finality: {price.finality};
-                valuation: {price.value.valuation}.
-                {market.error &&
-                  ' Latest price fetch failed; this retained observation cannot convert USD.'}
-              </p>
-            )}
+            {market.data?.live.hexPriceUsd !== null &&
+              market.data?.live.hexPriceUsd !== undefined && (
+                <p className="calculator-price-source">
+                  Saved HEX price ({priceState} for conversion): $
+                  {market.data.live.hexPriceUsd} / HEX. Observed at{' '}
+                  {market.data.live.freshness.HEX?.observedAtUtc ?? 'unknown'}. USD conversion
+                  requires a matching input generation and a source age of at most 300 seconds.
+                  {market.error &&
+                    ' Latest price fetch failed; retained data cannot convert USD.'}
+                </p>
+              )}
             <p role="status">{input.error ?? (input.loading ? 'Loading...' : '')}</p>
             {fields.futureMode === 'current' && (
               <p className="calculator-hint">
@@ -472,7 +495,11 @@ export default function Calculator() {
                 >
                   <option value="">Shares &amp; maturity only</option>
                   {input.data?.presets.map((p) => (
-                    <option key={p.window} value={p.window} disabled={p.status !== 'available'}>
+                    <option
+                      key={p.window}
+                      value={p.window}
+                      disabled={p.status !== 'available'}
+                    >
                       {p.window}-day mean{' '}
                       {p.status === 'available'
                         ? `· through ${dayLabel(p.toDay!)}`
@@ -491,9 +518,9 @@ export default function Calculator() {
             <div className="calculator-details">
               <h3>Scenario details</h3>
               <p>
-                Bonuses increase shares, not principal. Historical payout averages are held constant
-                without compounding; rewards and future USD values are hypothetical. Early or late
-                ending penalties are not modeled.
+                Bonuses increase shares, not principal. Historical payout averages are held
+                constant without compounding; rewards and future USD values are hypothetical.
+                Early or late ending penalties are not modeled.
               </p>
               {shown?.scenario && (
                 <dl className="fact-rows calculator-exact">
@@ -514,8 +541,8 @@ export default function Calculator() {
                 </dl>
               )}
               <p>
-                Scenario details truncate to 8 decimals; calculations retain exact ratios. Blank
-                future price means no USD result; zero is valid.
+                Scenario details truncate to 8 decimals; calculations retain exact ratios.
+                Blank future price means no USD result; zero is valid.
               </p>
               <a href="/learn">Calculation &amp; source notes ↗</a>
             </div>

@@ -15,12 +15,22 @@ export const examples = {
 } as const;
 export type ExampleId = keyof typeof examples;
 export type ExampleLanguage = 'cURL' | 'JavaScript' | 'Python';
-export function exampleCode(origin: string, language: ExampleLanguage, id: ExampleId = 'home') {
+export function exampleCode(
+  origin: string,
+  language: ExampleLanguage,
+  id: ExampleId = 'home',
+) {
   return requestCode(origin, language, examples[id]);
 }
-export function requestCode(origin: string, language: ExampleLanguage, path: string, csv = false) {
+export function requestCode(
+  origin: string,
+  language: ExampleLanguage,
+  path: string,
+  csv = false,
+) {
   const base = new URL(origin);
-  if (!['http:', 'https:'].includes(base.protocol)) throw new Error('An HTTP origin is required.');
+  if (!['http:', 'https:'].includes(base.protocol))
+    throw new Error('An HTTP origin is required.');
   const url = new URL(path, base.origin).href;
   const accept = csv ? 'text/csv' : 'application/json';
   const paid =
@@ -49,7 +59,6 @@ console.log(data);`;
 }
 // Small explicitly synthetic shape excerpt; real examples are in the generated reference.
 export const homeExcerpt = {
-  daily: { dateUtc: '2020-01-01', circulatingHEX: '100.00' },
   live: { hexPriceUsd: null, freshness: { HEX: { status: 'unavailable' } } },
 } as const;
 export const errorExample = {

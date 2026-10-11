@@ -1,3 +1,4 @@
+import { ProductHomeResponseSchema } from '../../src/contracts/product-daily.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,7 +9,12 @@ import {
   UIntStringSchema,
   DecimalStringSchema,
 } from '../../src/contracts/api.ts';
-import { DailyQuery, StakesQuery, HoldersQuery, AddressQuery } from '../../src/contracts/reads.ts';
+import {
+  DailyQuery,
+  StakesQuery,
+  HoldersQuery,
+  AddressQuery,
+} from '../../src/contracts/reads.ts';
 import { tokenSchema } from '../../src/contracts/history.ts';
 import { PageCursors } from '../../src/services/queries/cursor.ts';
 import {
@@ -23,7 +29,7 @@ const fixture = JSON.parse(readFileSync(new URL('../fixtures/home.json', import.
 const spec = JSON.parse(readFileSync(new URL('../../docs/openapi.json', import.meta.url)));
 test('all documented endpoints and bounded request examples match runtime schemas and OpenAPI', () => {
   const listed = endpointGroups.flatMap((g) => g.routes.map(({ id, path }) => ({ id, path })));
-  assert.equal(listed.length, 18);
+  assert.equal(listed.length, 17);
   assert.deepEqual(
     listed.map((x) => x.path).sort(),
     routes.map((x) => x.path.replace(/:([a-z]+)/g, '{$1}')).sort(),
@@ -38,7 +44,7 @@ test('all documented endpoints and bounded request examples match runtime schema
     const route = routes.find((r) => r.path === url.pathname);
     assert.ok(route, id);
     route.query.parse(Object.fromEntries(url.searchParams));
-    assert.equal(url.searchParams.get('chain'), 'pulsechain');
+    assert.equal(route.query.parse(Object.fromEntries(url.searchParams)).chain, 'pulsechain');
     assert.ok(exampleCode(url.origin, 'cURL', id).endsWith(`'${url.href}'`));
     assert.ok(!exampleCode(url.origin, 'cURL', id).includes('\n+'));
   }
@@ -46,6 +52,7 @@ test('all documented endpoints and bounded request examples match runtime schema
     [...jsonRevalidation].sort(),
     [
       'home',
+      'latest',
       'daily',
       'markets',
       'stakes',
@@ -70,7 +77,8 @@ test('indexed defaults/bounds and HDS continuation/range are distinct; expired c
     for (const q of [{ limit: '0' }, { limit: '101' }, { offset: '1' }])
       assert.equal(schema.safeParse(q).success, false);
   }
-  for (const lifecycle of ['open', 'good_accounted', 'ended']) StakesQuery.parse({ lifecycle });
+  for (const lifecycle of ['open', 'good_accounted', 'ended'])
+    StakesQuery.parse({ lifecycle });
   for (const lifecycle of ['queued', 'mature_open', 'cancelled'])
     assert.equal(StakesQuery.safeParse({ lifecycle }).success, false);
   for (const order of ['liquid', 'staker']) HoldersQuery.parse({ order });
@@ -103,14 +111,17 @@ test('indexed defaults/bounds and HDS continuation/range are distinct; expired c
   );
 });
 test('displayed excerpt equals a projection of a schema-valid synthetic response; zeros/exact tokens stay distinct', () => {
-  const full = HomeResponseSchema.parse(fixture);
+  const full = HomeResponseSchema.parse(fixture); // retained legacy numeric contract
+  const product = JSON.parse(
+    readFileSync(new URL('../../src/documentation/product-examples.json', import.meta.url)),
+  ).home;
+  const example = Object.values(product)[0];
+  ProductHomeResponseSchema.parse(example);
   assert.deepEqual(homeExcerpt, {
-    live: Object.fromEntries(
-      ['price', 'shareRate', 'latestCompletedPayout'].map((k) => [
-        k,
-        { status: full.live[k].status, value: full.live[k].value },
-      ]),
-    ),
+    live: {
+      hexPriceUsd: example.live.hexPriceUsd,
+      freshness: { HEX: { status: example.live.freshness.HEX.status } },
+    },
   });
   const alternate = structuredClone(full);
   alternate.live.latestCompletedPayout.value.payoutHearts = '0';
@@ -128,7 +139,8 @@ test('every JavaScript example runs with injected fetch and checks non-2xx befor
   for (const id of Object.keys(examples)) {
     let calls = 0,
       logged;
-    const body = id === 'home' ? fixture : { exact: '9007199254740993', zero: '0', missing: null };
+    const body =
+      id === 'home' ? fixture : { exact: '9007199254740993', zero: '0', missing: null };
     const code = exampleCode('http://127.0.0.1:12345', 'JavaScript', id);
     const run = new AsyncFunction('fetch', 'console', code);
     await run(

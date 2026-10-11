@@ -1214,3 +1214,14 @@ freshness SLA. One genuine base admission, compact backup/restore, protected-acc
 and history checks, and two previews passed; owned resources closed. Original
 R1/R2/R3 UNKNOWN states remain unchanged. The R4 command is consumed; no automatic
 follow-on.
+
+## Mainline Consolidation R1 candidate
+
+Explicit read-only product startup, existing Calculator raw-rate/ledger adapter,
+normal Home-price consumption, honest unavailable capabilities and finite labelled
+samples. Focused synthetic compiled-entry/API/browser/access checks and local
+fast-forward receipts are recorded in the task return. No genuine admission, data
+publication, restore, SQL/payment action, provider session or scheduler. Conditional
+main integration is recorded by its actual Git receipt, not inferred from this text.
+Genuine sequence116/115 and every old UNKNOWN/session remain unchanged. Market/HEX
+liquidity queue/reserve scheduling remains the first operating release blocker.

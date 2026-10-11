@@ -12,8 +12,8 @@ import { routes } from '../../src/api/routes.ts';
 import { createApp } from '../../dist/api/app.js';
 import { responseExamples } from '../../src/documentation/examples.mjs';
 const doc = JSON.parse(readFileSync('docs/openapi.json'));
-test('human projection is exactly18 GET resources; old links, legacy aliases and unknown recovery', () => {
-  assert.equal(resources.length, 18);
+test('human projection is exactly17 GET resources; old links, legacy aliases and unknown recovery', () => {
+  assert.equal(resources.length, 17);
   assert.deepEqual(resources.map((r) => r.id).sort(), routes.map((r) => r.id).sort());
   for (const route of resources) {
     assert.equal(selection(operationLink(route.id).split('/api/reference')[1]).id, route.id);
@@ -30,12 +30,14 @@ test('human projection is exactly18 GET resources; old links, legacy aliases and
 test('actual loopback data GET/HEAD preserve JSON, headers, validation and bodyless revalidation without SQL', async () => {
   const app = createApp({
     dependencies: {
-      downloads: { catalog: async () => structuredClone(responseExamples.downloads.synthetic) },
+      downloads: {
+        catalog: async () => structuredClone(responseExamples.downloads.synthetic),
+      },
     },
   });
   try {
     const base = await app.listen({ host: '127.0.0.1', port: 0 });
-    for (const path of ['/health/live', '/api/v2/downloads?chain=pulsechain']) {
+    for (const path of ['/health/live']) {
       const get = await fetch(base + path);
       assert.equal(get.status, 200);
       const body = await get.text();
@@ -55,6 +57,9 @@ test('actual loopback data GET/HEAD preserve JSON, headers, validation and bodyl
         assert.equal(await cached.text(), '');
       }
     }
+    const unavailable = await fetch(base + '/api/v2/downloads?chain=pulsechain');
+    assert.equal(unavailable.status, 503);
+    await unavailable.arrayBuffer();
     const invalid = await fetch(base + '/api/v2/home?chain=invalid', { method: 'HEAD' });
     assert.equal(invalid.status, 400);
     assert.equal(await invalid.text(), '');
@@ -80,7 +85,8 @@ test('parameter facts preserve zero/default/enum/bounds/nullable alternatives wi
         if (p.schema[key] !== undefined)
           assert.ok(facts.some((f) => f.endsWith(String(p.schema[key]))));
       if (p.schema.enum)
-        for (const e of p.schema.enum) assert.ok(facts.some((f) => f.includes(JSON.stringify(e))));
+        for (const e of p.schema.enum)
+          assert.ok(facts.some((f) => f.includes(JSON.stringify(e))));
     }
 });
 test('all generated requests parse actual path/query validators; JSON/CSV JS code preserves exact values and refuses HTTP errors', async () => {
@@ -132,7 +138,7 @@ test('all generated requests parse actual path/query validators; JSON/CSV JS cod
       );
     }
   }
-  assert.equal(doc.paths['/api/v2/daily'].get['x-requests'].length, 2);
+  assert.equal(doc.paths['/api/v2/daily'].get['x-requests'].length, 1);
   assert.equal(
     doc.paths['/api/v2/downloads/{bundle}/{dataset}'].get['x-requests'][0].template,
     true,

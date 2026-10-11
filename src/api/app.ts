@@ -20,6 +20,7 @@ import { type ApiDependencies, sqlBaseline } from './dependencies.ts';
 import { PageCursors } from '../services/queries/cursor.ts';
 import { home, status, chainId } from '../services/queries/home.ts';
 import { daily, markets, calculator } from '../services/queries/history.ts';
+import { productCalculator } from '../services/product-daily/calculator.ts';
 import { archiveCharts, nativeCharts, maturities } from '../services/queries/charts.ts';
 import { stakes, holders, indexedStake } from '../services/queries/lists.ts';
 import { AddressSchema, StakeIdSchema } from '../contracts/reads.ts';
@@ -93,7 +94,11 @@ export function createApp(
   app.addHook('onReady', async () => {
     if (deps.downloads && staticRoots.length && !deps.downloads.root)
       throw Error('Actual export root required for static isolation.');
-    if (deps.downloads?.root && options.exportRoot && deps.downloads.root !== options.exportRoot)
+    if (
+      deps.downloads?.root &&
+      options.exportRoot &&
+      deps.downloads.root !== options.exportRoot
+    )
       throw Error('Export root mismatch.');
     await validateStaticRoots(staticRoots, deps.downloads?.root ?? options.exportRoot);
     if (deps.participants) await validateStaticRoots(staticRoots, deps.participants.root);
@@ -110,11 +115,18 @@ export function createApp(
   });
   const privateDownload = (request: FastifyRequest, reply: FastifyReply) => {
     if (request.url.split('?')[0]?.startsWith('/api/v2/downloads/'))
-      reply.header('Cache-Control', 'private, no-store').header('Vary', 'Authorization, Cookie');
+      reply
+        .header('Cache-Control', 'private, no-store')
+        .header('Vary', 'Authorization, Cookie');
   };
   const contexts = new Map<
     string,
-    { controller: AbortController; deadline: number; timer: NodeJS.Timeout; cleanup: () => void }
+    {
+      controller: AbortController;
+      deadline: number;
+      timer: NodeJS.Timeout;
+      cleanup: () => void;
+    }
   >();
   const capacity = options.admission?.capacity ?? 1200,
     concurrent = options.admission?.concurrent ?? 64;
@@ -288,7 +300,11 @@ export function createApp(
         signal.throwIfAborted();
         const db = () => {
           if (!deps.db)
-            throw new ApiFailure(503, 'not_initialized', 'Data dependencies are not configured.');
+            throw new ApiFailure(
+              503,
+              'not_initialized',
+              'Data dependencies are not configured.',
+            );
           return deps.db;
         };
         const productRoutes = [
@@ -303,6 +319,7 @@ export function createApp(
           'addressStakes',
           'downloads',
           'download',
+          ...(deps.productDaily ? ['calculator'] : []),
         ];
         if (productRoutes.includes(route.id) && route.id !== 'download') {
           if (deps.participants) await deps.participants.refresh();
@@ -330,7 +347,8 @@ export function createApp(
             sources.descriptor.generation !== product.metadata.pair.generation ||
             sources.descriptor.holderDatasetVersion !==
               product.metadata.pair.holderDatasetVersion ||
-            sources.descriptor.stakeDatasetVersion !== product.metadata.pair.stakeDatasetVersion
+            sources.descriptor.stakeDatasetVersion !==
+              product.metadata.pair.stakeDatasetVersion
           )
             throw unavailable();
           q.source = 'subgraph';
@@ -391,6 +409,12 @@ export function createApp(
               );
               break;
             case 'maturities':
+              if (!deps.db)
+                throw new ApiFailure(
+                  503,
+                  'capability_unavailable',
+                  'Canonical maturity data is unavailable in the saved product.',
+                );
               body = await maturities(db(), signal);
               break;
             case 'markets':
@@ -419,6 +443,12 @@ export function createApp(
               body = await stakes(db(), q, signal, paid ? cursors : publicCursors, now());
               break;
             case 'stakeEvents':
+              if (!deps.db)
+                throw new ApiFailure(
+                  503,
+                  'capability_unavailable',
+                  'Canonical stake events are unavailable in the saved product.',
+                );
               body = await stakeEvents(db(), q, signal);
               break;
             case 'holders':
@@ -435,7 +465,15 @@ export function createApp(
               body = await holders(db(), q, signal, paid ? cursors : publicCursors, now());
               break;
             case 'calculator':
-              body = await calculator(db(), q.chain, signal, now());
+              if (product && q.chain !== 'pulsechain')
+                throw new ApiFailure(
+                  400,
+                  'unsupported_chain',
+                  'The saved Calculator supports PulseChain.',
+                );
+              body = product
+                ? productCalculator(product, now())
+                : await calculator(db(), q.chain, signal, now());
               break;
             case 'address':
             case 'addressStakes': {
@@ -465,7 +503,11 @@ export function createApp(
                   : {
                       outcome: 'unavailable',
                       reason: 'live_not_configured',
-                      indexed: await sqlBaseline(db()).address(chainId(q.chain), p.address, signal),
+                      indexed: await sqlBaseline(db()).address(
+                        chainId(q.chain),
+                        p.address,
+                        signal,
+                      ),
                       live: null,
                     };
               if (result.outcome === 'expired')
@@ -483,7 +525,11 @@ export function createApp(
                 ].some((value) => value !== null);
               if (!usefulIndexed && !result.live)
                 throw result.outcome === 'quota'
-                  ? new ApiFailure(429, 'provider_quota', 'Live observation quota is unavailable.')
+                  ? new ApiFailure(
+                      429,
+                      'provider_quota',
+                      'Live observation quota is unavailable.',
+                    )
                   : unavailable();
               body = result;
               break;
@@ -520,7 +566,11 @@ export function createApp(
                 );
               if (!known.indexed && ['unavailable', 'quota'].includes(recent.outcome))
                 throw recent.outcome === 'quota'
-                  ? new ApiFailure(429, 'provider_quota', 'Live observation quota is unavailable.')
+                  ? new ApiFailure(
+                      429,
+                      'provider_quota',
+                      'Live observation quota is unavailable.',
+                    )
                   : unavailable();
               body = {
                 chain: q.chain,
@@ -545,7 +595,11 @@ export function createApp(
               signal.throwIfAborted();
               if ('status' in authorization) {
                 if (authorization.status === 401)
-                  throw new ApiFailure(401, 'login_required', 'Valid credentials are required.');
+                  throw new ApiFailure(
+                    401,
+                    'login_required',
+                    'Valid credentials are required.',
+                  );
                 if (authorization.status === 403)
                   throw new ApiFailure(
                     403,
@@ -588,10 +642,14 @@ export function createApp(
                 .header('Cache-Control', 'private, no-store')
                 .header('Vary', 'Authorization, Cookie')
                 .header('Accept-Ranges', 'none');
-              if (matches(request.headers['if-none-match'], etag) || request.method === 'HEAD') {
+              if (
+                matches(request.headers['if-none-match'], etag) ||
+                request.method === 'HEAD'
+              ) {
                 stream.destroy();
                 await released;
-                if (matches(request.headers['if-none-match'], etag)) return reply.code(304).send();
+                if (matches(request.headers['if-none-match'], etag))
+                  return reply.code(304).send();
                 // Fastify's empty-payload serializer replaces Content-Length with zero.
                 // The reader is already closed: send only the verified HEAD metadata.
                 reply.header('Content-Length', bytes).hijack();
@@ -600,7 +658,10 @@ export function createApp(
                   Object.fromEntries(
                     Object.entries(reply.getHeaders())
                       .filter(([, value]) => value !== undefined)
-                      .map(([name, value]) => [name, Array.isArray(value) ? value : String(value)]),
+                      .map(([name, value]) => [
+                        name,
+                        Array.isArray(value) ? value : String(value),
+                      ]),
                   ),
                 );
                 reply.raw.end();
@@ -625,7 +686,10 @@ export function createApp(
           (q.source === 'subgraph' && ['address', 'addressStakes', 'stake'].includes(route.id))
         ) {
           const updatedSource =
-            q.source === 'subgraph' && body && typeof body === 'object' && 'generation' in body;
+            q.source === 'subgraph' &&
+            body &&
+            typeof body === 'object' &&
+            'generation' in body;
           const representation =
             product || updatedSource
               ? JSON.stringify([
@@ -700,7 +764,11 @@ export function createApp(
   }
   if (options.samples) app.register(options.samples);
   if (options.webRoot) {
-    app.register(fastifyStatic, { root: options.webRoot, index: ['index.html'], dotfiles: 'deny' });
+    app.register(fastifyStatic, {
+      root: options.webRoot,
+      index: ['index.html'],
+      dotfiles: 'deny',
+    });
     for (const path of [
       '/api',
       '/api/reference',

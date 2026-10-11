@@ -260,6 +260,11 @@ const rationalInteger = z
 export const CalculatorResponseSchema = z.strictObject({
   chain: ChainKeySchema,
   calculationVersion: z.literal('hex-native-1'),
+  // Present for the ordinary file-backed response; legacy SQL shape remains valid.
+  datasetVersion: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
   shareRate: HomeResponseSchema.shape.live.shape.shareRate,
   presets: z
     .array(

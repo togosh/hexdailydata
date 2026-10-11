@@ -1,3 +1,84 @@
+# Ordinary saved-product serving
+
+The ordinary API uses the explicitly configured, read-only file-backed product. It
+opens no SQL connection, provider, account service, paid worker or publisher.
+Missing or incompatible input fails startup with a bounded sanitized message.
+Do not launch old operator/qualification commands to serve the website.
+
+Use the existing locked Node 24.21.0 host dependencies. These build commands do
+not install anything:
+
+```powershell
+node scripts/openapi.mjs
+node node_modules/typescript/bin/tsc -p tsconfig.build.json
+node scripts/build-samples.mjs
+node node_modules/vite/bin/vite.js build
+$env:HDD_V2_API_MODE = 'product'
+$env:HDD_V2_PRODUCT_PROFILE = '<absolute local path to verified product profile>'
+$env:HDD_V2_HTTP_HOST = '127.0.0.1'
+$env:HDD_V2_HTTP_PORT = '4320'
+node dist/api/main.js
+```
+
+The source API entry (`node src/api/main.ts`) uses the same dependency policy;
+it does not serve the compiled website. `npm run build` is the same serving build
+recipe, and `npm start` runs the compiled entry. An old ignored `dist` is not
+updated merely by advancing Git. Build from the selected source before serving.
+
+A profile is a strict JSON file of at most 16 KiB. Paths must be absolute local
+paths, outside web roots. No URLs, UNC paths, parent traversal or extra properties.
+It supplies `productRoot`, `participantRoot`, `overlayRoot`, `holdersRoot`,
+`stakesRoot`, the retained `history`/`historyManifestSha256` and
+`ledger`/`ledgerSha256` references, and the complete `pair` object. The initial
+pair is the exact accepted B1 generation/family identities and observation times;
+the paired registry then reads the compatible committed descendant. Never edit
+these identities or counters to make a different dataset pass admission.
+
+The source archive is **not a data backup**. Required external inputs are the
+accepted immutable holder/stake bases, the admitted B1 overlay/index and the
+compatible paired product/participant root. Historical/ledger references remain
+part of the profile; serving uses the verified selected product rather than
+rebuilding it at startup. Source consolidation opens none of those genuine files.
+The profile creates no writer, data import or refresh service.
+
+Normal pages share one selected view. Calculator reads raw globals word 2 and
+exact completed-ledger payout words for 1/30/365-day rational means. Missing,
+pending or zero-share periods remain unavailable. Raw rate policy is 120 seconds
+fresh and at most 1,800 seconds last-known; HEX/USD conversion separately requires
+the same product generation and an original source time within 300 seconds.
+A hypothetical future price never renews the current quote. Stored data ages even
+when no new selection occurs; an old saved deployment may show unavailable inputs.
+
+Public lists keep the 50-row/five-page global bound. Known-address lookup remains
+bounded and source-reported. Advanced filters return 400. Canonical events and
+maturity schedules remain unavailable (access checks still precede event reads).
+Complete CSV and paid reads fail closed without a qualified authorizer. The five
+free sample CSVs are manifest-checked **SYNTHETIC SAMPLE / fixed partial fixture**
+assets, served by finite routes outside the web root; they are not genuine history.
+
+Accounts/payment remain inactive. `composePaidApp` still assumes
+`dependencies.downloads.root`, which the product dependency bundle does not supply.
+That separate integration needs qualification; it is not bypassed with a dummy
+account or export root. Serving build, optional composed account/SQL asset build,
+and native updater packaging are separate targets. Only the serving build is
+qualified here. Existing account/runtime/transport source and SQL assets remain.
+
+`HDD_V2_API_MODE=legacy-sql` is an explicit compatibility opt-in retaining the old
+SQL dependency implementation and its private configuration guards. It is not the
+ordinary product, does not make missing product routes work, and is not activated
+or SQL-qualified by this task. Incidental DB/export/live-RPC configuration is
+rejected in normal product mode. No automatic fallback is allowed.
+
+Source consolidation is not launch readiness. HEX/liquidity queue/reserve scheduling,
+current feed operation, required historical gaps, unsupported canonical features,
+paid/SQL integration, data rights, production operation and deployment remain open.
+Indexer and paid reconstruction remain PARKED. No perpetual scheduler is installed.
+
+
+# Retained legacy operational design (inactive compatibility)
+
+The following older SQL/operator material is retained history and design. It does not override the ordinary entry above or authorize execution.
+
 # Operations and build access
 
 ## Environments

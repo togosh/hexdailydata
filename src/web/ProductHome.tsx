@@ -36,6 +36,9 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
     <section className="panel live-product" data-testid="live-product">
       <p className="eyebrow">Latest / live availability</p>
       <h2>Freshness is per observation</h2>
+      <p>
+        <a href="/learn">Learn how these observations and calculations work</a>
+      </p>
       <p className="stale-banner" role="status">
         {Object.values(data.freshness).some((f) => f.status === 'stale')
           ? 'Some saved observations are stale.'
@@ -61,8 +64,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
         />
       </div>
       <p className="meta">
-        BTC/ETH references are not guaranteed executable quotes. Bitstamp readings sample a reported
-        trade. Each retains its own update time.
+        BTC/ETH references are not guaranteed executable quotes. Bitstamp readings sample a
+        reported trade. Each retains its own update time.
       </p>
       <section data-testid="protocol-availability">
         <h3>HEX protocol at its saved block</h3>
@@ -95,8 +98,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
           <Reading label="Reported queued shares" value={data.queuedTshares} unit="T-shares" />
         </div>
         <p>
-          Queued shares are reported separately. These are block observations, not a count of active
-          stakers.
+          Queued shares are reported separately. These are block observations, not a count of
+          active stakers.
         </p>
         {data.latestMaterializedPayout && (
           <div data-testid="materialized-payout">
@@ -134,9 +137,9 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
         <summary>Gas units and components</summary>
         <p>
           Suggested gas price is a node estimate, not a guaranteed fee or inclusion price. Raw
-          values use PulseChain smallest units per gas; the API/CSV *Wei names are EVM aliases, not
-          ETH amounts. The contextual mined base fee and optional suggested tip were measured
-          separately and need not sum to the suggestion.
+          values use PulseChain smallest units per gas; the API/CSV *Wei names are EVM aliases,
+          not ETH amounts. The contextual mined base fee and optional suggested tip were
+          measured separately and need not sum to the suggestion.
         </p>
         <dl>
           <dt>Mined contextual base fee</dt>
@@ -145,8 +148,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
           <dd>{data.priorityFeeWei ?? 'Unavailable'} raw units / gas</dd>
         </dl>
         <p>
-          Daily gas keeps the last measured whole sample on its UTC date, not an average or verified
-          daily close. Missing dates remain gaps.
+          Daily gas keeps the last measured whole sample on its UTC date, not an average or
+          verified daily close. Missing dates remain gaps.
         </p>
       </details>
       {data.trackedSet && (
@@ -181,8 +184,8 @@ function LiveValues({ data }: { data: z.infer<typeof ProductLiveResponseSchema> 
               <dd>
                 {f.observedAtUtc ?? 'No qualified observation'}
                 {f.baseObservedAtUtc && ` · retained base ${f.baseObservedAtUtc}`}
-                {f.ageSeconds !== null && ` · age ${f.ageSeconds.toLocaleString()} seconds`}.{' '}
-                {f.reason}
+                {f.ageSeconds !== null &&
+                  ` · age ${f.ageSeconds.toLocaleString()} seconds`}. {f.reason}
               </dd>
             </div>
           ))}
@@ -237,8 +240,8 @@ export default function Home() {
               <a href="/daily">All metrics →</a>
             </div>
             <p className="meta">
-              Recorded {h.daily.snapshotRecordedAtUtc ?? 'unavailable'} · historical observation,
-              not a live reading or verified close.
+              Recorded {h.daily.snapshotRecordedAtUtc ?? 'unavailable'} · historical
+              observation, not a live reading or verified close.
             </p>
             <div className="product-readings">
               <Reading label="Circulating HEX" value={h.daily.circulatingHEX} unit="HEX" />
@@ -255,9 +258,9 @@ export default function Home() {
               />
             </div>
             <p>
-              Reference quote recorded {h.daily.priceRecordedAtUtc ?? 'unavailable'}. Payouts use
-              their own independently supported contract-day totals; later missing totals remain
-              unavailable.
+              Reference quote recorded {h.daily.priceRecordedAtUtc ?? 'unavailable'}. Payouts
+              use their own independently supported contract-day totals; later missing totals
+              remain unavailable.
             </p>
           </section>
           <LiveValues data={h.live} />
@@ -265,10 +268,16 @@ export default function Home() {
             <div className="daily-chart-heading">
               <h2>Tracked HEX liquidity (USD estimate)</h2>
               <div>
-                <button onClick={() => setLiquidityDays(30)} aria-pressed={liquidityDays === 30}>
+                <button
+                  onClick={() => setLiquidityDays(30)}
+                  aria-pressed={liquidityDays === 30}
+                >
                   30 days
                 </button>{' '}
-                <button onClick={() => setLiquidityDays(90)} aria-pressed={liquidityDays === 90}>
+                <button
+                  onClick={() => setLiquidityDays(90)}
+                  aria-pressed={liquidityDays === 90}
+                >
                   90 days
                 </button>
               </div>
@@ -296,8 +305,8 @@ export default function Home() {
           <section className="panel">
             <h2>Explore saved records</h2>
             <p>
-              <a href="/search">Stake list</a> · <a href="/search?kind=holders">Holder list</a> ·{' '}
-              <a href="/daily?metric=payoutPerTshareHEX">Daily payouts</a>
+              <a href="/search">Stake list</a> · <a href="/search?kind=holders">Holder list</a>{' '}
+              · <a href="/daily?metric=payoutPerTshareHEX">Daily payouts</a>
             </p>
             <p className="meta">{h.credits}</p>
           </section>

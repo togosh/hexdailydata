@@ -1,34 +1,70 @@
 import { ParticipantRegistry } from '../source-update/refresh.ts';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { open } from 'node:fs/promises';
+import { join, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { PairSchema, digest } from '../../contracts/product-daily.ts';
 import { SavedSourceGenerations } from '../source-update/generation.ts';
 import { ProductDailyStore } from './store.ts';
 import type { ApiDependencies } from '../../api/dependencies.ts';
-import { BASE_SNAPSHOT, TARGET_SNAPSHOT } from '../../contracts/saved-generation.ts';
+import { ACCEPTED, BASE_SNAPSHOT, TARGET_SNAPSHOT } from '../../contracts/saved-generation.ts';
+
+const localPath = z
+  .string()
+  .min(1)
+  .max(4096)
+  .refine(
+    (p) =>
+      isAbsolute(p) &&
+      !/^(?:\\\\|\/\/)/.test(p) &&
+      !p.includes('\0') &&
+      !p.split(/[\\/]/).includes('..'),
+    'Absolute local path required',
+  );
 
 export const ProductProfileSchema = z.strictObject({
-  productRoot: z.string().min(1),
-  history: z.string().min(1),
+  productRoot: localPath,
+  history: localPath,
   historyManifestSha256: digest,
-  ledger: z.string().min(1),
+  ledger: localPath,
   ledgerSha256: digest,
-  holdersRoot: z.string().min(1),
-  stakesRoot: z.string().min(1),
-  overlayRoot: z.string().min(1),
+  holdersRoot: localPath,
+  stakesRoot: localPath,
+  overlayRoot: localPath,
   pair: PairSchema,
-  participantRoot: z.string().min(1).optional(),
+  participantRoot: localPath.optional(),
 });
 export type ProductProfile = z.infer<typeof ProductProfileSchema>;
 export async function readProductProfile(path: string) {
-  const b = await readFile(path);
-  if (b.length > 16384) throw Error('PRODUCT_PROFILE_BOUND');
-  return ProductProfileSchema.parse(JSON.parse(b.toString()));
+  localPath.parse(path);
+  const handle = await open(path, 'r');
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 16384) throw Error('PRODUCT_PROFILE_BOUND');
+    const b = Buffer.alloc(16385);
+    const { bytesRead } = await handle.read(b, 0, b.length, 0);
+    if (bytesRead > 16384 || bytesRead !== stat.size) throw Error('PRODUCT_PROFILE_BOUND');
+    return validateProfile(JSON.parse(b.subarray(0, bytesRead).toString('utf8')));
+  } finally {
+    await handle.close();
+  }
+}
+function validateProfile(value: unknown) {
+  const profile = ProductProfileSchema.parse(value);
+  if (
+    profile.pair.generation !== ACCEPTED.generation ||
+    profile.pair.holderDatasetVersion !== ACCEPTED.familyVersions.tokenHolders ||
+    profile.pair.stakeDatasetVersion !== ACCEPTED.familyVersions.stakeStarts ||
+    Date.parse(profile.pair.baseObservedAtUtc) !== Date.parse(BASE_SNAPSHOT.observedAtUtc) ||
+    Date.parse(profile.pair.observedAtUtc) !== Date.parse(TARGET_SNAPSHOT.observedAtUtc)
+  )
+    throw Error('PRODUCT_PROFILE_IDENTITY');
+  return profile;
 }
 /** Explicit file-backed composition. No SQL/provider/config discovery or publication. */
-export async function openProductDependencies(profile: ProductProfile): Promise<ApiDependencies> {
-  profile = ProductProfileSchema.parse(profile);
+export async function openProductDependencies(
+  profile: ProductProfile,
+): Promise<ApiDependencies> {
+  profile = validateProfile(profile);
   const sourceGenerations = await SavedSourceGenerations.activate({
     root: profile.overlayRoot,
     holdersRoot: profile.holdersRoot,
@@ -37,7 +73,7 @@ export async function openProductDependencies(profile: ProductProfile): Promise<
   try {
     const admission = await sourceGenerations.admit(
       join(profile.overlayRoot, profile.pair.generation),
-      { readOnly: Boolean(profile.participantRoot) },
+      { readOnly: true },
     );
     await sourceGenerations.loadSelection();
     const descriptor = sourceGenerations.descriptor;

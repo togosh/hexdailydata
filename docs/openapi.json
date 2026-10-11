@@ -1220,7 +1220,7 @@
           }
         ],
         "summary": "Maturity schedule",
-        "description": "Existing native schedule contract, backend not activated here.\n\nUnknown source locked/maturity days are not inferred.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
+        "description": "Existing native schedule contract, backend not activated here.\n\nReturns structured 503 capability_unavailable in ordinary file-backed mode. Unknown source locked/maturity days are not inferred.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
         "tags": [
           "Schedule"
         ],
@@ -1849,7 +1849,7 @@
           }
         ],
         "summary": "Maturity schedule headers",
-        "description": "Same validation and availability checks as GET, with no response body.\n\nExisting native schedule contract, backend not activated here.\n\nUnknown source locked/maturity days are not inferred.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
+        "description": "Same validation and availability checks as GET, with no response body.\n\nExisting native schedule contract, backend not activated here.\n\nReturns structured 503 capability_unavailable in ordinary file-backed mode. Unknown source locked/maturity days are not inferred.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
         "tags": [
           "Schedule"
         ],
@@ -16346,7 +16346,7 @@
         },
         "x-rules": [
           "source, view, series, generation, datasetVersion, holderDatasetVersion and old revision selectors are rejected with 400 selection_migrated. Omit them and restart pagination.",
-          "Public global browse: at most50 rows and five pages. Additional traversal requires an API key. Known-address pages retain100-row bounds. No financial ranking."
+          "Public global browse: at most50 rows and five pages. Additional traversal requires a separately qualified paid backend, inactive in the ordinary entry. Advanced maturity/amount filters return 400; a key does not implement them. Known-address pages retain100-row bounds. No financial ranking."
         ],
         "x-requests": [
           {
@@ -16564,7 +16564,7 @@
           }
         ],
         "summary": "Stake activity",
-        "description": "Existing canonical event contract, backend not activated here.\n\nActive API key and original continuation proof required; no source records are imported as raw events.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
+        "description": "Existing canonical event contract, backend not activated here.\n\nUnavailable in ordinary file-backed mode; access checks still run first. Legacy SQL requires its original API authority and continuation proof. No source records become raw events.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
         "tags": [
           "Stakes & addresses"
         ],
@@ -17682,7 +17682,7 @@
           }
         ],
         "summary": "Stake activity headers",
-        "description": "Same validation and availability checks as GET, with no response body.\n\nExisting canonical event contract, backend not activated here.\n\nActive API key and original continuation proof required; no source records are imported as raw events.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
+        "description": "Same validation and availability checks as GET, with no response body.\n\nExisting canonical event contract, backend not activated here.\n\nUnavailable in ordinary file-backed mode; access checks still run first. Legacy SQL requires its original API authority and continuation proof. No source records become raw events.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
         "tags": [
           "Stakes & addresses"
         ],
@@ -36970,7 +36970,7 @@
         },
         "x-rules": [
           "source, view, series, generation, datasetVersion, holderDatasetVersion and old revision selectors are rejected with 400 selection_migrated. Omit them and restart pagination.",
-          "Public global browse: at most50 rows and five pages. Additional traversal requires an API key. Known-address pages retain100-row bounds. No financial ranking."
+          "Public global browse: at most50 rows and five pages. Additional traversal requires a separately qualified paid backend, inactive in the ordinary entry. Advanced maturity/amount filters return 400; a key does not implement them. Known-address pages retain100-row bounds. No financial ranking."
         ],
         "x-requests": [
           {
@@ -37178,7 +37178,7 @@
           }
         ],
         "summary": "Calculator inputs",
-        "description": "Existing qualified calculation contract.\n\nUnavailable without its qualified backend; no replacement from unaligned daily fields.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
+        "description": "Raw protocol share rate and exact completed-ledger payout means from one admitted product.\n\nRaw globals word 2, never a reversed display ratio. The 1/30/365 windows preserve gaps and zero shares. Rate: 120-second fresh / 1800-second last-known policy. USD conversion separately requires same-generation HEX/USD no older than 300 seconds. Missing inputs remain unavailable.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
         "tags": [
           "Daily & latest"
         ],
@@ -37216,6 +37216,10 @@
                     "calculationVersion": {
                       "type": "string",
                       "const": "hex-native-1"
+                    },
+                    "datasetVersion": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
                     },
                     "shareRate": {
                       "oneOf": [
@@ -38075,7 +38079,7 @@
           }
         ],
         "summary": "Calculator inputs headers",
-        "description": "Same validation and availability checks as GET, with no response body.\n\nExisting qualified calculation contract.\n\nUnavailable without its qualified backend; no replacement from unaligned daily fields.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
+        "description": "Same validation and availability checks as GET, with no response body.\n\nRaw protocol share rate and exact completed-ledger payout means from one admitted product.\n\nRaw globals word 2, never a reversed display ratio. The 1/30/365 windows preserve gaps and zero shares. Rate: 120-second fresh / 1800-second last-known policy. USD conversion separately requires same-generation HEX/USD no older than 300 seconds. Missing inputs remain unavailable.\n\nA supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.\n\nNo Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
         "tags": [
           "Daily & latest"
         ],
@@ -38718,7 +38722,7 @@
           }
         ],
         "summary": "Complete CSV",
-        "description": "Purchased-access protected selected daily file.\n\nAuthorization precedes all file reads, HEAD and conditional responses. No static bulk file. Other legacy export families are not replaced with fabricated files.\n\nComplete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. Real account/payment backend and redistribution are not qualified by this offline task.",
+        "description": "Purchased-access protected selected daily file.\n\nAuthorization precedes all file reads, HEAD and conditional responses. No static bulk file. Other legacy export families are not replaced with fabricated files.\n\nComplete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. The ordinary entry does not activate account/payment services. Free /samples/*.csv files are bounded SYNTHETIC SAMPLE / fixed partial fixtures, not complete exports. Real account/payment backend and redistribution remain unqualified.",
         "tags": [
           "Downloads"
         ],
@@ -39289,7 +39293,7 @@
           }
         ],
         "summary": "Complete CSV headers",
-        "description": "Same validation and availability checks as GET, with no response body.\n\nPurchased-access protected selected daily file.\n\nAuthorization precedes all file reads, HEAD and conditional responses. No static bulk file. Other legacy export families are not replaced with fabricated files.\n\nComplete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. Real account/payment backend and redistribution are not qualified by this offline task.",
+        "description": "Same validation and availability checks as GET, with no response body.\n\nPurchased-access protected selected daily file.\n\nAuthorization precedes all file reads, HEAD and conditional responses. No static bulk file. Other legacy export families are not replaced with fabricated files.\n\nComplete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. The ordinary entry does not activate account/payment services. Free /samples/*.csv files are bounded SYNTHETIC SAMPLE / fixed partial fixtures, not complete exports. Real account/payment backend and redistribution remain unqualified.",
         "tags": [
           "Downloads"
         ],
@@ -39481,7 +39485,7 @@
     "hds": "Historical material is an internal bootstrap input, not a source selector or alternate product. Provider choices are retired. One selected Daily response preserves snapshot/ledger/reference-price meanings and explicit gaps.",
     "address": "Address responses preserve original reported records and coherent paired holder/stake versions. Absence is not zero; negative bookkeeping anomalies are not ordinary balances.",
     "errors": "A supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.",
-    "downloads": "Complete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. Real account/payment backend and redistribution are not qualified by this offline task.",
+    "downloads": "Complete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. The ordinary entry does not activate account/payment services. Free /samples/*.csv files are bounded SYNTHETIC SAMPLE / fixed partial fixtures, not complete exports. Real account/payment backend and redistribution remain unqualified.",
     "access": "No Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.",
     "caching": "Paid responses use private,no-store. Public JSON uses no-cache,must-revalidate. ETags and HEAD/304 never bypass authorization. Daily ETags bind selection/product/access; Live also changes with age/status."
   }

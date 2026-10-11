@@ -15,15 +15,27 @@ export function Downloads() {
       <section className="panel">
         <h2>The same selected daily values</h2>
         <p>
-          Daily CSV uses the exact values, dates, units and product version shown by the API and
-          Daily charts.
+          SYNTHETIC SAMPLE / fixed partial fixtures: these five free examples are not genuine
+          or complete history.
+        </p>
+        <p>
+          {['daily', 'stakes', 'holders', 'maturities', 'markets'].map((name) => (
+            <span key={name}>
+              <a href={'/samples/' + name + '.csv'}>{name} sample CSV</a>
+              {' · '}
+            </span>
+          ))}
+        </p>
+        <p>
+          Daily CSV uses the exact values, dates, units and product version shown by the API
+          and Daily charts.
         </p>
         <Feedback {...data} />
         <p>{data.data?.reason ?? 'The complete export catalog is unavailable.'}</p>
         <p>
           Complete downloads require current purchased access. This local candidate has not
-          activated real accounts, payments or public redistribution. No bulk file is served from a
-          static directory.
+          activated real accounts, payments or public redistribution. No bulk file is served
+          from a static directory.
         </p>
         <p>
           <a href="/daily">Browse Daily</a> · <a href="/api">Developer access</a>
@@ -39,8 +51,9 @@ export function Status() {
       <section className="panel">
         <h2>Qualification status</h2>
         <p>
-          The indexer is parked. No current feed, scheduler, production payment system or deployment
-          is qualified by this local candidate. Historical gaps remain visible in Daily.
+          The indexer is parked. No current feed, scheduler, production payment system or
+          deployment is qualified by this local candidate. Historical gaps remain visible in
+          Daily.
         </p>
       </section>
     </>

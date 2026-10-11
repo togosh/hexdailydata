@@ -6,25 +6,30 @@ export class RequestError extends Error {
   code: string;
   constructor(status: number, code = '') {
     super(
-      code === 'developer_access_required'
-        ? 'Public browse limit reached. More records require an active API key.'
-        : code === 'not_indexed'
-        ? 'The index is catching up; this bounded lookup is inconclusive.'
-        : status === 409
-          ? 'The observation changed or expired. Restart this selection.'
-          : status === 429
-            ? 'Request allowance reached. Try again later.'
-            : status === 404
-              ? 'No matching resource was confirmed.'
-              : status === 410
-                ? 'This download has retired. Refresh the catalog.'
-                : 'Data is unavailable. Please try again.',
+      code === 'capability_unavailable'
+        ? 'This capability is unavailable in the saved product.'
+        : code === 'developer_access_required'
+          ? 'Public browse limit reached. More records require an active API key.'
+          : code === 'not_indexed'
+            ? 'The index is catching up; this bounded lookup is inconclusive.'
+            : status === 409
+              ? 'The observation changed or expired. Restart this selection.'
+              : status === 429
+                ? 'Request allowance reached. Try again later.'
+                : status === 404
+                  ? 'No matching resource was confirmed.'
+                  : status === 410
+                    ? 'This download has retired. Refresh the catalog.'
+                    : 'Data is unavailable. Please try again.',
     );
     this.status = status;
     this.code = code;
   }
 }
-export const endpoint = (path: string, query: Record<string, string | number | undefined> = {}) => {
+export const endpoint = (
+  path: string,
+  query: Record<string, string | number | undefined> = {},
+) => {
   const params = new URLSearchParams({ chain: 'pulsechain' });
   for (const [key, value] of Object.entries(query))
     if (value !== undefined) params.set(key, String(value));

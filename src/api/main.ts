@@ -1,31 +1,12 @@
-import { fileURLToPath } from 'node:url';
-import { createApp } from './app.ts';
-import { developmentConfig } from './config.ts';
-import { openDependencies } from './dependencies.ts';
-
+import { startEntry } from './entry.ts';
 try {
-  const config = developmentConfig(process.env);
-  const dependencies = await openDependencies(process.env);
-  const app = createApp(
-    import.meta.url.endsWith('.js')
-      ? {
-          webRoot: fileURLToPath(new URL('../web/', import.meta.url)),
-          dependencies,
-          mode: config.mode,
-        }
-      : { dependencies, mode: config.mode },
-  );
-  try {
-    await app.listen(config);
-  } catch {
-    await app.close();
-    throw new Error('Listen failed.');
-  }
+  const { app, config } = await startEntry();
   const address = app.server.address();
   console.log(
     JSON.stringify({
       event: 'listening',
       mode: config.mode,
+      serving: process.env.HDD_V2_API_MODE ?? 'product',
       host: config.host,
       port: typeof address === 'object' && address ? address.port : null,
     }),
@@ -36,6 +17,7 @@ try {
       void app.close().then(
         () => {
           clearTimeout(deadline);
+          console.log(JSON.stringify({ event: 'closed' }));
         },
         () => process.exit(1),
       );
@@ -43,7 +25,10 @@ try {
   }
 } catch {
   console.error(
-    JSON.stringify({ event: 'startup_failed', code: 'configuration_or_dependency_unavailable' }),
+    JSON.stringify({
+      event: 'startup_failed',
+      code: 'explicit_mode_profile_or_dependency_unavailable',
+    }),
   );
   process.exitCode = 1;
 }

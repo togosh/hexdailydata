@@ -28,7 +28,9 @@ export default function MaturityDetail() {
     key: String(r.day),
     date: r.date,
     value: formatUnits(
-      BigInt(unit === 'HEX' ? r.principalHearts : unit === 'T-Shares' ? r.stakeShares : r.count),
+      BigInt(
+        unit === 'HEX' ? r.principalHearts : unit === 'T-Shares' ? r.stakeShares : r.count,
+      ),
       unit === 'HEX' ? 8 : unit === 'T-Shares' ? 12 : 0,
     ),
     detail: `Contract day ${r.day} / display ${r.day + 1} · ${r.count} open stakes`,
@@ -38,6 +40,12 @@ export default function MaturityDetail() {
     <>
       <a href="/charts">← All charts</a>
       <h1>Upcoming Maturities</h1>
+      {data.error && (
+        <p className="notice">
+          Canonical maturity schedules are unavailable in this saved product. Source end links
+          do not establish maturity or active stakes.
+        </p>
+      )}
       <div className="panel controls">
         <label>
           Metric
@@ -105,8 +113,9 @@ export default function MaturityDetail() {
             <p>
               Open, unsettled stakes strictly after indexed contract day{' '}
               {data.data.cutoff.contractDay}; includes queued stakes, excludes GA, ended and
-              cancelled. No expected yield is included. Block {data.data.cutoff.asOf.blockNumber} ·{' '}
-              {data.data.cutoff.asOf.blockTimestamp} · {data.data.cutoff.finality}.
+              cancelled. No expected yield is included. Block{' '}
+              {data.data.cutoff.asOf.blockNumber} · {data.data.cutoff.asOf.blockTimestamp} ·{' '}
+              {data.data.cutoff.finality}.
             </p>
           </details>
           {rows.length ? (

@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import Copy from './ApiCopy.tsx';
-import { endpointGroups, exampleCode, operationLink, type ExampleLanguage } from './api-guide.ts';
+import {
+  endpointGroups,
+  exampleCode,
+  operationLink,
+  homeExcerpt,
+  type ExampleLanguage,
+} from './api-guide.ts';
 import './api-guide.css';
 const languages: ExampleLanguage[] = ['cURL', 'JavaScript', 'Python'];
 export default function ApiGuide() {
@@ -36,10 +42,14 @@ export default function ApiGuide() {
         <p>
           <strong>GET</strong>
           <span>JSON + CSV</span>
-          <span>Public browsing + paid API-key access</span>
+          <span>Bounded public browsing; paid activation unavailable</span>
           <a href="#api-errors">Integration limits</a>
         </p>
       </div>
+      <p className="notice">
+        Free CSV examples on Downloads are SYNTHETIC SAMPLE / fixed partial fixtures, not
+        complete history. Complete exports remain protected.
+      </p>
       <section className="api-quickstart panel" aria-labelledby="api-quickstart-title">
         <div className="api-section-heading">
           <h2 id="api-quickstart-title">Quick start</h2>
@@ -67,7 +77,8 @@ export default function ApiGuide() {
                     aria-controls="api-example"
                     onClick={() => setLanguage(name)}
                     onKeyDown={(event) => {
-                      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key))
+                        return;
                       event.preventDefault();
                       const next =
                         event.key === 'Home'
@@ -101,13 +112,7 @@ export default function ApiGuide() {
               <span className="meta">Home excerpt · not live data</span>
             </div>
             <pre tabIndex={0} aria-label="Synthetic Home excerpt">
-              <code>
-                {JSON.stringify(
-                  { live: { price: { status: 'unavailable', value: null } } },
-                  null,
-                  2,
-                )}
-              </code>
+              <code>{JSON.stringify(homeExcerpt, null, 2)}</code>
             </pre>
           </div>
         </div>
@@ -115,10 +120,10 @@ export default function ApiGuide() {
           <summary>Using these examples</summary>
           <p>
             Check component status and coverage before using values. This excerpt omits other
-            fields. Examples use this page’s origin and do not run here. In Windows PowerShell 5 use{' '}
-            <code>curl.exe</code>. JavaScript needs top-level await support; Python uses its
-            standard library. HTTP errors fail rather than become success values. Cross-origin
-            browser access is not configured by these docs.
+            fields. Examples use this page’s origin and do not run here. In Windows PowerShell
+            5 use <code>curl.exe</code>. JavaScript needs top-level await support; Python uses
+            its standard library. HTTP errors fail rather than become success values.
+            Cross-origin browser access is not configured by these docs.
           </p>
         </details>
       </section>
@@ -159,35 +164,40 @@ export default function ApiGuide() {
           <details id="api-exact">
             <summary>Exact values &amp; time</summary>
             <p>
-              Keep magnitudes as exact strings; null is not zero. Hearts are 10<sup>−8</sup> HEX.
-              Day counters are numbers; timestamps are UTC. HDS tokens may use signs/exponents.
+              Keep magnitudes as exact strings; null is not zero. Hearts are 10<sup>−8</sup>{' '}
+              HEX. Day counters are numbers; timestamps are UTC. HDS tokens may use
+              signs/exponents.
             </p>
             <a href={operationLink('home')}>Value and observation reference →</a>
           </details>
           <details id="api-freshness">
             <summary>Freshness &amp; coverage</summary>
             <p>
-              Components can independently be fresh, stale or unavailable. A partial address page is
-              not a wallet inventory. Health is not proof of dataset completeness.
+              Components can independently be fresh, stale or unavailable. A partial address
+              page is not a wallet inventory. Health is not proof of dataset completeness.
             </p>
             <a href={operationLink('address')}>Availability reference →</a>
           </details>
           <details id="api-pagination">
             <summary>Pagination</summary>
             <p id="api-indexed-cursors">
-              Indexed cursors, HDS day/revision continuation and pinned address pages are different
-              contracts. Public global lists allow five pages of up to 50 rows. More traversal, stake activity and advanced maturity filters require a paid key. Restart when changing mode or when a cursor expires.
+              Saved lists and Daily pages use separate bound cursors. Public global lists allow
+              five pages of up to 50 rows. Advanced filters are unsupported. Canonical stake
+              activity and maturities are unavailable in this saved product. Paid access is
+              inactive; supplying a key cannot activate it. Restart when a cursor expires.
             </p>
             <a href={operationLink('stakes')}>Indexed lists</a> ·{' '}
-            <a href={operationLink('daily')}>HDS history</a> ·{' '}
+            <a href={operationLink('daily')}>Daily history</a> ·{' '}
             <a href={operationLink('addressStakes')}>Address pages</a>
           </details>
           <details id="api-errors">
             <summary>Errors, caching &amp; access</summary>
             <p>
               Honor 429 Retry-After and use bounded retries. Process resource limits are not
-              customer quotas. With Authorization, each successful data GET/HEAD/304 page uses one monthly request. Browser sessions alone stay public. Revalidation still constructs the response.
-              Read-only; no request console.
+              customer quotas. In a separately qualified paid deployment, successful authorized
+              data GET/HEAD/304 pages use one monthly request. The ordinary entry has no paid
+              authorizer. Browser sessions alone stay public. Revalidation still constructs the
+              response. Read-only; no request console.
             </p>
             <a href={operationLink('home')}>Errors &amp; caching</a> ·{' '}
             <a href={operationLink('download')}>CSV behavior</a> ·{' '}

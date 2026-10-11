@@ -1,3 +1,25 @@
+# HEXDailyData v2 — saved-product candidate
+
+Use the normal **read-only file-backed entry**, not the historical operator stack.
+See [ordinary serving and build instructions](docs/operations.md#ordinary-saved-product-serving).
+The compiled entry requires `HDD_V2_PRODUCT_PROFILE`; it never silently opens SQL
+or serves empty dependencies. Home, Daily, Search and Calculator share the selected
+product. The source ZIP needs separately admitted immutable data; it is not a full
+backup or production deployment. Fixed free CSV samples are clearly synthetic.
+
+Mainline consolidation is source/application qualification with synthetic fixtures.
+Genuine sequence 116 / rollback 115 remains unchanged. HEX/liquidity scheduling is
+a launch blocker; paid/account services, required gaps and production deployment
+are not qualified. All old public grants remain consumed; indexer/reconstruction
+remain PARKED. No old command below is authority to reopen them.
+
+## Retained SQL/operator reference — not the ordinary startup
+
+The older text below describes the dormant SQL/operator workstream. Its resource,
+Docker, secret and command requirements do not apply to the file-backed serving
+entry. SQL compatibility requires explicit `HDD_V2_API_MODE=legacy-sql`; this
+milestone neither runs nor qualifies that stack.
+
 # HEXDailyData v2
 
 Read-only HEX data API, exact TypeScript domain calculations, PostgreSQL projections,

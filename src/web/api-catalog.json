@@ -30,7 +30,7 @@
       {
         "id": "calculator",
         "title": "Calculator inputs",
-        "description": "Existing qualified calculation contract.",
+        "description": "Raw protocol share rate and exact completed-ledger payout means from one admitted product.",
         "path": "/api/v2/calculator/inputs"
       }
     ]

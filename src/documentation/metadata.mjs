@@ -62,18 +62,18 @@ export const metadata = {
   ],
   calculator: [
     'Calculator inputs',
-    'Existing qualified calculation contract.',
-    'Unavailable without its qualified backend; no replacement from unaligned daily fields.',
+    'Raw protocol share rate and exact completed-ledger payout means from one admitted product.',
+    'Raw globals word 2, never a reversed display ratio. The 1/30/365 windows preserve gaps and zero shares. Rate: 120-second fresh / 1800-second last-known policy. USD conversion separately requires same-generation HEX/USD no older than 300 seconds. Missing inputs remain unavailable.',
   ],
   stakeEvents: [
     'Stake activity',
     'Existing canonical event contract, backend not activated here.',
-    'Active API key and original continuation proof required; no source records are imported as raw events.',
+    'Unavailable in ordinary file-backed mode; access checks still run first. Legacy SQL requires its original API authority and continuation proof. No source records become raw events.',
   ],
   maturities: [
     'Maturity schedule',
     'Existing native schedule contract, backend not activated here.',
-    'Unknown source locked/maturity days are not inferred.',
+    'Returns structured 503 capability_unavailable in ordinary file-backed mode. Unknown source locked/maturity days are not inferred.',
   ],
   downloads: [
     'Complete export status',
@@ -95,7 +95,11 @@ export const metadata = {
     'Process health only.',
     'This does not indicate fresh product data; use /api/v2/live for observations.',
   ],
-  ready: ['Readiness', 'Configured data dependency readiness.', 'No provider call or acquisition.'],
+  ready: [
+    'Readiness',
+    'Configured data dependency readiness.',
+    'No provider call or acquisition.',
+  ],
 };
 const migration =
   'source, view, series, generation, datasetVersion, holderDatasetVersion and old revision selectors are rejected with 400 selection_migrated. Omit them and restart pagination.';
@@ -108,7 +112,7 @@ rules.daily.push(
 rules.markets.push(...rules.daily.slice(1));
 for (const id of ['stakes', 'holders'])
   rules[id].push(
-    'Public global browse: at most50 rows and five pages. Additional traversal requires an API key. Known-address pages retain100-row bounds. No financial ranking.',
+    'Public global browse: at most50 rows and five pages. Additional traversal requires a separately qualified paid backend, inactive in the ordinary entry. Advanced maturity/amount filters return 400; a key does not implement them. Known-address pages retain100-row bounds. No financial ranking.',
   );
 rules.latest.push(
   'Freshness thresholds: markets/liquidity/protocol300s; gas60s; saved state3600s; historical ledger86400s. Groups keep separate times. HTTP revalidation includes current age/status.',
@@ -129,7 +133,7 @@ export const essentials = {
   errors:
     'A supplied invalid/revoked/duplicate API key never falls back to public access. Successful paid GET/HEAD/304 uses the original allowance hold; failures/cancellation release it. HTTP/input bounds and429backoff remain. No arbitrary SQL or RPC access.',
   downloads:
-    'Complete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. Real account/payment backend and redistribution are not qualified by this offline task.',
+    'Complete daily CSV is the actual selected projection. Existing purchased-access authorization, private caching and reader admission remain. The ordinary entry does not activate account/payment services. Free /samples/*.csv files are bounded SYNTHETIC SAMPLE / fixed partial fixtures, not complete exports. Real account/payment backend and redistribution remain unqualified.',
   access:
     'No Authorization means bounded public JSON, even with a session. Public admission remains120requests/minute and8active per socket source. Complete CSV has separate authorization and is unmetered against JSON allowance.',
   caching:
@@ -143,8 +147,10 @@ export function parameterDescription(id, name) {
     to: 'Inclusive UTC reporting date; range maximum366days.',
     limit: 'Maximum page size; keep unchanged with cursor.',
     cursor: 'Opaque nextCursor; restart expired/incompatible pagination.',
-    metric: 'Metric of interest; typed full rows retain one shared value for API, Charts and CSV.',
-    asset: 'Optional metric context (HEX/BTC/ETH/PLS), not a provider or price-series selection.',
+    metric:
+      'Metric of interest; typed full rows retain one shared value for API, Charts and CSV.',
+    asset:
+      'Optional metric context (HEX/BTC/ETH/PLS), not a provider or price-series selection.',
     address: 'Optional owner address, normalized lowercase.',
     order: 'source-id-asc only; no financial ranking.',
     id: 'Unsigned decimal stake ID below2^40.',
