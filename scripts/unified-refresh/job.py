@@ -71,7 +71,7 @@ def main(offline_fixture=False):
     if offline_fixture:s.state['mode']='SYNTHETIC_OFFLINE_TEST';s.persist()
     save(root/'JOB_CLOCK.json',dict(startedMonotonic=s.started,networkSeconds=s.network_end,
          deadlineMonotonic=s.deadline,networkDeadline=a['networkDeadline'],recordedAt=utc()))
-    s.transport=ParentTransport(s,WorkerTransport(a['nonce'],worker_path=HERE/'worker.py'))
+    s.transport=ParentTransport(s,WorkerTransport(a['nonce'],worker_path=HERE/'worker.py',operating=operating))
     incoming=current().incoming if operating else queue.Queue()
     def reader():
         try:

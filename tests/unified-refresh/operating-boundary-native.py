@@ -35,7 +35,16 @@ else:
     import capture_client
     original=capture_client.WorkerTransport
     class ResponseChildren(original):
-        def __init__(self,nonce,**kw):super().__init__(nonce,worker_path=Path(worker))
+        def __init__(self,nonce,**kw):super().__init__(nonce,worker_path=Path(worker),operating=kw.get('operating',False))
+        def __call__(self,request,deadline,storage):
+            if f.get('requestReserve'):
+                # Inject only the remaining physical window from the saved
+                # queued request. This is not an elapsed-time or public proof.
+                clipped=min(deadline,self.clock()+2.120)
+                save(root/'QUEUED_WINDOW_FIXTURE.json',dict(originalDeadline=deadline,
+                    injectedDeadline=clipped,remainingSeconds=2.120,synthetic=True))
+                return super().__call__(request,clipped,storage)
+            return super().__call__(request,deadline,storage)
     capture_client.WorkerTransport=ResponseChildren
     import collector,job
     if f.get('postGrantReserve'):

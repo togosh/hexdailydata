@@ -72,6 +72,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       'native-startup-timeout',
       'native-timeout',
       'native-reserve',
+      'native-request-reserve',
       'operating-smoke',
       'operating-cancel-retry',
       'operating-cancel-physical',
@@ -122,6 +123,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     'native-timeout',
     'native-startup-timeout',
     'native-reserve',
+    'native-request-reserve',
   ].includes(mode);
   await fs.mkdir(join(root, 'evidence'));
   process.env.HDD_TASK_ROOT = root;
@@ -490,6 +492,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
               startupTimeout: mode === 'native-startup-timeout' && a.family === 'gas',
               timeoutTip: mode === 'native-timeout' && a.family === 'gas',
               postGrantReserve: mode === 'native-reserve' && a.family === 'market',
+              requestReserve: mode === 'native-request-reserve' && a.family === 'market',
               delay: mode === 'native-boundary' && a.family === 'participants' ? 121 : 0,
             }
           : {}),
@@ -656,7 +659,9 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       ...(boundary
         ? {
             mode: 'DENIED_NETWORK_TEST',
-            until: configuration.startsAt + (mode === 'native-reserve' ? 2 : 62),
+            until:
+              configuration.startsAt +
+              (['native-reserve', 'native-request-reserve'].includes(mode) ? 2 : 62),
           }
         : {}),
     });
@@ -726,7 +731,8 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         const jr = join(root, 'operating', j.job),
           r = await read(join(jr, 'COORDINATOR_RESULT.json'));
         const native = await read(join(jr, 'NATIVE_CLOSURE.json'));
-        const reserveRefusal = mode === 'native-reserve' && j.family === 'market';
+        const reserveRefusal =
+          ['native-reserve', 'native-request-reserve'].includes(mode) && j.family === 'market';
         assert(
           native.exit.code === (reserveRefusal ? 2 : 0) &&
             !native.killed &&
@@ -819,7 +825,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
           networkingDenied: true,
         };
       }
-      if (mode === 'native-reserve') {
+      if (['native-reserve', 'native-request-reserve'].includes(mode)) {
         const market = result.jobs.find((j) => j.family === 'market');
         const dir = join(root, 'operating', market.job, 'captures/00001');
         const c = await read(join(dir, 'capture.json')),
@@ -837,6 +843,14 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         assert.equal(c.childStarted, false);
         assert.equal(c.childReaped, false);
         assert.equal(c.closureKnown, true);
+        if (mode === 'native-request-reserve') {
+          assert.equal(c.transportError, 'Combined queued request execution reserve');
+          assert.equal(
+            (await read(join(root, 'operating', market.job, 'QUEUED_WINDOW_FIXTURE.json')))
+              .remainingSeconds,
+            2.12,
+          );
+        }
         assert.equal(physical.noChildStarted, true);
         assert.equal(physical.workerPid, null);
         assert.equal(settlement.bytes, permit.bytes);

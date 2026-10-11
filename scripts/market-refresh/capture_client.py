@@ -14,8 +14,9 @@ class LimitReached(Stop):pass
 
 class WorkerTransport:
     """One child, finite request INCLUDING kill/reap, inherited secrets excluded."""
-    def __init__(self,nonce,clock=time.monotonic,popen=subprocess.Popen,worker_path=None):
+    def __init__(self,nonce,clock=time.monotonic,popen=subprocess.Popen,worker_path=None,operating=False):
         self.nonce=nonce;self.clock=clock;self.popen=popen;self.child=None;self.worker_path=worker_path or ROOT/'http_worker.py'
+        self.operating=operating
     def __call__(self,request,deadline,storage):
         request=Path(request);body=request.parent/'response.body';meta=request.parent/'transport.json'
         env={k:os.environ[k] for k in ('SystemRoot','WINDIR','COMSPEC') if k in os.environ}
@@ -23,12 +24,19 @@ class WorkerTransport:
         result={'status':None,'complete':False,'connectionClosed':False,'failureKind':None,'transportError':None}
         started=False;closed=False;cancel=None
         try:
+            # Match the existing trade floor: two seconds to reap, with more
+            # than one second to execute. Never renew a deadline after queueing.
+            if self.operating and self.clock()>=deadline-3:
+                raise LimitReached('Combined queued request execution reserve')
             if self.clock()>=deadline-2:raise Stop('No attempt time before dispatch')
             self.child=self.popen([sys.executable,'-I','-S',str(self.worker_path),str(request),str(body),str(meta),self.nonce],
                 cwd=ROOT,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             started=True
             self.child.wait(timeout=max(.001,deadline-2-self.clock()))
             closed=True
+        except LimitReached:
+            # Only the owning ParentTransport can prove and settle no dispatch.
+            raise
         except subprocess.TimeoutExpired:
             result.update(failureKind='transport_timeout',transportError='Parent absolute request cutoff',complete=False)
         except KeyboardInterrupt as exc:

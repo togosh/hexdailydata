@@ -198,11 +198,17 @@ class ParentTransport:
             r['parentBefore']=answer['parentBefore']
             atomic(s.root/'combined-reservations'/f'{n:05d}.json',r)
             # Waiting consumed the original deadline; the exact query and controls are checked again.
+            permit_deadline=(bridge.clock.to_mono(bridge.pending['expiresAt'])
+                             if hasattr(bridge.clock,'to_mono') else bridge.pending['expiresAt'])
+            deadline=min(deadline,s.admission['networkDeadline'],permit_deadline)
             try:
                 s.phase_check(q,[])
+                if s.clock()>=deadline-3:
+                    raise LimitReached('Combined queued request execution reserve')
+                result=self.physical(request,deadline,storage)
             except LimitReached as exc:
-                # A queued permit can consume a mandatory-control reserve. No
-                # worker has been called here: record that exact fact, retain the
+                # A queued permit can consume the request or control reserve.
+                # Prove that no worker started, record that fact, retain the
                 # full liability, and let the ordinary durable ledger settle it.
                 # Storage/integrity failures deliberately do not enter this path.
                 if not hasattr(bridge.clock,'epoch'):raise
@@ -224,7 +230,6 @@ class ParentTransport:
                 native_closure(request,s.root,s.admission,dict(ownerPid=os.getpid(),workerPid=None,
                     childStarted=False,childReaped=False,exitCode=None,connectionClosed=True),bridge.clock.epoch())
                 return result
-            result=self.physical(request,min(deadline,s.admission['networkDeadline']),storage)
             if hasattr(bridge.clock,'epoch'):
                 from operating_bridge import native_closure
                 native_closure(request,s.root,s.admission,self.physical.last_lifecycle,bridge.clock.epoch())
