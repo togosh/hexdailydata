@@ -1,3 +1,4 @@
+import { canonical } from '../../dist/services/source-update/generation.js';
 // Repeatable OFFLINE mode in the existing coordinator. No public authority here.
 import fs from 'node:fs/promises';
 import { resolve, join, dirname } from 'node:path';
@@ -86,7 +87,9 @@ export function operatingAdmission(a) {
       a.authorityTaskId === operatingPolicy.task &&
         a.parentMode === 'DENIED_NETWORK_TEST' &&
         a.synthetic === true &&
-        a.clockMode === 'REAL_EPOCH',
+        a.clockMode === 'REAL_EPOCH' &&
+        operatingPolicy.public.families[a.family]?.enabled !== false &&
+        Object.hasOwn(operatingPolicy.public.childAllowances, a.family),
       'OPERATING_BOUNDARY_MODE',
     );
     return true;
@@ -387,7 +390,9 @@ export class OperatingOwner {
   async allocate(family) {
     return this.exclusive(async () => {
       check(
-        operatingFamilies.includes(family) && this.state.status === 'RUNNING',
+        operatingFamilies.includes(family) &&
+          this.config.families[family].enabled &&
+          this.state.status === 'RUNNING',
         'OPERATING_ALLOCATION',
       );
       check(
@@ -424,13 +429,25 @@ export class OperatingOwner {
         'OPERATING_CLOSED',
       );
       check(
-        ![...this.jobs.values()].some((j) => j.family === family) && this.jobs.size < 5,
+        this.config.families[family]?.enabled &&
+          ![...this.jobs.values()].some((j) => j.family === family) &&
+          this.jobs.size < (this.config.physicalAttemptSubcaps ? 4 : 5),
         'OPERATING_FAMILY_CONCURRENCY',
       );
       check(
         this.state.completed + this.jobs.size < this.config.storage.jobs,
         'OPERATING_JOB_BOUND',
       );
+      if (this.config.physicalAttemptSubcaps) {
+        check(
+          canonical(allowance) === canonical(operatingPolicy.public.childAllowances[family]),
+          'OPERATING_EXACT_CHILD_ALLOWANCE',
+        );
+        check(
+          this.now() < this.config.admissionEndsAt && deadline <= this.config.dispatchEndsAt,
+          'OPERATING_EXACT_CHILD_DEADLINE',
+        );
+      }
       const caps = zeros();
       for (const p of protocols)
         if (allowance[p + 'Attempts'])
@@ -788,6 +805,11 @@ export class OperatingOwner {
     };
   }
   checkAggregate(reserved) {
+    for (const [p, cap] of Object.entries(this.config.physicalAttemptSubcaps ?? {}))
+      check(
+        this.state.totals[p].attempts + reserved[p].attempts <= cap,
+        'OPERATING_PHYSICAL_SUBCAP',
+      );
     if (!this.config.aggregate) return;
     for (const k of ['attempts', 'bytes', 'objects'])
       check(

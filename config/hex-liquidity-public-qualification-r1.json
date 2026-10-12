@@ -1,0 +1,240 @@
+{
+  "task": "HDD-HEX-LIQUIDITY-PUBLIC-QUALIFICATION-R1",
+  "format": "hex-liquidity-operating-public-1",
+  "boundaryFormat": "hex-liquidity-operating-denied-boundary-1",
+  "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\hex-liquidity-public-qualification-r1",
+  "packetHashes": {
+    "packet/TASK.md": "273145980659fc54cf28c4ac0c6c732882038ec9ddd62cf34e13c00bb46f636c",
+    "packet/INPUTS.json": "b8c1651666632539ed84dc3464fcedbdabdeb5813527c89de8700795a0e86081",
+    "packet/SCOPE.json": "f688c71646ed5b262e3bb6c9d045a94f205166e2d6dd4cf4ad92816422648317",
+    "packet/SOURCE_NOTES.md": "40e1fc4e547697d0c3693db95aa859f76d9bccd77c2cd0a2310dfb54afc5378a"
+  },
+  "public": {
+    "sessions": 1,
+    "newJobAdmissionSeconds": 480,
+    "sessionSecondsIncludingClosure": 1200,
+    "finalClosureReserveSeconds": 180,
+    "families": {
+      "trade": {
+        "enabled": true,
+        "offsetSeconds": 0,
+        "periodSeconds": 60,
+        "maximumJobs": 8,
+        "deadlineSeconds": 600
+      },
+      "market": {
+        "enabled": true,
+        "offsetSeconds": 5,
+        "periodSeconds": 240,
+        "maximumJobs": 2,
+        "deadlineSeconds": 600
+      },
+      "gas": {
+        "enabled": true,
+        "offsetSeconds": 25,
+        "periodSeconds": 180,
+        "maximumJobs": 3,
+        "deadlineSeconds": 600
+      },
+      "protocol": {
+        "enabled": true,
+        "offsetSeconds": 50,
+        "periodSeconds": 300,
+        "maximumJobs": 2,
+        "deadlineSeconds": 600
+      },
+      "participants": {
+        "enabled": false,
+        "maximumJobs": 0,
+        "sourceRequests": 0,
+        "selection": "Retain exact admitted participant view at27766713; no new window."
+      }
+    },
+    "maximumJobs": 15,
+    "globalMaximumPhysicalAttempts": 336,
+    "physicalAttemptSubcaps": {
+      "http": 48,
+      "graph": 48,
+      "rpc": 240
+    },
+    "protocolReservationLimits": {
+      "http": {
+        "attempts": 48,
+        "bytes": 103809024,
+        "objects": 960000,
+        "extras": 24
+      },
+      "graph": {
+        "attempts": 96,
+        "bytes": 4194304,
+        "objects": 20000,
+        "extras": 8
+      },
+      "rpc": {
+        "attempts": 240,
+        "bytes": 35651584,
+        "objects": 100000,
+        "extras": 14
+      }
+    },
+    "rolling": {
+      "seconds": 600,
+      "limits": {
+        "http": {
+          "attempts": 48,
+          "bytes": 103809024,
+          "objects": 960000,
+          "extras": 24
+        },
+        "graph": {
+          "attempts": 96,
+          "bytes": 4194304,
+          "objects": 20000,
+          "extras": 8
+        },
+        "rpc": {
+          "attempts": 240,
+          "bytes": 35651584,
+          "objects": 100000,
+          "extras": 14
+        }
+      }
+    },
+    "endpointAttemptLimits": {
+      "graph": [
+        48,
+        48
+      ],
+      "rpc": [
+        120,
+        120
+      ]
+    },
+    "maximumChargedBytes": 143654912,
+    "maximumChargedObjects": 1080000,
+    "maximumExtras": 46,
+    "nativeChildrenMaximum": 4,
+    "physicalConcurrency": 1,
+    "publicationWriters": 1,
+    "minimumSecondsAfterKnownClosure": 1,
+    "childAllowances": {
+      "trade": {
+        "httpAttempts": 6,
+        "httpExtras": 3,
+        "httpChargedBytes": 12976128,
+        "controlGraphExtras": 0,
+        "controlRpcExtras": 0,
+        "graphAttempts": 0,
+        "rpcAttempts": 0,
+        "graphChargedBytes": 0,
+        "rpcChargedBytes": 0,
+        "chargedEntities": 120000,
+        "graphExtras": 0,
+        "rpcExtras": 0,
+        "seconds": 600,
+        "publication": 35
+      },
+      "market": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 1,
+        "controlRpcExtras": 0,
+        "graphAttempts": 24,
+        "rpcAttempts": 56,
+        "graphChargedBytes": 2097152,
+        "rpcChargedBytes": 2097152,
+        "chargedEntities": 10000,
+        "graphExtras": 4,
+        "rpcExtras": 0,
+        "seconds": 600,
+        "publication": 35
+      },
+      "gas": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 0,
+        "controlRpcExtras": 0,
+        "graphAttempts": 0,
+        "rpcAttempts": 24,
+        "graphChargedBytes": 0,
+        "rpcChargedBytes": 6291456,
+        "chargedEntities": 20000,
+        "graphExtras": 0,
+        "rpcExtras": 2,
+        "seconds": 600,
+        "publication": 35
+      },
+      "protocol": {
+        "httpAttempts": 0,
+        "httpExtras": 0,
+        "httpChargedBytes": 0,
+        "controlGraphExtras": 0,
+        "controlRpcExtras": 0,
+        "graphAttempts": 0,
+        "rpcAttempts": 28,
+        "graphChargedBytes": 0,
+        "rpcChargedBytes": 6291456,
+        "chargedEntities": 10000,
+        "graphExtras": 0,
+        "rpcExtras": 4,
+        "seconds": 600,
+        "publication": 35
+      }
+    },
+    "urls": {
+      "get": [
+        "https://www.bitstamp.net/api/v2/markets/",
+        "https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute",
+        "https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute"
+      ],
+      "rpc": [
+        "https://rpc.pulsechain.com/",
+        "https://rpc-pulsechain.g4mm4.io/"
+      ],
+      "graphql": [
+        "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsex",
+        "https://graph.pulsechain.com/subgraphs/name/pulsechain/pulsexv2"
+      ]
+    }
+  },
+  "selection": {
+    "sequence": 116,
+    "productVersion": "4304d14338cc3b9ddd6f461ecdc71f6381ae4a0eaec6ba61b73235fcc39525fe",
+    "participantGeneration": "5e9c3a8f07668a53b44645512cd58f38522bcef40608c4de90c880dbd8d45959",
+    "participantFrontier": 27766713,
+    "immediateRollbackSequence": 115,
+    "backupSha256": "5ad49a09c9773f6b79b9416612f038e3a44ccbfa33d3156dc28dc71349b2c3a4",
+    "productManifestSha256": "288ee2252f51fd68ada9672dea0a7efe00869a108d126d411a10fc041f8dfb84"
+  },
+  "oldStateProtection": {
+    "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r1",
+    "parentStatus": "UNKNOWN",
+    "pendingPermit": 43,
+    "reservedBytes": 16384,
+    "reservedObjects": 16,
+    "ownerLock": "session/OPERATING_OWNER.lock",
+    "rule": "R1 pending43/full charge/lock remain immutable; no old session state copied."
+  },
+  "additionalOldStateProtection": {
+    "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r2",
+    "parentStatus": "UNKNOWN",
+    "pendingPermit": 130,
+    "reservedBytes": 4096,
+    "reservedObjects": 2,
+    "physicalReaps": 129,
+    "ownerLock": "session/OPERATING_OWNER.lock",
+    "rule": "Read-only forever; no settlement, reset, repair, resume, refund or lock action. No old session or owner state is restored."
+  },
+  "thirdOldStateProtection": {
+    "root": "C:\\Code\\HEXDailyData-Subgraph-First-Launch-Proof-R2\\repeatable-refresh-public-qualification-r3",
+    "parentStatus": "UNKNOWN",
+    "pendingPermit": 103,
+    "reservedBytes": 1048576,
+    "reservedObjects": 128,
+    "physicalReaps": 103,
+    "ownerLock": "session/OPERATING_OWNER.lock",
+    "rule": "Immutable original UNKNOWN, full charges and lock; all103 workers reaped, last physical entry absent. No settlement, refund or old-runtime mutation."
+  }
+}

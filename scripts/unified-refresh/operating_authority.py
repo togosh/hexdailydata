@@ -2,25 +2,34 @@
 import hashlib,json,time,os,re,math,datetime
 from pathlib import Path
 REPO=Path(__file__).resolve().parents[2]
-POLICY=json.loads((REPO/'config/repeatable-operating-public-1.json').read_bytes())
-LIVE=POLICY['format'];BOUNDARY='unified-operating-denied-boundary-1'
+import sys
+QUALIFICATION=json.loads((REPO/'config/hex-liquidity-public-qualification-r1.json').read_bytes())
+def qualification_entry(arg):
+    try:
+        p=Path(arg).resolve();root=Path(QUALIFICATION['root'])
+        return p==root or p.is_relative_to(root)
+    except (ValueError,OSError):return False
+POLICY=QUALIFICATION if any(qualification_entry(arg) for arg in sys.argv[1:]) else json.loads((REPO/'config/repeatable-operating-public-1.json').read_bytes())
+LIVE=POLICY['format'];BOUNDARY=POLICY.get('boundaryFormat','unified-operating-denied-boundary-1')
 def digest(raw):return hashlib.sha256(raw).hexdigest()
 def canonical(v):return json.dumps(v,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
 def live(a):
     if a.get('operatingFormat')!=LIVE:return False
-    if a.get('authorityTaskId')!=POLICY['task'] or a.get('synthetic') is not False or a.get('parentMode')!='OWNER_AUTHORIZED_PUBLIC':raise ValueError('Exact live operating mode')
+    if a.get('authorityTaskId')!=POLICY['task'] or a.get('synthetic') is not False or a.get('parentMode')!='OWNER_AUTHORIZED_PUBLIC' or a.get('family') not in POLICY['public']['childAllowances'] or POLICY['public']['families'][a['family']].get('enabled') is False:raise ValueError('Exact live operating mode')
     return True
 def boundary(a):return a.get('operatingFormat')==BOUNDARY
 
 def bounded_config(start):
     p=POLICY['public']
-    return dict(format=LIVE,mode='OWNER_AUTHORIZED_PUBLIC',startsAt=start,expiresAt=start+2400,
-        admissionEndsAt=start+1200,dispatchEndsAt=start+2220,
-        families={f:dict(enabled=True,period=v['periodSeconds'],deadline=v['deadlineSeconds']) for f,v in p['families'].items()},
-        total=p['protocolReservationLimits'],rolling=p['rolling'],storage=dict(bytes=4294967296,entries=100000,jobs=37),
-        participants=dict(maximumWindowBlocks=4096,maximumActivationBlocks=4096),
-        maximumJobsByFamily={f:v['maximumJobs'] for f,v in p['families'].items()},
-        aggregate=dict(attempts=1376,bytes=503316480,objects=3100000))
+    c=dict(format=LIVE,mode='OWNER_AUTHORIZED_PUBLIC',startsAt=start,expiresAt=start+p['sessionSecondsIncludingClosure'],
+        admissionEndsAt=start+p['newJobAdmissionSeconds'],dispatchEndsAt=start+p['sessionSecondsIncludingClosure']-p['finalClosureReserveSeconds'],
+        families={f:dict(enabled=v.get('enabled',True),period=v.get('periodSeconds',3600),deadline=v.get('deadlineSeconds',600),**({'offset':v['offsetSeconds']} if 'offsetSeconds' in v else {})) for f,v in p['families'].items()},
+        total=p['protocolReservationLimits'],rolling=p['rolling'],storage=dict(bytes=4294967296,entries=100000,jobs=p['maximumJobs']),
+        participants=dict(maximumWindowBlocks=4096,maximumActivationBlocks=0 if p['families']['participants'].get('enabled') is False else 4096),
+        maximumJobsByFamily={f:v['maximumJobs'] for f,v in p['families'].items()})
+    if 'physicalAttemptSubcaps' in p:c['physicalAttemptSubcaps']=p['physicalAttemptSubcaps']
+    c['aggregate']=dict(attempts=p['globalMaximumPhysicalAttempts'],bytes=p['maximumChargedBytes'],objects=p['maximumChargedObjects'])
+    return c
 
 def validate_counters(a,state,config):
     p=POLICY['public'];limits={}
@@ -28,7 +37,9 @@ def validate_counters(a,state,config):
         limits.update({kind+'Attempts':b['attempts'],kind+'Extras':b['extras'],kind+'ChargedBytes':b['bytes']})
         bucket=state['totals'][kind]
         if set(bucket)!=set(b) or any(type(bucket[k]) is not int or not 0<=bucket[k]<=b[k] for k in b):raise ValueError('Operating durable counters')
-    limits.update(attempts=1376,extras=166,chargedBytes=503316480,chargedEntities=3100000)
+    limits.update(attempts=p['globalMaximumPhysicalAttempts'],extras=sum(b['extras'] for b in p['protocolReservationLimits'].values()),chargedBytes=p['maximumChargedBytes'],chargedEntities=p['maximumChargedObjects'])
+    for kind,limit in p.get('physicalAttemptSubcaps',{}).items():
+        if state['totals'][kind]['attempts']>limit:raise ValueError('Operating physical subcap')
     if a['parentLimits']!=limits:raise ValueError('Operating parent limits')
     for key,limit in config['aggregate'].items():
         if sum(v[key] for v in state['totals'].values())>limit:raise ValueError('Operating aggregate counters')
@@ -77,9 +88,9 @@ def validate(a,root,request=None):
     ready_at=datetime.datetime.fromisoformat(ready['readyAtUtc'].replace('Z','+00:00')).timestamp()
     if (not 0<=start-ready_at<120 or ready['pid']!=marker['clockOrigin']['pid']
         or digest(canonical(a['runtimeFiles']))!=a['sourceBindingSha256']):raise ValueError('Operating fresh owner/source binding')
-    if (a['allowance']!=p['childAllowances'][a['family']] or not start<=a['startedAtUnixSeconds']<start+1200
-        or a['deadlineUnixSeconds']!=a['startedAtUnixSeconds']+a['allowance']['seconds'] or a['deadlineUnixSeconds']>start+2400
-        or a['networkClosesAtUnixSeconds']!=min(start+2220,a['deadlineUnixSeconds']-a['allowance']['publication']-5)
+    if (a['allowance']!=p['childAllowances'][a['family']] or not start<=a['startedAtUnixSeconds']<config['admissionEndsAt']
+        or a['deadlineUnixSeconds']!=min(a['startedAtUnixSeconds']+a['allowance']['seconds'],config['dispatchEndsAt'] if 'physicalAttemptSubcaps' in p else config['expiresAt'])
+        or a['networkClosesAtUnixSeconds']!=min(config['dispatchEndsAt'],a['deadlineUnixSeconds']-a['allowance']['publication']-5)
         or time.time()>=a['networkClosesAtUnixSeconds']):raise ValueError('Operating fixed bounds')
     if not any(j['id']==a['job'] and j['admissionHash']==digest((root/'ADMISSION.json').read_bytes()) for j in state['active']):raise ValueError('Operating registered child')
     for name,h in plan['inputFiles'].items():

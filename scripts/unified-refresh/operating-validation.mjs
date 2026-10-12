@@ -1,3 +1,8 @@
+import {
+  operatingPolicy,
+  liveOperatingFormat,
+  boundaryOperatingFormat,
+} from './operating-authority.mjs';
 // Independent permit liabilities and saved-receipt binding. Native validators
 // still enforce complete family query/method/pin semantics at physical dispatch.
 import fs from 'node:fs/promises';
@@ -25,6 +30,7 @@ const trades = [
   'https://www.bitstamp.net/api/v2/transactions/ethusd/?time=minute',
 ];
 export async function permitLiability(family, raw, m, repo) {
+  assert(operatingPolicy.public.families[family]?.enabled !== false, 'OPERATING_DISABLED_SOURCE');
   const request = JSON.parse(raw),
     q = family === 'trade' ? request : request.job;
   assert(h(Buffer.from(JSON.stringify(sorted(q)))) === m.querySha256, 'OPERATING_QUERY_HASH');
@@ -174,7 +180,7 @@ export async function settlementEvidence(p, m, family) {
   // A timed-out worker can leave a default envelope or no envelope before entry.
   // Only the enclosing process's exact reaping proof can establish its closure.
   const enclosingTimeout =
-    ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
+    [liveOperatingFormat, boundaryOperatingFormat].includes(p.closureMode) &&
     family !== 'trade' &&
     closed === true &&
     r.complete === false &&
@@ -227,11 +233,9 @@ export async function settlementEvidence(p, m, family) {
     );
   }
   const noDispatch =
-    [
-      'unified-operating-public-1',
-      'unified-operating-denied-boundary-1',
-      'unified-operating-offline-1',
-    ].includes(p.closureMode) &&
+    [liveOperatingFormat, boundaryOperatingFormat, 'unified-operating-offline-1'].includes(
+      p.closureMode,
+    ) &&
     family !== 'trade' &&
     closed === true &&
     !complete &&
@@ -280,7 +284,7 @@ export async function settlementEvidence(p, m, family) {
       );
     if (enclosingTimeout && transport === null)
       assert(physical.physicalStarted === false, 'OPERATING_ABSENT_ENVELOPE_AFTER_START');
-    if (p.closureMode === 'unified-operating-public-1')
+    if (p.closureMode === liveOperatingFormat)
       assert(
         physical.syntheticResponse === false && physical.deniedBoundaryTest === false,
         'OPERATING_REAL_CLOSURE_REQUIRED',

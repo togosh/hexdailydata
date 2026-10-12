@@ -840,3 +840,8 @@ The new configuration is OFFLINE_ONLY; no provider activation, genuine admission
 or publication is part of this milestone. Public market freshness remains
 unqualified. The task return contains one proposed finite follow-on profile,
 requiring separate authority. No permanent service, deployment or paid activation.
+
+
+### HEX/liquidity public qualification R1 preparation
+
+The exact new four-family authority uses eight trade, two market, three gas and two protocol slots, an eight-minute start window and twenty-minute total window. Participants are disabled; graph admission96 is separate from actual graph48 and aggregate336. Source methods, closing reserves and freshness stay unchanged. Focused denied-network admission/native/worker/finalizer checks precede separate review and fresh paired readiness. Public outcome is not yet qualified; task evidence is kept in `hex-liquidity-public-qualification-r1`. No old session is reopened.

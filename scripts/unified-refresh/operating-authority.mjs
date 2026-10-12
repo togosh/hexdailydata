@@ -4,11 +4,27 @@ import { readFile, lstat, readdir } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { canonical, sha } from '../../dist/services/source-update/generation.js';
-export const operatingPolicy = JSON.parse(
-  readFileSync(new URL('../../config/repeatable-operating-public-1.json', import.meta.url)),
+const qualificationPolicy = JSON.parse(
+  readFileSync(new URL('../../config/hex-liquidity-public-qualification-r1.json', import.meta.url)),
 );
+// Exact new command/root selects a process-local immutable authority. Old commands
+// and their policy bytes stay bound to their historical roots and consumed markers.
+const qualificationEntry = process.argv
+  .slice(2)
+  .some(
+    (arg) =>
+      arg === 'hex-liquidity-public-qualification-r1' ||
+      resolve(arg) === qualificationPolicy.root ||
+      resolve(arg).startsWith(qualificationPolicy.root + '\\'),
+  );
+export const operatingPolicy = qualificationEntry
+  ? qualificationPolicy
+  : JSON.parse(
+      readFileSync(new URL('../../config/repeatable-operating-public-1.json', import.meta.url)),
+    );
 export const liveOperatingFormat = operatingPolicy.format;
-export const boundaryOperatingFormat = 'unified-operating-denied-boundary-1';
+export const boundaryOperatingFormat =
+  operatingPolicy.boundaryFormat ?? 'unified-operating-denied-boundary-1';
 const check = (v, why) => {
   if (!v) throw Error(why);
 };
@@ -431,7 +447,9 @@ export function liveOperating(a) {
   check(
     a.authorityTaskId === operatingPolicy.task &&
       a.parentMode === 'OWNER_AUTHORIZED_PUBLIC' &&
-      a.synthetic === false,
+      a.synthetic === false &&
+      operatingPolicy.public.families[a.family]?.enabled !== false &&
+      Object.hasOwn(operatingPolicy.public.childAllowances, a.family),
     'OPERATING_EXACT_LIVE_MODE',
   );
   check(
@@ -452,16 +470,25 @@ export function boundedOperatingConfig(start, boundary = false) {
     families: Object.fromEntries(
       Object.entries(p.families).map(([f, v]) => [
         f,
-        { enabled: true, period: v.periodSeconds, deadline: v.deadlineSeconds },
+        {
+          enabled: v.enabled ?? true,
+          period: v.periodSeconds ?? 3600,
+          deadline: v.deadlineSeconds ?? 600,
+          ...(v.offsetSeconds === undefined ? {} : { offset: v.offsetSeconds }),
+        },
       ]),
     ),
     total: p.protocolReservationLimits,
     rolling: p.rolling,
     storage: { bytes: 4294967296, entries: 100000, jobs: p.maximumJobs },
-    participants: { maximumWindowBlocks: 4096, maximumActivationBlocks: 4096 },
+    participants: {
+      maximumWindowBlocks: 4096,
+      maximumActivationBlocks: p.families.participants.enabled === false ? 0 : 4096,
+    },
     maximumJobsByFamily: Object.fromEntries(
       Object.entries(p.families).map(([f, v]) => [f, v.maximumJobs]),
     ),
+    ...(p.physicalAttemptSubcaps ? { physicalAttemptSubcaps: p.physicalAttemptSubcaps } : {}),
     aggregate: {
       attempts: p.globalMaximumPhysicalAttempts,
       bytes: p.maximumChargedBytes,

@@ -13,7 +13,7 @@ def admitted(a):
     from operating_authority import live,boundary,POLICY
     if live(a):return True
     if boundary(a):
-        if a.get('authorityTaskId')!=POLICY['task'] or a.get('synthetic') is not True or a.get('parentMode')!='DENIED_NETWORK_TEST' or a.get('clockMode')!='REAL_EPOCH':raise ValueError('Exact denied operating mode')
+        if a.get('authorityTaskId')!=POLICY['task'] or a.get('synthetic') is not True or a.get('parentMode')!='DENIED_NETWORK_TEST' or a.get('clockMode')!='REAL_EPOCH' or a.get('family') not in POLICY['public']['childAllowances'] or POLICY['public']['families'][a['family']].get('enabled') is False:raise ValueError('Exact denied operating mode')
         return True
     if (a['operatingFormat']!=FORMAT or a.get('authorityTaskId')!=TASK or a.get('synthetic') is not True
         or a.get('parentMode')!='OFFLINE_ONLY' or not re.fullmatch(r'[a-f0-9]{64}',a.get('parentProfileSha256',''))

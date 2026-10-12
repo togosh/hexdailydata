@@ -1238,3 +1238,8 @@ the task return. No source/price/retry/deadline/freshness changes or genuine acc
 Main integration is conditional on the exact independent review and fresh Git
 gates; its actual outcome is recorded separately. Public HEX/liquidity cadence
 and launch readiness remain unqualified; indexer/reconstruction remain parked.
+
+
+### HEX/liquidity public qualification R1 preparation
+
+The exact new four-family authority uses eight trade, two market, three gas and two protocol slots, an eight-minute start window and twenty-minute total window. Participants are disabled; graph admission96 is separate from actual graph48 and aggregate336. Source methods, closing reserves and freshness stay unchanged. Focused denied-network admission/native/worker/finalizer checks precede separate review and fresh paired readiness. Public outcome is not yet qualified; task evidence is kept in `hex-liquidity-public-qualification-r1`. No old session is reopened.

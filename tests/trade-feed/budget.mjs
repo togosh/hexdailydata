@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { wire } from '../market-feed/access-fixture.mjs';
 const R = process.env.HDD_TASK_ROOT;
 assert(
-  R?.endsWith('btc-eth-current-reference-freshness-r2') ||
+  R ===
+    String.raw`C:\Code\HEXDailyData-Subgraph-First-Launch-Proof-R2\hex-liquidity-public-qualification-r1` ||
+    R?.endsWith('btc-eth-current-reference-freshness-r2') ||
     R?.endsWith('repeatable-refresh-public-qualification-r1') ||
     R?.endsWith('repeatable-refresh-public-qualification-r2') ||
     R?.endsWith('repeatable-refresh-public-qualification-r3') ||

@@ -8,7 +8,7 @@ import {
 // One explicit finite operation. Status/default makes no provider requests.
 import { readFile, mkdir, open, rename, unlink, statfs, lstat, readdir } from 'node:fs/promises';
 import { join, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   publicAuthority,
   publicR3,
@@ -1533,6 +1533,9 @@ export async function runOperating({
   runtimeFiles['config/repeatable-operating-public-1.json'] = sha(
     await readFile(join(repo, 'config/repeatable-operating-public-1.json')),
   );
+  runtimeFiles['config/hex-liquidity-public-qualification-r1.json'] = sha(
+    await readFile(join(repo, 'config/hex-liquidity-public-qualification-r1.json')),
+  );
   let readiness;
   if (live) {
     readiness = await validateOperatingReady({ root, registry, loadedRuntimeFiles, repo });
@@ -1677,15 +1680,28 @@ export async function runOperating({
       runtimeFiles,
       sourceFiles,
       startedAtUnixSeconds: startTime,
-      deadlineUnixSeconds: startTime + allowance.seconds,
+      deadlineUnixSeconds: Math.min(
+        startTime + allowance.seconds,
+        c.physicalAttemptSubcaps ? c.dispatchEndsAt : Infinity,
+      ),
       networkClosesAtUnixSeconds: Math.min(
         c.dispatchEndsAt ?? Infinity,
-        startTime + allowance.seconds - allowance.publication - 5,
+        Math.min(
+          startTime + allowance.seconds,
+          c.physicalAttemptSubcaps ? c.dispatchEndsAt : Infinity,
+        ) -
+          allowance.publication -
+          5,
       ),
       networkSeconds:
         Math.min(
           c.dispatchEndsAt ?? Infinity,
-          startTime + allowance.seconds - allowance.publication - 5,
+          Math.min(
+            startTime + allowance.seconds,
+            c.physicalAttemptSubcaps ? c.dispatchEndsAt : Infinity,
+          ) -
+            allowance.publication -
+            5,
         ) - startTime,
       ...(family === 'trade'
         ? {
@@ -1782,7 +1798,7 @@ export async function runOperating({
       registry,
       onAdoption,
       spawnChild,
-      deadline: nativeStart + allowance.seconds * 1000,
+      deadline: nativeStart + (a.deadlineUnixSeconds - startTime) * 1000,
       signal: cancel.signal,
       syncFixtureClock: (t) => {
         if (t > clock.now() + 0.002) throw Error('CHILD_CLOCK_AHEAD');
@@ -1996,6 +2012,12 @@ export async function runOperating({
 }
 
 export async function main(args = process.argv.slice(2)) {
+  if (args[0] === 'hex-liquidity-public-qualification-r1' && args.length === 1) {
+    if (operatingPolicy.task !== 'HDD-HEX-LIQUIDITY-PUBLIC-QUALIFICATION-R1')
+      throw Error('EXACT_QUALIFICATION_PROCESS_ENTRY');
+    const owner = await import(pathToFileURL(join(operatingPolicy.root, 'tools/owner.mjs')).href);
+    return owner.runReviewedPublic(runOperating, liveOperatingFormat);
+  }
   if (args[0] === 'operating-public-qualification-r4' && args.length === 1) {
     const { runReviewedPublic } = await import('./unified-refresh/owner.mjs');
     return runReviewedPublic(runOperating, liveOperatingFormat);
