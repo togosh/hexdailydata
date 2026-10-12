@@ -850,3 +850,14 @@ The exact new four-family authority uses eight trade, two market, three gas and 
 ## 2026-10-12 - HEX/liquidity public qualification R1
 
 One finite activation CLOSED: 15/15 jobs qualified/adopted, 216 requests, 52,354,776 charged bytes, zero retries. Both market observations passed closing controls; the first was served stale at 307 seconds, the second fresh at 233 seconds. Regular samples retain stale intervals; no continuous freshness or SLA claim. Product 116 advanced to 131 with rollback 130; participants unchanged at 27766713; 2,505 materialized payout periods and 5,004 fixed closes preserved. Compact backup/restore and ordinary API, Calculator, sample and access checks passed; owner/resources closed. Conditional main integration is governed by this return's fresh receipt; ignored main dist is not updated by Git. No follow-on authority. Deployment, rights, permanent operation and inactive paid/SQL gates remain. Indexer/reconstruction PARKED.
+
+
+## Local saved-candidate owner review
+
+The host artifact helper in `build/release-candidate.mjs` uses the ordinary product
+entry and a manifest-bound local data profile. See `build/README.md` and the current
+local-release-candidate return for exact build/verify/run/stop commands. Run only on
+literal loopback with product mode and paid services inactive. It starts no feed,
+publisher or scheduler. Refresh controls re-read saved data; original quote times
+and the 300-second rule remain intact, so a stopped updater normally means stale
+values. A verified source/build is not continuous operating or launch approval.

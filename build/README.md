@@ -50,3 +50,37 @@ build or deployment PASS from this host build. Container recipe correction and
 qualification require a later scoped task. Paid composition still assumes
 `dependencies.downloads.root`; this host compile does not qualify its runtime, SQL
 or payments. The normal entry keeps those components inactive.
+
+## Clean local serving candidate
+
+`node build/release-candidate.mjs build PLAN.json` creates a new output directory
+from an explicit public-source map and clean committed source. It uses the normal
+OpenAPI, TypeScript, sample-copy and Vite implementations, with networking denied.
+It does not read excluded npm/environment configuration, install packages, build
+accounts or copy node_modules. Matching installed Windows host dependencies are
+referenced by a local junction and inventoried against the exact lock.
+
+The plan supplies absolute source/output/dependency/profile/map paths, source
+commit/tree, map/profile SHA256 and the selected/rollback/participant data identity.
+The output contains the compiled ordinary application, five checked synthetic
+samples, OpenAPI, a RELEASE_MANIFEST and the same verification helper. The `_build`
+subdirectory is retained build evidence, not a serving or return payload.
+
+`node OUTPUT/release-candidate.mjs verify OUTPUT MANIFEST_SHA256 PROFILE` verifies
+all serving files, source-map/host/dependency identities and the explicit profile
+without opening large bases. `serve` adds bounded selection-header checks before
+importing the ordinary compiled `dist/api/main.js`. Set HDD_V2_API_MODE=product,
+HDD_V2_PRODUCT_PROFILE to that exact profile, HDD_V2_HTTP_HOST=127.0.0.1 and an
+available HDD_V2_HTTP_PORT. No SQL/live/export environment is permitted. The
+foreground process uses the existing signal-based close handler; Ctrl+C stops it.
+
+This is an exact saved candidate, not an updater: a changed selected pair requires
+an intentionally rebuilt/rebound candidate. Restoring the accepted compact backup
+uses the unchanged maintained participant-refresh-backup helper in a new owned
+root. External immutable bases remain read-only and are not part of the artifact.
+Record actual admission/closure and verify the profile/data before serving.
+
+The task return supplies the actual paths, hashes and tested owner commands.
+Without its separately named installed dependencies and immutable data this is not
+portable or self-contained. It does not qualify Docker/Linux, paid components,
+provider operation, redistribution rights or launch readiness.
