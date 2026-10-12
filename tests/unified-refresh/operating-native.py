@@ -9,7 +9,7 @@ sys.dont_write_bytecode=True
 W=Path(__file__).resolve().parents[2];root=Path(sys.argv[1]).resolve()
 a=json.loads((root/'ADMISSION.json').read_bytes());f=json.loads((root/'FIXTURE.json').read_bytes())
 assert a['synthetic'] is True and a['authorityTaskId'] in ('HDD-UNIFIED-REFRESH-INTEGRATION-R2','HDD-REPEATABLE-REFRESH-OPERATIONS-R1')
-assert any(x in root.parts for x in ('unified-refresh-integration-r2','unified-refresh-public-qualification-r2','unified-refresh-public-qualification-r3','unified-refresh-public-qualification-r4','repeatable-refresh-operations-r1','repeatable-refresh-public-qualification-r1','repeatable-refresh-public-qualification-r2'))
+assert any(x in root.parts for x in ('hex-liquidity-scheduling-r1','unified-refresh-integration-r2','unified-refresh-public-qualification-r2','unified-refresh-public-qualification-r3','unified-refresh-public-qualification-r4','repeatable-refresh-operations-r1','repeatable-refresh-public-qualification-r1','repeatable-refresh-public-qualification-r2'))
 def deny(*args,**kwargs):raise AssertionError('DENIED_EXTERNAL_DNS_SOCKET_OR_CHILD')
 socket.getaddrinfo=socket.create_connection=socket.socket.connect=socket.socket.connect_ex=deny
 subprocess.Popen=os.system=deny
@@ -189,6 +189,7 @@ class Injected:
         # framing, writes capture/ledger, and actual auditors independently replay.
         assert strict_json(Path(request).read_bytes())['method']=='POST'
         token=physical_worker.operating_physical_enter(request,root,a,c) if 'operatingFormat' in a else None
+        if f.get('startupSeconds'):c.sleep(f['startupSeconds'])
         before=c.n
         q=strict_json(Path(request).read_bytes())['job']
         if q['kind']!='rpc' and self.graph_replies<f.get('graphRetries',0):
@@ -196,7 +197,9 @@ class Injected:
             result=frame(Path(request),{'errors':[{'message':'Store error: store error: prepared statement "__diesel_stmt_1" already exists'}]})
         else:result=response(Path(request),deadline,storage)
         if 'operatingFormat' in a:c.n=before # zero-duration physical response; waits use the actual owner permit bridge
+        if f.get('physicalSeconds'):c.sleep(f['physicalSeconds'])
         save(request.parent/'transport.json',result)
+        if f.get('durableSeconds'):c.sleep(f['durableSeconds'])
         if token and result.get('childReaped') and result.get('connectionClosed'):physical_worker.operating_physical_close(request,root,token,c())
         return result
 capture_client.WorkerTransport=Injected
@@ -212,10 +215,28 @@ if 'operatingFormat' in a and f.get('parserDelay'):
     from combined import Combined
     original_request=Combined.request
     def delayed_request(self,q,*args,**kwargs):
+        if self.state['attempts']+1==f.get('nearReserveAttempt'):
+            c.sleep(max(0,f['nearReserveOffset']-(c()-self.started)))
         result=original_request(self,q,*args,**kwargs)
         if self.state['attempts']==12:c.sleep(f['parserDelay'])
         return result
     Combined.request=delayed_request
+if family=='market' and f.get('collectedWait'):
+    import audit_market
+    original_market_audit=audit_market.audit
+    def delayed_market_audit(*args,**kwargs):
+        result=original_market_audit(*args,**kwargs)
+        if kwargs.get('active'):
+            save(root/'COLLECTION_READY.json',dict(at=c(),qualified=True,proofSha256=digest(encode(result[0])),synthetic=True))
+            c.sleep(f['collectedWait'])
+        return result
+    audit_market.audit=delayed_market_audit
+if f.get('permitDelayAt'):
+    original_permit=bridge.permit
+    def delayed_permit(request,q,attempt,*args,**kwargs):
+        if attempt==f['permitDelayAt']:c.sleep(f['permitDelay'])
+        return original_permit(request,q,attempt,*args,**kwargs)
+    bridge.permit=delayed_permit
 if f.get('actualMain'):
     import builtins
     real_print=builtins.print

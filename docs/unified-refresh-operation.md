@@ -363,7 +363,7 @@ Real source outcomes are reported separately after the single authorized run.
 The reviewed `public-qualification-r4` grant is consumed. The executed source was
 `910159fab698a7f14c7986eda7376e5d286991b0`; all five actual child families used the
 shared compact completion contract. All 23 scheduled jobs closed normally.
-The same real paired API adopted 20 publications (51 → 71), retaining the pair
+The same real paired API adopted 20 publications (51 â†’ 71), retaining the pair
 for empty ETH trade slots 1/7/14. The fixed participant window ended at 27,762,617.
 No runtime source fix, recovery, manual selection, restart or second session.
 
@@ -489,3 +489,47 @@ generation and all product data stayed fixed. Original controls were retained.
 Saved-only API/access/preservation, compact 80/79 backup/restore and two final
 stale previews passed with two closed base admissions. The reopened predecessor
 CSV proof is labelled offline; it is not invented original in-flight evidence.
+
+
+## Offline HEX/liquidity scheduling qualification
+
+The market queue now independently reconstructs its exact admitted closing
+reservation from the request, settled pool sequence, retry/counter lineage and
+saved reservation. It uses parent arrival plus 31 seconds as FIFO aging; only a
+proved earlier market closing deadline can advance a request. A feasible market
+cannot bypass a request already waiting 31 seconds. Child expiry remains a hard
+execution limit and cannot buy priority. This is a finite scheduling preference,
+not a latency guarantee or permission to lengthen any deadline.
+
+Before returning a market permit, the owner checks the original control and
+three-second worker windows again after preparation/durable writes. If only a
+known local window was consumed, it reserves a settlement-only attempt with
+`dispatchAllowed: false`. The worker gate refuses that permission. The enclosing
+collector must prove no child/start/active lock, then write the ordinary capture,
+ledger, no-dispatch and closure records. Full byte/object charges remain. Unknown
+closure, identity or publication still stops the owner. No incomplete market
+observation is publishable.
+
+A proved, fully settled market scheduling miss leaves only the next configured
+slot eligible; coalescing happens against current time, not the expired job.
+Known capacity admission conflicts can likewise defer market work to the next
+configured slot. Source failures and other feed quarantine are unchanged. None
+of this reinterprets, settles or restarts earlier consumed trials.
+
+`config/hex-liquidity-scheduling-offline-r1.json` is explicitly OFFLINE_ONLY.
+It preserves the R4 periods (trade60, market240, gas180, protocol300, participant3600
+seconds) and uses finite initial offsets 0/5/25/50/30 seconds. The focused command
+uses nine synthetic daily rows, empty participant bases, actual native collectors,
+auditors, permit/closure paths, paired storage and an ordinary running API:
+
+```powershell
+node tests/unified-refresh/market-scheduling.mjs '<new task root>' scheduling-mixed
+node tests/unified-refresh/market-scheduling.mjs '<new task root>' scheduling-overload
+```
+
+The fixture accepts only the explicitly owned hex-liquidity-scheduling-r1 root,
+creates exclusive per-run subdirectories and hard-denies external sockets/DNS.
+These commands do not authorize public operation. See that task's receipts for
+exact local results, failed fixture history and proposal. Delayed qualified
+observations may already be stale when published; API ages retain source time.
+The existing public configuration and all old grants remain unchanged/consumed.

@@ -202,6 +202,8 @@ class ParentTransport:
                              if hasattr(bridge.clock,'to_mono') else bridge.pending['expiresAt'])
             deadline=min(deadline,s.admission['networkDeadline'],permit_deadline)
             try:
+                if bridge.pending.get('dispatchAllowed') is False:
+                    raise LimitReached('Combined parent queued control reserve')
                 s.phase_check(q,[])
                 if s.clock()>=deadline-3:
                     raise LimitReached('Combined queued request execution reserve')
@@ -211,7 +213,7 @@ class ParentTransport:
                 # Prove that no worker started, record that fact, retain the
                 # full liability, and let the ordinary durable ledger settle it.
                 # Storage/integrity failures deliberately do not enter this path.
-                if not hasattr(bridge.clock,'epoch'):raise
+                if not hasattr(bridge.clock,'epoch') and not (s.admission.get('synthetic') is True and s.admission.get('parentMode')=='OFFLINE_ONLY'):raise
                 import os
                 p=bridge.pending;folder=Path(request).parent
                 if (not p or p['requestPath']!=str(Path(request).resolve()) or
@@ -228,7 +230,8 @@ class ParentTransport:
                 storage.json(folder/'transport.json',result)
                 from operating_bridge import native_closure
                 native_closure(request,s.root,s.admission,dict(ownerPid=os.getpid(),workerPid=None,
-                    childStarted=False,childReaped=False,exitCode=None,connectionClosed=True),bridge.clock.epoch())
+                    childStarted=False,childReaped=False,exitCode=None,connectionClosed=True),
+                    bridge.clock.epoch() if hasattr(bridge.clock,'epoch') else bridge.clock())
                 return result
             if hasattr(bridge.clock,'epoch'):
                 from operating_bridge import native_closure

@@ -825,3 +825,18 @@ it was not fetched or published again. One compact backup/isolated restore,
 normal access/preservation checks and two stale previews passed. Both genuine
 base admissions and all owned application/browser handles are closed. The
 operating parent remains UNKNOWN and consumed independently of this clean pair.
+
+
+### Offline market scheduling correction
+
+HEX/liquidity scheduling has a focused denied-network native qualification in
+HDD-HEX-LIQUIDITY-SCHEDULING-R1. Parent-owned FIFO aging is shortened only by an
+independently verified mandatory-control deadline; original worker and control
+cutoffs remain strict. A known, fully charged no-dispatch market miss can defer
+to a later configured slot. It cannot renew a job/session or clear an unknown
+liability. Earlier trial outcomes and locks are unchanged.
+
+The new configuration is OFFLINE_ONLY; no provider activation, genuine admission
+or publication is part of this milestone. Public market freshness remains
+unqualified. The task return contains one proposed finite follow-on profile,
+requiring separate authority. No permanent service, deployment or paid activation.

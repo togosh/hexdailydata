@@ -1747,10 +1747,16 @@ export async function runOperating({
         )
       )
         throw e;
-      disabled.add(family);
+      const defer =
+        family === 'market' &&
+        /OPERATING_(ACTIVE_RESERVATIONS|ROLLING_ADMISSION_RESERVE|ENDPOINT_ADMISSION_RESERVE)/.test(
+          String(e),
+        );
+      if (!defer) disabled.add(family);
+      if (defer) await owner.scheduleNext(family, clock.now());
       await owner.exclusive(async () => {
         owner.state.disabled = [...disabled];
-        owner.state.feeds[family].quarantine = String(e);
+        owner.state.feeds[family].quarantine = defer ? null : String(e);
         await owner.save();
       });
       await owner.receipt('REFUSED_' + id + '.json', {
@@ -1758,6 +1764,7 @@ export async function runOperating({
         family,
         reason: String(e),
         nativeStarted: false,
+        deferredToConfiguredSlot: defer,
       });
       return;
     }
@@ -1824,8 +1831,22 @@ export async function runOperating({
                 String(result.source.failure ?? result.source.accounting?.closureReason),
             );
         }
+        const schedulingMiss =
+          family === 'market' &&
+          result.native?.known === true &&
+          !result.error &&
+          !result.publicationUncertain &&
+          result.publications.length === 0 &&
+          result.source?.feedLocalClosedReserveRefusal === true &&
+          result.source.accounting?.status === 'CLOSED' &&
+          result.source.accounting?.pending === null;
+        if (schedulingMiss) {
+          fact.scheduling = 'KNOWN_CLOSED_NO_DISPATCH_NEXT_CONFIGURED_SLOT';
+          await owner.scheduleNext(family, clock.now());
+        }
         if (
           result.status === 'PARTIAL' &&
+          !schedulingMiss &&
           !(family === 'trade' && !result.error && result.source.status.startsWith('COMPLETE_'))
         )
           disabled.add(family);

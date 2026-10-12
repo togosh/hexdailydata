@@ -1,0 +1,90 @@
+{
+  "format": "unified-operating-offline-1",
+  "mode": "OFFLINE_ONLY",
+  "startsAt": 1791720300,
+  "expiresAt": 1791722621,
+  "families": {
+    "trade": {
+      "enabled": true,
+      "period": 60,
+      "deadline": 600,
+      "offset": 0
+    },
+    "market": {
+      "enabled": true,
+      "period": 240,
+      "deadline": 600,
+      "offset": 5
+    },
+    "gas": {
+      "enabled": true,
+      "period": 180,
+      "deadline": 600,
+      "offset": 25
+    },
+    "protocol": {
+      "enabled": true,
+      "period": 300,
+      "deadline": 600,
+      "offset": 50
+    },
+    "participants": {
+      "enabled": true,
+      "period": 3600,
+      "deadline": 1800,
+      "offset": 30
+    }
+  },
+  "total": {
+    "http": {
+      "attempts": 120,
+      "bytes": 268435456,
+      "objects": 2400000,
+      "extras": 60
+    },
+    "graph": {
+      "attempts": 1400,
+      "bytes": 100663296,
+      "objects": 200000,
+      "extras": 72
+    },
+    "rpc": {
+      "attempts": 640,
+      "bytes": 134217728,
+      "objects": 500000,
+      "extras": 34
+    }
+  },
+  "rolling": {
+    "seconds": 600,
+    "limits": {
+      "http": {
+        "attempts": 72,
+        "bytes": 167772160,
+        "objects": 1440000,
+        "extras": 36
+      },
+      "graph": {
+        "attempts": 800,
+        "bytes": 83886080,
+        "objects": 200000,
+        "extras": 72
+      },
+      "rpc": {
+        "attempts": 400,
+        "bytes": 67108864,
+        "objects": 350000,
+        "extras": 34
+      }
+    }
+  },
+  "storage": {
+    "bytes": 1073741824,
+    "entries": 30000,
+    "jobs": 37
+  },
+  "participants": {
+    "maximumWindowBlocks": 4096,
+    "maximumActivationBlocks": 4096
+  }
+}

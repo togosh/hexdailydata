@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import { resolve, join, dirname } from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { permitLiability, settlementEvidence } from './operating-validation.mjs';
+import { marketTiming, marketGranted, marketSettled, queuePriority } from './market-scheduling.mjs';
 import {
   liveOperating,
   liveOperatingFormat,
@@ -45,10 +46,11 @@ export function validateOperating(c) {
   exact(c.families, operatingFamilies);
   for (const f of operatingFamilies) {
     const p = c.families[f];
-    exact(p, ['enabled', 'period', 'deadline']);
+    exact(p, ['enabled', 'period', 'deadline', ...(Object.hasOwn(p, 'offset') ? ['offset'] : [])]);
     check(typeof p.enabled === 'boolean', 'OPERATING_ENABLED');
     integer(p.period, 30, 86400);
     integer(p.deadline, 90, 1800);
+    if (p.offset !== undefined) integer(p.offset, 0, p.period - 1);
   }
   const limits = (v) => {
     exact(v, protocols);
@@ -221,7 +223,9 @@ export class OperatingOwner {
           completed: 0,
           startedByFamily: Object.fromEntries(operatingFamilies.map((f) => [f, 0])),
           participantBlocks: 0,
-          due: Object.fromEntries(operatingFamilies.map((f) => [f, c.startsAt])),
+          due: Object.fromEntries(
+            operatingFamilies.map((f) => [f, c.startsAt + (c.families[f].offset ?? 0)]),
+          ),
           latest: {},
           feeds: Object.fromEntries(
             operatingFamilies.map((f) => [
@@ -405,9 +409,10 @@ export class OperatingOwner {
   }
   async scheduleNext(family, startedAt) {
     return this.exclusive(async () => {
+      const anchor = this.config.startsAt + (this.config.families[family].offset ?? 0);
       this.state.due[family] =
-        this.config.startsAt +
-        (Math.floor((startedAt - this.config.startsAt) / this.config.families[family].period) + 1) *
+        anchor +
+        (Math.floor((startedAt - anchor) / this.config.families[family].period) + 1) *
           this.config.families[family].period;
       await this.save();
     });
@@ -567,7 +572,9 @@ export class OperatingOwner {
     }
     if (m.type === 'operating-permit') {
       j.phase = 'PERMIT';
-      return new Promise((resolve, reject) => this.queue.push({ job, m, resolve, reject }));
+      return new Promise((resolve, reject) =>
+        this.queue.push({ job, m, resolve, reject, queuedAt: this.now() }),
+      );
     }
     if (m.type === 'operating-settle') return this.exclusive(() => this.settle(job, m));
     throw Error('OPERATING_CONTROL_TYPE');
@@ -596,6 +603,35 @@ export class OperatingOwner {
         !this.queue.length
       )
         return;
+      // Bounded control-deadline preference with parent-owned FIFO aging.
+      // At most one queued request per admitted family; an active request is never preempted.
+      for (const entry of [...this.queue]) {
+        try {
+          const job = this.jobs.get(entry.job),
+            m = entry.m;
+          check(job && Number.isFinite(m.expiresAt), 'OPERATING_QUEUED_BINDING');
+          entry.priorityAt = queuePriority(entry.queuedAt);
+          if (job.family === 'market') {
+            const path = resolve(m.requestPath);
+            check(
+              path.startsWith(resolve(this.root, job.id) + '\\') ||
+                path.startsWith(resolve(this.root, job.id) + '/'),
+              'OPERATING_REQUEST_PATH',
+            );
+            const raw = await fs.readFile(path);
+            check(raw.length <= 32768 && digest(raw) === m.requestSha256, 'OPERATING_REQUEST_HASH');
+            await permitLiability(job.family, raw, m, repo);
+            entry.timing = await marketTiming(this.root, job, m, raw, this.now());
+            entry.priorityAt = queuePriority(entry.queuedAt, entry.timing);
+          }
+        } catch (e) {
+          this.queue.splice(this.queue.indexOf(entry), 1);
+          if (this.jobs.has(entry.job)) this.jobs.get(entry.job).phase = 'RUNNING';
+          entry.reject(e);
+        }
+      }
+      this.queue.sort((a, b) => a.priorityAt - b.priorityAt || a.queuedAt - b.queuedAt);
+      if (!this.queue.length) return;
       const item = this.queue.shift(),
         { job, m } = item,
         j = this.jobs.get(job);
@@ -621,6 +657,8 @@ export class OperatingOwner {
         const raw = await fs.readFile(path);
         check(raw.length <= 32768 && digest(raw) === m.requestSha256, 'OPERATING_REQUEST_HASH');
         await permitLiability(j.family, raw, m, repo);
+        const timing =
+          j.family === 'market' ? await marketTiming(this.root, j, m, raw, this.now()) : null;
         // The real child validates the exact method/query and all control reservations again after queuing.
         const cost = zeros();
         Object.assign(cost[m.protocol], {
@@ -686,7 +724,12 @@ export class OperatingOwner {
             this.config.dispatchEndsAt ?? this.config.expiresAt,
           ),
           at: now,
+          ...(timing ? { scheduling: timing, queuedAt: item.queuedAt } : {}),
         };
+        // A settlement-only reservation is NOT authority to start a worker.
+        // The child has already durably reserved its attempt; preserve that full
+        // liability and require its ordinary enclosing no-dispatch proof.
+        if (timing && this.now() >= timing.latestDispatch) permit.dispatchAllowed = false;
         add(this.state.totals, cost);
         add(j.spent, cost);
         if (m.protocol !== 'http') {
@@ -700,6 +743,7 @@ export class OperatingOwner {
           Number(Boolean(this.state.pending)),
         );
         j.lastAttempt = m.attempt;
+        if (timing) marketGranted(j, m, timing);
         j.phase = 'RUNNING';
         await this.save();
         await this.receipt(`PERMIT_${String(permit.id).padStart(8, '0')}.json`, permit);
@@ -708,6 +752,11 @@ export class OperatingOwner {
           this.state.status === 'RUNNING' && dispatchTime < permit.expiresAt,
           'OPERATING_FINAL_PERMIT_EXPIRED',
         );
+        if (timing && dispatchTime >= timing.latestDispatch && permit.dispatchAllowed !== false) {
+          permit.dispatchAllowed = false;
+          await this.save();
+          await this.receipt(`NO_DISPATCH_${String(permit.id).padStart(8, '0')}.json`, permit);
+        }
         item.resolve({
           ok: true,
           now: dispatchTime,
@@ -763,6 +812,7 @@ export class OperatingOwner {
     integer(m.bytes, 0, p.bytes);
     integer(m.objects, 0, p.objects);
     const capture = await settlementEvidence(p, m, j.family);
+    if (j.family === 'market') marketSettled(j, capture);
     let startupTimeout = false;
     if (this.state.dispatchEvidence && m.closed) {
       const physical = JSON.parse(

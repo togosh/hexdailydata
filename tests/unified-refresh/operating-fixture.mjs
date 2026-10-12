@@ -38,6 +38,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   assert(
     [
       priorTask,
+      priorTask.replace('unified-refresh-integration-r2', 'hex-liquidity-scheduling-r1'),
       priorTask.replace(
         'unified-refresh-integration-r2',
         'repeatable-refresh-public-qualification-r3',
@@ -67,6 +68,8 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   );
   assert(
     [
+      'scheduling-mixed',
+      'scheduling-overload',
       'repeatable',
       'native-boundary',
       'native-startup-timeout',
@@ -117,6 +120,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     ].includes(mode),
   );
   const root = await fs.mkdtemp(join(T, 'fixtures/operating-' + mode + '-'));
+  const scheduling = mode.startsWith('scheduling-');
   const operatingSmall = mode.startsWith('operating-');
   const boundary = [
     'native-boundary',
@@ -129,7 +133,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
   process.env.HDD_TASK_ROOT = root;
   const NativeDate = Date,
     realNow = performance.now.bind(performance);
-  let now = Date.parse('2026-10-10T23:53:00Z');
+  let now = Date.parse(scheduling ? '2026-10-11T12:05:00Z' : '2026-10-10T23:53:00Z');
   globalThis.Date = class extends NativeDate {
     constructor(...a) {
       super(...(a.length ? a : [now]));
@@ -250,7 +254,91 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     cases: [],
   };
   try {
-    const template = await read(join(T, 'fixtures/template.json'));
+    const template = scheduling
+      ? (await import('../mainline/fixture.mjs')).template(participantPair(base))
+      : await read(join(T, 'fixtures/template.json'));
+    if (scheduling) {
+      template.rows = template.rows.filter((r) => r.contractDay >= 2496);
+      template.metadata.from = template.rows[0].dateUtc;
+      template.metadata.rows = template.rows.length;
+      template.metadata.methods = [
+        'SYNTHETIC ONLY; nine generated rows and empty participant bases',
+      ];
+      const { decodeDailyWord } = await import('../../dist/contracts/protocol-daily.js');
+      const words = Array.from({ length: 4 }, (_, i) => String(100n + BigInt(i) + (1000n << 72n)));
+      for (let i = 0; i < 4; i++)
+        Object.assign(
+          template.rows.find((r) => r.contractDay === 2498 + i),
+          decodeDailyWord(words[i]),
+        );
+      template.metadata.ledgerSegments = [
+        {
+          from: 2498,
+          words,
+          blockNumber: 27750318,
+          blockHash: '0x' + 'a'.repeat(64),
+          observedAtUtc: '2026-10-11T12:00:00.000Z',
+          receiptSha256: 'b'.repeat(64),
+        },
+      ];
+      template.metadata.coverage.ledgerDates = 2502;
+      template.metadata.readings.find((r) => r.kind === 'protocol').globalWords[4] = '2502';
+      template.metadata.readings.find((r) => r.kind === 'protocol').blockNumber = 27750318;
+      template.metadata.readings.push({
+        kind: 'gas',
+        chainId: 369,
+        unit: 'wei/gas',
+        gasPriceWei: '1100',
+        baseFeeWei: '1000',
+        priorityFeeWei: '0',
+        observedAtUtc: '2026-10-11T12:00:00.000Z',
+      });
+      for (const asset of ['BTC', 'ETH'])
+        template.metadata.readings.push({
+          kind: 'reference',
+          asset,
+          quote: 'USD',
+          observation: 'oracle-reference',
+          chainId: 1,
+          method: 'chainlink-standard-usd-1',
+          roundId: '1',
+          value: asset === 'BTC' ? '80000' : '2500',
+          observedAtUtc: '2026-10-09T12:00:00.000Z',
+        });
+      Object.assign(
+        template.rows.find((r) => r.dateUtc === '2026-10-09'),
+        {
+          btcPriceUsd: '80000',
+          ethPriceUsd: '2500',
+          btcRecordedAtUtc: '2026-10-09T12:00:00.000Z',
+          ethRecordedAtUtc: '2026-10-09T12:00:00.000Z',
+        },
+      );
+      const focus = await read(join(W, 'scripts/market-refresh/FOCUS_POOLS.json'));
+      template.metadata.readings.push({
+        kind: 'tracked-liquidity',
+        chainId: 369,
+        quote: 'USD',
+        value: '4',
+        observedAtUtc: '2026-10-11T12:00:00.000Z',
+        set: {
+          id: '7aa1cb9c1cc6fd91394f9caa1b8eda5927a610ac5941dca66aae46c92a02c50b',
+          measure: 'reserve-based source-derived USD estimate',
+          methodRevision: 'pulsex-four-pool-derived-usd-2',
+          coverage: 'bounded contemporary HEX-pool cohort',
+          pools: focus.pools.map((p) => ({
+            address: p.address,
+            dex: 'PulseX',
+            version: p.venue,
+            valueUsd: '1',
+          })),
+        },
+      });
+      Object.assign(template.rows.at(-1), {
+        trackedLiquidityUsd: '4',
+        liquidityRecordedAtUtc: '2026-10-11T12:00:00.000Z',
+      });
+    }
     template.metadata.pair = participantPair(base);
     const store = await createMarketStorage(join(root, 'product'), productFiles(template));
     const standalone = new ProductDailyStore(store.root, template.metadata.pair);
@@ -307,7 +395,10 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     );
     const inject = app.inject.bind(app);
     app.inject = async (...args) => {
-      assert(++localRequests <= (mode === 'repeatable' ? 512 : 128), 'FIXTURE_LOCAL_REQUEST_BOUND');
+      assert(
+        ++localRequests <= (mode === 'repeatable' || scheduling ? 512 : 128),
+        'FIXTURE_LOCAL_REQUEST_BOUND',
+      );
       const url = typeof args[0] === 'string' ? args[0] : args[0].url;
       const reserve = url.includes('/downloads/') ? 5 * 1024 ** 2 : 128 * 1024;
       chargedLocalBytes += reserve;
@@ -328,7 +419,13 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       const body = r.json();
       return {
         datasetVersion: body.datasetVersion,
+        queriedAtUnixSeconds: now / 1000,
         servedAtUtc: body.servedAtUtc,
+        hexPriceUsd: body.hexPriceUsd,
+        trackedLiquidityUsd: body.trackedLiquidityUsd,
+        marketObservations: reader.productDaily
+          .capture()
+          .metadata.readings.filter((r) => ['market', 'tracked-liquidity'].includes(r.kind)),
         btcPriceUsd: body.btcPriceUsd,
         ethPriceUsd: body.ethPriceUsd,
         freshness: body.freshness,
@@ -340,7 +437,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     const onAdoption = async (selected, check) => {
       check();
       const live = await getLive();
-      if (mode === 'repeatable' || boundary)
+      if (mode === 'repeatable' || scheduling || boundary)
         return {
           ...live,
           expectedSelected: selected.product.version,
@@ -458,7 +555,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     }
     const spawnFixture = (_exe, args, options) => {
       assert(
-        children.size < (mode === 'repeatable' || boundary ? 5 : 1),
+        children.size < (mode === 'repeatable' || scheduling || boundary ? 5 : 1),
         'BOUNDED_NATIVE_CHILDREN',
       );
       const jobRoot = args.at(-1),
@@ -469,6 +566,7 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         codeBody: join(T, 'fixtures/protocol-code.json'),
         actualMain:
           mode === 'repeatable' ||
+          scheduling ||
           operatingSmall ||
           mode === 'serial-blocked' ||
           T.endsWith('unified-refresh-public-qualification-r4'),
@@ -544,6 +642,25 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
         ...(['result-limit', 'result-over'].includes(mode)
           ? { exactResultBytes: mode === 'result-limit' ? 524288 : 524289 }
           : {}),
+        ...(scheduling ? { physicalSeconds: 0.6, startupSeconds: 0.2, durableSeconds: 0.1 } : {}),
+        ...(scheduling && a.family === 'market'
+          ? {
+              parserDelay: 45,
+              marketLag: 199,
+              graphRetries: starts.some((x) => x.job.startsWith('market-')) ? 0 : 1,
+              collectedWait: starts.some((x) => x.job.startsWith('market-')) ? 0 : 180,
+              ...(mode === 'scheduling-overload' && !starts.some((x) => x.job.startsWith('market-'))
+                ? {
+                    nearReserveAttempt: 36,
+                    nearReserveOffset: 244.5,
+                    permitDelayAt: 36,
+                    permitDelay: 8,
+                  }
+                : {}),
+            }
+          : {}),
+        ...(scheduling && a.family === 'participants' ? { delay: 180, auditDelay: 75 } : {}),
+        ...(scheduling && a.family === 'trade' && tradeOrdinal >= 3 ? { emptyETH: true } : {}),
         ...(mode === 'exhaust' ? { exhaust: true } : {}),
         ...(mode === 'no-body' ? { noBody: true } : {}),
         ...(mode === 'no-body-retry' ? { noBodyRetry: true } : {}),
@@ -621,6 +738,8 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
       return child;
     };
     let configuration;
+    if (scheduling)
+      configuration = await read(join(W, 'config/hex-liquidity-scheduling-offline-r1.json'));
     if (boundary) configuration = boundedOperatingConfig(clock.now(), true);
     if (mode === 'operating-receipt-failure') {
       fs.open = async (path, ...args) => {
@@ -667,7 +786,31 @@ export async function runFixture(taskRoot, mode = 'mixed', runUnified) {
     });
     receipt.result = result;
     receipt.starts = starts;
-    if (mode === 'native-startup-timeout') {
+    if (scheduling) {
+      facts.push({ job: 'timeline-final-closed', ...(await getLive()) });
+      now += 301000; // API-only aging probe after all collectors are closed; no publication.
+      facts.push({ job: 'timeline-final-stale', ...(await getLive()) });
+      const { schedulingProof } = await import('./market-scheduling-proof.mjs');
+      receipt.scheduling = await schedulingProof({
+        root,
+        mode,
+        result,
+        facts,
+        writer,
+        reader,
+        lagging,
+        store,
+        initialRows,
+        initialCsv,
+        heldExport,
+        app,
+        auth,
+        read,
+        now,
+        children,
+      });
+      heldExport = null;
+    } else if (mode === 'native-startup-timeout') {
       assert.equal(result.status, 'PARTIAL');
       assert.match(
         result.failure,

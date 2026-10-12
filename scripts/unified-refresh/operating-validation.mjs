@@ -227,7 +227,11 @@ export async function settlementEvidence(p, m, family) {
     );
   }
   const noDispatch =
-    ['unified-operating-public-1', 'unified-operating-denied-boundary-1'].includes(p.closureMode) &&
+    [
+      'unified-operating-public-1',
+      'unified-operating-denied-boundary-1',
+      'unified-operating-offline-1',
+    ].includes(p.closureMode) &&
     family !== 'trade' &&
     closed === true &&
     !complete &&
@@ -252,6 +256,7 @@ export async function settlementEvidence(p, m, family) {
     transport?.connectionClosed === true &&
     m.bytes === p.bytes &&
     m.objects === p.objects;
+  if (p.dispatchAllowed === false) assert(noDispatch, 'OPERATING_SETTLEMENT_ONLY_PERMIT');
   if (closed && transport && family !== 'trade')
     assert(
       noDispatch ||

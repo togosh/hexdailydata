@@ -15,7 +15,7 @@ def operating_physical_enter(request,root,a,clock):
     state=json.loads((root.parent/'OPERATING_STATE.json').read_bytes());p=state.get('pending')
     if (state['status']!='RUNNING' or not p or p['job']!=a['job'] or state['activation']!=a['activation']
         or p['requestPath']!=str(request.resolve()) or p['requestSha256']!=hashlib.sha256(request.read_bytes()).hexdigest()
-        or now>=p['expiresAt'] or not any(j['id']==a['job'] and j['admissionHash']==hashlib.sha256((root/'ADMISSION.json').read_bytes()).hexdigest() for j in state['active'])):
+        or p.get('dispatchAllowed') is False or now>=p['expiresAt'] or not any(j['id']==a['job'] and j['admissionHash']==hashlib.sha256((root/'ADMISSION.json').read_bytes()).hexdigest() for j in state['active'])):
         raise ValueError('Operating physical permit binding')
     for name,h in a['runtimeFiles'].items():
         if hashlib.sha256((HERE.parents[1]/name).read_bytes()).hexdigest()!=h:raise ValueError('Frozen operating source changed')
@@ -71,9 +71,11 @@ def record_native_closure(request,root,a,life,now):
     """
     import os
     from operating_authority import live,boundary
-    if not (live(a) or boundary(a)):raise ValueError('Native operating closure mode')
     root=Path(root);request=Path(request)
     not_started=life.get('childStarted') is False and life.get('workerPid') is None and life.get('exitCode') is None
+    from operating_bridge import admitted
+    offline_no_child=not_started and a.get('synthetic') is True and a.get('parentMode')=='OFFLINE_ONLY' and admitted(a)
+    if not (live(a) or boundary(a) or offline_no_child):raise ValueError('Native operating closure mode')
     if (life.get('ownerPid')!=os.getpid() or (not not_started and (life.get('childReaped') is not True
         or life.get('exitCode') is None or not isinstance(life.get('workerPid'),int)))):
         raise ValueError('Exact native worker closure unavailable')

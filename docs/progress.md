@@ -1225,3 +1225,16 @@ publication, restore, SQL/payment action, provider session or scheduler. Conditi
 main integration is recorded by its actual Git receipt, not inferred from this text.
 Genuine sequence116/115 and every old UNKNOWN/session remain unchanged. Market/HEX
 liquidity queue/reserve scheduling remains the first operating release blocker.
+
+
+## HEX/liquidity scheduling R1 offline candidate
+
+Focused parent queue/admission correction with strict independent market closing
+reserve, bounded FIFO aging and full-charge known no-dispatch handling. Actual
+native synthetic mixed/overload tests use paired publication and ordinary API
+readers, including a collected market observation published after participant
+advancement. Focused refusal tests and original failed fixtures are retained in
+the task return. No source/price/retry/deadline/freshness changes or genuine access.
+Main integration is conditional on the exact independent review and fresh Git
+gates; its actual outcome is recorded separately. Public HEX/liquidity cadence
+and launch readiness remain unqualified; indexer/reconstruction remain parked.
