@@ -363,7 +363,7 @@ Real source outcomes are reported separately after the single authorized run.
 The reviewed `public-qualification-r4` grant is consumed. The executed source was
 `910159fab698a7f14c7986eda7376e5d286991b0`; all five actual child families used the
 shared compact completion contract. All 23 scheduled jobs closed normally.
-The same real paired API adopted 20 publications (51 â†’ 71), retaining the pair
+The same real paired API adopted 20 publications (51 → 71), retaining the pair
 for empty ETH trade slots 1/7/14. The fixed participant window ended at 27,762,617.
 No runtime source fix, recovery, manual selection, restart or second session.
 
