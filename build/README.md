@@ -13,7 +13,8 @@ The build invokes the local TypeScript and Vite binaries at the repository root 
 sequentially. It verifies lock and installed inventory metadata, generates and
 checks OpenAPI/catalog output against the existing accepted bytes, typechecks and
 compiles both packages, selects `/account/` only for this composed UI build, and
-copies eight account SQL assets beside compiled modules. Six are installer URL
+copies/validates the five bounded synthetic CSV samples and their manifest for normal startup,
+and copies eight account SQL assets beside compiled modules. Six are installer URL
 targets. `schema.sql` and `upgrade.sql` are also copied for completeness; existing
 migration scripts still use the retained `account/src` paths. Nothing executes SQL.
 
@@ -40,3 +41,12 @@ The OpenAPI generator imports files under `src` and reads
 contract/domain modules. `COPY src` covers these. The recipe now also copies
 `scripts/openapi.mjs`. It generates `docs/openapi.json` before Vite reads it, so
 the existing `.dockerignore` exclusion of `docs` and `tests` remains valid.
+
+## Current deployment limitation
+
+The retained Docker recipe has not yet been aligned with the new sample-copy script
+and delivery sample inputs required by the normal build. Do not claim a container
+build or deployment PASS from this host build. Container recipe correction and
+qualification require a later scoped task. Paid composition still assumes
+`dependencies.downloads.root`; this host compile does not qualify its runtime, SQL
+or payments. The normal entry keeps those components inactive.

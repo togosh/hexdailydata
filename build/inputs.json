@@ -43,7 +43,13 @@
     "runtime/paid-service.mjs",
     "runtime/maintenance.mjs",
     "runtime/maintenance-pool.mjs",
-    "transport/http-source.mjs"
+    "transport/http-source.mjs",
+    "serving/scripts/build-samples.mjs",
+    "delivery/samples/daily.csv",
+    "delivery/samples/stakes.csv",
+    "delivery/samples/holders.csv",
+    "delivery/samples/maturities.csv",
+    "delivery/samples/markets.csv"
   ],
   "sqlAssets": {
     "account.sql": "account-install",

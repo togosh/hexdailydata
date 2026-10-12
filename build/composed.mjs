@@ -62,8 +62,29 @@ function checkWeb(base, name, baseUrl) {
   return refs;
 }
 
+export function checkSamples(base = root) {
+  const names = ['daily', 'stakes', 'holders', 'maturities', 'markets'];
+  const bounded = path => {
+    requireFile(base, path);
+    if (statSync(resolve(base, physical(path))).size > 16384) throw Error('Sample size bound');
+    return read(base, path);
+  };
+  const source = bounded('delivery/samples/MANIFEST.json');
+  const emitted = bounded('serving/dist/api/samples/MANIFEST.json');
+  if (!source.equals(emitted)) throw Error('Sample manifest differs');
+  const entries = JSON.parse(source).files;
+  for (const name of names) {
+    const original = bounded(`delivery/samples/${name}.csv`);
+    const output = bounded(`serving/dist/api/samples/${name}.csv`);
+    if (entries[name]?.bytes !== original.length || entries[name]?.sha256 !== hash(original) || !original.equals(output))
+      throw Error(`Sample integrity differs: ${name}`);
+  }
+  return ['MANIFEST.json', ...names.map(name => `${name}.csv`)];
+}
+
 export function checkOutputs(base = root) {
   checkInputs(base);
+  const samples = checkSamples(base);
   const assets = { serving: checkWeb(base, 'serving', '/'), account: checkWeb(base, 'account', '/account/') };
   if (!read(base, 'serving/docs/openapi.json').equals(read(base, 'serving/dist/web/openapi.json')))
     throw Error('Emitted OpenAPI differs from generated contract');
@@ -80,7 +101,7 @@ export function checkOutputs(base = root) {
   requireFile(base, 'serving/dist/api/main.js');
   requireFile(base, 'serving/dist/api/app.js');
   requireFile(base, 'account/dist/server/account-routes.js');
-  return { roots: manifest.roots, assets, sqlCopied: [...Object.keys(manifest.sqlAssets), ...manifest.additionalSqlCopies] };
+  return { roots: manifest.roots, assets, samples, sqlCopied: [...Object.keys(manifest.sqlAssets), ...manifest.additionalSqlCopies] };
 }
 
 export function build(base = root) {
@@ -101,6 +122,7 @@ export function build(base = root) {
     if (!bytes.equals(read(base, `serving/${path}`))) throw Error(`Generated contract changed: ${path}`);
   run('serving', ['node_modules/typescript/bin/tsc', '--noEmit']);
   run('serving', ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.build.json']);
+  run('serving', ['scripts/build-samples.mjs']);
   run('serving', ['node_modules/vite/bin/vite.js', 'build']);
   run('account', ['node_modules/typescript/bin/tsc']);
   run('account', ['node_modules/typescript/bin/tsc', '-p', 'tsconfig.ui.json']);
