@@ -81,7 +81,7 @@ test("cheap source/path/dependency checks refuse before creating an artifact or 
         sourceRoot: root,
         sourceMapFile: mapFile,
         sourceMapSha256: sha(b),
-        outputRoot: join(root, "artifact"),
+        outputRoot: root + "-artifact",
         dependencyRoot: root,
         profileFile,
       }),
@@ -106,7 +106,7 @@ test("cheap source/path/dependency checks refuse before creating an artifact or 
     /RELEASE_LOCAL_PATH/,
   );
   const absent = await import("node:fs/promises").then((fs) =>
-    fs.stat(join(root, "artifact")).then(
+    fs.stat(root + "-artifact").then(
       () => false,
       (e) => e.code === "ENOENT",
     ),
